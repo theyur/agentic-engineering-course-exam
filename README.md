@@ -41,8 +41,7 @@ HT.Domain  ←  HT.Application  ←  HT.Persistence
 | `HT.Persistence` | EF Core / SQL Server implementation of persistence contracts. |
 | `HT.Ui` | Blazor UI, authentication/authorization, application startup. |
 
-Layer rules are enforced by architecture tests. Details and rationale: [ARCHITECTURE.md](ARCHITECTURE.md).
-
+Layer rules will be enforced by architecture tests added with future feature tasks. Details and rationale: [ARCHITECTURE.md](ARCHITECTURE.md).
 ## Repository layout
 
 ```text
