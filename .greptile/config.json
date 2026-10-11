@@ -1,3 +1,4 @@
 {
+  "includeBranches": ["master"],
   "disabledLabels": ["skip-greptile"]
 }

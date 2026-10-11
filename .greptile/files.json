@@ -1,0 +1,16 @@
+{
+  "files": [
+    {
+      "path": "SPEC.md",
+      "description": "Product specification: source of truth for behavior, roles, business rules (grace period, excusals, pauses, streaks, consistency), privacy rules, non-goals, and open product questions that must not be decided silently."
+    },
+    {
+      "path": "ARCHITECTURE.md",
+      "description": "Architecture baseline: .NET 10 / Blazor Interactive Server / EF Core + SQL Server stack, Clean/Onion layer boundaries between HT.Domain, HT.Application, HT.Persistence and HT.Ui, testing requirements, and deliberately deferred technical choices."
+    },
+    {
+      "path": "CLAUDE.md",
+      "description": "Agent guidance: build/test commands, layer dependency rules, security/privacy boundary (admins must not access private tracking data), testing expectations, and docs/git conventions."
+    }
+  ]
+}
