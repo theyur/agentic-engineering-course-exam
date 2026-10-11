@@ -45,7 +45,7 @@ Use four production projects:
 - The runtime call flow may invoke infrastructure through abstractions defined inward; **runtime flow and source-code dependency direction are not identical**.
 - Keep business rules out of Blazor components and SQL-specific details out of Domain and Application.
 
-These boundaries must be enforced through tests, not only prose. The exact dependency-testing library is deferred.
+These boundaries must be enforced through tests, not only prose, using ArchUnitNET (see §6).
 
 ## 4. Web and security boundary
 
@@ -76,7 +76,12 @@ Testing is a part of feature completion, not an afterthought.
 | **Architecture** | Verify layer dependency rules and prevent business logic from crossing structural boundaries. |
 | **Selective UI** | Verify important Blazor interactions and authorization-sensitive experiences when useful. |
 
-Do not prescribe individual test cases, testing frameworks, test-project count, or end-to-end browser infrastructure at this stage. NetArchTest and ArchUnitNET are possible future architecture-testing choices, **not selected dependencies**.
+Selected testing libraries:
+
+- **xUnit** — test framework for unit, integration, and architecture tests.
+- **ArchUnitNET** (`TngTech.ArchUnitNET` + `TngTech.ArchUnitNET.xUnit`) — architecture tests: layer dependency rules and cross-boundary constraints (e.g., UI must not depend on persistence types; inward-defined abstractions are implemented only in outer layers).
+
+Do not prescribe individual test cases, test-project count, or end-to-end browser infrastructure at this stage.
 
 ## 7. Hosting and operation
 
@@ -106,7 +111,7 @@ Initial rationale stays in this document. **Do not create ADRs, tasks, domain-mo
 - Concrete use-case interfaces, services, component hierarchies, or endpoint contracts.
 - Authentication UX particulars, email verification, password recovery, and outbound email infrastructure decisions.
 - Timezone rules, scheduled evaluation mechanics, background processing, and caching.
-- Specific testing libraries and exact organization of test projects.
+- Exact organization of test projects; libraries for integration-test databases, mocking, and UI testing.
 - Azure service SKUs, deployment infrastructure, pipelines, and monitoring.
 - Production optimization and scaling strategy.
 
