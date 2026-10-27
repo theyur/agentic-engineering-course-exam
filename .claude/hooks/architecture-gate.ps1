@@ -1,5 +1,7 @@
 # Claude Code PreToolUse hook: reject Bash git commit attempts when ArchUnitNET fails.
 # Input is the JSON tool event supplied by Claude Code on stdin.
+# TEMP: invocation marker for testing the settings.json "if" condition; remove after testing.
+Add-Content -Path (Join-Path $env:TEMP 'architecture-gate.log') -Value "$(Get-Date -Format o) architecture-gate invoked"
 $ErrorActionPreference = 'Stop'
 
 try {
@@ -17,7 +19,7 @@ try {
     [Console]::Error.WriteLine('Architecture gate: running ArchUnitNET tests before git commit...')
     Push-Location $projectRoot
     try {
-        & dotnet test $testProject --configuration Debug --nologo --verbosity normal 1>&2
+        & dotnet test $testProject --configuration Debug --nologo --verbosity minimal 2>&1 | ForEach-Object { [Console]::Error.WriteLine($_) }
         if ($LASTEXITCODE -ne 0) {
             [Console]::Error.WriteLine('BLOCKED: architectural tests failed. Fix the dependency before committing; do not bypass or disable the gate.')
             exit 2

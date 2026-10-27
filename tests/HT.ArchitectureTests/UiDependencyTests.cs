@@ -1,6 +1,7 @@
 using ArchUnitNET.Domain;
 using ArchUnitNET.Fluent;
 using ArchUnitNET.Loader;
+using ArchUnitNET.xUnit;
 using HT.Persistence;
 using Xunit;
 
@@ -20,10 +21,10 @@ public sealed class UiDependencyTests
     public void BlazorComponentsMustNotDependOnPersistenceTypes()
     {
         var components = Types().That()
-            .ResideInNamespace("HT.Ui.Components", true);
+            .ResideInNamespaceMatching(@"^HT\.Ui\.Components(\..*)?$");
 
         var persistence = Types().That()
-            .ResideInNamespace("HT.Persistence", true);
+            .ResideInNamespaceMatching(@"^HT\.Persistence(\..*)?$");
 
         Types().That().Are(components)
             .Should().NotDependOnAny(persistence)
