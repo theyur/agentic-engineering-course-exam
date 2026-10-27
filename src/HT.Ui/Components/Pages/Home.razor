@@ -1,7 +1,11 @@
-﻿@page "/"
+@page "/"
+@using HT.Persistence
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Architecture Gate Demo</PageTitle>
 
 <h1>Hello, world!</h1>
 
-Welcome to your new app.
+<p>@(new DependencyViolationDemo().GetGreeting())</p>
+
+<p>This direct dependency from a Blazor component to Persistence is deliberate.
+It should build and run, but the architecture test should fail.</p>
