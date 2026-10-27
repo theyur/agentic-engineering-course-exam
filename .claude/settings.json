@@ -6,12 +6,23 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(git commit *)",
             "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/architecture-gate.ps1\"",
+            "if": "Bash(git commit *)",
             "timeout": 120
           }
         ]
       }
     ]
+  },
+  "extraKnownMarketplaces": {
+    "sdlc": {
+      "source": {
+        "source": "directory",
+        "path": "E:\\Personal\\agentic-engineering-course\\sdlc"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "sdlc@sdlc": true
   }
 }
