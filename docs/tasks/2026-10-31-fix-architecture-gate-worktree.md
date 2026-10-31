@@ -28,10 +28,13 @@ Run the tests in a **git `pre-commit` hook** (`.githooks/pre-commit`, enabled pe
 committed, so there is nothing to parse, and it covers every commit path (Bash, PowerShell,
 terminal, IDE). It blocks when the test project is missing.
 
-The Claude Code hook becomes a thin guard: it blocks commit commands that would skip the
-pre-commit hook (`--no-verify`, a short flag cluster containing `n`), that override
-`core.hooksPath` / `GIT_CONFIG_*`, or that run while the hook is not enabled. It errs towards
-blocking: text that merely looks like a commit is treated as one.
+The Claude Code hook becomes a thin guard over quote-aware tokens (no directory tracking): it
+blocks commit commands that would skip the pre-commit hook (`--no-verify` and abbreviations, a
+short flag cluster containing `n` among a commit's arguments, arguments from variables), that
+override `core.hooksPath` / `GIT_CONFIG_*` / `GIT_DIR` / `GIT_WORK_TREE`, that might commit outside
+this clone (every directory argument must be an absolute path inside one of its worktrees or a
+relative path without `..` — checking all of them avoids ordering logic), or that run while the
+hook is not enabled. It errs towards blocking.
 
 `settings.json`: Bash prefilter `Bash(git *)` (an `if` holds one rule and does not normalize git
 options) plus a `PowerShell` matcher without `if`. `.gitattributes` pins `.githooks/*` to LF

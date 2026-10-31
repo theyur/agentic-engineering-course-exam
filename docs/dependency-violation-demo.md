@@ -40,10 +40,15 @@ A Claude Code `PreToolUse` hook (`.claude/hooks/architecture-gate.ps1`) keeps
 Claude's own commits behind it. It does not run the tests; it blocks a commit
 command when:
 
-- it would skip the pre-commit hook: `--no-verify`, or a short flag cluster
-  containing `n` (`git commit -n` is `--no-verify`);
-- it overrides git config that could disable the hook (`core.hooksPath`,
-  `GIT_CONFIG_*`);
+- it would skip the pre-commit hook: `--no-verify` (or an abbreviation such as
+  `--no-veri`), a short flag cluster containing `n` among a commit's arguments
+  (`git commit -n` is `--no-verify`), or commit arguments taken from variables;
+- it overrides git config or the repository (`core.hooksPath`, `GIT_CONFIG_*`,
+  `GIT_DIR`, `GIT_WORK_TREE`);
+- it may commit outside this clone: every `cd` / `pushd` / `Set-Location` /
+  `git -C` / `--git-dir` / `--work-tree` argument must be an absolute path inside
+  one of the clone's worktrees, or a relative path without `..` (the hook setting
+  is per clone, so other clones cannot be vouched for);
 - the hook is not enabled (`core.hooksPath` is not `.githooks`).
 
 ## Try it
@@ -63,9 +68,10 @@ Limitations:
 - Outside Claude Code, `git commit --no-verify` still skips the hook, and a clone
   without `core.hooksPath` set has no gate. Branches created before the hook was
   added have no `.githooks/pre-commit`.
-- The Claude Code guard reads command text: phrases that look like a commit
-  (e.g. `echo "git commit"`) are treated as one, and `-n` inside a commit message
-  (`-m "add -name"`) is blocked; rephrase or spell out flags.
+- The Claude Code guard reads command text and errs towards blocking: any
+  unquoted `-C <dir>` (also `make -C`) or `cd ..` in a commit command is checked,
+  and `git commit -m $(date)` is blocked; use absolute paths and quote arguments.
+  Git aliases (`git ci -n`) are not recognized as commits.
 
 The gate is not a security boundary or a replacement for CI. Do not use
 `--no-verify` or disable either hook as a supposed fix.
