@@ -7,7 +7,6 @@
           {
             "type": "command",
             "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/architecture-gate.ps1\"",
-            "if": "Bash(git *)",
             "timeout": 120
           }
         ]

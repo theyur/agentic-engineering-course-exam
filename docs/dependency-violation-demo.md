@@ -37,19 +37,31 @@ git config core.hooksPath .githooks
 ```
 
 A Claude Code `PreToolUse` hook (`.claude/hooks/architecture-gate.ps1`) keeps
-Claude's own commits behind it. It does not run the tests; it blocks a commit
-command when:
+Claude's own commits behind it. It does not run the tests; it only stops Claude
+from skipping the hook. It is an **allowlist**: in any Bash or PowerShell command
+that mentions git or commit, every simple command must be one it can fully check,
+and anything else is blocked with a message saying how to rephrase:
 
-- it would skip the pre-commit hook: `--no-verify` (or an abbreviation such as
-  `--no-veri`), a short flag cluster containing `n` among a commit's arguments
-  (`git commit -n` is `--no-verify`), or commit arguments taken from variables;
-- it overrides git config or the repository (`core.hooksPath`, `GIT_CONFIG_*`,
-  `GIT_DIR`, `GIT_WORK_TREE`);
-- it may commit outside this clone: every `cd` / `pushd` / `Set-Location` /
-  `git -C` / `--git-dir` / `--work-tree` argument must be an absolute path inside
-  one of the clone's worktrees, or a relative path without `..` (the hook setting
-  is per clone, so other clones cannot be vouched for);
-- the hook is not enabled (`core.hooksPath` is not `.githooks`).
+- `git` written plainly, with literal arguments. Allowed git options before the
+  subcommand: `-C <dir>`, `--no-pager`, `-P`/`-p`; `-c`, `--config-env`,
+  `--git-dir`, `--work-tree` and git aliases are blocked. A commit's arguments are
+  read like git reads them: `--no-verify` (or `--no-veri…`), `-n` in a short flag
+  cluster, or an argument that could expand into a flag (variables, globs,
+  escapes, mixed quoting, PowerShell expressions) is blocked.
+- `cd` / `pushd` / `Set-Location` / `git -C` paths must stay inside this clone
+  (`core.hooksPath` is per clone): an absolute path in one of its worktrees, or a
+  relative path without `..`.
+- Shells and evaluators (`sh`, `bash`, `eval`, `source`, `pwsh`, `iex`, …) are not
+  allowed next to git; `xargs`, `env`, `find`, `Start-Process` and the like are
+  blocked when they could run git. Heredoc and `@'…'@` bodies are message data,
+  unless they feed a shell, or expand `$( )` / backticks.
+- `core.hooksPath`, `include.path`, `GIT_*` environment overrides and `PATH`
+  changes are blocked, and so is any commit while the hook is not enabled.
+
+The guard was verified with a differential oracle: each test command was run
+through the real shell against a fake `git.exe` that records the exact arguments,
+working directory and environment git would receive, and that ground truth was
+compared with the guard's verdict (215 commands, no bypass found).
 
 ## Try it
 
@@ -68,10 +80,11 @@ Limitations:
 - Outside Claude Code, `git commit --no-verify` still skips the hook, and a clone
   without `core.hooksPath` set has no gate. Branches created before the hook was
   added have no `.githooks/pre-commit`.
-- The Claude Code guard reads command text and errs towards blocking: any
-  unquoted `-C <dir>` (also `make -C`) or `cd ..` in a commit command is checked,
-  and `git commit -m $(date)` is blocked; use absolute paths and quote arguments.
-  Git aliases (`git ci -n`) are not recognized as commits.
+- The guard errs towards blocking: unusual but harmless shapes (`xargs git`,
+  `cd ..`, git by absolute path, `git commit -m $(date)` without quotes, variables
+  in PowerShell git commands) are refused with a message. A script file that runs
+  git internally, started by a separate command that doesn't mention git, is out
+  of its sight.
 
 The gate is not a security boundary or a replacement for CI. Do not use
 `--no-verify` or disable either hook as a supposed fix.

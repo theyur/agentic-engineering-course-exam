@@ -28,17 +28,25 @@ Run the tests in a **git `pre-commit` hook** (`.githooks/pre-commit`, enabled pe
 committed, so there is nothing to parse, and it covers every commit path (Bash, PowerShell,
 terminal, IDE). It blocks when the test project is missing.
 
-The Claude Code hook becomes a thin guard over quote-aware tokens (no directory tracking): it
-blocks commit commands that would skip the pre-commit hook (`--no-verify` and abbreviations, a
-short flag cluster containing `n` among a commit's arguments, arguments from variables), that
-override `core.hooksPath` / `GIT_CONFIG_*` / `GIT_DIR` / `GIT_WORK_TREE`, that might commit outside
-this clone (every directory argument must be an absolute path inside one of its worktrees or a
-relative path without `..` — checking all of them avoids ordering logic), or that run while the
-hook is not enabled. It errs towards blocking.
+The Claude Code hook becomes a guard that only stops Claude from skipping the pre-commit hook.
+Its first versions recognized bad shapes (a denylist over command text); each review round found
+another shell construct it misread. It is now an **allowlist**: in a command that mentions git or
+commit, every simple command must be one it can fully check — plain `git` with literal arguments
+(no `-c` / `--config-env` / `--git-dir` / `--work-tree` / aliases; commit arguments read like git
+reads them, nothing that could expand into a flag), a directory change that stays inside this
+clone, or a command that cannot run git (shells, `eval`, `iex` are never allowed next to git).
+Heredoc bodies are message data unless they feed a shell or expand. Anything else is blocked.
 
-`settings.json`: Bash prefilter `Bash(git *)` (an `if` holds one rule and does not normalize git
-options) plus a `PowerShell` matcher without `if`. `.gitattributes` pins `.githooks/*` to LF
-(the repo uses `core.autocrlf=true`; a CRLF shebang breaks `sh`).
+Verification: a differential oracle (scratch tooling, not committed) ran each test command through
+real Git Bash / pwsh with a fake `git.exe` first on PATH that records the exact argv, cwd and
+`GIT_*` environment, and compared that ground truth with the guard's verdict: 215 commands
+(realistic commit commands, one case per rule, and three fresh adversarial rounds), no bypass;
+realistic commands raise no false positives.
+
+`settings.json`: both the Bash and PowerShell entries run the guard for every command, without an
+`if` prefilter — an `if` such as `Bash(git *)` would not fire for `sh -c '…'`. The script exits in
+~0.25 s when a command does not mention git. `.gitattributes` pins `.githooks/*` to LF (the repo
+uses `core.autocrlf=true`; a CRLF shebang breaks `sh`).
 
 Trade-offs accepted: each clone needs the one-time `core.hooksPath` setting; outside Claude Code
 `git commit --no-verify` still skips the hook (CI remains the authoritative check).
