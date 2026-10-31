@@ -13,7 +13,7 @@ public sealed class UiDependencyTests
 {
     private static readonly Architecture Architecture = new ArchLoader()
         .LoadAssemblies(
-            typeof(DependencyViolationDemo).Assembly,
+            typeof(PersistenceAssemblyMarker).Assembly,
             typeof(HT.Ui.Components.App).Assembly)
         .Build();
 

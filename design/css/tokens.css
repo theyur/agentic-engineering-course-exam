@@ -1,0 +1,58 @@
+/* Habit Tracker — generated from tokens.json */
+:root, [data-theme="light"] {
+  --bg: #f3f4f8;
+  --surface: #ffffff;
+  --surface-2: #e9ecf4;
+  --line: #dde1ec;
+  --line-strong: #7c8399;
+  --ink: #161b2e;
+  --ink-muted: #565d73;
+  --accent: #2b479a;
+  --accent-hover: #223b82;
+  --accent-soft: #e3e9f8;
+  --on-accent: #ffffff;
+  --met: #2f6b4f;
+  --failed: #b03a2e;
+  --missed: var(--failed);
+  --danger: var(--failed);
+  --pending: #85570b;
+  --pending-soft: #f8ecd5;
+  --excused: #5c5a66;
+  --paused: #d6dae6;
+  --overlay: rgba(22,27,46,0.45);
+  --shadow-card: 0 1px 3px rgba(22,27,46,.06), 0 6px 16px rgba(22,27,46,.04);
+  --shadow-raised: 0 2px 6px rgba(22,27,46,.08), 0 12px 28px rgba(22,27,46,.08);
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 18px;
+  --space-6: 24px;
+  --space-7: 40px;
+  --space-8: 48px;
+  --radius-chip: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-full: 999px;
+  --container-max: 1040px;
+  --nav-height: 60px;
+  --control-height: 38px;
+  --font-head: "Sora", system-ui, sans-serif;
+  --font-body: "Source Sans 3", system-ui, sans-serif;
+}
+.display { font-family: var(--font-head); font-size: 40px; line-height: 44px; font-weight: 600; letter-spacing: -0.02em; }
+.heading-1 { font-family: var(--font-head); font-size: 28px; line-height: 34px; font-weight: 600; letter-spacing: -0.02em; }
+.heading-2 { font-family: var(--font-head); font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; }
+.heading-3 { font-family: var(--font-head); font-size: 18px; line-height: 24px; font-weight: 600; }
+.title { font-family: var(--font-head); font-size: 17px; line-height: 22px; font-weight: 600; }
+.stat-large { font-family: var(--font-head); font-size: 28px; line-height: 32px; font-weight: 600; }
+.stat { font-family: var(--font-head); font-size: 26px; line-height: 30px; font-weight: 600; }
+.stat-small { font-family: var(--font-head); font-size: 18px; line-height: 24px; font-weight: 600; }
+.body-large { font-family: var(--font-body); font-size: 17px; line-height: 26px; font-weight: 400; }
+.body { font-family: var(--font-body); font-size: 15px; line-height: 22px; font-weight: 400; }
+.body-strong { font-family: var(--font-body); font-size: 15px; line-height: 22px; font-weight: 600; }
+.small { font-family: var(--font-body); font-size: 13px; line-height: 18px; font-weight: 400; }
+.label { font-family: var(--font-body); font-size: 12px; line-height: 16px; font-weight: 700; }
+.eyebrow { font-family: var(--font-body); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: 0.07em; }

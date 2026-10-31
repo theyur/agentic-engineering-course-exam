@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/ht-components.css"><title>PageProfile — preview</title></head>
+<body>
+<div class="ht ht-page">
+<header class="ht-nav"><div class="ht-nav__inner"><a class="ht-nav__brand" href="#">Habit Tracker</a><nav class="ht-nav__links" aria-label="Main"><a href="#">Today</a><a href="#">Goals</a><a href="#">Catalog</a><a href="#">Community</a></nav><div class="ht-nav__end"><a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="#">+ New goal</a><span class="ht-avatar" aria-label="Account menu">YD</span><button class="ht-nav__menu-btn" aria-label="Menu" aria-expanded="false"><svg class="ht-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg></button></div></div></header>
+<main class="ht-container">
+  <div class="ht-page-head" style="align-items:center"><span class="ht-avatar ht-avatar--lg">YD</span><div><h1 style="font-size:24px;line-height:30px">Yuri Derevianko</h1><span class="ht-muted">yuri@example.com · member since July 2026</span></div></div>
+  <div class="ht-tabs" role="tablist">
+    <button class="ht-tab" role="tab" aria-selected="false">Account</button>
+    <button class="ht-tab" role="tab" aria-selected="true">Community</button>
+    <button class="ht-tab" role="tab" aria-selected="false">Goal history<span class="ht-count">4</span></button>
+    <button class="ht-tab" role="tab" aria-selected="false">Custom habits<span class="ht-count">3</span></button>
+  </div>
+  <div class="ht-grid-2">
+    <section class="ht-card ht-stack">
+      <div style="display:flex;align-items:flex-start;gap:12px"><div style="flex:1"><h2 class="ht-card__title">Take part in community comparison</h2><p class="ht-card__sub" style="margin:0">Off by default. When you stop, you are removed from bands and statistics; your private history stays.</p></div><button class="ht-toggle" role="switch" aria-checked="true" aria-label="Take part in community comparison"></button></div>
+      <label class="ht-field"><span class="ht-field__label">Public display name</span><input class="ht-input" value="Yuri D."><span class="ht-field__help">Shown in Consistency Bands. Your email is never shown.</span></label>
+      <div style="display:flex;gap:8px"><button class="ht-btn ht-btn--primary">Save</button><button class="ht-btn ht-btn--secondary">Cancel</button></div>
+    </section>
+    <section class="ht-card">
+      <h2 class="ht-card__title">What others can see</h2>
+      <div class="ht-goal"><b>Your public name</b> in one Consistency Band</div>
+      <div class="ht-goal"><b>An anonymous share</b> in catalog habit statistics</div>
+      <div class="ht-goal"><b>Never:</b> your goals, records, notes or custom habits</div>
+      <div class="ht-goal" style="display:flex;align-items:baseline;gap:8px"><span class="ht-muted">Your band now</span><span class="ht-spacer"></span><span class="ht-num" style="font-size:22px">70%+</span></div>
+    </section>
+  </div>
+</main>
+<footer class="ht-footer"><div class="ht-footer__inner"><span>Habit Tracker · Agentic Engineering course project</span><span class="ht-spacer"></span><a href="#">Privacy</a><a href="#">Send feedback</a></div></footer>
+</div>
+</body>
+</html>

@@ -1,16 +1,15 @@
 # Claude Code architecture-gate demo
 
-This branch intentionally has a **failing architectural test**. Do not merge the
-violation into the production branch.
+The deliberate violation that demonstrated the gate (Home page creating
+`HT.Persistence.DependencyViolationDemo`, introduced in PR #3) has been
+removed; the architecture test now passes. To re-run the demo, reintroduce a
+direct Persistence dependency in a Blazor component on a throwaway branch.
 
-## Rule and deliberate violation
+## Rule
 
 `HT.Ui` is the composition root and may reference `HT.Persistence` for
 dependency-injection registration. **Blazor components** under
 `HT.Ui.Components` must not depend on concrete Persistence types.
-
-The Home page directly creates `HT.Persistence.DependencyViolationDemo`.
-This compiles and renders, but breaks that rule.
 
 ## Test manually
 
@@ -21,8 +20,8 @@ dotnet build HabitTracker.slnx
 dotnet test tests/HT.ArchitectureTests/HT.ArchitectureTests.csproj -c Debug
 ```
 
-Expected: **build succeeds; architecture test fails**. The failing test is
-intentional, not a setup error.
+Expected: **build succeeds; architecture test passes**. With a violation
+reintroduced, the build still succeeds but the test fails.
 
 ## Try the Claude Code hook
 
