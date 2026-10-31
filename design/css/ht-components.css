@@ -238,7 +238,7 @@
 .ht-seg button:hover { background:var(--surface-2); }
 .ht-seg button[aria-pressed="true"] { background:var(--accent); color:var(--on-accent); }
 .ht-seg button:focus-visible { outline-offset:-2px; }
-.ht-seg button[aria-pressed="true"]:focus-visible { outline-color:var(--on-accent); }
+.ht-seg button[aria-pressed="true"]:focus-visible { outline-color:var(--on-accent); outline-offset:-4px; }
 
 /* ---------- choice cards (radio as cards) ---------- */
 .ht-choices { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:var(--space-2); }
