@@ -88,7 +88,7 @@
 .ht-strip { display:grid; grid-template-columns:repeat(15,1fr); gap:3px; }
 .ht-strip__cell { aspect-ratio:1; border-radius:3px; display:block; }
 .ht-cell--met { background:var(--met); }
-.ht-cell--failed { background:var(--failed); }
+.ht-cell--failed { background:linear-gradient(to top right, transparent calc(50% - 1px), var(--surface) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)), var(--failed); }
 .ht-cell--missed { background:repeating-linear-gradient(45deg,var(--missed) 0 2px,transparent 2px 5px); border:1.5px solid var(--missed); }
 .ht-cell--excused { border:1.5px dashed var(--excused); }
 .ht-cell--paused { background:var(--paused); }
@@ -237,6 +237,8 @@
 .ht-seg button:first-child { border-left:0; }
 .ht-seg button:hover { background:var(--surface-2); }
 .ht-seg button[aria-pressed="true"] { background:var(--accent); color:var(--on-accent); }
+.ht-seg button:focus-visible { outline-offset:-2px; }
+.ht-seg button[aria-pressed="true"]:focus-visible { outline-color:var(--on-accent); }
 
 /* ---------- choice cards (radio as cards) ---------- */
 .ht-choices { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:var(--space-2); }
@@ -256,6 +258,7 @@
 .ht-stepper { display:inline-flex; align-items:stretch; border:1px solid var(--line-strong); border-radius:var(--radius-sm); overflow:hidden; background:var(--surface); }
 .ht-stepper button { font:inherit; font-size:18px; font-weight:600; width:40px; border:0; background:var(--surface-2); color:var(--ink); cursor:pointer; }
 .ht-stepper button:hover { background:var(--line); }
+.ht-stepper > :focus-visible { outline-offset:-2px; }
 .ht-stepper input { font:inherit; font-weight:600; width:64px; text-align:center; border:0; border-left:1px solid var(--line-strong); border-right:1px solid var(--line-strong); color:var(--ink); background:var(--surface); min-height:36px; font-variant-numeric:tabular-nums; }
 .ht-unit { font-size:14px; color:var(--ink-muted); }
 

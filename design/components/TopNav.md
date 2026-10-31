@@ -10,5 +10,5 @@ The top navigation bar of layout A: product name on the left, main links, accoun
 ## Rules
 - Mark the current page with `aria-current="page"` on its link (shows the `accent` underline).
 - Height `nav-height` (60px), white `surface` with a `line` bottom border. Content is centered at `container-max`.
-- Under 860px the links are hidden and a menu button appears; see MobileNav.
+- Under 860px the links are hidden and a menu button appears; see MobileNav. Visitor "Sign in" and "Register" carry `ht-hide-sm` and move into the menu.
 - The product has no logo yet: set "Habit Tracker" in plain `heading` type, no mark.

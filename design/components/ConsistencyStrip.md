@@ -5,12 +5,13 @@ A grid of small squares, one per commitment or period, oldest first, showing how
 | Cell class | Shape | Meaning |
 |---|---|---|
 | `ht-cell--met` | solid `met` | Met |
-| `ht-cell--failed` | solid `failed` | Failed |
+| `ht-cell--failed` | solid `failed` with a light diagonal slash | Failed |
 | `ht-cell--missed` | hatched `missed` with border | Missed |
 | `ht-cell--excused` | dashed outline | Excused |
 | `ht-cell--paused` | light `paused` fill | Paused |
 | `ht-cell--pending` | dotted outline on `pending-soft` | Pending |
 
+- Every state must differ by shape, not only colour (Met and Failed have near-identical luminance).
 - 15 columns; 30 cells = last 30 commitments or periods. Always show the legend under it.
 - Give the grid `role="img"` and an `aria-label` that counts each state.
 - Each cell can have a `title` with the date and the recorded amount.

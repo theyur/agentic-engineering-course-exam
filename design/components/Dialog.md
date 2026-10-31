@@ -9,6 +9,7 @@ A modal window for short tasks that belong to the current page: Record, Add note
 
 ## Rules
 - Title says the action and the object: "Record · Reading", "Excuse this commitment?".
+- The title's `id` (target of `aria-labelledby`) must be unique on the page; in Blazor generate it per `HtDialog` instance, never a fixed string.
 - Explain the effect in plain words before a confirm button (Excuse, End goal, Pause).
 - Focus goes to the first field on open, Esc and × close it, focus returns to the button that opened it.
 - On phones the dialog takes the full width minus 16px.
