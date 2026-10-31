@@ -8,6 +8,6 @@ if (!string.IsNullOrEmpty(log))
         .Where(k => k.StartsWith("GIT_", StringComparison.OrdinalIgnoreCase))
         .ToDictionary(k => k, Environment.GetEnvironmentVariable);
     var record = new { cwd = Environment.CurrentDirectory, args, env };
-    File.AppendAllText(log, JsonSerializer.Serialize(record) + "\n");
+    await File.AppendAllTextAsync(log, JsonSerializer.Serialize(record) + "\n");
 }
 return 0;

@@ -34,11 +34,16 @@ case, `-GuardPath <file>` to test another version of the guard, `-KeepSandbox` t
 throwaway worktree for inspection.
 
 Requirements: Windows with Git for Windows (Git Bash is located from `git` on `PATH`, or pass
-`-Bash`), PowerShell 7, .NET 10 SDK (the fake git is built on first run into `shim/bin/`).
+`-Bash`), PowerShell 7, .NET 10 SDK (the fake git is built on first run into `shim/bin/`). The
+clone's own `core.hooksPath` setting does not matter: the guard is judged as if the pre-commit hook
+is enabled (`core.hooksPath=.githooks` is passed to it for the run only).
 
-Safety: commands run in `.claude/worktrees/guard-oracle-sandbox` (gitignored, removed after the
-run), and the run aborts unless the fake git demonstrably intercepts `git` in both shells, so the
-real git is never reached by test commands. Still, do not put destructive commands in case files.
+Safety: test commands run in `.claude/worktrees/guard-oracle-sandbox`, a plain folder (not a
+repository; gitignored, removed after the run). They get `GIT_DIR` pointing to a folder that does
+not exist and `GIT_CEILING_DIRECTORIES` above the sandbox, so even a real git they reach by absolute
+path finds no repository. Before the cases, the run aborts unless the fake git intercepts `git` in
+both shells and the real git cannot reach a repository; after every case it aborts if any branch
+head of this clone moved. Still, do not put destructive commands in case files.
 
 ## Cases
 

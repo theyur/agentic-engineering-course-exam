@@ -37,16 +37,20 @@ if (-not (Test-Path $shimExe) -or (Get-Item (Join-Path $shimProject 'Program.cs'
 }
 $shimBash = if ($IsWindows) { '/' + $shim.Substring(0, 1).ToLower() + ($shim.Substring(2) -replace '\\', '/') } else { $shim }
 
-if (-not (Test-Path (Join-Path $sandbox '.git'))) {
-    git -C $repoRoot worktree add -q --detach $sandbox HEAD
-    if ($LASTEXITCODE -ne 0) { throw "could not create sandbox worktree $sandbox" }
-}
+# The sandbox is a plain folder inside this clone (so the guard sees it as in the clone), not a repository.
+# Test commands get GIT_DIR pointing nowhere and a ceiling above the sandbox, so a real git they reach
+# (e.g. by absolute path) finds no repository to change. The fake git ignores both.
+New-Item -ItemType Directory -Force $sandbox | Out-Null
+$sandbox = (Resolve-Path $sandbox).Path
 $sandboxBash = if ($IsWindows) { '/' + $sandbox.Substring(0, 1).ToLower() + ($sandbox.Substring(2) -replace '\\', '/') } else { $sandbox }
+$decoyGitDir = Join-Path $sandbox '.no-repository'
 
-$roots = @(git -C $sandbox worktree list --porcelain | Where-Object { $_ -like 'worktree *' } |
+$roots = @(git -C $repoRoot worktree list --porcelain | Where-Object { $_ -like 'worktree *' } |
     ForEach-Object { [IO.Path]::GetFullPath($_.Substring(9)).TrimEnd('\', '/') + $sep })
+# Watchdog: no test may move HEAD in any worktree of this clone.
+function Get-HeadSnapshot { ($roots | ForEach-Object { "$_=$(git -C $_ rev-parse HEAD 2>$null)" }) -join ';' }
 $aliases = @{}
-git -C $sandbox config --get-regexp '^alias\.' 2>$null | ForEach-Object { $k, $v = $_ -split ' ', 2; $aliases[$k.Substring(6)] = $v }
+git -C $repoRoot config --get-regexp '^alias\.' 2>$null | ForEach-Object { $k, $v = $_ -split ' ', 2; $aliases[$k.Substring(6)] = $v }
 
 $commitLong = @('quiet', 'verbose', 'file', 'author', 'date', 'message', 'reedit-message', 'reuse-message', 'fixup', 'squash',
     'reset-author', 'trailer', 'signoff', 'template', 'edit', 'cleanup', 'status', 'gpg-sign', 'no-verify', 'verify', 'dry-run',
@@ -100,6 +104,7 @@ function Get-Violations($record) {
 
     foreach ($key in $record.env.PSObject.Properties.Name) {
         $value = [string]$record.env.$key
+        if ($key -match '(?i)^GIT_DIR$' -and [IO.Path]::GetFullPath($value) -eq $decoyGitDir) { continue }
         if ($key -match '(?i)^GIT_(DIR|WORK_TREE|COMMON_DIR)$') { $v += "environment override $key" }
         elseif ($key -match '(?i)^GIT_CONFIG_(GLOBAL|SYSTEM)$|^GIT_CONFIG$') { $v += "config file override $key=$value" }
         elseif ($key -match '(?i)^GIT_CONFIG_KEY_\d+$' -and $value -match '(?i)^(core\.hookspath|include\.|includeif\.)') { $v += "config override $key=$value" }
@@ -153,6 +158,8 @@ function Invoke-Truth([string]$command, [string]$tool) {
     $psi.Environment['PATH'] = $shim + [IO.Path]::PathSeparator + $env:PATH
     $psi.Environment['ORACLE_LOG'] = $log
     foreach ($k in @($psi.Environment.Keys)) { if ($k -match '^GIT_') { $psi.Environment.Remove($k) | Out-Null } }
+    $psi.Environment['GIT_DIR'] = $decoyGitDir
+    $psi.Environment['GIT_CEILING_DIRECTORIES'] = Split-Path $sandbox
     $p = [Diagnostics.Process]::Start($psi)
     $p.StandardInput.Close()
     $stderr = $p.StandardError.ReadToEndAsync(); $null = $p.StandardOutput.ReadToEndAsync()
@@ -160,13 +167,17 @@ function Invoke-Truth([string]$command, [string]$tool) {
     if ($timedOut) { $p.Kill($true) }
     $records = @(Get-Content $log -ErrorAction SilentlyContinue | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json })
     Remove-Item $log -ErrorAction SilentlyContinue
-    [pscustomobject]@{ Records = $records; TimedOut = $timedOut; Stderr = ($stderr.Result -split "`n" | Select-Object -First 2) -join ' | ' }
+    [pscustomobject]@{ Records = $records; TimedOut = $timedOut; ExitCode = ($timedOut ? $null : $p.ExitCode)
+        Stderr = ($stderr.Result -split "`n" | Select-Object -First 2) -join ' | ' }
 }
 
 function Invoke-Guard([string]$command, [string]$tool) {
     $json = @{ cwd = $sandbox; hook_event_name = 'PreToolUse'; tool_name = $tool; tool_input = @{ command = $command } } | ConvertTo-Json -Compress
-    $out = $json | pwsh -NoProfile -File $GuardPath 2>&1
-    [pscustomobject]@{ Exit = $LASTEXITCODE; Reason = (($out | Select-String 'BLOCKED') -join ' ') }
+    # Judge the guard as if the pre-commit hook is enabled, whatever this clone's own setting is.
+    $env:GIT_CONFIG_COUNT = '1'; $env:GIT_CONFIG_KEY_0 = 'core.hooksPath'; $env:GIT_CONFIG_VALUE_0 = '.githooks'
+    try { $out = $json | pwsh -NoProfile -File $GuardPath 2>&1; $exit = $LASTEXITCODE }
+    finally { Remove-Item Env:GIT_CONFIG_COUNT, Env:GIT_CONFIG_KEY_0, Env:GIT_CONFIG_VALUE_0 }
+    [pscustomobject]@{ Exit = $exit; Reason = (($out | Select-String 'BLOCKED') -join ' ') }
 }
 
 function Expand-Placeholders([string]$command) {
@@ -183,6 +194,11 @@ try {
             throw "fake git did not intercept 'git' under $tool; aborting. $($probe.Stderr)"
         }
     }
+    # Self-check: the real git, reached by absolute path, must find no repository from the sandbox.
+    $realGit = (Get-Command git -CommandType Application | Select-Object -First 1).Source
+    $probe = Invoke-Truth "& '$realGit' rev-parse --git-dir" 'PowerShell'
+    if ($probe.ExitCode -eq 0) { throw "real git can reach a repository from the sandbox; aborting." }
+    $heads = Get-HeadSnapshot
 
     foreach ($file in $CasesFile) {
         $counts = [ordered]@{ OK = 0; BYPASS = 0; EXPECT_FAIL = 0; UNKNOWN = 0; FALSE_POSITIVE = 0 }
@@ -192,6 +208,7 @@ try {
             $command = Expand-Placeholders $case.cmd
             $verdict = Invoke-Guard $command $tool
             $truth = Invoke-Truth $command $tool
+            if ((Get-HeadSnapshot) -ne $heads) { throw "a test command changed a branch head in this clone; aborting: $($case.cmd)" }
             $violations = @($truth.Records | ForEach-Object { Get-Violations $_ })
             $allowed = $verdict.Exit -eq 0
             $class = if ($violations.Count -and $allowed) { 'BYPASS' }
@@ -213,7 +230,7 @@ try {
     }
 }
 finally {
-    if (-not $KeepSandbox) { git -C $repoRoot worktree remove --force $sandbox 2>$null | Out-Null }
+    if (-not $KeepSandbox) { Remove-Item -Recurse -Force $sandbox -ErrorAction SilentlyContinue }
 }
 if ($failures) { "FAILED: $failures case(s)"; exit 1 }
 'PASSED'
