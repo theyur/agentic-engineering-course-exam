@@ -17,10 +17,18 @@ Also:
 
 ## Decision
 
-Resolve the repository from the command itself: start at the hook input's `cwd`, apply each
-`cd` / `pushd` before the commit, then each `git -C <dir>`; test the `git rev-parse
---show-toplevel` of that directory. Fail closed (block) if it cannot be resolved; skip (allow)
-only when the resolved repository has no architecture test project, i.e. it is another repo.
+Resolve the repositories from the command itself: start at the hook input's `cwd` and walk the
+command's segments in order, tracking `cd` / `pushd` / `popd` (and PowerShell equivalents) and
+subshells, skipping heredoc / here-string bodies; for **every** `git … commit`, apply its
+`-C <dir>` options and test the `git rev-parse --show-toplevel` of that directory. Fail closed
+(block) on anything unresolvable — missing directory, non-repo, `popd` with an empty stack,
+`--git-dir` / `--work-tree`; skip (allow) only a resolved repository without the architecture test
+project, i.e. another repo.
+
+Review (PR #6): attached `-C<path>` was reported as bypassing the gate; git 2.56 rejects it
+(`unknown option: -C.`, exit 129), so the commit fails before the gate matters. `popd` tracking and
+multiple commit targets were real gaps and are fixed, as is `--git-dir <path>` / `--work-tree
+<path>` (separate-argument form previously skipped the gate).
 
 Hook registration (`settings.json`): a per-hook `if` holds exactly one permission rule and does
 not normalize git global options, so the Bash prefilter widens to `Bash(git *)` (the script drops
@@ -40,4 +48,7 @@ only documented for Bash); the script exits in ~0.25 s for non-commit calls.
 
 - `PreToolUse` runs once before the whole Bash command, so `git apply x && git commit` is tested
   against the tree before `git apply`. Run such steps as separate commands.
-- Directory changes via variables or subshells (`cd "$DIR"`, `cd $(…)`) are not evaluated.
+- Directory changes via variables (`cd "$DIR"`, `cd $(…)`) are not evaluated; the commit is
+  blocked instead.
+- No full shell parser: a separator inside a quoted argument can create pseudo-commands, which
+  can only add tests or block.

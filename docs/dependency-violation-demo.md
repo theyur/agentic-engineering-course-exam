@@ -37,18 +37,23 @@ reintroduced, the build still succeeds but the test fails.
 
 The hook gates `git commit` run through Claude's Bash and PowerShell tools,
 including `git -C <dir> commit` and other git options before `commit`. It tests
-the repository the commit runs in: it starts at the session's working directory
-(a git worktree, in worktree sessions), then follows each `cd` / `pushd` /
-`Set-Location` before the commit and each `git -C <dir>`. If that directory is
-missing or not a git repository, the commit is blocked; a repository without
-`tests/HT.ArchitectureTests` is skipped.
+the repository **every** commit in the command runs in: it starts at the
+session's working directory (a git worktree, in worktree sessions) and walks the
+command in order, following `cd` / `pushd` / `popd` / `Set-Location` /
+`Push-Location` / `Pop-Location`, subshells `( … )` and each `git -C <dir>`;
+heredoc and here-string bodies are ignored. If a target directory is missing or
+not a git repository, or `--git-dir` / `--work-tree` is used, the commit is
+blocked; a repository without `tests/HT.ArchitectureTests` is skipped.
 
 Limitations:
 
 - The hook runs once, **before** the whole command. In `git apply x && git commit`
   the tests see the tree before `git apply`; run such steps as separate commands.
-- Directory changes through variables or subshells (`cd "$DIR"`, `cd $(...)`) are
-  not evaluated.
+- Directory changes through variables (`cd "$DIR"`, `cd $(...)`) are not
+  evaluated; such a commit is blocked rather than guessed.
+- The command is split on shell separators without full shell parsing, so a
+  separator inside a quoted argument can produce extra pseudo-commands; this can
+  only add tests or block, never skip one.
 - The script itself is loaded from `$CLAUDE_PROJECT_DIR` (the main checkout), so
   changes to the hook take effect once they are in the main checkout.
 - It checks the working tree, not exclusively staged changes, and does **not**
