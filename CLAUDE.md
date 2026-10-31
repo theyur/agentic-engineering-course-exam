@@ -46,6 +46,12 @@ C# / .NET 10, Blazor Interactive Server, EF Core + SQL Server (only provider —
 
 A feature is not done without tests: unit (domain rules — targets, grace period, corrections, pauses, consistency, streaks), integration (workflows against real SQL Server), architecture (layer deps), selective UI where useful. Use xUnit for all tests and ArchUnitNET for architecture tests.
 
+## Commits
+
+- Commits run the architecture tests via `.githooks/pre-commit`. Enable it once per clone: `git config core.hooksPath .githooks`. Never use `--no-verify` / `-n`; fix the failing test.
+- A Claude Code guard (`.claude/hooks/architecture-gate.ps1`) blocks commit commands it cannot fully check. Write them plainly: `git commit -m "..."` or `git commit -F - <<'EOF'` (quoted delimiter); no `sh -c` / `eval`, variables or `-c` options in git commands; use absolute paths inside the clone for `cd` / `git -C`.
+- Hook scripts load from the main checkout (`$CLAUDE_PROJECT_DIR`): changes under `.claude/hooks/` take effect only once they're in the main checkout.
+
 ## Docs and git workflow
 
 - `docs/tasks/` — task specs, date-prefixed: `2026-10-11-implement-auth.md`.
