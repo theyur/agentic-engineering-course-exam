@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/ht-components.css"><title>PageCatalogVisitor — preview</title></head>
+<body>
+<div class="ht ht-page">
+<header class="ht-nav"><div class="ht-nav__inner"><a class="ht-nav__brand" href="#">Habit Tracker</a><nav class="ht-nav__links" aria-label="Main"><a href="#" aria-current="page">Catalog</a><a href="#">Community</a></nav><div class="ht-nav__end"><a class="ht-btn ht-btn--ghost" href="#">Sign in</a><a class="ht-btn ht-btn--primary ht-btn--sm" href="#">Register</a><button class="ht-nav__menu-btn" aria-label="Menu" aria-expanded="false"><svg class="ht-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg></button></div></div></header>
+<main class="ht-container">
+  <div class="ht-page-head"><h1>Habit catalog</h1><span class="ht-spacer"></span><div class="ht-search" style="width:260px"><svg class="ht-icon ht-icon--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg><input class="ht-input" type="search" placeholder="Search habits" aria-label="Search habits"></div></div>
+  <div class="ht-notice" style="margin-bottom:16px"><span>Ideas to start from. <b>Register</b> to turn any habit into your own goal.</span><span class="ht-spacer"></span><a class="ht-btn ht-btn--primary ht-btn--sm" href="#">Register</a></div>
+  <div class="ht-sidebar-layout">
+    <aside class="ht-card" aria-label="Filters">
+  <div class="ht-filter__group"><div class="ht-filter__title">Category</div><label class="ht-check"><input type="radio" name="cat" checked> All</label><label class="ht-check"><input type="radio" name="cat"> Body</label><label class="ht-check"><input type="radio" name="cat"> Mind</label><label class="ht-check"><input type="radio" name="cat"> Health</label><label class="ht-check"><input type="radio" name="cat"> Money</label></div>
+  <div class="ht-filter__group"><div class="ht-filter__title">Intent</div><label class="ht-check"><input type="checkbox"> Build</label><label class="ht-check"><input type="checkbox"> Reduce</label></div>
+  
+</aside>
+    <div>
+      <div style="display:flex;align-items:center;margin-bottom:10px" class="ht-muted"><span>24 habits</span><span class="ht-spacer"></span><span>Sort: A–Z</span></div>
+      <div class="ht-grid-cards"><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Reading</h3></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Mind</span><span class="ht-chip">Build</span></div>
+  <p class="ht-habit__desc">Read books, articles or papers.</p><div class="ht-habit__start">Suggested start: <b>15 min, 5 days a week</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">See details</a></div>
+</article><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1" /><path d="m9 20 3-6 3 6" /><path d="m6 8 6 2 6-2" /><path d="M12 10v4" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Yoga</h3></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Body</span><span class="ht-chip">Build</span></div>
+  <p class="ht-habit__desc">Any yoga practice, at home or in class.</p><div class="ht-habit__start">Suggested start: <b>3 times a week</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">See details</a></div>
+</article><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Screen time</h3></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Mind</span><span class="ht-chip">Reduce</span></div>
+  <p class="ht-habit__desc">Time on phone and social apps outside work.</p><div class="ht-habit__start">Suggested start: <b>at most 2 h a day</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">See details</a></div>
+</article><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z" /><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z" /><path d="M16 17h4" /><path d="M4 13h4" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Walking</h3></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Body</span><span class="ht-chip">Build</span></div>
+  <p class="ht-habit__desc">Walks outside, at your own pace.</p><div class="ht-habit__start">Suggested start: <b>30 min daily</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">See details</a></div>
+</article><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z" /><path d="M2 9v1c0 1.1.9 2 2 2h1" /><path d="M16 11h.01" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Saving money</h3></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Money</span><span class="ht-chip">Build</span></div>
+  <p class="ht-habit__desc">Put a planned amount aside.</p><div class="ht-habit__start">Suggested start: <b>once a week</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">See details</a></div>
+</article><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 7.5-2 2a4.95 4.95 0 1 0 7 7l2-2a4.95 4.95 0 1 0-7-7Z" /><path d="M14 6.5v10" /><path d="M10 7.5v10" /><path d="m16 7 1-5 1.37.68A3 3 0 0 0 19.7 3H21v1.3c0 .46.1.92.32 1.33L22 7l-5 1" /><path d="m8 17-1 5-1.37-.68A3 3 0 0 0 4.3 21H3v-1.3a3 3 0 0 0-.32-1.33L2 17l5-1" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Sugar</h3></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Health</span><span class="ht-chip">Reduce</span></div>
+  <p class="ht-habit__desc">Sweets and sugary drinks.</p><div class="ht-habit__start">Suggested start: <b>at most 1 sweet a day</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">See details</a></div>
+</article></div>
+    </div>
+  </div>
+</main>
+<footer class="ht-footer"><div class="ht-footer__inner"><span>Habit Tracker · Agentic Engineering course project</span><span class="ht-spacer"></span><a href="#">Privacy</a><a href="#">Send feedback</a></div></footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/ht-components.css"><title>PageAdminSuggestions — preview</title></head>
+<body>
+<div class="ht ht-page">
+<header class="ht-nav"><div class="ht-nav__inner"><a class="ht-nav__brand" href="#">Habit Tracker</a><nav class="ht-nav__links" aria-label="Main"><a href="#">Today</a><a href="#">Catalog</a><a href="#">Community</a><a href="#" aria-current="page">Admin</a></nav><div class="ht-nav__end"><span class="ht-avatar" aria-label="Account menu">AK</span><button class="ht-nav__menu-btn" aria-label="Menu" aria-expanded="false"><svg class="ht-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg></button></div></div></header>
+<main class="ht-container">
+  <div class="ht-page-head"><h1>Administration</h1></div>
+  <div class="ht-notice ht-notice--neutral" style="margin-bottom:16px"><span><b>Privacy:</b> admins manage public content and accounts. Private goals, records, notes and personal reports are not available here.</span></div>
+  <div class="ht-tabs" role="tablist"><button class="ht-tab" role="tab" aria-selected="false">Catalog<span class="ht-count">24</span></button><button class="ht-tab" role="tab" aria-selected="true">Suggestions<span class="ht-count">3</span></button><button class="ht-tab" role="tab" aria-selected="false">Feedback<span class="ht-count">5</span></button><button class="ht-tab" role="tab" aria-selected="false">Accounts<span class="ht-count"></span></button></div>
+  <div class="ht-grid-2 ht-grid-2--list">
+    <section class="ht-card" style="padding:10px"><div class="ht-eyebrow" style="padding:6px 8px">Waiting for review · oldest first</div><div class="ht-select-row" aria-current="true"><div style="flex:1"><b>Cold shower</b><div class="ht-row__meta">Body · Build · suggested 29 Oct</div></div><svg class="ht-icon ht-icon--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></div><div class="ht-select-row"><div style="flex:1"><b>Journaling</b><div class="ht-row__meta">Mind · Build · suggested 28 Oct</div></div><svg class="ht-icon ht-icon--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></div><div class="ht-select-row"><div style="flex:1"><b>No phone in bed</b><div class="ht-row__meta">Health · Reduce · suggested 25 Oct</div></div><svg class="ht-icon ht-icon--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></div></section>
+    <section class="ht-card">
+      <div class="ht-inline"><h2 class="ht-card__title" style="margin:0">Review suggestion</h2><span class="ht-spacer"></span><span class="ht-muted" style="font-size:13px">from Bohdan · 29 Oct</span></div>
+      <blockquote class="ht-quote" style="margin:12px 0">"Many of my friends try this; it would be good to have it ready."</blockquote>
+      <div class="ht-stack">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><label class="ht-field"><span class="ht-field__label">Name</span><input class="ht-input" value="Cold shower"></label><label class="ht-field"><span class="ht-field__label">Category</span><select class="ht-input"><option>Body</option></select></label></div>
+        <label class="ht-field"><span class="ht-field__label">Description</span><textarea class="ht-input ht-textarea">At least 1 minute of cold water at the end of a shower.</textarea></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div class="ht-field"><span class="ht-field__label">Intent</span><div class="ht-seg" role="group" aria-label="Intent"><button type="button" aria-pressed="true">Build</button><button type="button" aria-pressed="false">Reduce</button></div></div><label class="ht-field"><span class="ht-field__label">Suggested starting goal <span class="ht-muted" style="font-weight:400">(optional)</span></span><input class="ht-input" value="3 times a week"></label></div>
+        <p class="ht-field__help" style="margin:0">Publishing creates a new, independent catalog habit. The person's custom habit and goals are not changed or linked.</p>
+      </div>
+      <div class="ht-form-actions" style="margin-top:16px"><button class="ht-btn ht-btn--primary">Approve &amp; publish</button><button class="ht-btn ht-btn--secondary">Save as draft</button><span class="ht-spacer"></span><button class="ht-btn ht-btn--danger">Reject</button></div>
+    </section>
+  </div>
+</main>
+<footer class="ht-footer"><div class="ht-footer__inner"><span>Habit Tracker · Agentic Engineering course project</span><span class="ht-spacer"></span><a href="#">Privacy</a><a href="#">Send feedback</a></div></footer>
+</div>
+</body>
+</html>

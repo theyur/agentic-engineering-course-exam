@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/ht-components.css"><title>PageNewGoal — preview</title></head>
+<body>
+<div class="ht ht-page">
+<header class="ht-nav"><div class="ht-nav__inner"><a class="ht-nav__brand" href="#">Habit Tracker</a><nav class="ht-nav__links" aria-label="Main"><a href="#">Today</a><a href="#" aria-current="page">Goals</a><a href="#">Catalog</a><a href="#">Community</a></nav><div class="ht-nav__end"><a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="#">+ New goal</a><span class="ht-avatar" aria-label="Account menu">YD</span><button class="ht-nav__menu-btn" aria-label="Menu" aria-expanded="false"><svg class="ht-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg></button></div></div></header>
+<main class="ht-container">
+  <a class="ht-back" href="#">← Catalog</a>
+  <div class="ht-page-head" style="padding-top:8px"><div><h1>New goal</h1><span class="ht-muted">Based on the catalog habit Reading. Change anything you like.</span></div></div>
+  <div class="ht-grid-2">
+    <form class="ht-card">
+      <div class="ht-form-section">
+        <h2 class="ht-form-section__title">Habit</h2>
+        <div class="ht-inline"><span class="ht-habit__glyph" style="margin:0;width:36px;height:36px"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg></span><b>Reading</b><span class="ht-chip">Mind</span><span class="ht-spacer"></span><button type="button" class="ht-btn ht-btn--ghost ht-btn--sm">Change</button></div>
+      </div>
+      <div class="ht-form-section">
+        <h2 class="ht-form-section__title">Do you want to build or reduce it?</h2>
+        <p class="ht-form-section__help">Build: do it at least the target. Reduce: stay at or below a limit.</p>
+        <div class="ht-seg" role="group" aria-label="Intent"><button type="button" aria-pressed="true">Build</button><button type="button" aria-pressed="false">Reduce</button></div>
+      </div>
+      <div class="ht-form-section">
+        <h2 class="ht-form-section__title">How do you measure it?</h2>
+        <p class="ht-form-section__help">You can record partial amounts; the target decides the result.</p>
+        <div class="ht-choices"><label class="ht-choice"><input type="radio" name="m"><span class="ht-choice__title">Yes / no</span><span class="ht-choice__desc">Did it or not</span></label><label class="ht-choice"><input type="radio" name="m"><span class="ht-choice__title">Count</span><span class="ht-choice__desc">Times, pages, cups</span></label><label class="ht-choice"><input type="radio" name="m" checked><span class="ht-choice__title">Duration</span><span class="ht-choice__desc">Minutes or hours</span></label></div>
+      </div>
+      <div class="ht-form-section">
+        <h2 class="ht-form-section__title">Target</h2>
+        <div class="ht-inline"><span>At least</span><span class="ht-inline"><span class="ht-stepper"><button type="button" aria-label="Less">−</button><input type="number" value="15" aria-label="Minutes"><button type="button" aria-label="More">+</button></span><span class="ht-unit">minutes each time</span></span></div>
+      </div>
+      <div class="ht-form-section">
+        <h2 class="ht-form-section__title">When?</h2>
+        <div class="ht-choices" style="margin-bottom:12px"><label class="ht-choice"><input type="radio" name="s" checked><span class="ht-choice__title">On fixed days</span><span class="ht-choice__desc">For example Mon to Fri</span></label><label class="ht-choice"><input type="radio" name="s"><span class="ht-choice__title">A number of times</span><span class="ht-choice__desc">For example 5 times a week</span></label></div>
+        <div class="ht-days" role="group" aria-label="Days"><button type="button" class="ht-day" aria-pressed="true">Mon</button><button type="button" class="ht-day" aria-pressed="true">Tue</button><button type="button" class="ht-day" aria-pressed="true">Wed</button><button type="button" class="ht-day" aria-pressed="true">Thu</button><button type="button" class="ht-day" aria-pressed="true">Fri</button><button type="button" class="ht-day" aria-pressed="false">Sat</button><button type="button" class="ht-day" aria-pressed="false">Sun</button></div>
+        <p class="ht-form-section__help" style="margin:8px 0 0">Each selected day is one commitment. You can excuse a single day later.</p>
+      </div>
+      <div class="ht-form-section">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <label class="ht-field"><span class="ht-field__label">Start date</span><input class="ht-input" value="Mon 2 Nov 2026"></label>
+          <label class="ht-field"><span class="ht-field__label">Name <span class="ht-muted" style="font-weight:400">(optional)</span></span><input class="ht-input" placeholder="Reading on weekdays"></label>
+        </div>
+      </div>
+      <div class="ht-form-actions"><button class="ht-btn ht-btn--primary">Create goal</button><button type="button" class="ht-btn ht-btn--secondary">Cancel</button></div>
+    </form>
+    <aside class="ht-card ht-sticky">
+      <div class="ht-eyebrow">Your goal</div>
+      <h2 class="ht-card__title" style="margin-top:2px">Read at least 15 minutes on Mon, Tue, Wed, Thu and Fri</h2>
+      <dl class="ht-kv" style="margin-top:12px"><dt>Evaluated</dt><dd>Each scheduled day</dd><dt>Met when</dt><dd>15 min or more</dd><dt>Streak counted in</dt><dd>Days</dd><dt>Late records</dt><dd>Up to 48 h after each day</dd></dl>
+      <div class="ht-notice ht-notice--neutral" style="margin-top:16px"><span>Catalog suggestion: 15 min, 5 days a week. An example to adjust, not a prescribed target.</span></div>
+    </aside>
+  </div>
+</main>
+<footer class="ht-footer"><div class="ht-footer__inner"><span>Habit Tracker · Agentic Engineering course project</span><span class="ht-spacer"></span><a href="#">Privacy</a><a href="#">Send feedback</a></div></footer>
+</div>
+</body>
+</html>
