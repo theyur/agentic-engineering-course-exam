@@ -26,13 +26,21 @@ function Get-ShellTokens([string]$command, [char]$escape) {
         $c = $command[$i]
         if ($quote -ne [char]0) {
             if ($c -eq $quote) { $quote = [char]0 }
-            elseif ($c -eq $escape -and $quote -eq '"' -and $i + 1 -lt $command.Length) { [void]$word.Append($command[++$i]) }
+            # In Bash double quotes '\' escapes only $ ` " \ and newline (so "E:\dir" keeps it).
+            elseif ($c -eq $escape -and $quote -eq '"' -and $i + 1 -lt $command.Length -and
+                ($escape -ne '\' -or $command[$i + 1] -in '$', '`', '"', '\', "`n")) { [void]$word.Append($command[++$i]) }
             else { [void]$word.Append($c) }
+            continue
+        }
+        # Unquoted '#' at the start of a word comments out the rest of the line.
+        if ($c -eq '#' -and -not $inWord) {
+            while ($i + 1 -lt $command.Length -and $command[$i + 1] -ne "`n") { $i++ }
             continue
         }
         if ($c -eq "'" -or $c -eq '"') { $quote = $c; $inWord = $true; continue }
         if ($c -eq $escape -and $i + 1 -lt $command.Length) { [void]$word.Append($command[++$i]); $inWord = $true; continue }
         if ($c -eq '$' -and $i + 1 -lt $command.Length -and $command[$i + 1] -eq '(') {
+            [void]$word.Append('$'); $i++
             $depth = 0
             do {
                 if ($command[$i] -eq '(') { $depth++ } elseif ($command[$i] -eq ')') { $depth-- }

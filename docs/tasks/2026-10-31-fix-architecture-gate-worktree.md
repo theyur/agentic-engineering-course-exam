@@ -57,3 +57,8 @@ Review round 2 (PR #6): splitting on separators before honoring quotes broke quo
 containing `;` or `)`, and `pushd` and subshells shared one stack (`pushd X; (popd); git commit`
 tested the wrong tree). Fixed with a quote-aware tokenizer (separators and `( )` only outside
 quotes and `$( … )`) and subshell frames that snapshot both the directory and the `pushd` stack.
+
+Review round 3 (PR #6): in Bash double quotes `\` now escapes only `$ \` " \` and newline (Windows
+paths like `"E:\dir"` keep their backslashes); `$( … )` consumes its opening parenthesis (an
+off-by-one made `git commit -m $(date)` fail); unquoted `#` at a word start skips the rest of the
+line as a comment.
