@@ -14,6 +14,10 @@ function Block([string]$reason) {
 $tokenPattern = '(?:"(?:\\.|[^"\\])*"|''[^'']*''|[^\s"'';&|()])+|[;&|()\r\n]+'
 $separatorPattern = '^[;&|()\r\n]+$'
 $directoryCommands = @('cd', 'chdir', 'pushd', 'sl', 'Set-Location', 'Push-Location')
+# git commit options whose value is the next argument (S and u take only attached values).
+$commitShortOptionsWithValue = @('m', 'F', 'C', 'c', 't')
+$commitLongOptionsWithValue = @('--message', '--file', '--reuse-message', '--reedit-message', '--fixup', '--squash',
+    '--author', '--date', '--template', '--cleanup', '--trailer', '--pathspec-from-file')
 
 function Get-Unquoted([string]$token) { $token -replace '["'']', '' }
 
@@ -40,15 +44,36 @@ try {
         exit 0
     }
 
-    # Arguments of each commit, up to the next separator.
+    # Arguments of each commit, up to the next separator, as git receives them (quotes removed).
+    # Option values (-m <msg>, --author <a> ...) are skipped so message text is not read as flags.
     foreach ($index in $commitIndexes) {
+        $expectValue = $false
         for ($j = $index + 1; $j -lt $tokens.Count -and $tokens[$j] -notmatch $separatorPattern; $j++) {
-            # -n is commit's short form of --no-verify, alone or in a flag cluster such as -nm.
-            if ($tokens[$j] -cmatch '^-[a-zA-Z]*n[a-zA-Z]*$') {
-                Block "a short flag containing 'n' (git commit -n = --no-verify) skips the architecture pre-commit hook. Spell out the flags you need."
+            if ($expectValue) { $expectValue = $false; continue }
+            $argument = Get-Unquoted $tokens[$j]
+            # A variable could expand to a flag where git expects an option name.
+            $variableFlag = "commit arguments from variables ($($tokens[$j])) cannot be checked for --no-verify; write them out."
+            if ($argument.StartsWith('$')) { Block $variableFlag }
+            if ($argument -ceq '--') { break }
+            if ($argument.StartsWith('--')) {
+                if (($argument -split '=', 2)[0].Contains('$')) { Block $variableFlag }
+                if ($argument.StartsWith('--no-veri')) {
+                    Block '--no-verify skips the architecture pre-commit hook. Fix the failing architecture test instead.'
+                }
+                $expectValue = $argument -notmatch '=' -and $argument -in $commitLongOptionsWithValue
+                continue
             }
-            if ($tokens[$j].StartsWith('$')) {
-                Block "commit arguments from variables ($($tokens[$j])) cannot be checked for --no-verify; write them out."
+            if ($argument -cmatch '^-[a-zA-Z]') {
+                # Short flag cluster, read like git: 'n' is --no-verify; a value-taking letter ends it.
+                for ($k = 1; $k -lt $argument.Length; $k++) {
+                    $letter = [string]$argument[$k]
+                    if ($letter -eq '$') { Block $variableFlag }
+                    if ($letter -ceq 'n') {
+                        Block "-n (git commit -n = --no-verify) skips the architecture pre-commit hook. Spell out the flags you need."
+                    }
+                    if ($letter -cin $commitShortOptionsWithValue) { $expectValue = $k -eq $argument.Length - 1; break }
+                    if ($letter -cin 'S', 'u') { break }
+                }
             }
         }
     }
