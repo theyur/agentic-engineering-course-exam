@@ -37,11 +37,12 @@ reads them, nothing that could expand into a flag), a directory change that stay
 clone, or a command that cannot run git (shells, `eval`, `iex` are never allowed next to git).
 Heredoc bodies are message data unless they feed a shell or expand. Anything else is blocked.
 
-Verification: a differential oracle (scratch tooling, not committed) ran each test command through
-real Git Bash / pwsh with a fake `git.exe` first on PATH that records the exact argv, cwd and
-`GIT_*` environment, and compared that ground truth with the guard's verdict: 215 commands
-(realistic commit commands, one case per rule, and three fresh adversarial rounds), no bypass;
-realistic commands raise no false positives.
+Verification: a differential oracle, `tools/guard-oracle`, runs each test command through real
+Git Bash / pwsh with a fake `git.exe` first on PATH that records the exact argv, cwd and `GIT_*`
+environment, and compares that ground truth with the guard's verdict. 215 commands (realistic
+commit commands, one case per rule, review findings and three adversarial rounds): no bypass, no
+false positive on realistic commands. As a negative check, the pre-allowlist guard (79e499f) fails
+it with 59 bypasses.
 
 `settings.json`: both the Bash and PowerShell entries run the guard for every command, without an
 `if` prefilter — an `if` such as `Bash(git *)` would not fire for `sh -c '…'`. The script exits in

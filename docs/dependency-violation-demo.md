@@ -58,10 +58,11 @@ and anything else is blocked with a message saying how to rephrase:
 - `core.hooksPath`, `include.path`, `GIT_*` environment overrides and `PATH`
   changes are blocked, and so is any commit while the hook is not enabled.
 
-The guard was verified with a differential oracle: each test command was run
-through the real shell against a fake `git.exe` that records the exact arguments,
-working directory and environment git would receive, and that ground truth was
-compared with the guard's verdict (215 commands, no bypass found).
+The guard is tested with a differential oracle, `tools/guard-oracle` (run
+`pwsh tools/guard-oracle/oracle.ps1` after changing the guard): each test command
+runs through the real shell against a fake `git.exe` that records the exact
+arguments, working directory and environment git would receive, and that ground
+truth is compared with the guard's verdict.
 
 ## Try it
 
