@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Fake git.exe for the guard oracle; not part of HabitTracker.slnx. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>git</AssemblyName>
+  </PropertyGroup>
+
+</Project>

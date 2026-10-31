@@ -20,6 +20,7 @@ C# / .NET 10, Blazor Interactive Server, EF Core + SQL Server (only provider —
 - Build: `dotnet build HabitTracker.slnx`
 - Test: `dotnet test HabitTracker.slnx`; single test: `dotnet test HabitTracker.slnx --filter "FullyQualifiedName~<TestName>"`
 - Run UI: `dotnet run --project src/HT.Ui`
+- Changed `.claude/hooks/architecture-gate.ps1`? Run `pwsh tools/guard-oracle/oracle.ps1` — it must print `PASSED` (see `tools/guard-oracle/README.md`).
 - `TreatWarningsAsErrors` is on — any warning fails the build; fix it, don't suppress it.
 - `TargetFramework`, `Nullable`, `ImplicitUsings` live in root `Directory.Build.props`; don't repeat them in `.csproj` files.
 
