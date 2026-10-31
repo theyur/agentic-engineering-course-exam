@@ -51,9 +51,9 @@ Limitations:
   the tests see the tree before `git apply`; run such steps as separate commands.
 - Directory changes through variables (`cd "$DIR"`, `cd $(...)`) are not
   evaluated; such a commit is blocked rather than guessed.
-- The command is split on shell separators without full shell parsing, so a
-  separator inside a quoted argument can produce extra pseudo-commands; this can
-  only add tests or block, never skip one.
+- The command is tokenized with quote awareness (quotes, escapes, `$( … )`), not
+  a full shell parser. Unterminated quotes or unbalanced parentheses block the
+  commit; constructs such as `eval`, aliases or functions are not interpreted.
 - The script itself is loaded from `$CLAUDE_PROJECT_DIR` (the main checkout), so
   changes to the hook take effect once they are in the main checkout.
 - It checks the working tree, not exclusively staged changes, and does **not**

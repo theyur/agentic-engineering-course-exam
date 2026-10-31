@@ -50,5 +50,10 @@ only documented for Bash); the script exits in ~0.25 s for non-commit calls.
   against the tree before `git apply`. Run such steps as separate commands.
 - Directory changes via variables (`cd "$DIR"`, `cd $(…)`) are not evaluated; the commit is
   blocked instead.
-- No full shell parser: a separator inside a quoted argument can create pseudo-commands, which
-  can only add tests or block.
+- Quote-aware tokenizer, not a full shell parser: unterminated quotes / unbalanced parentheses
+  block; `eval`, aliases and functions are not interpreted.
+
+Review round 2 (PR #6): splitting on separators before honoring quotes broke quoted paths
+containing `;` or `)`, and `pushd` and subshells shared one stack (`pushd X; (popd); git commit`
+tested the wrong tree). Fixed with a quote-aware tokenizer (separators and `( )` only outside
+quotes and `$( … )`) and subshell frames that snapshot both the directory and the `pushd` stack.
