@@ -15,6 +15,41 @@ function Resolve-CommandPath([string]$base, [string]$path) {
     return [System.IO.Path]::GetFullPath($path)
 }
 
+# Reads the $( ... ) starting at $start (its '$') into $word and returns the index of its closing
+# ')'. Quotes, escapes, comments and nested substitutions inside it are honored.
+function Read-Substitution([string]$command, [int]$start, [char]$escape, [System.Text.StringBuilder]$word) {
+    [void]$word.Append('$(')
+    $i = $start + 2
+    $depth = 1
+    $quote = [char]0
+    while ($i -lt $command.Length) {
+        $ch = $command[$i]
+        if ($ch -eq '$' -and $quote -ne "'" -and $i + 1 -lt $command.Length -and $command[$i + 1] -eq '(') {
+            $i = (Read-Substitution $command $i $escape $word) + 1
+            continue
+        }
+        if ($quote -ne [char]0) {
+            if ($ch -eq $quote) { $quote = [char]0 }
+            elseif ($ch -eq $escape -and $quote -eq '"' -and $i + 1 -lt $command.Length) { [void]$word.Append($ch); $ch = $command[++$i] }
+        }
+        elseif ($ch -eq "'" -or $ch -eq '"') { $quote = $ch }
+        elseif ($ch -eq $escape -and $i + 1 -lt $command.Length) { [void]$word.Append($ch); $ch = $command[++$i] }
+        elseif ($ch -eq '#' -and $command[$i - 1] -match '[\s(;|&]') {
+            while ($i + 1 -lt $command.Length -and $command[$i + 1] -ne "`n") { $i++ }
+            $i++
+            continue
+        }
+        elseif ($ch -eq '(') { $depth++ }
+        elseif ($ch -eq ')') {
+            $depth--
+            if ($depth -eq 0) { [void]$word.Append($ch); return $i }
+        }
+        [void]$word.Append($ch)
+        $i++
+    }
+    throw 'unbalanced $( in command'
+}
+
 # Splits a shell command into words (quotes removed) and operators: '(' and ')' for subshells,
 # ';' for any command separator. Quoted text and $( ... ) never produce operators.
 function Get-ShellTokens([string]$command, [char]$escape) {
@@ -24,8 +59,10 @@ function Get-ShellTokens([string]$command, [char]$escape) {
     $quote = [char]0
     for ($i = 0; $i -lt $command.Length; $i++) {
         $c = $command[$i]
+        $isSubstitution = $c -eq '$' -and $i + 1 -lt $command.Length -and $command[$i + 1] -eq '('
         if ($quote -ne [char]0) {
-            if ($c -eq $quote) { $quote = [char]0 }
+            if ($isSubstitution -and $quote -eq '"') { $i = Read-Substitution $command $i $escape $word }
+            elseif ($c -eq $quote) { $quote = [char]0 }
             # In Bash double quotes '\' escapes only $ ` " \ and newline (so "E:\dir" keeps it).
             elseif ($c -eq $escape -and $quote -eq '"' -and $i + 1 -lt $command.Length -and
                 ($escape -ne '\' -or $command[$i + 1] -in '$', '`', '"', '\', "`n")) { [void]$word.Append($command[++$i]) }
@@ -39,16 +76,7 @@ function Get-ShellTokens([string]$command, [char]$escape) {
         }
         if ($c -eq "'" -or $c -eq '"') { $quote = $c; $inWord = $true; continue }
         if ($c -eq $escape -and $i + 1 -lt $command.Length) { [void]$word.Append($command[++$i]); $inWord = $true; continue }
-        if ($c -eq '$' -and $i + 1 -lt $command.Length -and $command[$i + 1] -eq '(') {
-            [void]$word.Append('$'); $i++
-            $depth = 0
-            do {
-                if ($command[$i] -eq '(') { $depth++ } elseif ($command[$i] -eq ')') { $depth-- }
-                [void]$word.Append($command[$i]); $i++
-            } while ($i -lt $command.Length -and $depth -gt 0)
-            if ($depth -gt 0) { throw 'unbalanced $( in command' }
-            $i--; $inWord = $true; continue
-        }
+        if ($isSubstitution) { $i = Read-Substitution $command $i $escape $word; $inWord = $true; continue }
 
         $op = $null
         if ($c -eq '(' -and -not $inWord) { $op = '(' }

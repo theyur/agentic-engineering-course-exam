@@ -62,3 +62,8 @@ Review round 3 (PR #6): in Bash double quotes `\` now escapes only `$ \` " \` an
 paths like `"E:\dir"` keep their backslashes); `$( … )` consumes its opening parenthesis (an
 off-by-one made `git commit -m $(date)` fail); unquoted `#` at a word start skips the rest of the
 line as a comment.
+
+Review round 4 (PR #6): the `$( … )` scan counted parentheses inside quotes and comments, so
+`git status -- $(printf '('); git commit …` hid the commit. It is now a recursive scanner that
+honors quotes, escapes, comments and nested substitutions, also inside double quotes; an
+unterminated substitution blocks.
