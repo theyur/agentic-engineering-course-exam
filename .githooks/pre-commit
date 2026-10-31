@@ -1,0 +1,17 @@
+#!/bin/sh
+# Git pre-commit hook: block the commit when the ArchUnitNET architecture tests fail.
+# Git runs it inside the repository or worktree being committed, so it always tests that tree.
+# Enable once per clone (covers all its worktrees): git config core.hooksPath .githooks
+
+root=$(git rev-parse --show-toplevel) || exit 1
+project="$root/tests/HT.ArchitectureTests/HT.ArchitectureTests.csproj"
+if [ ! -f "$project" ]; then
+    echo "BLOCKED: architecture gate cannot find $project." >&2
+    exit 1
+fi
+
+echo "Architecture gate: running ArchUnitNET tests in $root before commit..." >&2
+if ! dotnet test "$project" --configuration Debug --nologo --verbosity minimal >&2; then
+    echo "BLOCKED: architectural tests failed. Fix the dependency before committing; do not bypass the hook (--no-verify)." >&2
+    exit 1
+fi

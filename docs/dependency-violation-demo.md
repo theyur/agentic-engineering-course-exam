@@ -23,44 +23,52 @@ dotnet test tests/HT.ArchitectureTests/HT.ArchitectureTests.csproj -c Debug
 Expected: **build succeeds; architecture test passes**. With a violation
 reintroduced, the build still succeeds but the test fails.
 
-## Try the Claude Code hook
+## How the gate works
 
-1. Install .NET 10 SDK and PowerShell 7 (`pwsh`) on the machine running Claude Code.
-2. Check out this branch and start a **new Claude Code session**, so it loads
-   `.claude/settings.json` (approve the project hook if prompted).
-3. Ask Claude to commit the current changes, or have it make a small edit and
-   attempt `git commit` through its Bash or PowerShell tool.
-4. The `PreToolUse` hook runs architecture tests first. When they fail, exit
-   code **2** blocks Claude's tool call, and stderr gives Claude feedback.
-5. Fix the page to use an Application abstraction (or remove the offending
-   component dependency), then retry the commit: the gate should pass.
+The architecture tests run in a **git `pre-commit` hook**, `.githooks/pre-commit`.
+Git runs it inside the repository or worktree being committed, so it always tests
+that tree, however the commit was started (Claude's Bash or PowerShell tool, a
+terminal, an IDE).
 
-The hook gates `git commit` run through Claude's Bash and PowerShell tools,
-including `git -C <dir> commit` and other git options before `commit`. It tests
-the repository **every** commit in the command runs in: it starts at the
-session's working directory (a git worktree, in worktree sessions) and walks the
-command in order, following `cd` / `pushd` / `popd` / `Set-Location` /
-`Push-Location` / `Pop-Location`, subshells `( … )` and each `git -C <dir>`;
-heredoc and here-string bodies are ignored. If a target directory is missing or
-not a git repository, or `--git-dir` / `--work-tree` is used, the commit is
-blocked; a repository without `tests/HT.ArchitectureTests` is skipped.
+Enable it once per clone (the setting is shared by all of the clone's worktrees):
+
+```bash
+git config core.hooksPath .githooks
+```
+
+A Claude Code `PreToolUse` hook (`.claude/hooks/architecture-gate.ps1`) keeps
+Claude's own commits behind it. It does not run the tests; it blocks a commit
+command when:
+
+- it would skip the pre-commit hook: `--no-verify`, or a short flag cluster
+  containing `n` (`git commit -n` is `--no-verify`);
+- it overrides git config that could disable the hook (`core.hooksPath`,
+  `GIT_CONFIG_*`);
+- the hook is not enabled (`core.hooksPath` is not `.githooks`).
+
+## Try it
+
+1. Install .NET 10 SDK and PowerShell 7 (`pwsh`), and enable the hook as above.
+2. Start a **new Claude Code session**, so it loads `.claude/settings.json`
+   (approve the project hook if prompted).
+3. Add a direct Persistence dependency to a Blazor component and ask Claude to
+   commit. The pre-commit hook runs the tests and rejects the commit; Claude sees
+   the failing rule in the git output.
+4. Fix the component to use an Application abstraction, then retry: the commit
+   goes through.
 
 Limitations:
 
-- The hook runs once, **before** the whole command. In `git apply x && git commit`
-  the tests see the tree before `git apply`; run such steps as separate commands.
-- Directory changes through variables (`cd "$DIR"`, `cd $(...)`) are not
-  evaluated; such a commit is blocked rather than guessed.
-- The command is tokenized with quote awareness (quotes, escapes, `$( … )`), not
-  a full shell parser. Unterminated quotes or unbalanced parentheses block the
-  commit; constructs such as `eval`, aliases or functions are not interpreted.
-- The script itself is loaded from `$CLAUDE_PROJECT_DIR` (the main checkout), so
-  changes to the hook take effect once they are in the main checkout.
-- It checks the working tree, not exclusively staged changes, and does **not**
-  affect manual commits outside Claude Code.
+- The tests check the working tree, not exclusively staged changes.
+- Outside Claude Code, `git commit --no-verify` still skips the hook, and a clone
+  without `core.hooksPath` set has no gate. Branches created before the hook was
+  added have no `.githooks/pre-commit`.
+- The Claude Code guard reads command text: phrases that look like a commit
+  (e.g. `echo "git commit"`) are treated as one, and `-n` inside a commit message
+  (`-m "add -name"`) is blocked; rephrase or spell out flags.
 
-The demo is not a security boundary or a replacement for CI. Do not use
-`--no-verify` or disable the Claude Code hook as a supposed fix.
+The gate is not a security boundary or a replacement for CI. Do not use
+`--no-verify` or disable either hook as a supposed fix.
 
 Run the commands locally to confirm behavior; the code was authored remotely
 and was not executed against a .NET SDK during repository setup.
