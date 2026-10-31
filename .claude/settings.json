@@ -7,7 +7,17 @@
           {
             "type": "command",
             "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/architecture-gate.ps1\"",
-            "if": "Bash(git commit *)",
+            "if": "Bash(git *)",
+            "timeout": 120
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/architecture-gate.ps1\"",
             "timeout": 120
           }
         ]

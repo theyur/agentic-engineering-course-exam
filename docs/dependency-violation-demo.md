@@ -29,17 +29,33 @@ reintroduced, the build still succeeds but the test fails.
 2. Check out this branch and start a **new Claude Code session**, so it loads
    `.claude/settings.json` (approve the project hook if prompted).
 3. Ask Claude to commit the current changes, or have it make a small edit and
-   attempt `git commit` through its Bash tool.
+   attempt `git commit` through its Bash or PowerShell tool.
 4. The `PreToolUse` hook runs architecture tests first. When they fail, exit
-   code **2** blocks Claude's Bash tool call, and stderr gives Claude feedback.
+   code **2** blocks Claude's tool call, and stderr gives Claude feedback.
 5. Fix the page to use an Application abstraction (or remove the offending
    component dependency), then retry the commit: the gate should pass.
 
-The hook does **not** affect manual commits outside Claude Code. It checks the
-working tree (not exclusively staged changes), and only recognizes conventional
-`git commit` syntax in Bash commands. The demo is not a security boundary or
-a replacement for CI. Do not use `--no-verify` or disable the Claude Code hook
-as a supposed fix.
+The hook gates `git commit` run through Claude's Bash and PowerShell tools,
+including `git -C <dir> commit` and other git options before `commit`. It tests
+the repository the commit runs in: it starts at the session's working directory
+(a git worktree, in worktree sessions), then follows each `cd` / `pushd` /
+`Set-Location` before the commit and each `git -C <dir>`. If that directory is
+missing or not a git repository, the commit is blocked; a repository without
+`tests/HT.ArchitectureTests` is skipped.
+
+Limitations:
+
+- The hook runs once, **before** the whole command. In `git apply x && git commit`
+  the tests see the tree before `git apply`; run such steps as separate commands.
+- Directory changes through variables or subshells (`cd "$DIR"`, `cd $(...)`) are
+  not evaluated.
+- The script itself is loaded from `$CLAUDE_PROJECT_DIR` (the main checkout), so
+  changes to the hook take effect once they are in the main checkout.
+- It checks the working tree, not exclusively staged changes, and does **not**
+  affect manual commits outside Claude Code.
+
+The demo is not a security boundary or a replacement for CI. Do not use
+`--no-verify` or disable the Claude Code hook as a supposed fix.
 
 Run the commands locally to confirm behavior; the code was authored remotely
 and was not executed against a .NET SDK during repository setup.
