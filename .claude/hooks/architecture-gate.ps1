@@ -23,6 +23,7 @@ $shellCommands = @('sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'eval', 'exec', '
 $indirectCommands = @('xargs', 'env', 'command', 'builtin', 'nohup', 'time', 'timeout', 'nice', 'sudo', 'watch',
     'parallel', 'find', 'start', 'Start-Process', 'Invoke-Command', 'alias', 'function', 'Set-Alias', 'New-Alias',
     'sal', 'nal', 'python', 'python3', 'py', 'node', 'perl', 'ruby')
+$controlWords = @('if', 'then', 'else', 'elif', 'do', 'while', 'until', '!', '{', '}')
 $gitGlobalFlags = @('--no-pager', '-P', '-p', '--paginate', '--no-optional-locks', '--literal-pathspecs')
 # git commit options whose value is the next argument (S and u take only attached values).
 $commitShortOptionsWithValue = @('m', 'F', 'C', 'c', 't')
@@ -183,9 +184,9 @@ function Test-Command([string]$command) {
 }
 
 function Test-SimpleCommand([string[]]$words) {
-    # Leading VAR=value assignments.
+    # Leading VAR=value assignments and shell control words: check the command they introduce.
     $i = 0
-    while ($i -lt $words.Count -and $words[$i] -match '^[A-Za-z_]\w*=') { $i++ }
+    while ($i -lt $words.Count -and ($words[$i] -match '^[A-Za-z_]\w*=' -or $words[$i] -cin $controlWords)) { $i++ }
     if ($i -ge $words.Count) { return }
     $words = @($words | Select-Object -Skip $i)
     $first = $words[0]
@@ -204,9 +205,11 @@ function Test-SimpleCommand([string[]]$words) {
     if ($null -eq $firstWord -or $firstWord.Expands -or $first -match '^["'']') {
         Block "cannot check what '$first' runs in a command that mentions git; write the command name plainly."
     }
-    if ($first -in $shellCommands) { Block "'$first' can run git out of sight of this guard; run git directly." }
+    # Compare by program name, so /bin/bash counts as bash.
+    $program = ($first -split '[\\/]')[-1] -replace '(?i)\.exe$', ''
+    if ($program -in $shellCommands) { Block "'$first' can run git out of sight of this guard; run git directly." }
     $text = ($words -join ' ') -replace '[''"\\`]', ''
-    if ($first -in $indirectCommands -and $text -match '(?i)git|commit') {
+    if ($program -in $indirectCommands -and $text -match '(?i)git|commit') {
         Block "'$first' can run git out of sight of this guard; run git directly."
     }
     foreach ($word in $words) {

@@ -114,5 +114,21 @@
   {"cmd":"git commit -m x;git commit -n -m y"},
   {"cmd":"git commit -m x&&git commit -n -m y"},
   {"cmd":"git commit -m 'x'\"\"-n"},
-  {"cmd":"git commit -m=x -n"}
+  {"cmd":"git commit -m=x -n"},
+  {"cmd":"/bin/bash -c 'git commit --no-verify -m fix'"},
+  {"cmd":"/usr/bin/sh -c 'git commit -n -m fix'"},
+  {"cmd":"\"C:/Program Files/Git/bin/bash.exe\" -c 'git commit -n -m fix'"},
+  {"cmd":"/usr/bin/env git commit -n -m fix"},
+  {"cmd":"/usr/bin/xargs git commit -n -m fix < /dev/null"},
+  {"cmd":"if true; then cd /tmp; fi; git commit -m fix"},
+  {"cmd":"if false; then :; else cd /tmp; fi; git commit -m fix"},
+  {"cmd":"if false; then :; elif cd /tmp; then :; fi; git commit -m fix"},
+  {"cmd":"while true; do cd /tmp; break; done; git commit -m fix"},
+  {"cmd":"for d in x; do cd /tmp; done; git commit -m fix"},
+  {"cmd":"! cd /tmp; git commit -m fix"},
+  {"cmd":"{ cd /tmp; }; git commit -m fix"},
+  {"cmd":"if true; then git commit -n -m fix; fi"},
+  {"cmd":"case x in x) cd /tmp;; esac; git commit -m fix"},
+  {"cmd":"& 'C:\\Program Files\\PowerShell\\7\\pwsh.exe' -c 'git commit -n -m fix'", "tool": "PowerShell"},
+  {"cmd":"if ($true) { Set-Location C:\\Windows }; git commit -m fix", "tool": "PowerShell"}
 ]
