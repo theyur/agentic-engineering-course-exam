@@ -50,7 +50,8 @@ Directory.Build.props    shared build settings (net10.0, nullable, warnings as e
 src/                     production projects
 tests/                   test projects
 docs/adr/                architecture decision records (0001-initial-setup.md)
-docs/tasks/              feature / bug-fix task specs (2026-10-11-implement-auth.md)
+specs/                   Spec Kit feature folders: spec, plan, tasks (001-habit-catalog/)
+.specify/                Spec Kit templates, scripts and the project constitution
 ```
 
 ## Getting started
@@ -69,7 +70,7 @@ Warnings are treated as errors — the build must stay warning-free.
 
 Developed primarily through an agentic SDLC workflow with Claude Code (agent guidance in [CLAUDE.md](CLAUDE.md)):
 
-1. Describe the feature or fix as a task spec in `docs/tasks/`.
+1. Describe the feature or fix with [Spec Kit](https://github.com/github/spec-kit) (`/speckit-specify`, then `/speckit-clarify`, `/speckit-plan`, `/speckit-tasks`); artifacts land in `specs/NNN-<name>/`, checked against the [constitution](.specify/memory/constitution.md).
 2. Resolve any relevant open questions from SPEC.md / ARCHITECTURE.md; record significant architectural decisions as ADRs in `docs/adr/`.
 3. Implement on a dedicated branch, with unit, integration, and architecture tests as part of the feature.
 4. Open a pull request against `master`; PRs are reviewed by Greptile.
