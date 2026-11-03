@@ -9,7 +9,7 @@ Habit Tracker — personal habit/consistency tracker web app, built as an agenti
 - @SPEC.md — what the app does (behavior, roles, rules, non-goals, open product questions).
 - @ARCHITECTURE.md — how it is built (stack, layer boundaries, quality constraints).
 - If a request conflicts with either file, stop and ask; don't silently diverge. Material architectural changes go in an ADR.
-- SPEC §11 (open product questions) and ARCHITECTURE §9 (deferred technical choices) are **deliberate unknowns**. Do not pick an answer silently (timezones, grace-period edge cases, mocking/UI-test libraries, Azure SKUs, schema, etc.) — raise it during feature planning and record the decision in the task file or an ADR.
+- SPEC §11 (open product questions) and ARCHITECTURE §9 (deferred technical choices) are **deliberate unknowns**. Do not pick an answer silently (timezones, grace-period edge cases, mocking/UI-test libraries, Azure SKUs, schema, etc.) — raise it during feature planning and record the decision in the feature's spec or an ADR.
 
 ## Stack
 
@@ -54,6 +54,7 @@ A feature is not done without tests: unit (domain rules — targets, grace perio
 
 ## Docs and git workflow
 
-- `docs/tasks/` — task specs, date-prefixed: `2026-10-11-implement-auth.md`.
+- `specs/NNN-<name>/` — Spec Kit feature folders (spec, plan, tasks) for features and bug fixes, created by `/speckit-specify`. `docs/tasks/` is legacy: don't add to it.
+- `.specify/memory/constitution.md` — engineering principles and quality gates; change only via `/speckit-constitution`.
 - `docs/adr/` — numbered ADRs: `0001-initial-setup.md`.
 - One branch per task; open PRs against `master`.

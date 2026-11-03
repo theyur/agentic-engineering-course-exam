@@ -101,7 +101,7 @@ Only **two foundation files** are created now, both at the repository root:
 Future documentation conventions (not files to create now):
 
 - `docs/adr/` — significant architectural decisions, numbered, e.g. `0001-initial-setup.md`.
-- `docs/tasks/` — feature and bug-fix task specifications, date-prefixed, e.g. `2026-10-11-implement-auth.md`.
+- `specs/NNN-<name>/` — feature and bug-fix specifications, plans, and tasks, created by Spec Kit (replaces the earlier `docs/tasks/` convention).
 
 Initial rationale stays in this document. **Do not create ADRs, tasks, domain-model plans, database designs, or scaffolding as part of this foundation step.** Future agents should resolve relevant open questions explicitly during feature planning and document material architectural changes in ADRs when warranted.
 
