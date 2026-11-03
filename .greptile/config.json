@@ -1,4 +1,5 @@
 {
   "includeBranches": ["master"],
+  "autoReview": [],
   "disabledLabels": ["skip-greptile"]
 }
