@@ -11,6 +11,10 @@
     {
       "path": "CLAUDE.md",
       "description": "Agent guidance: build/test commands, layer dependency rules, security/privacy boundary (admins must not access private tracking data), testing expectations, and docs/git conventions."
+    },
+    {
+      "path": ".specify/memory/constitution.md",
+      "description": "Engineering constitution: domain-language, reproducible-evaluation, privacy-below-the-UI, design-system, verification and demo-data principles, plus decision discipline and PR quality gates."
     }
   ]
 }

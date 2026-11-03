@@ -1,0 +1,108 @@
+# SonarQube Cloud analysis for the .NET solution.
+#
+# Setup (one-time, outside this file):
+#   - SonarQube Cloud project: Administration > Analysis Method > turn Automatic Analysis OFF
+#     (CI analysis fails while it is on).
+#   - Repo secret SONAR_TOKEN: a SonarQube Cloud token with "Execute Analysis" on this project.
+#   - Optional repo variables SONAR_ORGANIZATION / SONAR_PROJECT_KEY if the keys differ from
+#     the defaults below.
+#
+# The job skips cleanly while SONAR_TOKEN is not set.
+
+name: SonarQube Cloud
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'theyur' }}
+  SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'theyur_agentic-engineering-course-exam' }}
+  SOLUTION: HabitTracker.slnx
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  analyze:
+    name: Build, test and analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history so Sonar can attribute issues (blame) and detect new code.
+          fetch-depth: 0
+
+      - name: Check prerequisites
+        id: pre
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "::notice::SONAR_TOKEN is not set; skipping SonarQube analysis."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK (required by the scanner)
+        if: steps.pre.outputs.run == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up .NET
+        if: steps.pre.outputs.run == 'true'
+        # setup-dotnet@v5 downloads from dotnetorigin.blob.core.windows.net, which answered HTTP 409
+        # (2026-10-25, seen in another repo); v4 uses builds.dotnet.microsoft.com.
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache SonarQube packages
+        if: steps.pre.outputs.run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Install scanner and coverage tools
+        if: steps.pre.outputs.run == 'true'
+        run: |
+          dotnet tool install --global dotnet-sonarscanner
+          dotnet tool install --global dotnet-coverage
+
+      - name: Build, test and analyze
+        if: steps.pre.outputs.run == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        # sonar.qualitygate.wait makes `end` block on the quality gate and fail this job when the
+        # gate is red, so the job's conclusion is the gate result (greptile-gate.yml relies on it).
+        # .specify/ is vendored Spec Kit tooling, refreshed by the Specify CLI; we don't maintain it.
+        run: |
+          dotnet sonarscanner begin \
+            /k:"$SONAR_PROJECT_KEY" \
+            /o:"$SONAR_ORGANIZATION" \
+            /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.host.url="https://sonarcloud.io" \
+            /d:sonar.qualitygate.wait=true \
+            /d:sonar.exclusions=".specify/**" \
+            /d:sonar.cs.vscoveragexml.reportsPaths="coverage/coverage.xml" \
+            /d:sonar.cs.vstest.reportsPaths="**/TestResults/*.trx"
+          dotnet build "$SOLUTION" --configuration Release
+          dotnet-coverage collect \
+            "dotnet test $SOLUTION --configuration Release --no-build --logger trx" \
+            -f xml -o coverage/coverage.xml
+          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"

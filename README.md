@@ -73,7 +73,7 @@ Developed primarily through an agentic SDLC workflow with Claude Code (agent gui
 1. Describe the feature or fix with [Spec Kit](https://github.com/github/spec-kit) (`/speckit-specify`, then `/speckit-clarify`, `/speckit-plan`, `/speckit-tasks`); artifacts land in `specs/NNN-<name>/`, checked against the [constitution](.specify/memory/constitution.md).
 2. Resolve any relevant open questions from SPEC.md / ARCHITECTURE.md; record significant architectural decisions as ADRs in `docs/adr/`.
 3. Implement on a dedicated branch, with unit, integration, and architecture tests as part of the feature.
-4. Open a pull request against `master`; PRs are reviewed by Greptile.
+4. Open a pull request against `master`. The SonarQube Cloud workflow (`.github/workflows/sonar.yml`) builds, tests and analyzes it; once its quality gate passes, `greptile-gate.yml` requests a Greptile review (label `skip-greptile` to skip it).
 
 ## Status
 
