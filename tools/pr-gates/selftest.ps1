@@ -36,6 +36,11 @@ $sonar = @(
     @{ n = 'sonar rerun wins (red->green)'; runs = @((Run $job -Conclusion failure -Id 1), (Run $sq -Conclusion failure -Id 2),
                                                     (Run $job -Id 3 -StartedAt '2026-11-04T11:45:00Z'), (Run $sq -Id 4 -StartedAt '2026-11-04T11:45:00Z')); e = 'GREEN' }
     @{ n = 'sonar rerun in progress';      runs = @((Run $job -Id 1), (Run $sq -Id 2), (Run $job 'in_progress' -Id 3 -StartedAt '2026-11-04T11:45:00Z')); e = 'PENDING' }
+    # Re-runs: newest attempt by id even without started_at; an older attempt's gate check is not reused.
+    @{ n = 'sonar queued rerun, no started_at'; runs = @((Run $job -Id 1), (Run $sq -Id 2), (Run $job 'queued' -Id 3 -StartedAt '')); e = 'PENDING' }
+    @{ n = 'sonar rerun skipped analysis, old gate'; runs = @((Run $job -Id 1), (Run $sq -Id 2), (Run $job -Id 3));          e = 'SKIPPED' }
+    @{ n = 'sonar rerun finished, gate on its way';  runs = @((Run $job -Id 1), (Run $sq -Id 2), (Run $job -Id 3 -CompletedAt $recent)); e = 'PENDING' }
+    @{ n = 'sonar rerun red after old green';  runs = @((Run $job -Id 1), (Run $sq -Id 2), (Run $job -Conclusion failure -Id 3), (Run $sq -Conclusion failure -Id 4)); e = 'RED' }
 )
 foreach ($c in $sonar) { Expect $c.n (Get-SonarGateState -CheckRuns $c.runs -Now $now).state $c.e }
 
@@ -53,6 +58,11 @@ $codeql = @(
     @{ n = 'codeql results running';       runs = @((Run $cs), (Run $cq 'in_progress' -Id 3));                       e = 'PENDING' }
     @{ n = 'codeql results neutral';       runs = @((Run $cs), (Run $cq -Conclusion neutral -Id 3));                 e = 'INFRA_FAILED' }
     @{ n = 'codeql results check only';    runs = @((Run $cq -Id 3));                                                e = 'GREEN' }
+    # Real ordering seen on PR #11: the results check completes before the last Analyze job does.
+    @{ n = 'codeql results before last job completes'; runs = @((Run $cs -Id 1 -CompletedAt $old), (Run $ac -Id 2), (Run $cq -Id 3 -CompletedAt '2026-11-04T11:45:00Z')); e = 'GREEN' }
+    @{ n = 'codeql rerun, new results pending';  runs = @((Run $cs -Id 1), (Run $cq -Id 2), (Run $cs -Id 3 -CompletedAt $recent)); e = 'PENDING' }
+    @{ n = 'codeql rerun, results never came';   runs = @((Run $cs -Id 1), (Run $cq -Id 2), (Run $cs -Id 3));                    e = 'MISSING' }
+    @{ n = 'codeql queued rerun, old green';     runs = @((Run $cs -Id 1), (Run $cq -Id 2), (Run $cs 'queued' -Id 3 -StartedAt '')); e = 'PENDING' }
 )
 foreach ($c in $codeql) { Expect $c.n (Get-CodeQLGateState -CheckRuns $c.runs -Now $now).state $c.e }
 
@@ -63,6 +73,19 @@ Expect 'overall one pending'      (Get-OverallState @((G RED), (G PENDING)))    
 Expect 'overall red + green'      (Get-OverallState @((G RED), (G GREEN)))          'BLOCKED'
 Expect 'overall skipped + green'  (Get-OverallState @((G SKIPPED), (G GREEN)))      'BLOCKED'
 Expect 'overall missing + green'  (Get-OverallState @((G GREEN), (G MISSING)))      'BLOCKED'
+
+# --- -Wait continuation (startup grace for checks not registered yet) ------------------------
+$wait = @(
+    @{ n = 'wait: pending keeps waiting';          o = 'PENDING';           g = @((G PENDING), (G GREEN));  s = 900; e = $true }
+    @{ n = 'wait: missing during startup grace';   o = 'BLOCKED';           g = @((G MISSING), (G MISSING)); s = 20;  e = $true }
+    @{ n = 'wait: missing + green during grace';   o = 'BLOCKED';           g = @((G MISSING), (G GREEN));   s = 60;  e = $true }
+    @{ n = 'wait: missing after grace is final';   o = 'BLOCKED';           g = @((G MISSING), (G GREEN));   s = 400; e = $false }
+    @{ n = 'wait: red is final even in grace';     o = 'BLOCKED';           g = @((G RED), (G MISSING));     s = 20;  e = $false }
+    @{ n = 'wait: skipped is final even in grace'; o = 'BLOCKED';           g = @((G SKIPPED), (G GREEN));   s = 20;  e = $false }
+    @{ n = 'wait: ready stops';                    o = 'READY_FOR_COPILOT'; g = @((G GREEN), (G GREEN));     s = 20;  e = $false }
+    @{ n = 'wait: stale stops';                    o = 'STALE';             g = @((G MISSING), (G MISSING)); s = 20;  e = $false }
+)
+foreach ($c in $wait) { Expect $c.n "$(Test-KeepWaiting $c.o $c.g $c.s 300)" "$($c.e)" }
 
 # --- Fingerprints ----------------------------------------------------------------------------
 $a = Get-FindingFingerprint 'sonar' 'csharpsquid:S1481' 'src/A.cs' 'Remove the unused  local variable'
@@ -87,7 +110,7 @@ foreach ($c in $hookCases) {
     Expect $c.n "$LASTEXITCODE" "$($c.e)"
 }
 
-$total = $sonar.Count + $codeql.Count + 5 + 2 + $hookCases.Count
+$total = $sonar.Count + $codeql.Count + 5 + $wait.Count + 2 + $hookCases.Count
 if ($failures.Count) {
     'FAILED'
     $failures | ForEach-Object { "  $_" }

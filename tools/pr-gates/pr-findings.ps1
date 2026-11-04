@@ -69,15 +69,13 @@ if ($Stage -eq 'static') {
                     "Quality gate condition $($c.metricKey): actual $($c.actualValue), threshold $($c.comparator) $($c.errorThreshold)" `
                     $meta.sonar.url $sonarSha
             }
-            $issues = Invoke-SonarApi "issues/search?componentKeys=$key&pullRequest=$Pr&resolved=false&ps=500"
-            foreach ($i in @($issues.issues)) {
+            foreach ($i in @(Get-SonarAll "issues/search?componentKeys=$key&pullRequest=$Pr&resolved=false" 'issues')) {
                 $path = ($i.component -replace "^$([regex]::Escape($key)):", '')
                 $line = if ($i.PSObject.Properties['line']) { $i.line } else { $null }
                 Add-Finding 'sonar' "issue:$($i.type)" $i.severity $i.rule $path $line $i.message `
                     "https://sonarcloud.io/project/issues?id=$key&pullRequest=$Pr&open=$($i.key)" $sonarSha
             }
-            $hotspots = Invoke-SonarApi "hotspots/search?projectKey=$key&pullRequest=$Pr&status=TO_REVIEW&ps=500"
-            foreach ($h in @($hotspots.hotspots)) {
+            foreach ($h in @(Get-SonarAll "hotspots/search?projectKey=$key&pullRequest=$Pr&status=TO_REVIEW" 'hotspots')) {
                 $path = ($h.component -replace "^$([regex]::Escape($key)):", '')
                 $line = if ($h.PSObject.Properties['line']) { $h.line } else { $null }
                 Add-Finding 'sonar' 'hotspot' $h.vulnerabilityProbability $h.ruleKey $path $line $h.message `
@@ -94,15 +92,13 @@ if ($Stage -eq 'static') {
         $meta.codeql = [ordered]@{ resultsCheck = $(if ($check) { $check.html_url }); conclusion = $(if ($check) { $check.conclusion }) }
         if ($check) {
             # Annotations of the results check = alerts the PR introduces, reported against the head SHA.
-            $ann = Invoke-Gh @('api', '--paginate', "repos/$Repo/check-runs/$($check.id)/annotations?per_page=100") | ConvertFrom-Json
-            foreach ($a in @($ann)) {
+            foreach ($a in @(Invoke-GhList "repos/$Repo/check-runs/$($check.id)/annotations?per_page=100")) {
                 Add-Finding 'codeql' 'annotation' $a.annotation_level $a.title $a.path $a.start_line $a.message $check.html_url $head
             }
         }
         # Alerts on the PR merge ref, tied to the merge commit that was analyzed. The merge commit's
         # second parent must be the current head, otherwise the analysis is for an older revision.
-        $alertsJson = Invoke-Gh @('api', '--paginate', "repos/$Repo/code-scanning/alerts?ref=refs/pull/$Pr/merge&state=open&per_page=100")
-        $alerts = @($alertsJson | ConvertFrom-Json)
+        $alerts = @(Invoke-GhList "repos/$Repo/code-scanning/alerts?ref=refs/pull/$Pr/merge&state=open&per_page=100")
         $mergeHeads = @{}
         foreach ($al in $alerts) {
             $inst = $al.most_recent_instance
@@ -125,7 +121,7 @@ if ($Stage -eq 'static') {
 if ($Stage -eq 'copilot') {
     $isCopilot = { param($login) $login -match '(?i)copilot' }
     try {
-        $reviews = Invoke-Gh @('api', '--paginate', "repos/$Repo/pulls/$Pr/reviews?per_page=100") | ConvertFrom-Json
+        $reviews = Invoke-GhList "repos/$Repo/pulls/$Pr/reviews?per_page=100"
         $meta.copilot = [ordered]@{ reviews = @() }
         foreach ($r in @($reviews | Where-Object { & $isCopilot $_.user.login })) {
             $meta.copilot.reviews += [pscustomobject]@{ id = $r.id; login = $r.user.login; state = $r.state
@@ -140,9 +136,13 @@ query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       reviewThreads(first: 100) {
+        pageInfo { hasNextPage }
         nodes {
           id isResolved isOutdated path line originalLine
-          comments(first: 30) { nodes { databaseId author { login } body url createdAt originalCommit { oid } } }
+          comments(first: 30) {
+            pageInfo { hasNextPage }
+            nodes { databaseId author { login } body url createdAt originalCommit { oid } }
+          }
         }
       }
     }
@@ -150,7 +150,11 @@ query($owner: String!, $name: String!, $number: Int!) {
 }
 '@
         $data = Invoke-Gh @('api', 'graphql', '-f', "query=$query", '-F', "owner=$owner", '-F', "name=$name", '-F', "number=$Pr") | ConvertFrom-Json
-        foreach ($t in @($data.data.repository.pullRequest.reviewThreads.nodes)) {
+        $threads = $data.data.repository.pullRequest.reviewThreads
+        # Not paged further: say so instead of presenting a partial list as complete.
+        if ($threads.pageInfo.hasNextPage) { $errors.Add([pscustomobject]@{ source = 'copilot'; error = 'INCOMPLETE: more than 100 review threads; only the first 100 were read' }) }
+        foreach ($t in @($threads.nodes)) {
+            if ($t.comments.pageInfo.hasNextPage) { $errors.Add([pscustomobject]@{ source = 'copilot'; error = "INCOMPLETE: thread $($t.id) has more than 30 comments; later replies not read" }) }
             $first = $t.comments.nodes | Select-Object -First 1
             if (-not $first -or -not (& $isCopilot $first.author.login)) { continue }
             $line = if ($t.line) { $t.line } else { $t.originalLine }
@@ -167,10 +171,16 @@ query($owner: String!, $name: String!, $number: Int!) {
     } catch { $errors.Add([pscustomobject]@{ source = 'copilot'; error = $_.Exception.Message }) }
 }
 
+# The head can move while we read. Findings collected for an old head must not drive a fix round.
+$headNow = (Get-PrInfo $Repo $Pr).headRefOid
+$headMoved = $headNow -ne $head
+if ($headMoved) { $errors.Add([pscustomobject]@{ source = 'pr'; error = "STALE: head moved from $head to $headNow while collecting; re-run" }) }
+
 [pscustomobject]@{
-    repo = $Repo; pr = $Pr; headSha = $head; stage = $Stage
+    repo = $Repo; pr = $Pr; headSha = $head; headMoved = $headMoved; stage = $Stage
     attempts = @($(if ($state.attempts.ContainsKey($Stage)) { $state.attempts[$Stage] }))
     sources = [pscustomobject]$meta
     errors = $errors
     findings = $findings
 } | ConvertTo-Json -Depth 8
+if ($headMoved) { exit 30 }

@@ -26,6 +26,9 @@ param(
     [switch]$Wait,
     [int]$TimeoutMinutes = 25,
     [int]$IntervalSeconds = 30,
+    # Right after a push the analyzers' checks may not exist yet: with -Wait, MISSING is retried
+    # for this long before it counts as a result.
+    [int]$StartupGraceMinutes = 5,
     [switch]$Summary
 )
 $ErrorActionPreference = 'Stop'
@@ -33,7 +36,8 @@ Import-Module (Join-Path $PSScriptRoot 'PrGates.psm1') -Force
 
 try {
     if (-not $Repo) { $Repo = Get-RepoSlug }
-    $deadline = [datetime]::UtcNow.AddMinutes($TimeoutMinutes)
+    $started = [datetime]::UtcNow
+    $deadline = $started.AddMinutes($TimeoutMinutes)
     $firstSha = $null
     while ($true) {
         $report = Get-GateReport $Repo $Pr
@@ -41,7 +45,9 @@ try {
         if (-not $firstSha) { $firstSha = $report.headSha }
         # A push during the wait means the old revision no longer matters: report STALE, don't wait on.
         if ($report.headSha -ne $firstSha) { $report.overall = 'STALE' }
-        if (-not $Wait -or $report.overall -ne 'PENDING' -or [datetime]::UtcNow -ge $deadline) { break }
+        $elapsed = ([datetime]::UtcNow - $started).TotalSeconds
+        $keep = Test-KeepWaiting $report.overall @($report.gates.PSObject.Properties.Value) $elapsed ($StartupGraceMinutes * 60)
+        if (-not $Wait -or -not $keep -or [datetime]::UtcNow -ge $deadline) { break }
         Start-Sleep -Seconds $IntervalSeconds
     }
 } catch {

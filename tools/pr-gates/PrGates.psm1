@@ -28,11 +28,19 @@ function Get-PrGatesConfig { $script:Config }
 
 $failedToRun = @('cancelled', 'timed_out', 'stale', 'action_required', 'startup_failure')
 
-# Latest check run of that name (re-runs create new check runs with the same name).
+# Latest check run of that name (re-runs create new check runs with the same name). Ordered by id,
+# i.e. creation order: a queued re-run has no started_at yet but is still the newest attempt.
 function Select-LatestCheck([object[]]$CheckRuns, [string]$Name) {
-    @($CheckRuns | Where-Object { $_.name -eq $Name }) |
-        Sort-Object { if ($_.PSObject.Properties['started_at'] -and $_.started_at) { [datetime]$_.started_at } else { [datetime]::MinValue } }, { [long]$_.id } |
-        Select-Object -Last 1
+    @($CheckRuns | Where-Object { $_.name -eq $Name }) | Sort-Object { [long]$_.id } | Select-Object -Last 1
+}
+
+# A gate check belongs to the newest analysis attempt only if it was created after that attempt's
+# job(s). Check-run ids are creation-ordered; timestamps are not usable (the CodeQL results check can
+# complete before the last Analyze job does). An older gate check is a previous attempt's result.
+function Test-ResultIsCurrent($Gate, [object[]]$Jobs) {
+    $newestJob = @($Jobs | Where-Object { $_ }) | Measure-Object -Property id -Maximum
+    if (-not $newestJob.Count) { return $true }
+    [long]$Gate.id -gt [long]$newestJob.Maximum
 }
 
 function New-GateResult([string]$State, [string]$Reason, [object[]]$Checks) {
@@ -54,6 +62,7 @@ function Get-SonarGateState {
     param([object[]]$CheckRuns, [datetime]$Now = [datetime]::UtcNow)
     $job = Select-LatestCheck $CheckRuns $script:Config.SonarWorkflowCheck
     $gate = Select-LatestCheck $CheckRuns $script:Config.SonarGateCheck
+    if ($job -and $gate -and -not (Test-ResultIsCurrent $gate @($job))) { $gate = $null }   # previous attempt's result
     $checks = @($job, $gate)
 
     if (-not $job -and -not $gate) { return New-GateResult 'MISSING' 'SonarQube Cloud workflow has not started for this head SHA.' $checks }
@@ -88,6 +97,7 @@ function Get-CodeQLGateState {
     $names = @($CheckRuns | Where-Object { $_.name -match $script:Config.CodeQLAnalyzeRegex } | ForEach-Object name | Sort-Object -Unique)
     $jobs = @($names | ForEach-Object { Select-LatestCheck $CheckRuns $_ })
     $gate = Select-LatestCheck $CheckRuns $script:Config.CodeQLGateCheck
+    if ($gate -and $jobs.Count -and -not (Test-ResultIsCurrent $gate $jobs)) { $gate = $null }   # previous attempt's result
     $checks = @($jobs) + @($gate)
 
     if ($jobs.Count -eq 0 -and -not $gate) { return New-GateResult 'MISSING' 'CodeQL has not started for this head SHA (is code scanning default setup enabled?).' $checks }
@@ -116,6 +126,15 @@ function Get-OverallState([object[]]$Gates) {
     'READY_FOR_COPILOT'
 }
 
+# -Wait keeps polling while the result can still change. Right after a push GitHub may not have
+# registered the analyzers' checks yet, so MISSING counts as "not started yet" during a startup grace.
+function Test-KeepWaiting([string]$Overall, [object[]]$Gates, [double]$ElapsedSeconds, [double]$StartupGraceSeconds) {
+    if ($Overall -eq 'PENDING') { return $true }
+    if ($Overall -ne 'BLOCKED' -or $ElapsedSeconds -ge $StartupGraceSeconds) { return $false }
+    # Only MISSING (no red, no failure) may still turn into a real result.
+    @($Gates | Where-Object { $_.state -notin 'GREEN', 'MISSING' }).Count -eq 0
+}
+
 # ---------------------------------------------------------------------------------------------
 # Data access (gh CLI for GitHub, public web API for SonarQube Cloud)
 
@@ -137,9 +156,15 @@ function Get-PrInfo([string]$Repo, [int]$Pr) {
     Invoke-Gh $ghArgs | ConvertFrom-Json
 }
 
-function Get-CheckRuns([string]$Repo, [string]$Sha) {
-    $json = Invoke-Gh @('api', '--paginate', "repos/$Repo/commits/$Sha/check-runs?per_page=100", '--jq', '.check_runs[]')
+# All items of a paginated REST list. `gh api --paginate` prints one JSON document per page, which
+# is not one valid JSON value, so emit one item per line with --jq and parse each line.
+function Invoke-GhList([string]$Path, [string]$Jq = '.[]') {
+    $json = Invoke-Gh @('api', '--paginate', $Path, '--jq', $Jq)
     @($json -split "`n" | Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })
+}
+
+function Get-CheckRuns([string]$Repo, [string]$Sha) {
+    Invoke-GhList "repos/$Repo/commits/$Sha/check-runs?per_page=100" '.check_runs[]'
 }
 
 function Invoke-SonarApi([string]$Path) {
@@ -147,6 +172,22 @@ function Invoke-SonarApi([string]$Path) {
     # Public projects need no token; a private project can use SONAR_TOKEN from the environment.
     if ($env:SONAR_TOKEN) { $headers.Authorization = "Bearer $($env:SONAR_TOKEN)" }
     Invoke-RestMethod -Uri "https://sonarcloud.io/api/$Path" -Headers $headers
+}
+
+# Every page of a Sonar search endpoint; throws rather than returning a silently truncated list.
+function Get-SonarAll([string]$Path, [string]$ItemsProperty, [int]$PageSize = 500, [int]$MaxPages = 20) {
+    $items = [System.Collections.Generic.List[object]]::new()
+    for ($p = 1; $p -le $MaxPages; $p++) {
+        $page = Invoke-SonarApi "$Path&ps=$PageSize&p=$p"
+        $batch = @($page.$ItemsProperty)
+        $batch | ForEach-Object { $items.Add($_) }
+        $total = if ($page.PSObject.Properties['paging']) { [int]$page.paging.total } elseif ($page.PSObject.Properties['total']) { [int]$page.total } else { $items.Count }
+        if ($items.Count -ge $total -or $batch.Count -eq 0) {
+            if ($items.Count -lt $total) { throw "Sonar $ItemsProperty incomplete: got $($items.Count) of $total" }
+            return $items.ToArray()
+        }
+    }
+    throw "Sonar $ItemsProperty incomplete: more than $($MaxPages * $PageSize) results"
 }
 
 function Get-GateReport([string]$Repo, [int]$Pr) {
@@ -204,6 +245,7 @@ function Get-FindingFingerprint([string]$Source, [string]$Rule, [string]$Path, [
     ([System.Convert]::ToHexString($bytes)).Substring(0, 12).ToLowerInvariant()
 }
 
-Export-ModuleMember -Function Get-PrGatesConfig, Select-LatestCheck, Get-SonarGateState, Get-CodeQLGateState,
-    Get-OverallState, Invoke-Gh, Get-RepoSlug, Get-PrInfo, Get-CheckRuns, Invoke-SonarApi, Get-GateReport,
+Export-ModuleMember -Function Get-PrGatesConfig, Select-LatestCheck, Test-ResultIsCurrent, Get-SonarGateState,
+    Get-CodeQLGateState, Get-OverallState, Test-KeepWaiting, Invoke-Gh, Invoke-GhList, Get-RepoSlug, Get-PrInfo,
+    Get-CheckRuns, Invoke-SonarApi, Get-SonarAll, Get-GateReport,
     Get-StatePath, Read-FeedbackState, Write-FeedbackState, Get-FindingFingerprint
