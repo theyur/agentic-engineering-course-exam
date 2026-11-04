@@ -179,6 +179,8 @@ function Test-CopilotLogin([string]$Login) { $Login -in $script:CopilotReviewerL
 # "a Copilot re-review is pending" (the timeline names the requested reviewer just "Copilot").
 function Test-CopilotLike([string]$Login) { [bool]($Login -match '(?i)copilot') }
 
+$script:StatusRank = @{ resolved = 1; unknown = 2; open = 3 }
+
 function Test-CopilotOverview([string]$Body) { [bool]($Body -and $Body -match '<!--\s*ccr-overview-v\d+\s*-->') }
 
 # Verdict line of the overview: "### 🟢 Approval recommended", "### 🟡 Changes recommended",
@@ -204,8 +206,9 @@ function Get-CopilotOverviewStatus([string]$Body) {
                 else { 'unknown' }
         foreach ($l in [regex]::Matches($d.Groups[2].Value, '#discussion_r(\d+)')) {
             $id = $l.Groups[1].Value
-            # A finding listed both as open and resolved is contradictory: open wins.
-            if (-not $status.ContainsKey($id) -or $kind -eq 'open') { $status[$id] = $kind }
+            # A finding listed in several sections is contradictory: the least-resolved status wins,
+            # whatever the order (open > unknown > resolved), so contradictions fail closed.
+            if (-not $status.ContainsKey($id) -or $script:StatusRank[$kind] -gt $script:StatusRank[$status[$id]]) { $status[$id] = $kind }
         }
     }
     $status
@@ -304,13 +307,16 @@ function Get-ThreadResolution {
 }
 
 # Right before resolving, the thread is read again. The decision stands only if nothing changed:
-# still unresolved, same number of comments, same last comment. Otherwise a reply or resolution
-# arrived after the decision was made and the thread is left alone.
-#   Before: { commentCount; lastCommentId }   Now: { isResolved; commentCount; lastCommentId }
+# still unresolved, same number of comments, same last comment - same id, same updatedAt and same
+# text (an edit from "Fixed in ..." to "Not changed: ..." keeps the id). Otherwise a reply, edit or
+# resolution arrived after the decision was made and the thread is left alone.
+#   Before / Now: { isResolved; commentCount; lastCommentId; lastCommentUpdatedAt; lastCommentBody }
 function Test-ThreadUnchanged($Before, $Now) {
     if (-not $Before -or -not $Now) { return $false }
     (-not $Now.isResolved) -and [int]$Now.commentCount -eq [int]$Before.commentCount -and
-        "$($Now.lastCommentId)" -eq "$($Before.lastCommentId)" -and "$($Now.lastCommentId)" -ne ''
+        "$($Now.lastCommentId)" -eq "$($Before.lastCommentId)" -and "$($Now.lastCommentId)" -ne '' -and
+        "$($Now.lastCommentUpdatedAt)" -eq "$($Before.lastCommentUpdatedAt)" -and
+        [string]$Now.lastCommentBody -ceq [string]$Before.lastCommentBody
 }
 
 # Right before each mutation, the re-review state is computed again from fresh reviews AND

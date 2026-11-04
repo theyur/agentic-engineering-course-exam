@@ -77,7 +77,7 @@ query($owner: String!, $name: String!, $number: Int!) {
           comments(first: 50) {
             pageInfo { hasNextPage }
             nodes {
-              databaseId author { __typename login } body createdAt
+              databaseId author { __typename login } body createdAt updatedAt
               pullRequestReview { databaseId } originalCommit { oid }
             }
           }
@@ -98,7 +98,9 @@ query($owner: String!, $name: String!, $number: Int!) {
                 originalCommit = $(($_.comments.nodes | Select-Object -First 1).originalCommit.oid)
                 commentCount = @($_.comments.nodes).Count
                 lastCommentId = $(($_.comments.nodes | Select-Object -Last 1).databaseId)
-                comments = @($_.comments.nodes | ForEach-Object {
+                lastCommentUpdatedAt = $("$(($_.comments.nodes | Select-Object -Last 1).updatedAt)")
+                lastCommentBody = $(($_.comments.nodes | Select-Object -Last 1).body)
+                comments =@($_.comments.nodes | ForEach-Object {
                         [pscustomobject]@{ databaseId = $_.databaseId; author = $(if ($_.author) { $_.author.login } else { '' })
                             authorType = $(if ($_.author) { $_.author.__typename } else { '' }); canPush = $false
                             body = $_.body; createdAt = $_.createdAt
@@ -170,7 +172,7 @@ query($owner: String!, $name: String!, $number: Int!) {
     $skipped = @()
     if ($Apply) {
         $mutation = 'mutation($id: ID!) { resolveReviewThread(input: { threadId: $id, resolutionReason: ADDRESSED }) { thread { id isResolved } } }'
-        $reread = 'query($id: ID!) { node(id: $id) { ... on PullRequestReviewThread { isResolved comments(last: 1) { totalCount nodes { databaseId } } } } }'
+        $reread = 'query($id: ID!) { node(id: $id) { ... on PullRequestReviewThread { isResolved comments(last: 1) { totalCount nodes { databaseId updatedAt body } } } } }'
         $authorizing = if ($reReview.review) { "$($reReview.review.id)" } else { '' }
         foreach ($d in @($decisions | Where-Object decision -eq 'RESOLVE')) {
             # Everything the decision rested on, read again right before the mutation.
@@ -188,7 +190,9 @@ query($owner: String!, $name: String!, $number: Int!) {
             $before = $threads | Where-Object id -eq $d.threadId | Select-Object -First 1
             $node = (Invoke-Gh @('api', 'graphql', '-f', "query=$reread", '-F', "id=$($d.threadId)") | ConvertFrom-Json).data.node
             $now = [pscustomobject]@{ isResolved = $node.isResolved; commentCount = $node.comments.totalCount
-                lastCommentId = $(@($node.comments.nodes) | Select-Object -Last 1 | ForEach-Object databaseId) }
+                lastCommentId = $(@($node.comments.nodes) | Select-Object -Last 1 | ForEach-Object databaseId)
+                lastCommentUpdatedAt = $("$(@($node.comments.nodes) | Select-Object -Last 1 | ForEach-Object updatedAt)")
+                lastCommentBody = $(@($node.comments.nodes) | Select-Object -Last 1 | ForEach-Object body) }
             if (-not (Test-ThreadUnchanged $before $now)) {
                 $d.decision = 'KEEP'; $d.reason = 'Thread changed after evaluation (new comment or resolved meanwhile); left alone - re-run.'
                 $skipped += $d.threadId

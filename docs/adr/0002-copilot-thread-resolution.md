@@ -87,7 +87,9 @@ How it runs:
 
 - The script is a dry run by default. `-Apply` uses `resolveReviewThread` with `resolutionReason:
   ADDRESSED`. Right before each mutation it re-checks the head SHA and Copilot's latest review, and
-  re-reads the thread. A thread with a new comment or a changed state is left alone. A small window
+  re-reads the thread. A thread with a new comment, an edited last comment (`updatedAt` or text)
+  or a changed state is left alone. A finding the overview lists under contradictory sections takes
+  the least-resolved status (open > unknown > resolved). A small window
   between that re-read and the mutation remains; GitHub offers no conditional resolve.
 - Already-resolved threads are never touched, so re-runs are no-ops.
 - It reads GitHub and writes thread state only. It does not touch checks, so it cannot affect

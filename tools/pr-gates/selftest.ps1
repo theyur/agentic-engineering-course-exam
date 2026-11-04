@@ -22,7 +22,10 @@ function Wf([string]$Status = 'completed', [string]$Conclusion = 'success', [str
 }
 
 $failures = [System.Collections.Generic.List[string]]::new()
+# Every assertion goes through Expect, which counts it: the reported total is what actually ran.
+$script:expectCount = 0
 function Expect([string]$Case, [string]$Actual, [string]$Expected) {
+    $script:expectCount++
     if ($Actual -ne $Expected) { $failures.Add("$Case : got $Actual, expected $Expected") }
 }
 
@@ -225,11 +228,24 @@ Expect 'rereview: only a dismissed review'          (Get-CopilotReReviewState -H
 Expect 'rereview: pending (unsubmitted) ignored'    (Get-CopilotReReviewState -HeadSha $H -Events @() -Reviews @((Rev 2 $H '2026-11-04T21:05:07Z' -State 'PENDING'))).state 'NO_REVIEW'
 Expect 'rereview: APPROVED state counts'            (Get-CopilotReReviewState -HeadSha $H -Events @() -Reviews @((Rev 2 $H '2026-11-04T21:05:07Z' -State 'APPROVED'))).state 'READY'
 # Re-read before the mutation: any change means the decision is stale.
-$snap = [pscustomobject]@{ commentCount = 2; lastCommentId = 200 }
-Expect 'reread: unchanged'          (Test-ThreadUnchanged $snap ([pscustomobject]@{ isResolved = $false; commentCount = 2; lastCommentId = 200 })) 'True'
-Expect 'reread: new comment'        (Test-ThreadUnchanged $snap ([pscustomobject]@{ isResolved = $false; commentCount = 3; lastCommentId = 300 })) 'False'
-Expect 'reread: comment replaced'   (Test-ThreadUnchanged $snap ([pscustomobject]@{ isResolved = $false; commentCount = 2; lastCommentId = 300 })) 'False'
-Expect 'reread: resolved meanwhile' (Test-ThreadUnchanged $snap ([pscustomobject]@{ isResolved = $true;  commentCount = 2; lastCommentId = 200 })) 'False'
+function Snap([bool]$Resolved = $false, [int]$Count = 2, [long]$Id = 200, [string]$At = '2026-11-04T21:00:22Z', [string]$Body = 'Fixed in fffffff: done.') {
+    [pscustomobject]@{ isResolved = $Resolved; commentCount = $Count; lastCommentId = $Id; lastCommentUpdatedAt = $At; lastCommentBody = $Body }
+}
+$snap = Snap
+Expect 'reread: unchanged'          (Test-ThreadUnchanged $snap (Snap)) 'True'
+Expect 'reread: new comment'        (Test-ThreadUnchanged $snap (Snap -Count 3 -Id 300)) 'False'
+Expect 'reread: comment replaced'   (Test-ThreadUnchanged $snap (Snap -Id 300)) 'False'
+Expect 'reread: resolved meanwhile' (Test-ThreadUnchanged $snap (Snap -Resolved $true)) 'False'
+Expect 'reread: reply edited (text)' (Test-ThreadUnchanged $snap (Snap -At '2026-11-04T21:09:00Z' -Body 'Not changed: on reflection.')) 'False'
+Expect 'reread: edited, same text'  (Test-ThreadUnchanged $snap (Snap -At '2026-11-04T21:09:00Z')) 'False'
+Expect 'reread: text differs only'  (Test-ThreadUnchanged $snap (Snap -Body 'Not changed: on reflection.')) 'False'
+# Contradictory overview sections: least-resolved status wins, in either order.
+$both = { param([string[]]$Headings) (Get-CopilotOverviewStatus (Overview -Sections (($Headings | ForEach-Object { Section $_ 101 }) -join '')))['101'] }
+Expect 'overview: resolved then unknown' (& $both @('1 resolved since last review', 'Addressed maybe')) 'unknown'
+Expect 'overview: unknown then resolved' (& $both @('Addressed maybe', '1 resolved since last review')) 'unknown'
+Expect 'overview: unknown then open'     (& $both @('Addressed maybe', '1 open issue')) 'open'
+Expect 'overview: open then unknown'     (& $both @('1 open issue', 'Addressed maybe')) 'open'
+Expect 'overview: open then resolved'    (& $both @('1 open issue', '1 resolved since last review')) 'open'
 Expect 'reread: thread unreadable'  (Test-ThreadUnchanged $snap $null) 'False'
 Expect 'login: exact reviewer (GraphQL)' (Test-CopilotLogin 'copilot-pull-request-reviewer') 'True'
 Expect 'login: exact reviewer (REST)'    (Test-CopilotLogin 'copilot-pull-request-reviewer[bot]') 'True'
@@ -253,7 +269,7 @@ Expect 'recheck: no authorizing review'   (Test-ReReviewStillValid '' (& $readyO
 Expect 'recheck: no state'                (Test-ReReviewStillValid '2' $null) 'False'
 # The real pending case: events after the latest review flip READY to PENDING.
 Expect 'recheck: requested after review'  (Test-ReReviewStillValid '2' (Get-CopilotReReviewState -Reviews @($r2) -HeadSha $H -Events @((Evt review_requested '2026-11-04T21:10:00Z' Copilot)))) 'False'
-$hardeningCases = 4 + 5 + 3 + 5 + 7
+$hardeningCases = 4 + 8 + 5 + 3 + 5 + 7
 # Qualifying thread with no usable re-review: wait, never resolve.
 $prLevel = @('PENDING', 'NOT_ON_HEAD', 'UNKNOWN_FORMAT', 'NO_REVIEW')
 foreach ($s in $prLevel) {
@@ -309,7 +325,10 @@ foreach ($c in $hookCases) {
     Expect $c.n "$LASTEXITCODE" "$($c.e)"
 }
 
-$total = $sonar.Count + $codeql.Count + 5 + $wait.Count + 2 + $resolutionCases + $hookCases.Count
+$total = $script:expectCount
+# Cross-check the hand-kept per-section tallies against what ran (catches a section silently skipped).
+$tallied = $sonar.Count + $codeql.Count + 5 + $wait.Count + 2 + $resolutionCases + $hookCases.Count
+if ($tallied -ne $total) { $failures.Add("case count: sections tally $tallied, but $total assertions ran") }
 if ($failures.Count) {
     'FAILED'
     $failures | ForEach-Object { "  $_" }
