@@ -20,6 +20,9 @@ $script:Config = [ordered]@{
     SonarGateCheck     = 'SonarCloud Code Analysis'  # posted by the SonarQube Cloud app
     CodeQLGateCheck    = 'CodeQL'                    # posted by GitHub Advanced Security (code scanning)
     CodeQLAnalyzeRegex = '^Analyze \('               # per-language jobs of the CodeQL default setup
+    # The default setup's workflow run (its name is "PR #N", so match the path). It exists from the
+    # start and completes only after every language job, including jobs not registered as check runs yet.
+    CodeQLWorkflowPath = 'dynamic/github-code-scanning/codeql'
     # How long after the analysis job finished a missing gate check still counts as "on its way".
     GateCheckGraceSeconds = 180
 }
@@ -93,21 +96,31 @@ function Get-SonarGateState {
 }
 
 function Get-CodeQLGateState {
-    param([object[]]$CheckRuns, [datetime]$Now = [datetime]::UtcNow)
+    # WorkflowRuns: Actions workflow runs for the head SHA. The CodeQL default-setup run is the
+    # authoritative "all languages done" signal: the results check is updated per language upload,
+    # and a language whose job is not yet registered as a check run would otherwise be invisible.
+    # Without that run (e.g. an advanced setup), the visible Analyze jobs are all there is.
+    param([object[]]$CheckRuns, [object[]]$WorkflowRuns = @(), [datetime]$Now = [datetime]::UtcNow)
     $names = @($CheckRuns | Where-Object { $_.name -match $script:Config.CodeQLAnalyzeRegex } | ForEach-Object name | Sort-Object -Unique)
     $jobs = @($names | ForEach-Object { Select-LatestCheck $CheckRuns $_ })
     $gate = Select-LatestCheck $CheckRuns $script:Config.CodeQLGateCheck
     if ($gate -and $jobs.Count -and -not (Test-ResultIsCurrent $gate $jobs)) { $gate = $null }   # previous attempt's result
-    $checks = @($jobs) + @($gate)
+    $run = @($WorkflowRuns | Where-Object { $_ -and $_.PSObject.Properties['path'] -and $_.path -eq $script:Config.CodeQLWorkflowPath }) |
+        Sort-Object { [long]$_.id } | Select-Object -Last 1
+    $checks = @($run) + @($jobs) + @($gate)
 
-    if ($jobs.Count -eq 0 -and -not $gate) { return New-GateResult 'MISSING' 'CodeQL has not started for this head SHA (is code scanning default setup enabled?).' $checks }
+    if ($jobs.Count -eq 0 -and -not $gate -and -not $run) { return New-GateResult 'MISSING' 'CodeQL has not started for this head SHA (is code scanning default setup enabled?).' $checks }
+    # A re-run keeps the run id and resets its status, so this also covers re-runs.
+    if ($run -and $run.status -ne 'completed') { return New-GateResult 'PENDING' 'CodeQL workflow run is still in progress (not every language has finished).' $checks }
     $running = @($jobs | Where-Object { $_.status -ne 'completed' })
     if ($running.Count) { return New-GateResult 'PENDING' "CodeQL analysis running: $(($running.name) -join ', ')." $checks }
     $broken = @($jobs | Where-Object { $_.conclusion -ne 'success' })
     if ($broken.Count) { return New-GateResult 'INFRA_FAILED' "CodeQL analysis did not complete: $(($broken | ForEach-Object { "$($_.name)=$($_.conclusion)" }) -join ', ')." $checks }
+    if ($run -and $run.conclusion -ne 'success') { return New-GateResult 'INFRA_FAILED' "CodeQL workflow run ended '$($run.conclusion)'." $checks }
 
     if (-not $gate) {
         $last = $jobs | Sort-Object { [datetime]$_.completed_at } | Select-Object -Last 1
+        if (-not $last -and $run) { $last = [pscustomobject]@{ completed_at = $run.updated_at } }   # runs have no completed_at
         if ($last -and (Test-WithinGrace $last $Now)) { return New-GateResult 'PENDING' 'Analysis finished; waiting for the CodeQL results check.' $checks }
         return New-GateResult 'MISSING' "Analysis finished but no '$($script:Config.CodeQLGateCheck)' results check was posted." $checks
     }
@@ -167,6 +180,10 @@ function Get-CheckRuns([string]$Repo, [string]$Sha) {
     Invoke-GhList "repos/$Repo/commits/$Sha/check-runs?per_page=100" '.check_runs[]'
 }
 
+function Get-WorkflowRuns([string]$Repo, [string]$Sha) {
+    Invoke-GhList "repos/$Repo/actions/runs?head_sha=$Sha&per_page=100" '.workflow_runs[]'
+}
+
 function Invoke-SonarApi([string]$Path) {
     $headers = @{}
     # Public projects need no token; a private project can use SONAR_TOKEN from the environment.
@@ -193,10 +210,11 @@ function Get-SonarAll([string]$Path, [string]$ItemsProperty, [int]$PageSize = 50
 function Get-GateReport([string]$Repo, [int]$Pr) {
     $info = Get-PrInfo $Repo $Pr
     $runs = Get-CheckRuns $Repo $info.headRefOid
+    $workflowRuns = Get-WorkflowRuns $Repo $info.headRefOid
     $now = [datetime]::UtcNow
     $gates = [ordered]@{
         sonar  = Get-SonarGateState -CheckRuns $runs -Now $now
-        codeql = Get-CodeQLGateState -CheckRuns $runs -Now $now
+        codeql = Get-CodeQLGateState -CheckRuns $runs -WorkflowRuns $workflowRuns -Now $now
     }
     # The head can move while we read; a report for an old head is useless.
     $headNow = (Get-PrInfo $Repo $info.number).headRefOid
@@ -247,5 +265,5 @@ function Get-FindingFingerprint([string]$Source, [string]$Rule, [string]$Path, [
 
 Export-ModuleMember -Function Get-PrGatesConfig, Select-LatestCheck, Test-ResultIsCurrent, Get-SonarGateState,
     Get-CodeQLGateState, Get-OverallState, Test-KeepWaiting, Invoke-Gh, Invoke-GhList, Get-RepoSlug, Get-PrInfo,
-    Get-CheckRuns, Invoke-SonarApi, Get-SonarAll, Get-GateReport,
+    Get-CheckRuns, Get-WorkflowRuns, Invoke-SonarApi, Get-SonarAll, Get-GateReport,
     Get-StatePath, Read-FeedbackState, Write-FeedbackState, Get-FindingFingerprint

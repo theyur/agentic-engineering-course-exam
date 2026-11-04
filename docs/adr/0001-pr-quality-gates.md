@@ -24,9 +24,12 @@ looks at the PR.
   gate evaluation keys on the head SHA, and CodeQL alerts are read from `refs/pull/N/head` (merge
   ref as fallback for an advanced setup, tied back to the head via the merge commit's parent).
 - The `CodeQL` results check aggregates every language's upload and is updated in place (its
-  `completed_at` stays at the first upload), so the gate also requires every `Analyze (…)` job to
-  have finished. Verified on demo PR #12: two C# alerts, uploaded after the check's
-  `completed_at`, turned the check red.
+  `completed_at` stays at the first upload), so the gate trusts it only after the CodeQL
+  default-setup **workflow run** for the head SHA (path `dynamic/github-code-scanning/codeql`) has
+  completed successfully. That run exists from the start and covers every language job, including
+  jobs not yet registered as check runs. Verified on demo PR #12: two C# alerts, uploaded after
+  the check's `completed_at`, turned the check red. Without that run (e.g. an advanced CodeQL
+  workflow) the gate falls back to the `Analyze (…)` check runs it can see.
 - **Gate evaluation** lives in `tools/pr-gates/` (PowerShell, offline self-test). Only
   `GREEN` + `GREEN` on the current head counts as ready.
 - **Copilot code review is requested manually** by the user once both gates are green. Nothing
