@@ -41,5 +41,7 @@ looks at the PR.
   secret, and a privileged job that only reads check results and never executes PR code — deferred.
 - The branch ruleset does not require the gate checks; the human merging is the enforcement point.
   Adding `SonarCloud Code Analysis` and `CodeQL` as required checks is a one-step tightening.
+- Coverage is collected for .NET only, so repo scripts (`tools/**`, `.claude/hooks/**`) are in
+  `sonar.coverage.exclusions`; Sonar still reports issues in them, and their self-tests cover them.
 - `master` currently fails the Sonar gate on `new_coverage` (0% vs 80%) because there are no unit
   tests yet; it clears as features land with tests. The threshold stays.
