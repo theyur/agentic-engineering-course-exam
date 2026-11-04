@@ -47,13 +47,22 @@ head of this clone moved. Still, do not put destructive commands in case files.
 
 ## Cases
 
-`cases/*.json` are arrays of `{ "cmd": "...", "tool": "Bash" | "PowerShell", "expect": "allow" | "block" }`
-(`tool` defaults to Bash; `expect` is optional). Placeholders: `{SANDBOX}`, `{SANDBOX_BASH}`
-(Git Bash form `/e/...`), `{CLONE}`, `{CLONE_WIN}` (main checkout root).
+`cases/*.json` are arrays of `{ "cmd": "...", "tool": "Bash" | "PowerShell", "expect": "allow" | "block", "reason": "...", "hooksPath": "...", "worktreeOnly": true }`
+(`tool` defaults to Bash; the rest is optional). `reason` is text the guard's block message must
+contain. `hooksPath` is the `core.hooksPath` value the guard sees for that case, in every worktree
+(default `.githooks`). `worktreeOnly` cases need the oracle to run from a linked worktree, so that
+`{CLONE}` and `{WORKTREE}` differ; they count as `SKIPPED` when it runs from the main checkout.
+Placeholders, in `cmd` and `hooksPath`: `{SANDBOX}`, `{SANDBOX_BASH}` (Git Bash form `/e/...`),
+`{CLONE}`, `{CLONE_WIN}`, `{CLONE_WIN_UPPER}` (main checkout root), `{WORKTREE}`, `{WORKTREE_WIN}`
+(root of the checkout running the oracle).
 
 - `realistic.json` — commit commands Claude actually writes; all `expect: allow`.
 - `rules.json` — one or more cases per rule the guard enforces.
 - `adversarial.json` — constructs from review findings and adversarial rounds.
+- `hookspath.json` — which `core.hooksPath` values count as the hook being enabled: `.githooks`, or
+  an absolute path to the `.githooks` folder of the main checkout or this worktree (the desktop app
+  writes one into each worktree's `config.worktree`). Everything else is blocked. The value is
+  checked in every worktree the command can commit in (`cd`, `git -C`), not only the start directory.
 
 When a review or a new idea finds a way around the guard, add the command here first, see it
 reported as `BYPASS`, then fix the guard until the whole run passes again.

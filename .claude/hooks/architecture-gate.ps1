@@ -59,6 +59,15 @@ function Test-Path-Argument([string]$word, [string]$token) {
     elseif ($path -split '[\\/]' -contains '..') {
         Block "'$word $token' may leave this clone; use an absolute path inside it."
     }
+    Add-Directory $path
+}
+
+# Directories git may run in: the start directory plus every cd / -C target, a relative one resolved
+# against each directory collected before it. An over-approximation; the hook setup of each is checked.
+function Add-Directory([string]$path) {
+    $new = if ([System.IO.Path]::IsPathRooted($path)) { @([System.IO.Path]::GetFullPath($path)) }
+    else { @($script:directories | ForEach-Object { [System.IO.Path]::GetFullPath($path, $_) }) }
+    $script:directories = @($script:directories + $new | Select-Object -Unique)
 }
 
 function Test-CommitArguments([string[]]$arguments) {
@@ -218,6 +227,35 @@ function Test-SimpleCommand([string[]]$words) {
     }
 }
 
+# core.hooksPath of the worktree at $root enables the hook when it names the .githooks folder (holding
+# pre-commit) of the main checkout or of that worktree: the relative '.githooks' (git resolves it
+# against the worktree root), or an absolute path to either folder, as the desktop app writes into
+# config.worktree.
+function Test-HooksPath([string]$value, [string]$root) {
+    $allowed = @(($script:cloneRoots[0] + '.githooks'), ($root + '.githooks'))
+    if ([string]::Equals($value, '.githooks', $script:pathComparison)) { $full = $allowed[1] }
+    elseif (($IsWindows -and $value -match '^[A-Za-z]:[\\/]') -or (-not $IsWindows -and $value.StartsWith('/'))) {
+        $full = [System.IO.Path]::GetFullPath($value).TrimEnd('\', '/')
+    }
+    else { return $false }
+    if (-not ($allowed | Where-Object { [string]::Equals($_, $full, $script:pathComparison) })) { return $false }
+    return Test-Path -LiteralPath (Join-Path $full 'pre-commit') -PathType Leaf
+}
+
+# The worktree of this clone that git uses in $dir (a directory not created yet: its nearest parent).
+function Get-WorktreeRoot([string]$dir) {
+    $existing = $dir
+    while ($existing -and -not (Test-Path -LiteralPath $existing -PathType Container)) { $existing = Split-Path $existing }
+    if (-not $existing) { Block "cannot check the git setup of '$dir'." }
+    $top = & git -C $existing rev-parse --show-toplevel 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $top) { Block "cannot check the git setup of '$dir'." }
+    $root = [System.IO.Path]::GetFullPath([string]$top).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+    if (-not ($script:cloneRoots | Where-Object { [string]::Equals($_, $root, $script:pathComparison) })) {
+        Block "'$dir' is not in a worktree of this clone, whose architecture hook setup is the only one checked."
+    }
+    return $root
+}
+
 try {
     $inputJson = [Console]::In.ReadToEnd() | ConvertFrom-Json
     $command = [string]$inputJson.tool_input.command
@@ -238,14 +276,20 @@ try {
         [System.IO.Path]::GetFullPath($_.Substring(9)).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
     })
 
+    $script:pathComparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    $script:directories = @([System.IO.Path]::GetFullPath($script:cwd))
     $script:commits = 0
     Test-Command $command
 
-    # The pre-commit hook only runs when this clone points core.hooksPath at it.
+    # The pre-commit hook only runs when core.hooksPath points at it. With extensions.worktreeConfig each
+    # worktree can set its own value, so check every worktree the command may commit in.
     if ($script:commits -gt 0) {
-        $hooksPath = & git -C $script:cwd config --get core.hooksPath 2>$null
-        if ($hooksPath -ne '.githooks') {
-            Block "the architecture pre-commit hook is not enabled (core.hooksPath is '$hooksPath'). Run: git config core.hooksPath .githooks"
+        $roots = @($script:directories | ForEach-Object { Get-WorktreeRoot $_ } | Select-Object -Unique)
+        foreach ($root in $roots) {
+            $hooksPath = & git -C $root config --get core.hooksPath 2>$null
+            if (-not (Test-HooksPath ([string]$hooksPath) $root)) {
+                Block "the architecture pre-commit hook is not enabled in '$root' (core.hooksPath is '$hooksPath'). Run: git config core.hooksPath .githooks"
+            }
         }
     }
 }
