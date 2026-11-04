@@ -218,6 +218,24 @@ function Test-SimpleCommand([string[]]$words) {
     }
 }
 
+# core.hooksPath enables the hook when it names the .githooks folder (holding pre-commit) of the main
+# checkout or of the worktree being committed in: the relative '.githooks' (git resolves it against the
+# worktree root), or an absolute path to either folder, as the desktop app writes into config.worktree.
+function Test-HooksPath([string]$value) {
+    $worktreeRoot = & git -C $script:cwd rev-parse --show-toplevel 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $worktreeRoot) { return $false }
+    $roots = @($script:cloneRoots[0], ([System.IO.Path]::GetFullPath([string]$worktreeRoot).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar))
+    $allowed = @($roots | ForEach-Object { $_ + '.githooks' })
+    if ($value -ceq '.githooks') { $full = $allowed[1] }
+    elseif (($IsWindows -and $value -match '^[A-Za-z]:[\\/]') -or (-not $IsWindows -and $value.StartsWith('/'))) {
+        $full = [System.IO.Path]::GetFullPath($value).TrimEnd('\', '/')
+    }
+    else { return $false }
+    $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    if (-not ($allowed | Where-Object { [string]::Equals($_, $full, $comparison) })) { return $false }
+    return Test-Path -LiteralPath (Join-Path $full 'pre-commit') -PathType Leaf
+}
+
 try {
     $inputJson = [Console]::In.ReadToEnd() | ConvertFrom-Json
     $command = [string]$inputJson.tool_input.command
@@ -244,7 +262,7 @@ try {
     # The pre-commit hook only runs when this clone points core.hooksPath at it.
     if ($script:commits -gt 0) {
         $hooksPath = & git -C $script:cwd config --get core.hooksPath 2>$null
-        if ($hooksPath -ne '.githooks') {
+        if (-not (Test-HooksPath ([string]$hooksPath))) {
             Block "the architecture pre-commit hook is not enabled (core.hooksPath is '$hooksPath'). Run: git config core.hooksPath .githooks"
         }
     }

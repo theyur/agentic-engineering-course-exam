@@ -171,10 +171,11 @@ function Invoke-Truth([string]$command, [string]$tool) {
         Stderr = ($stderr.Result -split "`n" | Select-Object -First 2) -join ' | ' }
 }
 
-function Invoke-Guard([string]$command, [string]$tool) {
+function Invoke-Guard([string]$command, [string]$tool, [string]$hooksPath = '.githooks') {
     $json = @{ cwd = $sandbox; hook_event_name = 'PreToolUse'; tool_name = $tool; tool_input = @{ command = $command } } | ConvertTo-Json -Compress
-    # Judge the guard as if the pre-commit hook is enabled, whatever this clone's own setting is.
-    $env:GIT_CONFIG_COUNT = '1'; $env:GIT_CONFIG_KEY_0 = 'core.hooksPath'; $env:GIT_CONFIG_VALUE_0 = '.githooks'
+    # Judge the guard as if the pre-commit hook is enabled (or as the case's hooksPath says), whatever
+    # this clone's own setting is: command-scope config outranks local and worktree config.
+    $env:GIT_CONFIG_COUNT = '1'; $env:GIT_CONFIG_KEY_0 = 'core.hooksPath'; $env:GIT_CONFIG_VALUE_0 = $hooksPath
     try { $out = $json | pwsh -NoProfile -File $GuardPath 2>&1; $exit = $LASTEXITCODE }
     finally { Remove-Item Env:GIT_CONFIG_COUNT, Env:GIT_CONFIG_KEY_0, Env:GIT_CONFIG_VALUE_0 }
     [pscustomobject]@{ Exit = $exit; Reason = (($out | Select-String 'BLOCKED') -join ' ') }
@@ -182,7 +183,9 @@ function Invoke-Guard([string]$command, [string]$tool) {
 
 function Expand-Placeholders([string]$command) {
     $command.Replace('{SANDBOX_BASH}', $sandboxBash).Replace('{SANDBOX}', ($sandbox -replace '\\', '/')).
-        Replace('{CLONE_WIN}', ($cloneRoot -replace '/', '\')).Replace('{CLONE}', ($cloneRoot -replace '\\', '/'))
+        Replace('{CLONE_WIN}', ($cloneRoot -replace '/', '\')).Replace('{CLONE}', ($cloneRoot -replace '\\', '/')).
+        Replace('{CLONE_WIN_UPPER}', ($cloneRoot -replace '/', '\').ToUpperInvariant()).
+        Replace('{WORKTREE_WIN}', ($repoRoot -replace '/', '\')).Replace('{WORKTREE}', ($repoRoot -replace '\\', '/'))
 }
 
 $failures = 0
@@ -206,20 +209,22 @@ try {
         foreach ($case in $cases) {
             $tool = if ($case.tool) { $case.tool } else { 'Bash' }
             $command = Expand-Placeholders $case.cmd
-            $verdict = Invoke-Guard $command $tool
+            $hooksPath = if ($null -ne $case.hooksPath) { Expand-Placeholders $case.hooksPath } else { '.githooks' }
+            $verdict = Invoke-Guard $command $tool $hooksPath
             $truth = Invoke-Truth $command $tool
             if ((Get-HeadSnapshot) -ne $heads) { throw "a test command changed a branch head in this clone; aborting: $($case.cmd)" }
             $violations = @($truth.Records | ForEach-Object { Get-Violations $_ })
             $allowed = $verdict.Exit -eq 0
             $class = if ($violations.Count -and $allowed) { 'BYPASS' }
             elseif ($case.expect -and $case.expect -ne ($allowed ? 'allow' : 'block')) { 'EXPECT_FAIL' }
+            elseif ($case.reason -and -not $allowed -and -not $verdict.Reason.Contains([string]$case.reason)) { 'EXPECT_FAIL' }
             elseif (-not $case.expect -and $truth.Records.Count -eq 0 -and $command -match 'commit' -and $allowed) { 'UNKNOWN' }
             elseif (-not $violations.Count -and -not $allowed) { 'FALSE_POSITIVE' }
             else { 'OK' }
             $counts[$class]++
             if ($class -in 'BYPASS', 'EXPECT_FAIL') { $failures++ }
             if ($ShowAll -or $class -in 'BYPASS', 'EXPECT_FAIL', 'UNKNOWN') {
-                "[$class] ($tool) guard=$($allowed ? 'allow' : 'block')$(if ($case.expect) { " expect=$($case.expect)" }) | $($case.cmd -replace "`r?`n", '\n')"
+                "[$class] ($tool) guard=$($allowed ? 'allow' : 'block')$(if ($case.expect) { " expect=$($case.expect)" })$(if ($null -ne $case.hooksPath) { " hooksPath=$($case.hooksPath)" }) | $($case.cmd -replace "`r?`n", '\n')"
                 if ($violations.Count) { "      truth: $($violations -join '; ')" }
                 elseif ($truth.Records.Count) { "      truth: git called $($truth.Records.Count)x, no violation" }
                 else { "      truth: no git call recorded$(if ($truth.TimedOut) { ' (timed out)' }) $($truth.Stderr)" }
