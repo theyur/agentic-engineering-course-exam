@@ -204,9 +204,13 @@ try {
     $heads = Get-HeadSnapshot
 
     foreach ($file in $CasesFile) {
-        $counts = [ordered]@{ OK = 0; BYPASS = 0; EXPECT_FAIL = 0; UNKNOWN = 0; FALSE_POSITIVE = 0 }
+        $counts = [ordered]@{ OK = 0; BYPASS = 0; EXPECT_FAIL = 0; UNKNOWN = 0; FALSE_POSITIVE = 0; SKIPPED = 0 }
         $cases = @(Get-Content $file -Raw | ConvertFrom-Json)
         foreach ($case in $cases) {
+            # Cases that need the main checkout and this checkout to be different worktrees.
+            if ($case.worktreeOnly -and [string]::Equals($repoRoot.TrimEnd('\', '/'), $cloneRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+                $counts['SKIPPED']++; continue
+            }
             $tool = if ($case.tool) { $case.tool } else { 'Bash' }
             $command = Expand-Placeholders $case.cmd
             $hooksPath = if ($null -ne $case.hooksPath) { Expand-Placeholders $case.hooksPath } else { '.githooks' }

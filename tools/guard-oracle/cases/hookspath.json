@@ -21,5 +21,11 @@
   {"cmd":"git commit -m x","hooksPath":"../.githooks","expect":"block","reason":"pre-commit hook is not enabled"},
   {"cmd":"git commit -m x","hooksPath":"~/.githooks","expect":"block","reason":"pre-commit hook is not enabled"},
   {"cmd":"git commit -m x","hooksPath":"githooks","expect":"block","reason":"pre-commit hook is not enabled"},
-  {"cmd":"git commit -m x","tool":"PowerShell","hooksPath":"C:\\Windows\\Temp\\.githooks","expect":"block","reason":"pre-commit hook is not enabled"}
+  {"cmd":"git commit -m x","tool":"PowerShell","hooksPath":"C:\\Windows\\Temp\\.githooks","expect":"block","reason":"pre-commit hook is not enabled"},
+  {"cmd":"git -C {CLONE} commit -m x","hooksPath":"{CLONE_WIN}\\.githooks","expect":"allow"},
+  {"cmd":"cd {CLONE} && git commit -m x","hooksPath":".githooks","expect":"allow"},
+  {"cmd":"cd not-created-yet && git commit -m x","hooksPath":".githooks","expect":"allow"},
+  {"cmd":"git -C {CLONE} commit -m x","hooksPath":"{WORKTREE_WIN}\\.githooks","worktreeOnly":true,"expect":"block","reason":"pre-commit hook is not enabled"},
+  {"cmd":"cd {CLONE} && git commit -m x","hooksPath":"{WORKTREE_WIN}\\.githooks","worktreeOnly":true,"expect":"block","reason":"pre-commit hook is not enabled"},
+  {"cmd":"Set-Location '{CLONE_WIN}'; git commit -m x","tool":"PowerShell","hooksPath":"{WORKTREE_WIN}\\.githooks","worktreeOnly":true,"expect":"block","reason":"pre-commit hook is not enabled"}
 ]
