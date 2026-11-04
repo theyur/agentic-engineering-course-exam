@@ -1,5 +1,6 @@
 [
   {"cmd":"git commit -m x","hooksPath":".githooks","expect":"allow"},
+  {"cmd":"git commit -m x","hooksPath":".GITHOOKS","expect":"allow"},
   {"cmd":"git commit -m x","hooksPath":"{CLONE_WIN}\\.githooks","expect":"allow"},
   {"cmd":"git commit -m x","hooksPath":"{CLONE}/.githooks","expect":"allow"},
   {"cmd":"git commit -m x","hooksPath":"{CLONE_WIN}\\.githooks\\","expect":"allow"},

@@ -233,7 +233,7 @@ function Test-SimpleCommand([string[]]$words) {
 # config.worktree.
 function Test-HooksPath([string]$value, [string]$root) {
     $allowed = @(($script:cloneRoots[0] + '.githooks'), ($root + '.githooks'))
-    if ($value -ceq '.githooks') { $full = $allowed[1] }
+    if ([string]::Equals($value, '.githooks', $script:pathComparison)) { $full = $allowed[1] }
     elseif (($IsWindows -and $value -match '^[A-Za-z]:[\\/]') -or (-not $IsWindows -and $value.StartsWith('/'))) {
         $full = [System.IO.Path]::GetFullPath($value).TrimEnd('\', '/')
     }
