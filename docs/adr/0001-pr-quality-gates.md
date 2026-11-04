@@ -19,9 +19,14 @@ looks at the PR.
     build needed). Authoritative signal is the `CodeQL` results check, which fails when the PR adds
     alerts at or above the repository's failure threshold. A green `Analyze (…)` job alone is not.
     Default setup over an advanced workflow: nothing here needs custom queries or a build.
-- Both analyzers check out the PR merge ref `refs/pull/N/merge`; GitHub posts their check runs on
-  the PR head SHA. Gate evaluation keys on the head SHA; CodeQL alerts are read from the merge ref
-  and tied back to the head through the merge commit's parent.
+- SonarQube Cloud checks out the PR merge ref `refs/pull/N/merge`; CodeQL default setup analyzes
+  `refs/pull/N/head` at the head SHA. GitHub posts both analyzers' check runs on the PR head SHA, so
+  gate evaluation keys on the head SHA, and CodeQL alerts are read from `refs/pull/N/head` (merge
+  ref as fallback for an advanced setup, tied back to the head via the merge commit's parent).
+- The `CodeQL` results check aggregates every language's upload and is updated in place (its
+  `completed_at` stays at the first upload), so the gate also requires every `Analyze (…)` job to
+  have finished. Verified on demo PR #12: two C# alerts, uploaded after the check's
+  `completed_at`, turned the check red.
 - **Gate evaluation** lives in `tools/pr-gates/` (PowerShell, offline self-test). Only
   `GREEN` + `GREEN` on the current head counts as ready.
 - **Copilot code review is requested manually** by the user once both gates are green. Nothing

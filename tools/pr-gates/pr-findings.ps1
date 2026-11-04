@@ -5,7 +5,7 @@
 .DESCRIPTION
   -Stage static   SonarQube Cloud quality-gate conditions, open issues and hotspots for the PR;
                   CodeQL results-check annotations (what the PR introduces) and open code-scanning
-                  alerts on refs/pull/N/merge, each tied to the analyzed commit.
+                  alerts on refs/pull/N/head (default setup), each tied to the analyzed commit.
   -Stage copilot  Copilot review submissions and its inline review threads (resolved / outdated
                   state from GraphQL), separate from ordinary PR comments.
 
@@ -96,21 +96,34 @@ if ($Stage -eq 'static') {
                 Add-Finding 'codeql' 'annotation' $a.annotation_level $a.title $a.path $a.start_line $a.message $check.html_url $head
             }
         }
-        # Alerts on the PR merge ref, tied to the merge commit that was analyzed. The merge commit's
-        # second parent must be the current head, otherwise the analysis is for an older revision.
-        $alerts = @(Invoke-GhList "repos/$Repo/code-scanning/alerts?ref=refs/pull/$Pr/merge&state=open&per_page=100")
-        $mergeHeads = @{}
+        # Open alerts on the PR ref, each tied to the commit its latest instance was found in.
+        # Default setup analyzes refs/pull/N/head at the head SHA (verified on PR #12). An advanced
+        # workflow would analyze refs/pull/N/merge instead; there the merge commit's second parent is
+        # the PR head it belongs to. Either way, an instance from another SHA is marked stale.
+        $alertRef = "refs/pull/$Pr/head"
+        $alerts = @(Invoke-GhList "repos/$Repo/code-scanning/alerts?ref=$alertRef&state=open&per_page=100")
+        if (-not $alerts.Count) {
+            $merged = @(Invoke-GhList "repos/$Repo/code-scanning/alerts?ref=refs/pull/$Pr/merge&state=open&per_page=100")
+            if ($merged.Count) { $alerts = $merged; $alertRef = "refs/pull/$Pr/merge" }
+        }
+        $headOf = @{}
         foreach ($al in $alerts) {
             $inst = $al.most_recent_instance
-            if (-not $mergeHeads.ContainsKey($inst.commit_sha)) {
-                $parents = (Invoke-Gh @('api', "repos/$Repo/commits/$($inst.commit_sha)", '--jq', '[.parents[].sha] | join(" ")')).Trim() -split ' '
-                $mergeHeads[$inst.commit_sha] = $parents[-1]
+            if (-not $headOf.ContainsKey($inst.commit_sha)) {
+                $headOf[$inst.commit_sha] = if ($alertRef -like '*/merge') {
+                    ((Invoke-Gh @('api', "repos/$Repo/commits/$($inst.commit_sha)", '--jq', '[.parents[].sha] | join(" ")')).Trim() -split ' ')[-1]
+                } else { $inst.commit_sha }
             }
             $sev = if ($al.rule.security_severity_level) { $al.rule.security_severity_level } else { $al.rule.severity }
             Add-Finding 'codeql' 'alert' $sev $al.rule.id $inst.location.path $inst.location.start_line `
-                $inst.message.text $al.html_url $mergeHeads[$inst.commit_sha]
+                $inst.message.text $al.html_url $headOf[$inst.commit_sha]
         }
-        $meta.codeql.analyzedMergeCommits = @($mergeHeads.Keys)
+        $meta.codeql.alertRef = $alertRef
+        # Which language analyses exist for this PR head - a missing category means that language's
+        # results are not in yet (or its analysis failed).
+        $meta.codeql.analyses = @(Invoke-GhList "repos/$Repo/code-scanning/analyses?ref=refs/pull/$Pr/head&per_page=20" |
+            Where-Object { $_.commit_sha -eq $head } |
+            ForEach-Object { [pscustomobject]@{ category = $_.category; results = $_.results_count; createdAt = $_.created_at } })
     } catch {
         $msg = $_.Exception.Message
         if ($msg -match 'no analysis found') { $msg = 'no code scanning analysis for this PR yet' }

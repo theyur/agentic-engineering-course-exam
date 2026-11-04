@@ -7,8 +7,10 @@
   GREEN / RED / PENDING / MISSING / SKIPPED / BUILD_FAILED / INFRA_FAILED (see PrGates.psm1).
   Overall: READY_FOR_COPILOT (both GREEN), BLOCKED, PENDING, or STALE (head moved while reading).
 
-  Both analyzers scan the PR merge commit (refs/pull/N/merge), but GitHub attaches their check runs
-  to the PR head SHA, so the head SHA is the key here.
+  SonarQube Cloud checks out the PR merge commit (refs/pull/N/merge) and CodeQL default setup the
+  PR head (refs/pull/N/head); GitHub attaches both analyzers' check runs to the PR head SHA, so the
+  head SHA is the key here. The CodeQL results check is updated as each language uploads (its
+  completed_at stays at the first upload), so it is final only once every Analyze job has finished.
 
   With -Wait it polls (bounded) until no gate is PENDING. Run it in the background from Claude Code:
   the harness wakes the session when the process exits. Nothing wakes a session that has ended.
