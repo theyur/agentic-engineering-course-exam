@@ -22,7 +22,10 @@ function Wf([string]$Status = 'completed', [string]$Conclusion = 'success', [str
 }
 
 $failures = [System.Collections.Generic.List[string]]::new()
+# Every assertion goes through Expect, which counts it: the reported total is what actually ran.
+$script:expectCount = 0
 function Expect([string]$Case, [string]$Actual, [string]$Expected) {
+    $script:expectCount++
     if ($Actual -ne $Expected) { $failures.Add("$Case : got $Actual, expected $Expected") }
 }
 
@@ -113,6 +116,199 @@ $c2 = Get-FindingFingerprint 'sonar' 'csharpsquid:S1481' 'src/B.cs' 'Remove the 
 Expect 'fingerprint ignores case/whitespace' ($a -eq $b) 'True'
 Expect 'fingerprint differs by file' ($a -eq $c2) 'False'
 
+# --- Copilot thread resolution ---------------------------------------------------------------
+# Modeled on PR #13: review 1 on commit A raised a thread (comment 101), fix commit F, head H = F,
+# review 2 on H. What differs per case is what review 2's overview says about comment 101.
+$A = 'a' * 40; $F = 'f' * 40; $H = $F; $X = 'e' * 40
+function Overview([string]$Verdict = 'Approval recommended', [string]$Sections = '') {
+    "<!-- ccr-overview-v2 -->`n`n### 🟢 $Verdict`n`nSummary.`n`n$Sections`n<details>`n<summary><strong>What changed in this PR</strong></summary>`nSee #discussion_r999 for context.`n</details>"
+}
+function Section([string]$Heading, [long[]]$Ids) {
+    "<details open>`n<summary><strong>$Heading</strong></summary>`n`n" + (($Ids | ForEach-Object { "- [Finding](https://github.com/o/r/pull/1#discussion_r$_) · Fixed" }) -join "`n") + "`n</details>`n"
+}
+$resolvedBody = Overview -Sections (Section '1 resolved since last review' 101)
+$openBody     = Overview -Sections (Section '1 open issue' 101)      # what PR #13's re-review actually said
+$changesBody  = Overview 'Changes recommended' (Section '1 resolved since last review' 101)
+function Rev([long]$Id, [string]$Commit, [string]$At, [string]$Body = $resolvedBody, [string]$State = 'COMMENTED') { [pscustomobject]@{ id = $Id; state = $State; commit = $Commit; submittedAt = $At; body = $Body } }
+function Evt([string]$Event, [string]$At, [string]$Reviewer = '') { [pscustomobject]@{ event = $Event; createdAt = $At; reviewer = $Reviewer } }
+function Cm([string]$Author, [string]$Body, [string]$At, $ReviewId = $null, [string]$Type = 'User', [bool]$CanPush = $true, [long]$DbId = 200) {
+    [pscustomobject]@{ databaseId = $DbId; author = $Author; authorType = $Type; canPush = $CanPush; body = $Body; createdAt = $At; reviewId = $ReviewId }
+}
+function CopilotCm([long]$ReviewId, [string]$At = '2026-11-04T20:54:30Z', [long]$DbId = 101) { Cm 'copilot-pull-request-reviewer' 'Gate can miss late jobs.' $At $ReviewId 'Bot' $false $DbId }
+function Th([string]$Id, [object[]]$Comments, [string]$Path = 'tools/pr-gates/pr-gates.ps1', [bool]$Resolved = $false, [bool]$Outdated = $true) {
+    [pscustomobject]@{ id = $Id; isResolved = $Resolved; isOutdated = $Outdated; path = $Path; originalCommit = $A; comments = $Comments }
+}
+function Ready([string]$Body) { Get-CopilotReReviewState -Reviews @((Rev 1 $A '2026-11-04T20:54:31Z' (Overview 'Changes recommended')), (Rev 2 $H '2026-11-04T21:05:07Z' $Body)) -Events @() -HeadSha $H }
+$fixReply = Cm 'theyur' "Fixed in $($F.Substring(0,7)): the gate now waits for the workflow run." '2026-11-04T21:00:22Z'
+$ready = Get-CopilotReReviewState -Reviews @((Rev 1 $A '2026-11-04T20:54:31Z' (Overview 'Changes recommended')), (Rev 2 $H '2026-11-04T21:05:07Z')) -HeadSha $H -Events @(
+    (Evt review_requested '2026-11-04T20:51:27Z' Copilot), (Evt copilot_work_started '2026-11-04T20:51:52Z'),
+    (Evt review_requested '2026-11-04T21:01:56Z' Copilot), (Evt copilot_work_started '2026-11-04T21:02:23Z'))
+# Fake commit lookups: F is in the head after A; X is not in the head; A is the commented commit.
+$commits = {
+    param($Sha, $Thread)
+    switch -Regex ($Sha) {
+        '^f+$'  { [pscustomobject]@{ found = $true; sha = $F; inHead = $true; afterFinding = $true; files = @('tools/pr-gates/pr-gates.ps1') } }
+        '^e+$'  { [pscustomobject]@{ found = $true; sha = $X; inHead = $false; afterFinding = $true; files = @('tools/pr-gates/pr-gates.ps1') } }
+        '^a+$'  { [pscustomobject]@{ found = $true; sha = $A; inHead = $true; afterFinding = $false; files = @('tools/pr-gates/pr-gates.ps1') } }
+        default { [pscustomobject]@{ found = $false; sha = $Sha; inHead = $false; afterFinding = $false; files = @() } }
+    }
+}
+$good = Th 't1' @((CopilotCm 1), $fixReply)
+
+# Overview parsing.
+$ov = Get-CopilotOverviewStatus (Overview -Sections ((Section '2 resolved since last review' 101, 102) + (Section '1 open issue' 103) + (Section '1 previously missed' 104) + (Section 'Something new' 105)))
+Expect 'overview: resolved section'       $ov['101'] 'resolved'
+Expect 'overview: open section'           $ov['103'] 'open'
+Expect 'overview: previously missed'      $ov['104'] 'open'
+Expect 'overview: unknown section'        $ov['105'] 'unknown'
+Expect 'overview: "what changed" link'    $ov['999'] 'unknown'
+Expect 'overview: open beats resolved'    (Get-CopilotOverviewStatus (Overview -Sections ((Section '1 resolved since last review' 101) + (Section '1 open issue' 101))))['101'] 'open'
+Expect 'overview: no marker, no status'   (Get-CopilotOverviewStatus ((Section '1 resolved since last review' 101))).Count '0'
+Expect 'verdict: approve'                 (Get-CopilotVerdict $resolvedBody) 'APPROVE'
+Expect 'verdict: changes'                 (Get-CopilotVerdict $changesBody) 'CHANGES'
+Expect 'verdict: no overview marker'      (Get-CopilotVerdict '### 🟢 Approval recommended') 'UNKNOWN'
+
+# PR-level re-review state.
+$r1 = Rev 1 $A '2026-11-04T20:54:31Z' (Overview 'Changes recommended'); $r2 = Rev 2 $H '2026-11-04T21:05:07Z'
+$rr = @(
+    @{ n = 'rereview: on head';                  r = @($r1, $r2); ev = @(); e = 'READY' }
+    @{ n = 'rereview: none';                     r = @();         ev = @(); e = 'NO_REVIEW' }
+    @{ n = 'rereview: only on old commit';       r = @($r1);      ev = @(); e = 'NOT_ON_HEAD' }
+    @{ n = 'rereview: requested, not started';   r = @($r1, $r2); ev = @((Evt review_requested '2026-11-04T21:10:00Z' Copilot)); e = 'PENDING' }
+    @{ n = 'rereview: running';                  r = @($r1, $r2); ev = @((Evt copilot_work_started '2026-11-04T21:10:00Z')); e = 'PENDING' }
+    @{ n = 'rereview: other reviewer requested'; r = @($r1, $r2); ev = @((Evt review_requested '2026-11-04T21:10:00Z' someone)); e = 'READY' }
+    @{ n = 'rereview: unknown format';           r = @($r1, (Rev 2 $H '2026-11-04T21:05:07Z' 'Looks good to me')); ev = @(); e = 'UNKNOWN_FORMAT' }
+    @{ n = 'rereview: empty body';               r = @($r1, (Rev 2 $H '2026-11-04T21:05:07Z' '')); ev = @(); e = 'UNKNOWN_FORMAT' }
+)
+foreach ($c in $rr) { Expect $c.n (Get-CopilotReReviewState -Reviews $c.r -Events $c.ev -HeadSha $H).state $c.e }
+Expect 'rereview: PR #13 event sequence' $ready.state 'READY'
+
+# Per-thread decisions against a re-review that lists comment 101 as resolved. Only the RESOLVE
+# rows may resolve; each KEEP row removes exactly one piece of evidence.
+$sha7 = $F.Substring(0, 7)
+$tc = @(
+    @{ n = 'thread: both confirmations resolve';   t = $good; e = 'RESOLVE' }
+    @{ n = 'thread: full-length sha';              t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' "Fixed in $F." '2026-11-04T21:00:22Z'))); e = 'RESOLVE' }
+    @{ n = 'thread: already resolved';             t = (Th 't1' @((CopilotCm 1), $fixReply) -Resolved $true); e = 'SKIP' }
+    @{ n = 'thread: human thread ignored';         t = (Th 't1' @((Cm 'theyur' 'note' '2026-11-04T20:00:00Z'), $fixReply)); e = 'SKIP' }
+    @{ n = 'thread: no reply';                     t = (Th 't1' @((CopilotCm 1))); e = 'KEEP' }
+    @{ n = 'thread: rejected (false positive)';    t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' 'Not changed: this is intended, see ADR 0001.' '2026-11-04T21:00:22Z'))); e = 'KEEP' }
+    @{ n = 'thread: partial fix wording';          t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' "Partially fixed in $sha7; the rest needs a decision." '2026-11-04T21:00:22Z'))); e = 'KEEP' }
+    @{ n = 'thread: fix mentioned mid-sentence';   t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' "Same gap, fixed in $sha7." '2026-11-04T21:00:22Z'))); e = 'KEEP' }
+    @{ n = 'thread: "Fixed in" not leading';       t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' "Reverted: Fixed in $sha7 was wrong." '2026-11-04T21:00:22Z'))); e = 'KEEP' }
+    @{ n = 'thread: Copilot answered after fix';   t = (Th 't1' @((CopilotCm 1), $fixReply, (CopilotCm 2 '2026-11-04T21:05:07Z' 300))); e = 'KEEP' }
+    @{ n = 'thread: user followed up after fix';   t = (Th 't1' @((CopilotCm 1), $fixReply, (Cm 'theyur' 'Keep this open, still flaky.' '2026-11-04T21:06:00Z'))); e = 'KEEP' }
+    @{ n = 'thread: reply by read-only user';      t = (Th 't1' @((CopilotCm 1), (Cm 'drive-by' "Fixed in $sha7" '2026-11-04T21:00:22Z' -CanPush $false))); e = 'KEEP' }
+    @{ n = 'thread: reply by a bot with push';     t = (Th 't1' @((CopilotCm 1), (Cm 'some-bot' "Fixed in $sha7" '2026-11-04T21:00:22Z' -Type 'Bot'))); e = 'KEEP' }
+    @{ n = 'thread: look-alike reviewer login';    t = (Th 't1' @((Cm 'copilot-helper' 'Gate can miss late jobs.' '2026-11-04T20:54:30Z' 1 'Bot' $false 101), $fixReply)); e = 'SKIP' }
+    @{ n = 'thread: Copilot login, but a User';    t = (Th 't1' @((Cm 'copilot-pull-request-reviewer' 'x' '2026-11-04T20:54:30Z' 1 'User' $false 101), $fixReply)); e = 'SKIP' }
+    @{ n = 'thread: look-alike spoke last';        t = (Th 't1' @((CopilotCm 1), $fixReply, (Cm 'copilot-helper' 'not fixed' '2026-11-04T21:06:00Z' -Type 'Bot'))); e = 'KEEP' }
+    @{ n = 'thread: fix commit not in head';       t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' "Fixed in $($X.Substring(0,7))" '2026-11-04T21:00:22Z'))); e = 'KEEP' }
+    @{ n = 'thread: fix commit unknown';           t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' 'Fixed in 1234567' '2026-11-04T21:00:22Z'))); e = 'KEEP' }
+    @{ n = 'thread: fix predates finding';         t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' "Fixed in $($A.Substring(0,7))" '2026-11-04T21:00:22Z'))); e = 'KEEP' }
+    @{ n = 'thread: raised by latest review';      t = (Th 't1' @((CopilotCm 2), $fixReply)); e = 'KEEP' }
+    @{ n = 'thread: finding not in overview';      t = (Th 't1' @((CopilotCm 1 -DbId 555), $fixReply)); e = 'KEEP' }
+)
+foreach ($c in $tc) { Expect $c.n (Get-ThreadResolution -Thread $c.t -ReReview $ready -Threads @($c.t) -CommitInfo $commits).decision $c.e }
+
+# Copilot's per-finding status decides; its verdict does not.
+Expect 'thread: PR #13 - approval but finding still open' (Get-ThreadResolution -Thread $good -ReReview (Ready $openBody) -Threads @($good) -CommitInfo $commits).decision 'KEEP'
+Expect 'thread: changes recommended, finding resolved'    (Get-ThreadResolution -Thread $good -ReReview (Ready $changesBody) -Threads @($good) -CommitInfo $commits).decision 'RESOLVE'
+Expect 'thread: approval, no sections at all'             (Get-ThreadResolution -Thread $good -ReReview (Ready (Overview)) -Threads @($good) -CommitInfo $commits).decision 'KEEP'
+Expect 'thread: unknown section heading'                  (Get-ThreadResolution -Thread $good -ReReview (Ready (Overview -Sections (Section 'Addressed maybe' 101))) -Threads @($good) -CommitInfo $commits).decision 'KEEP'
+# Re-raise / duplicate handling.
+$newOnSamePath = Th 't9' @((CopilotCm 2 '2026-11-04T21:05:06Z' 301))
+Expect 'thread: re-raised on same file'   (Get-ThreadResolution -Thread $good -ReReview $ready -Threads @($good, $newOnSamePath) -CommitInfo $commits).decision 'KEEP'
+Expect 'thread: new thread elsewhere ok'  (Get-ThreadResolution -Thread $good -ReReview $ready -Threads @($good, (Th 't9' @((CopilotCm 2 -DbId 301)) -Path 'README.md')) -CommitInfo $commits).decision 'RESOLVE'
+Expect 'thread: resolved re-raise still counts' (Get-ThreadResolution -Thread $good -ReReview $ready -Threads @($good, (Th 't9' @((CopilotCm 2 -DbId 301)) -Resolved $true)) -CommitInfo $commits).decision 'KEEP'
+# Dismissed reviews never authorize: the older active review is used instead (not on the head).
+Expect 'rereview: dismissed review on head ignored' (Get-CopilotReReviewState -HeadSha $H -Events @() -Reviews @(
+        (Rev 1 $A '2026-11-04T20:54:31Z' (Overview 'Changes recommended')), (Rev 2 $H '2026-11-04T21:05:07Z' -State 'DISMISSED'))).state 'NOT_ON_HEAD'
+Expect 'rereview: only a dismissed review'          (Get-CopilotReReviewState -HeadSha $H -Events @() -Reviews @((Rev 2 $H '2026-11-04T21:05:07Z' -State 'DISMISSED'))).state 'NO_REVIEW'
+Expect 'rereview: pending (unsubmitted) ignored'    (Get-CopilotReReviewState -HeadSha $H -Events @() -Reviews @((Rev 2 $H '2026-11-04T21:05:07Z' -State 'PENDING'))).state 'NO_REVIEW'
+Expect 'rereview: APPROVED state counts'            (Get-CopilotReReviewState -HeadSha $H -Events @() -Reviews @((Rev 2 $H '2026-11-04T21:05:07Z' -State 'APPROVED'))).state 'READY'
+# Re-read before the mutation: any change means the decision is stale.
+function Snap([bool]$Resolved = $false, [int]$Count = 2, [long]$Id = 200, [string]$At = '2026-11-04T21:00:22Z', [string]$Body = 'Fixed in fffffff: done.') {
+    [pscustomobject]@{ isResolved = $Resolved; commentCount = $Count; lastCommentId = $Id; lastCommentUpdatedAt = $At; lastCommentBody = $Body }
+}
+$snap = Snap
+Expect 'reread: unchanged'          (Test-ThreadUnchanged $snap (Snap)) 'True'
+Expect 'reread: new comment'        (Test-ThreadUnchanged $snap (Snap -Count 3 -Id 300)) 'False'
+Expect 'reread: comment replaced'   (Test-ThreadUnchanged $snap (Snap -Id 300)) 'False'
+Expect 'reread: resolved meanwhile' (Test-ThreadUnchanged $snap (Snap -Resolved $true)) 'False'
+Expect 'reread: reply edited (text)' (Test-ThreadUnchanged $snap (Snap -At '2026-11-04T21:09:00Z' -Body 'Not changed: on reflection.')) 'False'
+Expect 'reread: edited, same text'  (Test-ThreadUnchanged $snap (Snap -At '2026-11-04T21:09:00Z')) 'False'
+Expect 'reread: text differs only'  (Test-ThreadUnchanged $snap (Snap -Body 'Not changed: on reflection.')) 'False'
+# Contradictory overview sections: least-resolved status wins, in either order.
+$both = { param([string[]]$Headings) (Get-CopilotOverviewStatus (Overview -Sections (($Headings | ForEach-Object { Section $_ 101 }) -join '')))['101'] }
+Expect 'overview: resolved then unknown' (& $both @('1 resolved since last review', 'Addressed maybe')) 'unknown'
+Expect 'overview: unknown then resolved' (& $both @('Addressed maybe', '1 resolved since last review')) 'unknown'
+Expect 'overview: unknown then open'     (& $both @('Addressed maybe', '1 open issue')) 'open'
+Expect 'overview: open then unknown'     (& $both @('1 open issue', 'Addressed maybe')) 'open'
+Expect 'overview: open then resolved'    (& $both @('1 open issue', '1 resolved since last review')) 'open'
+Expect 'reread: thread unreadable'  (Test-ThreadUnchanged $snap $null) 'False'
+Expect 'login: exact reviewer (GraphQL)' (Test-CopilotLogin 'copilot-pull-request-reviewer') 'True'
+Expect 'login: exact reviewer (REST)'    (Test-CopilotLogin 'copilot-pull-request-reviewer[bot]') 'True'
+Expect 'login: look-alike rejected'      (Test-CopilotLogin 'copilot-helper') 'False'
+# Third verdict seen on PR #14, and its nested <details> layout ("previously missed" with an inner
+# <details> per finding, no inline-thread link; then "N resolved since last review").
+$closer = "<!-- ccr-overview-v2 -->`n`n### 🔵 Needs a closer look`n`nOne moderate issue.`n`n**No open issues** 🎉`n`n<details>`n<summary><strong>1 previously missed issue</strong></summary>`n`nIn code that hasn't changed`n`n<details>`n<summary>Recheck events</summary>`n`n``pr-resolve.ps1:178```n`nText.`n</details>`n</details>`n`n<details>`n<summary><strong>2 resolved since last review</strong></summary>`n`n- [A](https://github.com/o/r/pull/14#discussion_r101)`n- [B](https://github.com/o/r/pull/14#discussion_r102)`n</details>"
+$ovc = Get-CopilotOverviewStatus $closer
+Expect 'verdict: needs a closer look'          (Get-CopilotVerdict $closer) 'CLOSER_LOOK'
+Expect 'overview: nested layout, resolved 101' $ovc['101'] 'resolved'
+Expect 'overview: nested layout, resolved 102' $ovc['102'] 'resolved'
+Expect 'approval: closer look, finding open'   (Get-ThreadResolution -Thread $good -ReReview (Ready ($closer -replace 'resolved since last review', 'open issues')) -Threads @($good) -CommitInfo $commits -AcceptApproval).decision 'KEEP'
+Expect 'approval: closer look, finding resolved' (Get-ThreadResolution -Thread $good -ReReview (Ready $closer) -Threads @($good) -CommitInfo $commits -AcceptApproval).decision 'RESOLVE'
+# Apply-time re-check: still READY on the same review, or stop.
+$readyOn = { param($id, $s = 'READY') [pscustomobject]@{ state = $s; review = [pscustomobject]@{ id = $id } } }
+Expect 'recheck: same review, ready'      (Test-ReReviewStillValid '2' (& $readyOn 2)) 'True'
+Expect 'recheck: re-review now pending'   (Test-ReReviewStillValid '2' (& $readyOn 2 'PENDING')) 'False'
+Expect 'recheck: newer review arrived'    (Test-ReReviewStillValid '2' (& $readyOn 3)) 'False'
+Expect 'recheck: review gone (dismissed)' (Test-ReReviewStillValid '2' (& $readyOn 1 'NOT_ON_HEAD')) 'False'
+Expect 'recheck: no authorizing review'   (Test-ReReviewStillValid '' (& $readyOn 2)) 'False'
+Expect 'recheck: no state'                (Test-ReReviewStillValid '2' $null) 'False'
+# The real pending case: events after the latest review flip READY to PENDING.
+Expect 'recheck: requested after review'  (Test-ReReviewStillValid '2' (Get-CopilotReReviewState -Reviews @($r2) -HeadSha $H -Events @((Evt review_requested '2026-11-04T21:10:00Z' Copilot)))) 'False'
+$hardeningCases = 4 + 8 + 5 + 3 + 5 + 7
+# Qualifying thread with no usable re-review: wait, never resolve.
+$prLevel = @('PENDING', 'NOT_ON_HEAD', 'UNKNOWN_FORMAT', 'NO_REVIEW')
+foreach ($s in $prLevel) {
+    $st = [pscustomobject]@{ state = $s; reason = $s; review = $r2 }
+    Expect "thread: re-review $s" (Get-ThreadResolution -Thread $good -ReReview $st -Threads @($good) -CommitInfo $commits).decision 'WAIT'
+}
+
+# Approval mode (-AcceptApproval): the PR #13 case resolves; everything that removes evidence other
+# than Copilot's per-finding listing still keeps the thread open.
+function Decide($Thread, $Body, [object[]]$All = @($Thread)) {
+    (Get-ThreadResolution -Thread $Thread -ReReview (Ready $Body) -Threads $All -CommitInfo $commits -AcceptApproval).decision
+}
+$notOutdatedGood = Th 't1' @((CopilotCm 1), $fixReply) -Outdated $false
+$ap = @(
+    @{ n = 'approval: PR #13 - approval, finding listed open';  d = (Decide $good $openBody);   e = 'RESOLVE' }
+    @{ n = 'approval: approval, finding not listed';           d = (Decide $good (Overview));  e = 'RESOLVE' }
+    @{ n = 'approval: confirmed still resolves';               d = (Decide $good $resolvedBody); e = 'RESOLVE' }
+    @{ n = 'approval: changes recommended, finding open';      d = (Decide $good (Overview 'Changes recommended' (Section '1 open issue' 101))); e = 'KEEP' }
+    @{ n = 'approval: verdict unrecognized';                   d = (Decide $good (Overview 'Looks fine' (Section '1 open issue' 101))); e = 'KEEP' }
+    @{ n = 'approval: unknown section heading';                d = (Decide $good (Overview -Sections (Section 'Addressed maybe' 101))); e = 'KEEP' }
+    @{ n = 'approval: not outdated, fix touches file';         d = (Decide $notOutdatedGood $openBody); e = 'RESOLVE' }
+    @{ n = 'approval: not outdated, fix elsewhere';            d = (Decide (Th 't1' @((CopilotCm 1), $fixReply) -Path 'README.md' -Outdated $false) $openBody); e = 'KEEP' }
+    @{ n = 'approval: re-raised on same file';                 d = (Decide $good $openBody @($good, $newOnSamePath)); e = 'KEEP' }
+)
+foreach ($c in $ap) { Expect $c.n $c.d $c.e }
+# Every claim-side negative from the strict table stays open in approval mode too.
+foreach ($c in @($tc | Where-Object { $_.e -eq 'KEEP' -and $_.n -ne 'thread: finding not in overview' })) {
+    Expect "approval/$($c.n)" (Decide $c.t $openBody) 'KEEP'
+}
+foreach ($s in $prLevel) {
+    $st = [pscustomobject]@{ state = $s; reason = $s; review = $r2 }
+    Expect "approval: re-review $s" (Get-ThreadResolution -Thread $good -ReReview $st -Threads @($good) -CommitInfo $commits -AcceptApproval).decision 'WAIT'
+}
+Expect 'approval: basis reported' (Get-ThreadResolution -Thread $good -ReReview (Ready $openBody) -Threads @($good) -CommitInfo $commits -AcceptApproval).basis 'approval'
+Expect 'strict: basis reported'   (Get-ThreadResolution -Thread $good -ReReview $ready -Threads @($good) -CommitInfo $commits).basis 'copilot-confirmed'
+$approvalKeeps = @($tc | Where-Object { $_.e -eq 'KEEP' -and $_.n -ne 'thread: finding not in overview' }).Count
+$resolutionCases = 10 + $rr.Count + 1 + $tc.Count + 4 + 3 + $hardeningCases + $prLevel.Count + $ap.Count + $approvalKeeps + $prLevel.Count + 2
+
+
 # --- /pr-review guard hook -------------------------------------------------------------------
 $hook = Join-Path $PSScriptRoot '..\..\.claude\hooks\block-pr-review.ps1'
 $hookCases = @(
@@ -129,7 +325,10 @@ foreach ($c in $hookCases) {
     Expect $c.n "$LASTEXITCODE" "$($c.e)"
 }
 
-$total = $sonar.Count + $codeql.Count + 5 + $wait.Count + 2 + $hookCases.Count
+$total = $script:expectCount
+# Cross-check the hand-kept per-section tallies against what ran (catches a section silently skipped).
+$tallied = $sonar.Count + $codeql.Count + 5 + $wait.Count + 2 + $resolutionCases + $hookCases.Count
+if ($tallied -ne $total) { $failures.Add("case count: sections tally $tallied, but $total assertions ran") }
 if ($failures.Count) {
     'FAILED'
     $failures | ForEach-Object { "  $_" }

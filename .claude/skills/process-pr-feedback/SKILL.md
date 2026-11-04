@@ -16,6 +16,10 @@ global `/pr-review` are not used here - never invoke them, never post `@greptile
   was produced for an older SHA (`stale: true`) without re-checking it against the current code.
 - **Never request a review** from Copilot, Greptile or any other bot, and never merge. The user
   requests Copilot and merges.
+- **Resolve review threads only through `pr-resolve.ps1 -AcceptApproval -Apply`.** It needs a
+  Copilot re-review of the current head that confirms the finding, or approves without re-raising
+  it, plus your verified `Fixed in <sha>` reply. Never resolve because of a push alone, and never by
+  your own judgment.
 - **Never weaken a gate**: no edits to quality-gate settings, CodeQL thresholds, `sonar.*`
   exclusions, suppressions (`#pragma warning disable`, `[SuppressMessage]`, `// NOSONAR`, CodeQL
   dismissals) or test assertions to make a finding go away. A finding you believe is wrong is a
@@ -32,6 +36,7 @@ next to text that mentions git, and some checkout paths contain "github"):
 pwsh -NoProfile -File tools/pr-gates/pr-gates.ps1    -Pr <N> [-Wait] [-Summary]
 pwsh -NoProfile -File tools/pr-gates/pr-findings.ps1 -Pr <N> -Stage static|copilot
 pwsh -NoProfile -File tools/pr-gates/pr-state.ps1    show|attempt|decide|reset -Pr <N> ...
+pwsh -NoProfile -File tools/pr-gates/pr-resolve.ps1  -Pr <N> -AcceptApproval [-Apply]
 ```
 
 `pr-gates.ps1` exit codes: 0 `READY_FOR_COPILOT`, 10 `BLOCKED`, 20 `PENDING` (wait timed out),
@@ -107,18 +112,58 @@ Then stop. Do not request the review yourself.
 
 On a later invocation where gates are green and a Copilot review exists:
 
-1. `pr-findings.ps1 -Pr <N> -Stage copilot`. Its `sources.copilot.reviews` lists submissions
-   (with `stale` when reviewed on an older commit); findings are the review bodies and inline
-   threads (`isResolved`, `isOutdated`, replies).
-2. Triage with the same classes. Skip resolved threads; treat outdated threads as `stale` unless the
-   issue still exists on the head.
-3. Present the table, then fix one round exactly as in step 4 with `-Stage copilot`.
-4. Reply on each thread you acted on or rejected (`gh api repos/{owner}/{repo}/pulls/<N>/comments/<commentId>/replies -f body=...`, `commentId` from the finding)
-   with what changed or why not. Do not resolve threads - the user does.
-5. After the push, go back to step 2: static gates must be green again on the new head before the
+1. **Settle earlier threads first.**
+   Run `pr-resolve.ps1 -Pr <N> -AcceptApproval -Apply`. Exit codes:
+
+   | Exit | Meaning | Action |
+   |---|---|---|
+   | 0 | Copilot's latest review is on the head | Eligible threads are resolved (reason ADDRESSED) |
+   | 10 | No re-review usable for the head | Nothing is resolved; carry on with item 2 below |
+   | 20 | Copilot re-review in progress | Stop: say you are waiting for it |
+   | 30 | Head moved | Start again at section 1 |
+
+   Report each thread's `decision`, `basis` and `reason`. A thread is resolved only when its last
+   comment is `Fixed in <sha>`, `<sha>` is in the head, and Copilot's review of the current head
+   either lists the finding as resolved (`copilot-confirmed`) or recommends approval without
+   re-raising it (`approval`). The `approval` basis also needs the fix to touch the commented file,
+   or the thread to be outdated. A "Changes recommended" review resolves only confirmed findings.
+2. `pr-findings.ps1 -Pr <N> -Stage copilot`.
+   - `sources.copilot.reviews` lists the submissions, marked `stale` when reviewed on an older commit.
+   - The findings are the review bodies and inline threads, with `isResolved`, `isOutdated` and
+     replies.
+3. Triage with the same classes.
+   - Skip resolved threads.
+   - Treat outdated threads as `stale` unless the issue still exists on the head.
+   - A thread `pr-resolve` kept open is not confirmed fixed: re-check it against the code using
+     its `reason`. Either it needs more work, or the user decides.
+4. Present the table, then fix one round exactly as in step 4 with `-Stage copilot`.
+5. **After the push**, reply on each thread you acted on or rejected:
+   `gh api repos/{owner}/{repo}/pulls/<N>/comments/<commentId>/replies -f body=...`, with
+   `commentId` from the finding. The first words of the reply are machine-read by `pr-resolve.ps1`:
+
+   | Case | Reply begins with |
+   |---|---|
+   | Fully fixed, commit pushed | `Fixed in <short sha>: <what changed>` (the commit that contains the fix) |
+   | Duplicate of a fixed finding | `Fixed in <short sha> (duplicate of <link>): ...` |
+   | Partly fixed | `Partially addressed in <sha>: ... Remaining: ...` (never `Fixed in`) |
+   | Rejected | `Not changed: <why>` |
+   | Needs a decision | `Needs a decision: ...` |
+
+   One reply per thread, posted after the fix is pushed.
+6. **Never resolve a thread yourself** (no `resolveReviewThread` mutation, no GitHub MCP
+   `resolve_thread`). The only path is `pr-resolve.ps1 -AcceptApproval -Apply` after Copilot has
+   re-reviewed the head. Anything it keeps open is for the user or for the next round.
+7. After the push, go back to step 2: static gates must be green again on the new head before the
    user re-requests Copilot. Do not re-request it.
 
 ## 7. Report
 
-End with: PR, head SHA, gate states, findings by class, what was fixed / pushed, what needs the
-user, and the next manual step (request Copilot, re-run a workflow, decide X, or merge).
+End with:
+- PR and head SHA
+- gate states
+- findings by class
+- what was fixed and pushed
+- threads resolved by `pr-resolve` and threads Copilot resolved itself
+- threads left open, each with its reason
+- what needs the user
+- the next manual step: request Copilot, re-run a workflow, decide X, or merge

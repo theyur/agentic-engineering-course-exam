@@ -89,8 +89,9 @@ Then a human-controlled AI review:
 1. Push the branch and open the PR.
 2. In Claude Code run `/process-pr-feedback [PR number]`. It waits (bounded) for both gates on the **current head SHA**, reports the findings, fixes the justified ones and pushes (max two rounds per stage before it asks you).
 3. When both gates are green it reports **Ready for manual Copilot review** and stops. Request the review yourself: `gh pr edit <N> --add-reviewer @copilot`, or *Reviewers → Copilot* in the PR page.
-4. When Copilot has reviewed, run `/process-pr-feedback <N>` again; it triages Copilot's threads the same way.
-5. Merge manually.
+4. When Copilot has reviewed, run `/process-pr-feedback <N>` again; it triages Copilot's threads the same way and replies in each one (`Fixed in <sha>: …`, `Not changed: …`).
+5. After you re-request Copilot on the fixed head, `/process-pr-feedback <N>` resolves the earlier threads with `tools/pr-gates/pr-resolve.ps1 -AcceptApproval -Apply`. A thread is resolved when its last reply is `Fixed in <sha>` with that commit in the head, and Copilot's review of the head either lists the finding as resolved or recommends approval without raising it again. Rejected, partial or disputed threads, re-raised findings and "Changes recommended" reviews stay open with a reason. See [ADR 0002](docs/adr/0002-copilot-thread-resolution.md).
+6. Merge manually.
 
 Gate status alone: `pwsh tools/pr-gates/pr-gates.ps1 -Pr <N>` (add `-Wait` to block until both gates settle). Greptile and the global `/pr-review` command are not used in this repository — see [ADR 0001](docs/adr/0001-pr-quality-gates.md).
 

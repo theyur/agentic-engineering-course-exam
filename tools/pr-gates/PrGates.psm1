@@ -149,6 +149,184 @@ function Test-KeepWaiting([string]$Overall, [object[]]$Gates, [double]$ElapsedSe
 }
 
 # ---------------------------------------------------------------------------------------------
+# Copilot review-thread resolution (pure; pr-resolve.ps1 gathers the data, selftest.ps1 the fixtures)
+#
+# Copilot resolves its own threads during a re-review when it judges a later commit fixed them
+# (changelog 2026-09-11), and its overview lists them under "Resolved since last review". It does not
+# always: on PR #13 the approving re-review left both fixed threads open and still listed them under
+# "open issues". A thread is resolved only when both sides agree:
+#   1. Claude's claim, checked against git - the thread's LAST comment is a repository writer's reply
+#      starting "Fixed in <sha>", and <sha> is in the PR head and comes after the commented commit;
+#   2. Copilot's side - its latest review is on the current head (it saw the fix), no Copilot review
+#      is in progress, that review raised no new thread on the same file, and either
+#        strict:   the overview lists this finding in a "resolved" section (basis copilot-confirmed), or
+#        approval: (-AcceptApproval) the verdict is "Approval recommended", the overview does not put
+#                  the finding in an unrecognized section, and the fix commit touches the thread's file
+#                  or GitHub marks the thread outdated (basis approval). This trusts the verdict plus
+#                  Copilot's silence on the finding - the PR #13 case.
+# Anything else stays open with the reason. Unrecognized formats fail closed.
+
+# Exact identities of the Copilot code reviewer: REST reports the bot as "...[bot]", GraphQL without
+# the suffix. Anything that decides what may be resolved uses this allow-list. A look-alike
+# (copilot-helper) is not Copilot.
+$script:CopilotReviewerLogins = @('copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]')
+$script:FixReplyRegex = '^\s*Fixed in `?([0-9a-f]{7,40})\b'
+# Reviews that count; DISMISSED (and unsubmitted PENDING) reviews never authorize anything.
+$script:ActiveReviewStates = @('COMMENTED', 'APPROVED', 'CHANGES_REQUESTED')
+
+function Test-CopilotLogin([string]$Login) { $Login -in $script:CopilotReviewerLogins }
+# Broad match, only where a false positive keeps threads OPEN: "Copilot spoke after the fix" and
+# "a Copilot re-review is pending" (the timeline names the requested reviewer just "Copilot").
+function Test-CopilotLike([string]$Login) { [bool]($Login -match '(?i)copilot') }
+
+$script:StatusRank = @{ resolved = 1; unknown = 2; open = 3 }
+
+function Test-CopilotOverview([string]$Body) { [bool]($Body -and $Body -match '<!--\s*ccr-overview-v\d+\s*-->') }
+
+# Verdict line of the overview: "### 🟢 Approval recommended", "### 🟡 Changes recommended",
+# "### 🔵 Needs a closer look" (seen on PR #14). Only APPROVE enables the approval basis.
+function Get-CopilotVerdict([string]$Body) {
+    if (-not (Test-CopilotOverview $Body)) { return 'UNKNOWN' }
+    if ($Body -match '(?m)^#{2,4}\s*\S*\s*Changes recommended\b') { return 'CHANGES' }
+    if ($Body -match '(?m)^#{2,4}\s*\S*\s*Needs a closer look\b') { return 'CLOSER_LOOK' }
+    if ($Body -match '(?m)^#{2,4}\s*\S*\s*Approval recommended\b') { return 'APPROVE' }
+    'UNKNOWN'
+}
+
+# Per-finding status from the overview's <details> sections, keyed by the inline comment id in each
+# item's link (#discussion_r<id>): 'resolved' ("Resolved since last review"), 'open' ("N open
+# issues", "Previously missed"), 'unknown' (a section heading not recognized).
+function Get-CopilotOverviewStatus([string]$Body) {
+    $status = @{}
+    if (-not (Test-CopilotOverview $Body)) { return $status }
+    foreach ($d in [regex]::Matches($Body, '(?s)<details[^>]*>\s*<summary>(.*?)</summary>(.*?)</details>')) {
+        $heading = ($d.Groups[1].Value -replace '<[^>]+>', '').Trim()
+        $kind = if ($heading -match '(?i)\bresolved\b') { 'resolved' }
+                elseif ($heading -match '(?i)\bopen\b|\bmissed\b') { 'open' }
+                else { 'unknown' }
+        foreach ($l in [regex]::Matches($d.Groups[2].Value, '#discussion_r(\d+)')) {
+            $id = $l.Groups[1].Value
+            # A finding listed in several sections is contradictory: the least-resolved status wins,
+            # whatever the order (open > unknown > resolved), so contradictions fail closed.
+            if (-not $status.ContainsKey($id) -or $script:StatusRank[$kind] -gt $script:StatusRank[$status[$id]]) { $status[$id] = $kind }
+        }
+    }
+    $status
+}
+
+# Whether Copilot's latest review can speak for the current head.
+#   Reviews: Copilot reviews { id; state; commit; submittedAt; body } - DISMISSED / PENDING ones are
+#            ignored, so a dismissed review on the head can never be the one that authorizes.
+#   Events:  PR timeline { event; createdAt; reviewer } - review_requested (reviewer Copilot) or
+#            copilot_work_started after the latest review mean a re-review is still coming.
+# State: READY, PENDING (re-review requested / running), NO_REVIEW, NOT_ON_HEAD, UNKNOWN_FORMAT.
+function Get-CopilotReReviewState {
+    param([object[]]$Reviews, [object[]]$Events, [string]$HeadSha)
+    $latest = @($Reviews | Where-Object { $_ -and $_.state -in $script:ActiveReviewStates }) |
+        Sort-Object { [datetime]$_.submittedAt } | Select-Object -Last 1
+    $since = if ($latest) { [datetime]$latest.submittedAt } else { [datetime]::MinValue }
+    $pending = @($Events | Where-Object {
+            $_ -and [datetime]$_.createdAt -gt $since -and
+            ($_.event -eq 'copilot_work_started' -or ($_.event -eq 'review_requested' -and (Test-CopilotLike $_.reviewer)))
+        }) | Sort-Object { [datetime]$_.createdAt } | Select-Object -Last 1
+    $out = { param($s, $r) [pscustomobject]@{ state = $s; reason = $r; review = $latest } }
+    if ($pending) { return & $out 'PENDING' "Copilot re-review in progress ($($pending.event) at $($pending.createdAt)); resolve nothing until it is submitted." }
+    if (-not $latest) { return & $out 'NO_REVIEW' 'No Copilot review on this PR.' }
+    if ($latest.commit -ne $HeadSha) { return & $out 'NOT_ON_HEAD' "Latest Copilot review is on $($latest.commit.Substring(0,7)), not the head $($HeadSha.Substring(0,7)): it has not seen the fixes. Request a re-review." }
+    if (-not (Test-CopilotOverview $latest.body)) { return & $out 'UNKNOWN_FORMAT' 'Latest Copilot review has no recognizable overview; no thread is resolved automatically.' }
+    & $out 'READY' 'Latest Copilot review is on the head.'
+}
+
+# Decision for one review thread.
+#   Thread:   { id; isResolved; isOutdated; path; comments = @({ databaseId; author; authorType; canPush; body; createdAt; reviewId }) }
+#             canPush: the comment author's actual repository permission is write or higher (looked
+#             up by pr-resolve.ps1). authorAssociation is not used: MEMBER / COLLABORATOR can be read-only.
+#   ReReview: output of Get-CopilotReReviewState
+#   Threads:  all threads of the PR (to see new Copilot threads raised by the latest review)
+#   CommitInfo: scriptblock (sha, thread) -> { found; sha; inHead; afterFinding; files } (gh lookups in
+#               pr-resolve.ps1, fakes in selftest.ps1)
+#   AcceptApproval: also resolve on the approval basis (see above)
+# Decision: RESOLVE (with basis), KEEP (with reason), SKIP (already resolved / not a Copilot thread),
+# WAIT (no usable re-review).
+function Get-ThreadResolution {
+    param($Thread, $ReReview, [object[]]$Threads, [scriptblock]$CommitInfo, [switch]$AcceptApproval)
+    $res = { param($d, $r, $sha, $basis = $null) [pscustomobject]@{ threadId = $Thread.id; path = $Thread.path; decision = $d; reason = $r; fixSha = $sha; basis = $basis } }
+    $comments = @($Thread.comments | Where-Object { $_ })
+    $first = $comments | Select-Object -First 1
+    if (-not $first -or -not (Test-CopilotLogin $first.author) -or $first.authorType -ne 'Bot') { return & $res 'SKIP' 'Not a Copilot thread.' $null }
+    if ($Thread.isResolved) { return & $res 'SKIP' 'Already resolved.' $null }
+
+    # 1. Claude's claim, checked against git.
+    $last = $comments | Select-Object -Last 1
+    if ($comments.Count -lt 2) { return & $res 'KEEP' "No 'Fixed in <sha>' reply in the thread." $null }
+    if (Test-CopilotLike $last.author) { return & $res 'KEEP' 'Copilot has the last word in the thread (it answered after the reply).' $null }
+    $m = [regex]::Match([string]$last.body, $script:FixReplyRegex)
+    if (-not $m.Success) { return & $res 'KEEP' "Last comment is not a 'Fixed in <sha>' reply (rejected, partial, or follow-up discussion)." $null }
+    if ($last.authorType -ne 'User' -or $last.canPush -ne $true) {
+        return & $res 'KEEP' "Fix reply by $($last.author) - only users with write permission on the repository count." $null
+    }
+    $sha = $m.Groups[1].Value
+    if ($ReReview.state -ne 'READY') { return & $res 'WAIT' $ReReview.reason $sha }
+    $c = & $CommitInfo $sha $Thread
+    if (-not $c -or -not $c.found) { return & $res 'KEEP' "Fix commit $sha not found in the repository." $sha }
+    if (-not $c.inHead) { return & $res 'KEEP' "Fix commit $sha is not in the PR head (rewritten history?)." $sha }
+    if (-not $c.afterFinding) { return & $res 'KEEP' "Fix commit $sha does not come after the commented commit." $sha }
+
+    # 2. Copilot's own status for this finding, on a review that saw the fix.
+    $review = $ReReview.review
+    if ("$($first.reviewId)" -eq "$($review.id)") { return & $res 'KEEP' 'Raised by the latest Copilot review itself.' $sha }
+    $status = (Get-CopilotOverviewStatus $review.body)["$($first.databaseId)"]   # resolved / open / unknown / $null
+    $verdict = Get-CopilotVerdict $review.body
+    if ($status -eq 'resolved') { $basis = 'copilot-confirmed' }
+    elseif (-not $AcceptApproval) {
+        $what = if ($status -eq 'open') { 'still lists this finding as open' } else { 'does not list this finding as resolved' }
+        return & $res 'KEEP' "Copilot's latest review (on the head) $what - no per-finding confirmation (approval mode off)." $sha
+    }
+    elseif ($verdict -ne 'APPROVE') {
+        return & $res 'KEEP' "Copilot's latest review does not confirm this finding and its verdict is $verdict, not 'Approval recommended'." $sha
+    }
+    elseif ($status -eq 'unknown') {
+        return & $res 'KEEP' "Copilot's overview lists this finding under a section heading not recognized - verify by hand." $sha
+    }
+    elseif (-not $Thread.isOutdated -and $Thread.path -notin @($c.files)) {
+        return & $res 'KEEP' "Approval basis needs the fix to touch $($Thread.path) or the thread to be outdated; $sha does neither - verify by hand." $sha
+    }
+    else { $basis = 'approval' }
+    # A new Copilot thread from that review on the same file may be the issue raised again (partial
+    # fix). That holds whether or not the new thread has since been resolved: it is evidence about
+    # what Copilot saw, not about its current state.
+    $reraised = @($Threads | Where-Object {
+            $_ -and $_.id -ne $Thread.id -and $_.path -eq $Thread.path -and
+            (@($_.comments) | Select-Object -First 1 | Where-Object { (Test-CopilotLogin $_.author) -and "$($_.reviewId)" -eq "$($review.id)" })
+        })
+    if ($reraised.Count) { return & $res 'KEEP' "Latest Copilot review raised a new thread on $($Thread.path) (possible partial fix or duplicate)." $sha }
+
+    $why = if ($basis -eq 'copilot-confirmed') { 'lists the finding as resolved but left the thread open' }
+           else { "recommends approval and did not re-raise the finding (overview: $(if ($status) { $status } else { 'not listed' }))" }
+    & $res 'RESOLVE' "Fixed in $($c.sha.Substring(0,7)); Copilot's review of $($review.commit.Substring(0,7)) $why." $c.sha $basis
+}
+
+# Right before resolving, the thread is read again. The decision stands only if nothing changed:
+# still unresolved, same number of comments, same last comment - same id, same updatedAt and same
+# text (an edit from "Fixed in ..." to "Not changed: ..." keeps the id). Otherwise a reply, edit or
+# resolution arrived after the decision was made and the thread is left alone.
+#   Before / Now: { isResolved; commentCount; lastCommentId; lastCommentUpdatedAt; lastCommentBody }
+function Test-ThreadUnchanged($Before, $Now) {
+    if (-not $Before -or -not $Now) { return $false }
+    (-not $Now.isResolved) -and [int]$Now.commentCount -eq [int]$Before.commentCount -and
+        "$($Now.lastCommentId)" -eq "$($Before.lastCommentId)" -and "$($Now.lastCommentId)" -ne '' -and
+        "$($Now.lastCommentUpdatedAt)" -eq "$($Before.lastCommentUpdatedAt)" -and
+        [string]$Now.lastCommentBody -ceq [string]$Before.lastCommentBody
+}
+
+# Right before each mutation, the re-review state is computed again from fresh reviews AND
+# timeline events. The decision stands only while that state is still READY on the very review that
+# authorized it - not PENDING (a re-review requested or started meanwhile), not a newer review.
+function Test-ReReviewStillValid([string]$AuthorizingReviewId, $Now) {
+    [bool]($AuthorizingReviewId -and $Now -and $Now.state -eq 'READY' -and $Now.review -and "$($Now.review.id)" -eq $AuthorizingReviewId)
+}
+
+# ---------------------------------------------------------------------------------------------
 # Data access (gh CLI for GitHub, public web API for SonarQube Cloud)
 
 function Invoke-Gh([string[]]$Arguments) {
@@ -264,6 +442,7 @@ function Get-FindingFingerprint([string]$Source, [string]$Rule, [string]$Path, [
 }
 
 Export-ModuleMember -Function Get-PrGatesConfig, Select-LatestCheck, Test-ResultIsCurrent, Get-SonarGateState,
-    Get-CodeQLGateState, Get-OverallState, Test-KeepWaiting, Invoke-Gh, Invoke-GhList, Get-RepoSlug, Get-PrInfo,
+    Get-CodeQLGateState, Get-OverallState, Test-KeepWaiting, Test-CopilotLogin, Test-CopilotLike, Test-CopilotOverview, Get-CopilotVerdict, Get-CopilotOverviewStatus,
+    Get-CopilotReReviewState, Get-ThreadResolution, Test-ThreadUnchanged, Test-ReReviewStillValid, Invoke-Gh, Invoke-GhList, Get-RepoSlug, Get-PrInfo,
     Get-CheckRuns, Get-WorkflowRuns, Invoke-SonarApi, Get-SonarAll, Get-GateReport,
     Get-StatePath, Read-FeedbackState, Write-FeedbackState, Get-FindingFingerprint
