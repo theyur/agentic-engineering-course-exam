@@ -234,7 +234,26 @@ Expect 'reread: thread unreadable'  (Test-ThreadUnchanged $snap $null) 'False'
 Expect 'login: exact reviewer (GraphQL)' (Test-CopilotLogin 'copilot-pull-request-reviewer') 'True'
 Expect 'login: exact reviewer (REST)'    (Test-CopilotLogin 'copilot-pull-request-reviewer[bot]') 'True'
 Expect 'login: look-alike rejected'      (Test-CopilotLogin 'copilot-helper') 'False'
-$hardeningCases = 4 + 5 + 3
+# Third verdict seen on PR #14, and its nested <details> layout ("previously missed" with an inner
+# <details> per finding, no inline-thread link; then "N resolved since last review").
+$closer = "<!-- ccr-overview-v2 -->`n`n### 🔵 Needs a closer look`n`nOne moderate issue.`n`n**No open issues** 🎉`n`n<details>`n<summary><strong>1 previously missed issue</strong></summary>`n`nIn code that hasn't changed`n`n<details>`n<summary>Recheck events</summary>`n`n``pr-resolve.ps1:178```n`nText.`n</details>`n</details>`n`n<details>`n<summary><strong>2 resolved since last review</strong></summary>`n`n- [A](https://github.com/o/r/pull/14#discussion_r101)`n- [B](https://github.com/o/r/pull/14#discussion_r102)`n</details>"
+$ovc = Get-CopilotOverviewStatus $closer
+Expect 'verdict: needs a closer look'          (Get-CopilotVerdict $closer) 'CLOSER_LOOK'
+Expect 'overview: nested layout, resolved 101' $ovc['101'] 'resolved'
+Expect 'overview: nested layout, resolved 102' $ovc['102'] 'resolved'
+Expect 'approval: closer look, finding open'   (Get-ThreadResolution -Thread $good -ReReview (Ready ($closer -replace 'resolved since last review', 'open issues')) -Threads @($good) -CommitInfo $commits -AcceptApproval).decision 'KEEP'
+Expect 'approval: closer look, finding resolved' (Get-ThreadResolution -Thread $good -ReReview (Ready $closer) -Threads @($good) -CommitInfo $commits -AcceptApproval).decision 'RESOLVE'
+# Apply-time re-check: still READY on the same review, or stop.
+$readyOn = { param($id, $s = 'READY') [pscustomobject]@{ state = $s; review = [pscustomobject]@{ id = $id } } }
+Expect 'recheck: same review, ready'      (Test-ReReviewStillValid '2' (& $readyOn 2)) 'True'
+Expect 'recheck: re-review now pending'   (Test-ReReviewStillValid '2' (& $readyOn 2 'PENDING')) 'False'
+Expect 'recheck: newer review arrived'    (Test-ReReviewStillValid '2' (& $readyOn 3)) 'False'
+Expect 'recheck: review gone (dismissed)' (Test-ReReviewStillValid '2' (& $readyOn 1 'NOT_ON_HEAD')) 'False'
+Expect 'recheck: no authorizing review'   (Test-ReReviewStillValid '' (& $readyOn 2)) 'False'
+Expect 'recheck: no state'                (Test-ReReviewStillValid '2' $null) 'False'
+# The real pending case: events after the latest review flip READY to PENDING.
+Expect 'recheck: requested after review'  (Test-ReReviewStillValid '2' (Get-CopilotReReviewState -Reviews @($r2) -HeadSha $H -Events @((Evt review_requested '2026-11-04T21:10:00Z' Copilot)))) 'False'
+$hardeningCases = 4 + 5 + 3 + 5 + 7
 # Qualifying thread with no usable re-review: wait, never resolve.
 $prLevel = @('PENDING', 'NOT_ON_HEAD', 'UNKNOWN_FORMAT', 'NO_REVIEW')
 foreach ($s in $prLevel) {

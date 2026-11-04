@@ -23,6 +23,10 @@ What the data shows:
   2026-09-11 ("auto-resolution") and 2026-09-18 ("improved review experience"). Copilot keeps a
   thread open when a reply asks for that. On PR #13 the native mechanism did not fire. The likely
   reason is that Copilot did not consider the findings fixed; the evidence can't show why.
+- On PR #14 the native mechanism did fire. Copilot's re-review resolved all four of its threads
+  itself (`resolvedBy: Copilot`) and listed them under "4 resolved since last review". It used a
+  third verdict, **Needs a closer look**, for a finding reported only in the overview (no inline
+  thread).
 - Approvals are a separate, opt-in repository setting (GA 2026-10-28). They are not enabled here,
   and an approval would not be per-thread evidence either.
 

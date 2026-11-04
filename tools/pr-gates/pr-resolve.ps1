@@ -56,12 +56,15 @@ try {
         @(Invoke-GhList "repos/$Repo/pulls/$Pr/reviews?per_page=100" | Where-Object { Test-CopilotLogin $_.user.login } |
             ForEach-Object { [pscustomobject]@{ id = $_.id; state = $_.state; commit = $_.commit_id; submittedAt = $_.submitted_at; body = $_.body } })
     }
+    # Timeline events that mean a Copilot re-review is on its way.
+    $readEvents = {
+        @(Invoke-GhList "repos/$Repo/issues/$Pr/events?per_page=100" |
+            Where-Object { $_.event -in 'review_requested', 'copilot_work_started' } |
+            ForEach-Object { [pscustomobject]@{ event = $_.event; createdAt = $_.created_at
+                    reviewer = $(if ($_.PSObject.Properties['requested_reviewer'] -and $_.requested_reviewer) { $_.requested_reviewer.login } else { '' }) } })
+    }
     $reviews = & $readReviews
-    $events = @(Invoke-GhList "repos/$Repo/issues/$Pr/events?per_page=100" |
-        Where-Object { $_.event -in 'review_requested', 'copilot_work_started' } |
-        ForEach-Object { [pscustomobject]@{ event = $_.event; createdAt = $_.created_at
-                reviewer = $(if ($_.PSObject.Properties['requested_reviewer'] -and $_.requested_reviewer) { $_.requested_reviewer.login } else { '' }) } })
-    $reReview = Get-CopilotReReviewState -Reviews $reviews -Events $events -HeadSha $head
+    $reReview = Get-CopilotReReviewState -Reviews $reviews -Events (& $readEvents) -HeadSha $head
 
     $query = @'
 query($owner: String!, $name: String!, $number: Int!) {
@@ -175,9 +178,11 @@ query($owner: String!, $name: String!, $number: Int!) {
                 [Console]::Error.WriteLine("STALE: head moved during apply; stopped after $($resolved.Count) thread(s).")
                 exit 30
             }
-            $latestNow = (Get-CopilotReReviewState -Reviews (& $readReviews) -Events @() -HeadSha $head).review
-            if ("$($latestNow.id)" -ne $authorizing) {
-                [Console]::Error.WriteLine("STALE: Copilot's latest review changed during apply; stopped after $($resolved.Count) thread(s).")
+            # Reviews AND timeline events: a re-review requested or started since the snapshot means
+            # the authorizing review is about to be superseded.
+            $stateNow = Get-CopilotReReviewState -Reviews (& $readReviews) -Events (& $readEvents) -HeadSha $head
+            if (-not (Test-ReReviewStillValid $authorizing $stateNow)) {
+                [Console]::Error.WriteLine("STALE: Copilot re-review state changed during apply ($($stateNow.state)); stopped after $($resolved.Count) thread(s).")
                 exit 30
             }
             $before = $threads | Where-Object id -eq $d.threadId | Select-Object -First 1

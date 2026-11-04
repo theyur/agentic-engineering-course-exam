@@ -181,10 +181,12 @@ function Test-CopilotLike([string]$Login) { [bool]($Login -match '(?i)copilot') 
 
 function Test-CopilotOverview([string]$Body) { [bool]($Body -and $Body -match '<!--\s*ccr-overview-v\d+\s*-->') }
 
-# Verdict line of the overview ("### 🟢 Approval recommended"). Reported for context only.
+# Verdict line of the overview: "### 🟢 Approval recommended", "### 🟡 Changes recommended",
+# "### 🔵 Needs a closer look" (seen on PR #14). Only APPROVE enables the approval basis.
 function Get-CopilotVerdict([string]$Body) {
     if (-not (Test-CopilotOverview $Body)) { return 'UNKNOWN' }
     if ($Body -match '(?m)^#{2,4}\s*\S*\s*Changes recommended\b') { return 'CHANGES' }
+    if ($Body -match '(?m)^#{2,4}\s*\S*\s*Needs a closer look\b') { return 'CLOSER_LOOK' }
     if ($Body -match '(?m)^#{2,4}\s*\S*\s*Approval recommended\b') { return 'APPROVE' }
     'UNKNOWN'
 }
@@ -311,6 +313,13 @@ function Test-ThreadUnchanged($Before, $Now) {
         "$($Now.lastCommentId)" -eq "$($Before.lastCommentId)" -and "$($Now.lastCommentId)" -ne ''
 }
 
+# Right before each mutation, the re-review state is computed again from fresh reviews AND
+# timeline events. The decision stands only while that state is still READY on the very review that
+# authorized it - not PENDING (a re-review requested or started meanwhile), not a newer review.
+function Test-ReReviewStillValid([string]$AuthorizingReviewId, $Now) {
+    [bool]($AuthorizingReviewId -and $Now -and $Now.state -eq 'READY' -and $Now.review -and "$($Now.review.id)" -eq $AuthorizingReviewId)
+}
+
 # ---------------------------------------------------------------------------------------------
 # Data access (gh CLI for GitHub, public web API for SonarQube Cloud)
 
@@ -428,6 +437,6 @@ function Get-FindingFingerprint([string]$Source, [string]$Rule, [string]$Path, [
 
 Export-ModuleMember -Function Get-PrGatesConfig, Select-LatestCheck, Test-ResultIsCurrent, Get-SonarGateState,
     Get-CodeQLGateState, Get-OverallState, Test-KeepWaiting, Test-CopilotLogin, Test-CopilotLike, Test-CopilotOverview, Get-CopilotVerdict, Get-CopilotOverviewStatus,
-    Get-CopilotReReviewState, Get-ThreadResolution, Test-ThreadUnchanged, Invoke-Gh, Invoke-GhList, Get-RepoSlug, Get-PrInfo,
+    Get-CopilotReReviewState, Get-ThreadResolution, Test-ThreadUnchanged, Test-ReReviewStillValid, Invoke-Gh, Invoke-GhList, Get-RepoSlug, Get-PrInfo,
     Get-CheckRuns, Get-WorkflowRuns, Invoke-SonarApi, Get-SonarAll, Get-GateReport,
     Get-StatePath, Read-FeedbackState, Write-FeedbackState, Get-FindingFingerprint
