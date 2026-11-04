@@ -64,4 +64,5 @@ A feature is not done without tests: unit (domain rules — targets, grace perio
 - After opening or updating a PR, use `/process-pr-feedback` (SonarQube Cloud + CodeQL gates on the current head SHA, then manual Copilot review). Flow and gate semantics: README "PR review flow", `docs/adr/0001-pr-quality-gates.md`.
 - **Greptile is not used here.** Never run the global `/pr-review`, never post `@greptileai`, never trigger a Greptile review (also blocked via `.claude/settings.json`).
 - Never request Copilot (or any AI) review yourself and never merge — the user does both.
+- Resolve review threads only via `tools/pr-gates/pr-resolve.ps1 -AcceptApproval -Apply`, after a Copilot re-review of the head and with a verified `Fixed in <sha>` reply. Never resolve by hand or because of a push alone (ADR 0002).
 - Changed `tools/pr-gates/` or `.claude/hooks/block-pr-review.ps1`? Run `pwsh -NoProfile -File tools/pr-gates/selftest.ps1` — it must print `PASSED`.
