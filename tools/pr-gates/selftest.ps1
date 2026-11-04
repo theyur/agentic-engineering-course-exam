@@ -126,12 +126,12 @@ function Section([string]$Heading, [long[]]$Ids) {
 $resolvedBody = Overview -Sections (Section '1 resolved since last review' 101)
 $openBody     = Overview -Sections (Section '1 open issue' 101)      # what PR #13's re-review actually said
 $changesBody  = Overview 'Changes recommended' (Section '1 resolved since last review' 101)
-function Rev([long]$Id, [string]$Commit, [string]$At, [string]$Body = $resolvedBody) { [pscustomobject]@{ id = $Id; commit = $Commit; submittedAt = $At; body = $Body } }
+function Rev([long]$Id, [string]$Commit, [string]$At, [string]$Body = $resolvedBody, [string]$State = 'COMMENTED') { [pscustomobject]@{ id = $Id; state = $State; commit = $Commit; submittedAt = $At; body = $Body } }
 function Evt([string]$Event, [string]$At, [string]$Reviewer = '') { [pscustomobject]@{ event = $Event; createdAt = $At; reviewer = $Reviewer } }
-function Cm([string]$Author, [string]$Body, [string]$At, $ReviewId = $null, [string]$Type = 'User', [string]$Assoc = 'OWNER', [long]$DbId = 200) {
-    [pscustomobject]@{ databaseId = $DbId; author = $Author; authorType = $Type; authorAssociation = $Assoc; body = $Body; createdAt = $At; reviewId = $ReviewId }
+function Cm([string]$Author, [string]$Body, [string]$At, $ReviewId = $null, [string]$Type = 'User', [bool]$CanPush = $true, [long]$DbId = 200) {
+    [pscustomobject]@{ databaseId = $DbId; author = $Author; authorType = $Type; canPush = $CanPush; body = $Body; createdAt = $At; reviewId = $ReviewId }
 }
-function CopilotCm([long]$ReviewId, [string]$At = '2026-11-04T20:54:30Z', [long]$DbId = 101) { Cm 'copilot-pull-request-reviewer' 'Gate can miss late jobs.' $At $ReviewId 'Bot' 'NONE' $DbId }
+function CopilotCm([long]$ReviewId, [string]$At = '2026-11-04T20:54:30Z', [long]$DbId = 101) { Cm 'copilot-pull-request-reviewer' 'Gate can miss late jobs.' $At $ReviewId 'Bot' $false $DbId }
 function Th([string]$Id, [object[]]$Comments, [string]$Path = 'tools/pr-gates/pr-gates.ps1', [bool]$Resolved = $false, [bool]$Outdated = $true) {
     [pscustomobject]@{ id = $Id; isResolved = $Resolved; isOutdated = $Outdated; path = $Path; originalCommit = $A; comments = $Comments }
 }
@@ -195,8 +195,11 @@ $tc = @(
     @{ n = 'thread: "Fixed in" not leading';       t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' "Reverted: Fixed in $sha7 was wrong." '2026-11-04T21:00:22Z'))); e = 'KEEP' }
     @{ n = 'thread: Copilot answered after fix';   t = (Th 't1' @((CopilotCm 1), $fixReply, (CopilotCm 2 '2026-11-04T21:05:07Z' 300))); e = 'KEEP' }
     @{ n = 'thread: user followed up after fix';   t = (Th 't1' @((CopilotCm 1), $fixReply, (Cm 'theyur' 'Keep this open, still flaky.' '2026-11-04T21:06:00Z'))); e = 'KEEP' }
-    @{ n = 'thread: reply by outsider';            t = (Th 't1' @((CopilotCm 1), (Cm 'drive-by' "Fixed in $sha7" '2026-11-04T21:00:22Z' -Assoc 'NONE'))); e = 'KEEP' }
-    @{ n = 'thread: reply by a bot';               t = (Th 't1' @((CopilotCm 1), (Cm 'some-bot' "Fixed in $sha7" '2026-11-04T21:00:22Z' -Type 'Bot' -Assoc 'NONE'))); e = 'KEEP' }
+    @{ n = 'thread: reply by read-only user';      t = (Th 't1' @((CopilotCm 1), (Cm 'drive-by' "Fixed in $sha7" '2026-11-04T21:00:22Z' -CanPush $false))); e = 'KEEP' }
+    @{ n = 'thread: reply by a bot with push';     t = (Th 't1' @((CopilotCm 1), (Cm 'some-bot' "Fixed in $sha7" '2026-11-04T21:00:22Z' -Type 'Bot'))); e = 'KEEP' }
+    @{ n = 'thread: look-alike reviewer login';    t = (Th 't1' @((Cm 'copilot-helper' 'Gate can miss late jobs.' '2026-11-04T20:54:30Z' 1 'Bot' $false 101), $fixReply)); e = 'SKIP' }
+    @{ n = 'thread: Copilot login, but a User';    t = (Th 't1' @((Cm 'copilot-pull-request-reviewer' 'x' '2026-11-04T20:54:30Z' 1 'User' $false 101), $fixReply)); e = 'SKIP' }
+    @{ n = 'thread: look-alike spoke last';        t = (Th 't1' @((CopilotCm 1), $fixReply, (Cm 'copilot-helper' 'not fixed' '2026-11-04T21:06:00Z' -Type 'Bot'))); e = 'KEEP' }
     @{ n = 'thread: fix commit not in head';       t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' "Fixed in $($X.Substring(0,7))" '2026-11-04T21:00:22Z'))); e = 'KEEP' }
     @{ n = 'thread: fix commit unknown';           t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' 'Fixed in 1234567' '2026-11-04T21:00:22Z'))); e = 'KEEP' }
     @{ n = 'thread: fix predates finding';         t = (Th 't1' @((CopilotCm 1), (Cm 'theyur' "Fixed in $($A.Substring(0,7))" '2026-11-04T21:00:22Z'))); e = 'KEEP' }
@@ -214,7 +217,24 @@ Expect 'thread: unknown section heading'                  (Get-ThreadResolution 
 $newOnSamePath = Th 't9' @((CopilotCm 2 '2026-11-04T21:05:06Z' 301))
 Expect 'thread: re-raised on same file'   (Get-ThreadResolution -Thread $good -ReReview $ready -Threads @($good, $newOnSamePath) -CommitInfo $commits).decision 'KEEP'
 Expect 'thread: new thread elsewhere ok'  (Get-ThreadResolution -Thread $good -ReReview $ready -Threads @($good, (Th 't9' @((CopilotCm 2 -DbId 301)) -Path 'README.md')) -CommitInfo $commits).decision 'RESOLVE'
-Expect 'thread: resolved re-raise ignored' (Get-ThreadResolution -Thread $good -ReReview $ready -Threads @($good, (Th 't9' @((CopilotCm 2 -DbId 301)) -Resolved $true)) -CommitInfo $commits).decision 'RESOLVE'
+Expect 'thread: resolved re-raise still counts' (Get-ThreadResolution -Thread $good -ReReview $ready -Threads @($good, (Th 't9' @((CopilotCm 2 -DbId 301)) -Resolved $true)) -CommitInfo $commits).decision 'KEEP'
+# Dismissed reviews never authorize: the older active review is used instead (not on the head).
+Expect 'rereview: dismissed review on head ignored' (Get-CopilotReReviewState -HeadSha $H -Events @() -Reviews @(
+        (Rev 1 $A '2026-11-04T20:54:31Z' (Overview 'Changes recommended')), (Rev 2 $H '2026-11-04T21:05:07Z' -State 'DISMISSED'))).state 'NOT_ON_HEAD'
+Expect 'rereview: only a dismissed review'          (Get-CopilotReReviewState -HeadSha $H -Events @() -Reviews @((Rev 2 $H '2026-11-04T21:05:07Z' -State 'DISMISSED'))).state 'NO_REVIEW'
+Expect 'rereview: pending (unsubmitted) ignored'    (Get-CopilotReReviewState -HeadSha $H -Events @() -Reviews @((Rev 2 $H '2026-11-04T21:05:07Z' -State 'PENDING'))).state 'NO_REVIEW'
+Expect 'rereview: APPROVED state counts'            (Get-CopilotReReviewState -HeadSha $H -Events @() -Reviews @((Rev 2 $H '2026-11-04T21:05:07Z' -State 'APPROVED'))).state 'READY'
+# Re-read before the mutation: any change means the decision is stale.
+$snap = [pscustomobject]@{ commentCount = 2; lastCommentId = 200 }
+Expect 'reread: unchanged'          (Test-ThreadUnchanged $snap ([pscustomobject]@{ isResolved = $false; commentCount = 2; lastCommentId = 200 })) 'True'
+Expect 'reread: new comment'        (Test-ThreadUnchanged $snap ([pscustomobject]@{ isResolved = $false; commentCount = 3; lastCommentId = 300 })) 'False'
+Expect 'reread: comment replaced'   (Test-ThreadUnchanged $snap ([pscustomobject]@{ isResolved = $false; commentCount = 2; lastCommentId = 300 })) 'False'
+Expect 'reread: resolved meanwhile' (Test-ThreadUnchanged $snap ([pscustomobject]@{ isResolved = $true;  commentCount = 2; lastCommentId = 200 })) 'False'
+Expect 'reread: thread unreadable'  (Test-ThreadUnchanged $snap $null) 'False'
+Expect 'login: exact reviewer (GraphQL)' (Test-CopilotLogin 'copilot-pull-request-reviewer') 'True'
+Expect 'login: exact reviewer (REST)'    (Test-CopilotLogin 'copilot-pull-request-reviewer[bot]') 'True'
+Expect 'login: look-alike rejected'      (Test-CopilotLogin 'copilot-helper') 'False'
+$hardeningCases = 4 + 5 + 3
 # Qualifying thread with no usable re-review: wait, never resolve.
 $prLevel = @('PENDING', 'NOT_ON_HEAD', 'UNKNOWN_FORMAT', 'NO_REVIEW')
 foreach ($s in $prLevel) {
@@ -251,7 +271,7 @@ foreach ($s in $prLevel) {
 Expect 'approval: basis reported' (Get-ThreadResolution -Thread $good -ReReview (Ready $openBody) -Threads @($good) -CommitInfo $commits -AcceptApproval).basis 'approval'
 Expect 'strict: basis reported'   (Get-ThreadResolution -Thread $good -ReReview $ready -Threads @($good) -CommitInfo $commits).basis 'copilot-confirmed'
 $approvalKeeps = @($tc | Where-Object { $_.e -eq 'KEEP' -and $_.n -ne 'thread: finding not in overview' }).Count
-$resolutionCases = 10 + $rr.Count + 1 + $tc.Count + 4 + 3 + $prLevel.Count + $ap.Count + $approvalKeeps + $prLevel.Count + 2
+$resolutionCases = 10 + $rr.Count + 1 + $tc.Count + 4 + 3 + $hardeningCases + $prLevel.Count + $ap.Count + $approvalKeeps + $prLevel.Count + 2
 
 
 # --- /pr-review guard hook -------------------------------------------------------------------

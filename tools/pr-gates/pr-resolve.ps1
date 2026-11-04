@@ -51,8 +51,12 @@ try {
     if ($Apply -and $info.state -ne 'OPEN') { throw "PR #$Pr is $($info.state); nothing to resolve." }
     $owner, $name = $Repo -split '/'
 
-    $reviews = @(Invoke-GhList "repos/$Repo/pulls/$Pr/reviews?per_page=100" | Where-Object { Test-CopilotLogin $_.user.login } |
-        ForEach-Object { [pscustomobject]@{ id = $_.id; commit = $_.commit_id; submittedAt = $_.submitted_at; body = $_.body } })
+    # Copilot reviews with their state: Get-CopilotReReviewState ignores DISMISSED / PENDING ones.
+    $readReviews = {
+        @(Invoke-GhList "repos/$Repo/pulls/$Pr/reviews?per_page=100" | Where-Object { Test-CopilotLogin $_.user.login } |
+            ForEach-Object { [pscustomobject]@{ id = $_.id; state = $_.state; commit = $_.commit_id; submittedAt = $_.submitted_at; body = $_.body } })
+    }
+    $reviews = & $readReviews
     $events = @(Invoke-GhList "repos/$Repo/issues/$Pr/events?per_page=100" |
         Where-Object { $_.event -in 'review_requested', 'copilot_work_started' } |
         ForEach-Object { [pscustomobject]@{ event = $_.event; createdAt = $_.created_at
@@ -70,7 +74,7 @@ query($owner: String!, $name: String!, $number: Int!) {
           comments(first: 50) {
             pageInfo { hasNextPage }
             nodes {
-              databaseId author { __typename login } authorAssociation body createdAt
+              databaseId author { __typename login } body createdAt
               pullRequestReview { databaseId } originalCommit { oid }
             }
           }
@@ -89,13 +93,31 @@ query($owner: String!, $name: String!, $number: Int!) {
             [pscustomobject]@{
                 id = $_.id; isResolved = $_.isResolved; isOutdated = $_.isOutdated; viewerCanResolve = $_.viewerCanResolve; path = $_.path
                 originalCommit = $(($_.comments.nodes | Select-Object -First 1).originalCommit.oid)
+                commentCount = @($_.comments.nodes).Count
+                lastCommentId = $(($_.comments.nodes | Select-Object -Last 1).databaseId)
                 comments = @($_.comments.nodes | ForEach-Object {
-                        [pscustomobject]@{ databaseId = $_.databaseId; author = $_.author.login; authorType = $_.author.__typename; authorAssociation = $_.authorAssociation
+                        [pscustomobject]@{ databaseId = $_.databaseId; author = $(if ($_.author) { $_.author.login } else { '' })
+                            authorType = $(if ($_.author) { $_.author.__typename } else { '' }); canPush = $false
                             body = $_.body; createdAt = $_.createdAt
                             reviewId = $(if ($_.pullRequestReview) { $_.pullRequestReview.databaseId } else { $null }) }
                     })
             }
         })
+
+    # Actual repository permission of whoever wrote each thread's last comment (the only comment
+    # whose author matters). authorAssociation is not a permission: MEMBER / COLLABORATOR can be
+    # read-only. A failed lookup counts as no permission.
+    $pushCache = @{}
+    foreach ($t in $threads) {
+        $last = @($t.comments) | Select-Object -Last 1
+        if (-not $last -or $last.authorType -ne 'User' -or -not $last.author) { continue }
+        if (-not $pushCache.ContainsKey($last.author)) {
+            $pushCache[$last.author] = try {
+                (Invoke-Gh @('api', "repos/$Repo/collaborators/$($last.author)/permission", '--jq', '.user.permissions.push')).Trim() -eq 'true'
+            } catch { $false }
+        }
+        $last.canPush = $pushCache[$last.author]
+    }
 
     # Commit facts via the compare API, cached per (sha, commented commit).
     $cache = @{}
@@ -142,12 +164,30 @@ query($owner: String!, $name: String!, $number: Int!) {
     }
 
     $resolved = @()
+    $skipped = @()
     if ($Apply) {
         $mutation = 'mutation($id: ID!) { resolveReviewThread(input: { threadId: $id, resolutionReason: ADDRESSED }) { thread { id isResolved } } }'
+        $reread = 'query($id: ID!) { node(id: $id) { ... on PullRequestReviewThread { isResolved comments(last: 1) { totalCount nodes { databaseId } } } } }'
+        $authorizing = if ($reReview.review) { "$($reReview.review.id)" } else { '' }
         foreach ($d in @($decisions | Where-Object decision -eq 'RESOLVE')) {
+            # Everything the decision rested on, read again right before the mutation.
             if ((Get-PrInfo $Repo $Pr).headRefOid -ne $head) {
                 [Console]::Error.WriteLine("STALE: head moved during apply; stopped after $($resolved.Count) thread(s).")
                 exit 30
+            }
+            $latestNow = (Get-CopilotReReviewState -Reviews (& $readReviews) -Events @() -HeadSha $head).review
+            if ("$($latestNow.id)" -ne $authorizing) {
+                [Console]::Error.WriteLine("STALE: Copilot's latest review changed during apply; stopped after $($resolved.Count) thread(s).")
+                exit 30
+            }
+            $before = $threads | Where-Object id -eq $d.threadId | Select-Object -First 1
+            $node = (Invoke-Gh @('api', 'graphql', '-f', "query=$reread", '-F', "id=$($d.threadId)") | ConvertFrom-Json).data.node
+            $now = [pscustomobject]@{ isResolved = $node.isResolved; commentCount = $node.comments.totalCount
+                lastCommentId = $(@($node.comments.nodes) | Select-Object -Last 1 | ForEach-Object databaseId) }
+            if (-not (Test-ThreadUnchanged $before $now)) {
+                $d.decision = 'KEEP'; $d.reason = 'Thread changed after evaluation (new comment or resolved meanwhile); left alone - re-run.'
+                $skipped += $d.threadId
+                continue
             }
             $null = Invoke-Gh @('api', 'graphql', '-f', "query=$mutation", '-F', "id=$($d.threadId)")
             $resolved += $d.threadId
@@ -160,6 +200,7 @@ query($owner: String!, $name: String!, $number: Int!) {
         reReview = [pscustomobject]@{ state = $reReview.state; reason = $reReview.reason
             review = $(if ($reReview.review) { [pscustomobject]@{ id = $reReview.review.id; commit = $reReview.review.commit; submittedAt = $reReview.review.submittedAt; verdict = (Get-CopilotVerdict $reReview.review.body) } }) }
         resolved = $resolved
+        changedDuringApply = $skipped
         threads = $decisions
     } | ConvertTo-Json -Depth 6
 

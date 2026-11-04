@@ -44,13 +44,17 @@ script.
 **A + B, with B in approval mode by default.** Copilot resolves what it confirms.
 `pr-resolve.ps1` reports every thread's state and resolves a thread only when both sides agree:
 
-1. **Claude's claim, checked against git.** The thread's *last* comment is a repository writer's
-   reply that starts with `Fixed in <sha>`. `<sha>` is in the PR head (`compare` ahead or identical)
-   and comes after the commented commit.
-2. **Copilot's side.** Copilot's latest review is on the current head SHA, so it saw the fix. No
-   Copilot review is requested or running since then (`review_requested`, `copilot_work_started`).
-   That review raised no new Copilot thread on the same file, which would point to a partial fix or
-   a duplicate. In addition, one of these holds:
+1. **Claude's claim, checked against git.** The thread's *last* comment is a reply that starts
+   with `Fixed in <sha>`, by a user whose actual repository permission includes push
+   (`collaborators/<user>/permission`). `authorAssociation` is not used: MEMBER and COLLABORATOR
+   can be read-only. `<sha>` is in the PR head (`compare` ahead or identical) and comes after the
+   commented commit.
+2. **Copilot's side.** Only the exact reviewer bot counts (`copilot-pull-request-reviewer`, a
+   `Bot`); look-alike logins are not Copilot. Its latest *active* review is on the current head
+   SHA, so it saw the fix; dismissed or unsubmitted reviews are ignored. No Copilot review is
+   requested or running since then (`review_requested`, `copilot_work_started`).
+   That review raised no new Copilot thread on the same file, resolved since or not, which would
+   point to a partial fix or a duplicate. In addition, one of these holds:
    - **`copilot-confirmed`** (always on): the overview lists the finding (`#discussion_r<id>`) in a
      "resolved" section.
    - **`approval`** (`-AcceptApproval`, the `/process-pr-feedback` default): the verdict is
@@ -78,7 +82,9 @@ Everything else stays open with a stated reason:
 How it runs:
 
 - The script is a dry run by default. `-Apply` uses `resolveReviewThread` with `resolutionReason:
-  ADDRESSED` and re-checks the head SHA before every mutation.
+  ADDRESSED`. Right before each mutation it re-checks the head SHA and Copilot's latest review, and
+  re-reads the thread. A thread with a new comment or a changed state is left alone. A small window
+  between that re-read and the mutation remains; GitHub offers no conditional resolve.
 - Already-resolved threads are never touched, so re-runs are no-ops.
 - It reads GitHub and writes thread state only. It does not touch checks, so it cannot affect
   SonarQube Cloud or CodeQL.
