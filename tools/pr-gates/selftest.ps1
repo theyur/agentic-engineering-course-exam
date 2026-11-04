@@ -14,6 +14,13 @@ function Run([string]$Name, [string]$Status = 'completed', [string]$Conclusion =
 }
 $job = 'Build, test and analyze'; $sq = 'SonarCloud Code Analysis'; $cq = 'CodeQL'
 
+# An Actions workflow run as /actions/runs returns it (default setup: path dynamic/github-code-scanning/codeql).
+function Wf([string]$Status = 'completed', [string]$Conclusion = 'success', [string]$UpdatedAt = $old,
+    [string]$Path = 'dynamic/github-code-scanning/codeql', [long]$Id = 100) {
+    [pscustomobject]@{ id = $Id; name = 'PR #1'; path = $Path; status = $Status
+        conclusion = $(if ($Status -eq 'completed') { $Conclusion } else { $null }); updated_at = $UpdatedAt; html_url = "https://example/run/$Id" }
+}
+
 $failures = [System.Collections.Generic.List[string]]::new()
 function Expect([string]$Case, [string]$Actual, [string]$Expected) {
     if ($Actual -ne $Expected) { $failures.Add("$Case : got $Actual, expected $Expected") }
@@ -63,8 +70,20 @@ $codeql = @(
     @{ n = 'codeql rerun, new results pending';  runs = @((Run $cs -Id 1), (Run $cq -Id 2), (Run $cs -Id 3 -CompletedAt $recent)); e = 'PENDING' }
     @{ n = 'codeql rerun, results never came';   runs = @((Run $cs -Id 1), (Run $cq -Id 2), (Run $cs -Id 3));                    e = 'MISSING' }
     @{ n = 'codeql queued rerun, old green';     runs = @((Run $cs -Id 1), (Run $cq -Id 2), (Run $cs 'queued' -Id 3 -StartedAt '')); e = 'PENDING' }
+    # The default-setup workflow run covers language jobs that are not registered as check runs yet.
+    @{ n = 'codeql later language not registered, run in progress'; runs = @((Run $ac -Id 2), (Run $cq -Id 3)); wf = @((Wf 'in_progress')); e = 'PENDING' }
+    @{ n = 'codeql run done, all green';          runs = @((Run $cs), (Run $ac -Id 2), (Run $cq -Id 3)); wf = @((Wf));                  e = 'GREEN' }
+    @{ n = 'codeql run failed, visible jobs green'; runs = @((Run $ac -Id 2), (Run $cq -Id 3));          wf = @((Wf -Conclusion failure)); e = 'INFRA_FAILED' }
+    @{ n = 'codeql run queued, no checks yet';    runs = @();                                            wf = @((Wf 'queued'));           e = 'PENDING' }
+    @{ n = 'codeql workflow re-run, old green';   runs = @((Run $cs), (Run $ac -Id 2), (Run $cq -Id 3)); wf = @((Wf 'in_progress'));      e = 'PENDING' }
+    @{ n = 'codeql run done, results lagging';    runs = @();                                            wf = @((Wf -UpdatedAt $recent)); e = 'PENDING' }
+    @{ n = 'codeql run done, results never came'; runs = @();                                            wf = @((Wf));                    e = 'MISSING' }
+    @{ n = 'codeql other workflows ignored';      runs = @((Run $cs), (Run $cq -Id 3)); wf = @((Wf 'in_progress' -Path '.github/workflows/sonar.yml')); e = 'GREEN' }
 )
-foreach ($c in $codeql) { Expect $c.n (Get-CodeQLGateState -CheckRuns $c.runs -Now $now).state $c.e }
+foreach ($c in $codeql) {
+    $wfRuns = if ($c.ContainsKey('wf')) { $c.wf } else { @() }
+    Expect $c.n (Get-CodeQLGateState -CheckRuns $c.runs -WorkflowRuns $wfRuns -Now $now).state $c.e
+}
 
 # --- Overall ---------------------------------------------------------------------------------
 function G([string]$s) { [pscustomobject]@{ state = $s } }
