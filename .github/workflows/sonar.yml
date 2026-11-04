@@ -89,7 +89,8 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         # sonar.qualitygate.wait makes `end` block on the quality gate and fail this job when the
-        # gate is red, so the job's conclusion is the gate result (greptile-gate.yml relies on it).
+        # gate is red. The authoritative gate signal is still the "SonarCloud Code Analysis" check
+        # (a run without SONAR_TOKEN succeeds without analyzing); tools/pr-gates reads that check.
         # .specify/ is vendored Spec Kit tooling, refreshed by the Specify CLI; we don't maintain it.
         run: |
           dotnet sonarscanner begin \

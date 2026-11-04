@@ -1,4 +1,14 @@
 {
+  "permissions": {
+    "deny": [
+      "Skill(pr-review)",
+      "Skill(pr-review *)",
+      "mcp__greptile__trigger_code_review"
+    ]
+  },
+  "skillOverrides": {
+    "pr-review": "off"
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -18,6 +28,28 @@
             "type": "command",
             "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/architecture-gate.ps1\"",
             "timeout": 120
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-pr-review.ps1\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "matcher": "pr-review",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-pr-review.ps1\"",
+            "timeout": 30
           }
         ]
       }

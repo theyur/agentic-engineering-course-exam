@@ -73,7 +73,26 @@ Developed primarily through an agentic SDLC workflow with Claude Code (agent gui
 1. Describe the feature or fix with [Spec Kit](https://github.com/github/spec-kit) (`/speckit-specify`, then `/speckit-clarify`, `/speckit-plan`, `/speckit-tasks`); artifacts land in `specs/NNN-<name>/`, checked against the [constitution](.specify/memory/constitution.md).
 2. Resolve any relevant open questions from SPEC.md / ARCHITECTURE.md; record significant architectural decisions as ADRs in `docs/adr/`.
 3. Implement on a dedicated branch, with unit, integration, and architecture tests as part of the feature.
-4. Open a pull request against `master`. The SonarQube Cloud workflow (`.github/workflows/sonar.yml`) builds, tests and analyzes it; once its quality gate passes, `greptile-gate.yml` requests a Greptile review (label `skip-greptile` to skip it).
+4. Open a pull request against `master` and run `/process-pr-feedback` — see [PR review flow](#pr-review-flow).
+
+## PR review flow
+
+Two static analyzers run in parallel on every PR revision and on pushes to `master`:
+
+| Gate | Source | Green means |
+| --- | --- | --- |
+| SonarQube Cloud | `.github/workflows/sonar.yml` → check `SonarCloud Code Analysis` | quality gate passed on the PR head (a run without `SONAR_TOKEN` is *skipped*, not green) |
+| CodeQL | GitHub code scanning default setup (C#, JS/TS, Actions) → check `CodeQL` | analysis finished and the PR adds no alert at or above the failure threshold |
+
+Then a human-controlled AI review:
+
+1. Push the branch and open the PR.
+2. In Claude Code run `/process-pr-feedback [PR number]`. It waits (bounded) for both gates on the **current head SHA**, reports the findings, fixes the justified ones and pushes (max two rounds per stage before it asks you).
+3. When both gates are green it reports **Ready for manual Copilot review** and stops. Request the review yourself: `gh pr edit <N> --add-reviewer @copilot`, or *Reviewers → Copilot* in the PR page.
+4. When Copilot has reviewed, run `/process-pr-feedback <N>` again; it triages Copilot's threads the same way.
+5. Merge manually.
+
+Gate status alone: `pwsh tools/pr-gates/pr-gates.ps1 -Pr <N>` (add `-Wait` to block until both gates settle). Greptile and the global `/pr-review` command are not used in this repository — see [ADR 0001](docs/adr/0001-pr-quality-gates.md).
 
 ## Status
 
