@@ -48,6 +48,9 @@ A feature is not done without tests: unit (domain rules — targets, grace perio
 
 ## Commits
 
+- Subject line: Conventional Commits with one gitmoji right after the colon: `<type>(<scope>): <emoji> <subject>`, e.g. `feat(ac): ✨ add the acceptance-test workflow`. The type stays first so Conventional Commits tooling can still parse it. Use the emoji that matches the type:
+  - `feat` ✨ · `fix` 🐛 · `refactor` ♻️ · `test` ✅ · `docs` 📝 · `chore` / config 🔧 · `ci` 👷 · `build` / dependencies 📦 · `perf` ⚡ · a security fix (`fix`) 🔒
+  - The body stays plain text, without emojis.
 - Commits run the architecture tests via `.githooks/pre-commit`. Enable it once per clone: `git config core.hooksPath .githooks`. Never use `--no-verify` / `-n`; fix the failing test.
 - A Claude Code guard (`.claude/hooks/architecture-gate.ps1`) blocks commit commands it cannot fully check. Write them plainly: `git commit -m "..."` or `git commit -F - <<'EOF'` (quoted delimiter); no `sh -c` / `eval`, variables or `-c` options in git commands; use absolute paths inside the clone for `cd` / `git -C`.
 - Hook scripts load from the main checkout (`$CLAUDE_PROJECT_DIR`): changes under `.claude/hooks/` take effect only once they're in the main checkout.
