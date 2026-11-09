@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <None Include="Samples/**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- ADR 0003: every scenario shares the HT-AC database, so test collections run one at a time. -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Ref mode: used only by ac-feature-translator and ac-test-writer to compile. Never executed.

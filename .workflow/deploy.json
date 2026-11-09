@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "version": "0.1.0.dev0",
   "command": "uv run --no-project python -I \"$CLAUDE_PROJECT_DIR/.specify/extensions/ac/hooks/guard.py\"",
-  "installedAt": "2026-11-09T16:51:25+00:00",
+  "installedAt": "2026-11-09T17:59:22+00:00",
   "preexisting": {
     ".claude/settings.json": true,
     ".claude/agents": false,
@@ -46,7 +46,7 @@
     {
       "path": ".claude/skills/speckit-ac-tests-analyze/SKILL.md",
       "kind": "skill",
-      "sha256": "e9ea4c6b5aa4afb8c4119c01750b3ed4229b1637b177f30c57ef2e86e2067632"
+      "sha256": "ad7cd5eb108150adeb04a118c83a2b464c2dc266c2c77664ccc97eb40a48f938"
     },
     {
       "path": ".claude/skills/speckit-ac-tests-write/SKILL.md",
@@ -71,7 +71,7 @@
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-tests-analyze/SKILL.md",
       "kind": "extension",
-      "sha256": "49b5edc465ec4ded2fbf5d4dd26cdefa0a5a461bcdb47f080dd13632304b33fe"
+      "sha256": "2ed4f0f1d027c91629b2657940255334831430c0bb6b3714bc9599c3e7cb1d2c"
     },
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-tests-write/SKILL.md",
@@ -116,7 +116,7 @@
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.tests-analyze.md",
       "kind": "extension",
-      "sha256": "5c3c81c75e4225112dc5fe5db9a5e8a6c200f2fa4c701d679f33358c06759fd4"
+      "sha256": "c602e89846d91be6f8626b08b44755b12ab20858345606e1fdbabf7762d6def7"
     },
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.tests-write.md",
@@ -136,7 +136,7 @@
     {
       "path": ".specify/extensions/ac/hooks/guard.py",
       "kind": "extension",
-      "sha256": "5492ea4281c2b21c17cba17a75c46c2ad635ecbec3c7e53a74d6f9bdab8e9b6b"
+      "sha256": "626021a29138739dc42ee5f410d8564eb43e5c2f59b683cc425e27732388d7aa"
     },
     {
       "path": ".specify/extensions/ac/scripts/ac_feature.py",
@@ -151,7 +151,7 @@
     {
       "path": ".specify/extensions/ac/scripts/aclib.py",
       "kind": "extension",
-      "sha256": "089ccec96ca9faa368e3128c04e74978f57bb908d31a939f4641226b3da736d5"
+      "sha256": "f28da6b0cd204cbec4eb843dc57c3d9736babe21b85c4590944fddbfcfc1bc69"
     },
     {
       "path": ".specify/extensions/ac/scripts/changed_files.py",
@@ -166,7 +166,7 @@
     {
       "path": ".specify/extensions/ac/scripts/check_features.py",
       "kind": "extension",
-      "sha256": "57f15c0533d66f97e2496409708df851ba56ad50f585a160bb6ba32a60cc4ade"
+      "sha256": "e376b1b807808ac6b91f35b563eac97c5db3893dad3acfb303169082db2ad015"
     },
     {
       "path": ".specify/extensions/ac/scripts/clear_generated.py",
@@ -176,7 +176,7 @@
     {
       "path": ".specify/extensions/ac/scripts/export_refs.py",
       "kind": "extension",
-      "sha256": "8ebe532fd5b92e016273911447835d7539a39c9c326d98d3b7948086600e7461"
+      "sha256": "9cedfd3c288cc960d3dccc930bf6da3335f40f765b31a4385de3363267066dba"
     },
     {
       "path": ".specify/extensions/ac/scripts/extract_feedback.py",
@@ -186,7 +186,7 @@
     {
       "path": ".specify/extensions/ac/scripts/init_config.py",
       "kind": "extension",
-      "sha256": "73afc5c12540e833cf992891fb24665bea3f79e450ca009336de6302ced867b7"
+      "sha256": "a8113613a9f299e9f4bd8eff7bef34c5368e1c6ac4793774ec5011537082e1eb"
     },
     {
       "path": ".specify/extensions/ac/scripts/init_detect.py",
@@ -201,7 +201,7 @@
     {
       "path": ".specify/extensions/ac/scripts/init_verify.py",
       "kind": "extension",
-      "sha256": "2c021aa40cefef659c81593ab790b3f637c8ab216bf8948ccd7a587efea8b7a8"
+      "sha256": "8ea7eb96e14db6f3b647ad832355e6ca3378ab180b695ad849d046df01df7a57"
     },
     {
       "path": ".specify/extensions/ac/scripts/new_analyze.py",
@@ -226,7 +226,7 @@
     {
       "path": ".specify/extensions/ac/scripts/summarize_trx.py",
       "kind": "extension",
-      "sha256": "9a9642cd067c7d50ff95ce2cf30c0f3b8cf6d10889b4e4d72aec42274051ee06"
+      "sha256": "db3375242bb77853993420505c633562bf6acd44e8847806110eff90302f6bd2"
     },
     {
       "path": ".specify/extensions/ac/scripts/task_message.py",
