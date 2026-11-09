@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "version": "0.1.0.dev0",
   "command": "uv run --no-project python -I \"$CLAUDE_PROJECT_DIR/.specify/extensions/ac/hooks/guard.py\"",
-  "installedAt": "2026-11-09T19:49:03+00:00",
+  "installedAt": "2026-11-09T20:47:30+00:00",
   "preexisting": {
     ".claude/settings.json": true,
     ".claude/agents": false,
@@ -41,7 +41,7 @@
     {
       "path": ".claude/skills/speckit-ac-init/SKILL.md",
       "kind": "skill",
-      "sha256": "9478b0f1c8c0c6a5804065ea11d0ee1294949f24f0ca88ab8cd46cd0b43c07d0"
+      "sha256": "5ef87cea0267aac5013a3a1ef6ead9a7f9923ce960e8818bf45b45553879cdb8"
     },
     {
       "path": ".claude/skills/speckit-ac-tests-analyze/SKILL.md",
@@ -51,12 +51,12 @@
     {
       "path": ".claude/skills/speckit-ac-tests-write/SKILL.md",
       "kind": "skill",
-      "sha256": "e7b578e00dae1c0db22966b33926146356a84ed4463ff567f145d829acec0283"
+      "sha256": "0609e76897653c8151d33bb7e1e42c06fd3927a020a0a17b35ac49fe6e4ffd21"
     },
     {
       "path": ".claude/skills/speckit-ac-translate/SKILL.md",
       "kind": "skill",
-      "sha256": "d1eb92b67b71f29a42a512f123283744b0f17326adb382c461d5c08c27f0e701"
+      "sha256": "40fc858d8e6052839a752b3bc80abd549c1819b812e57e9b119971802209750c"
     },
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-critic/SKILL.md",
@@ -66,7 +66,7 @@
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-init/SKILL.md",
       "kind": "extension",
-      "sha256": "fc34d88b1f9260d6405fd67d3efd981fc3791fbd6a59844c179b3e7b8a449b5d"
+      "sha256": "8f2179f449de9b53bbd1d1c5093a83d2b873e2b7544256eec5eb795d865e34b6"
     },
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-tests-analyze/SKILL.md",
@@ -76,17 +76,17 @@
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-tests-write/SKILL.md",
       "kind": "extension",
-      "sha256": "839ca51afebb60b89c29d709f94def122c20e3b74b82807ccf34d5288d7f36ff"
+      "sha256": "03b569679efc11b7e0a8dbe48d779075276e391c4ccd74a2b174ee88d252eb3a"
     },
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-translate/SKILL.md",
       "kind": "extension",
-      "sha256": "dd4d243a0d2a2beb8b378d7193f7c329bc03079a0664fb91af905af6fa106581"
+      "sha256": "5fc7184db98b487448e0b46c139775ce6528647efcca375c91aebbc5c3b4c261"
     },
     {
       "path": ".specify/extensions/ac/README.md",
       "kind": "extension",
-      "sha256": "5bf96b234b27b01418358d1da51ece3ed5a7caddbf35cedba4edddb5ff0bcb10"
+      "sha256": "83d32a9f35aa5278c589c340a033f3cd67302fa91e7125e9993f96e4a1e373d8"
     },
     {
       "path": ".specify/extensions/ac/agents/ac-feature-translator.md",
@@ -111,7 +111,7 @@
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.init.md",
       "kind": "extension",
-      "sha256": "940d0af12b41a20040c87a12b1d7d77f81dac4638ab8df86594b637ee600f238"
+      "sha256": "69e815060298ff0b9bdc675cab0c68c0a4daeb6d09848ef5b44601aa05ec2271"
     },
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.tests-analyze.md",
@@ -121,12 +121,12 @@
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.tests-write.md",
       "kind": "extension",
-      "sha256": "44b81979da00966dd279900ac07442e5dcd6e0ebd8a39de04f442d1eeba1b7f8"
+      "sha256": "4c2567088c233cd619bc64b69a27c9a53a8d3fce1052d7fd3328194c8668d459"
     },
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.translate.md",
       "kind": "extension",
-      "sha256": "5d81a1eaa051da68526a06067011b1707996418377fd8020b5ad742af17b97f6"
+      "sha256": "6cefee82efcb236fc84f16320f4a1f2843a1c985acdbde47b26017959b06979a"
     },
     {
       "path": ".specify/extensions/ac/extension.yml",
@@ -146,12 +146,12 @@
     {
       "path": ".specify/extensions/ac/scripts/ac_lock.py",
       "kind": "extension",
-      "sha256": "3124dcf9a924ae15b29907a23dd5ae8ac6b6356dc8fcf1982734efb5692e2339"
+      "sha256": "6b31a0fbd8e601680f4e6f4be4af4594ecffcde2e067ea7273f0ab29c1c7f0aa"
     },
     {
       "path": ".specify/extensions/ac/scripts/aclib.py",
       "kind": "extension",
-      "sha256": "8b688b4ff911dbbb5d8e54cf746ec27aba9351f84f3e43f4e55ca042bc39f9f2"
+      "sha256": "cfe9a7ba879942a99902722ce90a9fb8130ee790a26dec703ed2b4f7f29e5852"
     },
     {
       "path": ".specify/extensions/ac/scripts/changed_files.py",
@@ -166,7 +166,7 @@
     {
       "path": ".specify/extensions/ac/scripts/check_features.py",
       "kind": "extension",
-      "sha256": "e376b1b807808ac6b91f35b563eac97c5db3893dad3acfb303169082db2ad015"
+      "sha256": "435a365824b32544270e718c3df35474a595260ba3e6e6a03bcd9e74c7261788"
     },
     {
       "path": ".specify/extensions/ac/scripts/clear_generated.py",
@@ -196,7 +196,7 @@
     {
       "path": ".specify/extensions/ac/scripts/init_scaffold.py",
       "kind": "extension",
-      "sha256": "788ecac58ff9ba7881d95ce9018a891ae2e344d0b04a5df5bc1fdc326647e4c8"
+      "sha256": "612469fda9934aa5b8ca6bf82b943ee774458d5f02ba4e847f4089b666f5cd8d"
     },
     {
       "path": ".specify/extensions/ac/scripts/init_verify.py",
@@ -216,7 +216,7 @@
     {
       "path": ".specify/extensions/ac/scripts/record_skips.py",
       "kind": "extension",
-      "sha256": "49bdaea46fe1291b6017112a8213d0f4a71f4c7f0f6c5bff9e0a8f7715078670"
+      "sha256": "c666dcbcebcc0c95c4dfadfdc20618160776a1c45163610b1b4f16cfd3e74691"
     },
     {
       "path": ".specify/extensions/ac/scripts/smoke_test.py",
@@ -236,7 +236,7 @@
     {
       "path": ".specify/extensions/ac/templates/ac-project/AcceptanceTests.csproj.template",
       "kind": "extension",
-      "sha256": "8094c7a144ca707c4eeedf30f45ab3b416676bf24aa25f3b089536efb34a277b"
+      "sha256": "a3fb69be27c84d7a95218b1bd8d20f196830031566bedc9d964fd4f4bf0ae781"
     },
     {
       "path": ".specify/extensions/ac/templates/ac-project/Directory.Build.props.template",
@@ -247,6 +247,11 @@
       "path": ".specify/extensions/ac/templates/ac-project/reqnroll.json",
       "kind": "extension",
       "sha256": "d63f81a87f1d3f36178c00783ecc2ce4973ec86e1fd86ec6c762133bd46da95a"
+    },
+    {
+      "path": ".specify/extensions/ac/templates/ac-project/xunit.runner.json",
+      "kind": "extension",
+      "sha256": "503bd8a8218c2dee7cf9eaf56cc856883b7eb213f19d6d0b94d0f26dec5aa705"
     },
     {
       "path": ".specify/extensions/ac/templates/acceptance-template.md",
