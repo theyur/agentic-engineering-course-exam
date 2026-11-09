@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "version": "0.1.0.dev0",
   "command": "uv run --no-project python -I \"$CLAUDE_PROJECT_DIR/.specify/extensions/ac/hooks/guard.py\"",
-  "installedAt": "2026-11-09T16:15:42+00:00",
+  "installedAt": "2026-11-09T16:51:25+00:00",
   "preexisting": {
     ".claude/settings.json": true,
     ".claude/agents": false,
@@ -46,7 +46,7 @@
     {
       "path": ".claude/skills/speckit-ac-tests-analyze/SKILL.md",
       "kind": "skill",
-      "sha256": "5a16438f90c9eef4f9734abc271502296eee2d384fbeb79106516e066f3df833"
+      "sha256": "e9ea4c6b5aa4afb8c4119c01750b3ed4229b1637b177f30c57ef2e86e2067632"
     },
     {
       "path": ".claude/skills/speckit-ac-tests-write/SKILL.md",
@@ -71,7 +71,7 @@
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-tests-analyze/SKILL.md",
       "kind": "extension",
-      "sha256": "2ac1f498be8315ce8966903c0d20b0ad1fc233dd86ea6bbf8efdbb88a873e468"
+      "sha256": "49b5edc465ec4ded2fbf5d4dd26cdefa0a5a461bcdb47f080dd13632304b33fe"
     },
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-tests-write/SKILL.md",
@@ -116,7 +116,7 @@
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.tests-analyze.md",
       "kind": "extension",
-      "sha256": "b97150f5a4ba042ea0dee44d2ff7e54c9ad70111ed1cacb662ef81a5eeabb2ae"
+      "sha256": "5c3c81c75e4225112dc5fe5db9a5e8a6c200f2fa4c701d679f33358c06759fd4"
     },
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.tests-write.md",
@@ -136,7 +136,7 @@
     {
       "path": ".specify/extensions/ac/hooks/guard.py",
       "kind": "extension",
-      "sha256": "f5861ed99ba255a0d6f7b8610bdf59f27c9686394b5fc459f4b5ff667d731d22"
+      "sha256": "5492ea4281c2b21c17cba17a75c46c2ad635ecbec3c7e53a74d6f9bdab8e9b6b"
     },
     {
       "path": ".specify/extensions/ac/scripts/ac_feature.py",
@@ -151,12 +151,12 @@
     {
       "path": ".specify/extensions/ac/scripts/aclib.py",
       "kind": "extension",
-      "sha256": "dd8b14cb8a3f2d3b77b2aef550d25c210f8ad56fab08a7bb77e907709c5052fb"
+      "sha256": "089ccec96ca9faa368e3128c04e74978f57bb908d31a939f4641226b3da736d5"
     },
     {
       "path": ".specify/extensions/ac/scripts/changed_files.py",
       "kind": "extension",
-      "sha256": "be2a4da6cf692c28d17c6503614c5a1f568af53379ecd50ed95e2c4179b405a9"
+      "sha256": "71bbd8d6c9800c20641e30e062d82ecb6c47e787febf36add1bdb830b18011db"
     },
     {
       "path": ".specify/extensions/ac/scripts/check_acceptance.py",
@@ -176,7 +176,7 @@
     {
       "path": ".specify/extensions/ac/scripts/export_refs.py",
       "kind": "extension",
-      "sha256": "83a83712849b30a7bd2ba1388c02b97a2ba8f2b00c5d2289dd63ee105625b487"
+      "sha256": "8ebe532fd5b92e016273911447835d7539a39c9c326d98d3b7948086600e7461"
     },
     {
       "path": ".specify/extensions/ac/scripts/extract_feedback.py",
@@ -221,7 +221,7 @@
     {
       "path": ".specify/extensions/ac/scripts/smoke_test.py",
       "kind": "extension",
-      "sha256": "764757ba2d0893efb86931e3fe14aae948dbf28e82ac8ede72b379f39adf9d6d"
+      "sha256": "2345e4402e74cdc284a0823c3e63b5b8e0b644268700fce6de1bffcefbf2cd04"
     },
     {
       "path": ".specify/extensions/ac/scripts/summarize_trx.py",
