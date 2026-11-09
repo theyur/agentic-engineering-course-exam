@@ -1,0 +1,257 @@
+{
+  "schemaVersion": 1,
+  "version": "0.1.0.dev0",
+  "command": "uv run --no-project python -I \"$CLAUDE_PROJECT_DIR/.specify/extensions/ac/hooks/guard.py\"",
+  "installedAt": "2026-11-09T14:12:29+00:00",
+  "preexisting": {
+    ".claude/settings.json": true,
+    ".claude/agents": false,
+    ".claude/agents/ac-feature-translator.md": false,
+    ".claude/agents/ac-test-writer.md": false,
+    ".claude/agents/ac-test-fail-judge.md": false,
+    ".specify/extensions": false,
+    ".specify/extensions.yml": false,
+    ".specify/extensions/.registry": false,
+    ".specify/extensions/.backup": false
+  },
+  "settingsCreatedKeys": [],
+  "settingsNewline": "CRLF",
+  "settingsReformatted": false,
+  "files": [
+    {
+      "path": ".claude/agents/ac-feature-translator.md",
+      "kind": "agent",
+      "sha256": "93e2444fbefa855976b615c22505ed71a73a46991d054974581713b38ed12f47"
+    },
+    {
+      "path": ".claude/agents/ac-test-fail-judge.md",
+      "kind": "agent",
+      "sha256": "0955d994d56df52e8deb1de4a1b6067ac740e2a356122e082fdaf9311f7ed11f"
+    },
+    {
+      "path": ".claude/agents/ac-test-writer.md",
+      "kind": "agent",
+      "sha256": "6c6a085cf7128eed4496aff014472adb111a2c262b79b238f36e9c6ab25ec810"
+    },
+    {
+      "path": ".claude/skills/speckit-ac-critic/SKILL.md",
+      "kind": "skill",
+      "sha256": "faf912ea1cddbc97de6999fdd0ee10a402c326983e1dbb2f26a03e2958ba27f3"
+    },
+    {
+      "path": ".claude/skills/speckit-ac-init/SKILL.md",
+      "kind": "skill",
+      "sha256": "9478b0f1c8c0c6a5804065ea11d0ee1294949f24f0ca88ab8cd46cd0b43c07d0"
+    },
+    {
+      "path": ".claude/skills/speckit-ac-tests-analyze/SKILL.md",
+      "kind": "skill",
+      "sha256": "5a16438f90c9eef4f9734abc271502296eee2d384fbeb79106516e066f3df833"
+    },
+    {
+      "path": ".claude/skills/speckit-ac-tests-write/SKILL.md",
+      "kind": "skill",
+      "sha256": "6bc459267ee64eddb49c8d9b41bc031de18009363cb6dc8cb5a1588be326f58f"
+    },
+    {
+      "path": ".claude/skills/speckit-ac-translate/SKILL.md",
+      "kind": "skill",
+      "sha256": "da39de6de61368ec564a2a0019bd98ed89221a309befb1fca1f8efd9f0817a08"
+    },
+    {
+      "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-critic/SKILL.md",
+      "kind": "extension",
+      "sha256": "6feac9b5cd69e268d2f8494d45724a350d8f6e8bdcc593a4f25ffa489c1f0489"
+    },
+    {
+      "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-init/SKILL.md",
+      "kind": "extension",
+      "sha256": "fc34d88b1f9260d6405fd67d3efd981fc3791fbd6a59844c179b3e7b8a449b5d"
+    },
+    {
+      "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-tests-analyze/SKILL.md",
+      "kind": "extension",
+      "sha256": "2ac1f498be8315ce8966903c0d20b0ad1fc233dd86ea6bbf8efdbb88a873e468"
+    },
+    {
+      "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-tests-write/SKILL.md",
+      "kind": "extension",
+      "sha256": "3dd32b5e4c540eda0f594a596b2d413e3c1cac398ab1d7f2e196ae1d1389a238"
+    },
+    {
+      "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-translate/SKILL.md",
+      "kind": "extension",
+      "sha256": "0e7a0edc5c238ea70c10c4fa249212976b6567b865e3a4dd79c48d5a2569d9c6"
+    },
+    {
+      "path": ".specify/extensions/ac/README.md",
+      "kind": "extension",
+      "sha256": "5bf96b234b27b01418358d1da51ece3ed5a7caddbf35cedba4edddb5ff0bcb10"
+    },
+    {
+      "path": ".specify/extensions/ac/agents/ac-feature-translator.md",
+      "kind": "extension",
+      "sha256": "93e2444fbefa855976b615c22505ed71a73a46991d054974581713b38ed12f47"
+    },
+    {
+      "path": ".specify/extensions/ac/agents/ac-test-fail-judge.md",
+      "kind": "extension",
+      "sha256": "0955d994d56df52e8deb1de4a1b6067ac740e2a356122e082fdaf9311f7ed11f"
+    },
+    {
+      "path": ".specify/extensions/ac/agents/ac-test-writer.md",
+      "kind": "extension",
+      "sha256": "6c6a085cf7128eed4496aff014472adb111a2c262b79b238f36e9c6ab25ec810"
+    },
+    {
+      "path": ".specify/extensions/ac/commands/speckit.ac.critic.md",
+      "kind": "extension",
+      "sha256": "291930631bce541183cf832e4808bbf48b38f4737455181a072f3ac5b7873ccd"
+    },
+    {
+      "path": ".specify/extensions/ac/commands/speckit.ac.init.md",
+      "kind": "extension",
+      "sha256": "940d0af12b41a20040c87a12b1d7d77f81dac4638ab8df86594b637ee600f238"
+    },
+    {
+      "path": ".specify/extensions/ac/commands/speckit.ac.tests-analyze.md",
+      "kind": "extension",
+      "sha256": "b97150f5a4ba042ea0dee44d2ff7e54c9ad70111ed1cacb662ef81a5eeabb2ae"
+    },
+    {
+      "path": ".specify/extensions/ac/commands/speckit.ac.tests-write.md",
+      "kind": "extension",
+      "sha256": "ed9de50dcf672feb161cfe1abdc0fcdbccdad36b294891065b91ff5c8989b962"
+    },
+    {
+      "path": ".specify/extensions/ac/commands/speckit.ac.translate.md",
+      "kind": "extension",
+      "sha256": "808c8d815bdccf7037db0b7b81a0bbd336534c264267489f438398d925ea2c7e"
+    },
+    {
+      "path": ".specify/extensions/ac/extension.yml",
+      "kind": "extension",
+      "sha256": "2fde4950033b078d86c613ab8e898ad042002dd6dc7f388b7e4234343215e825"
+    },
+    {
+      "path": ".specify/extensions/ac/hooks/guard.py",
+      "kind": "extension",
+      "sha256": "de44539f898318979c0455c5afeac6a954332e4b062f904d8a405b1b71fee463"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/ac_feature.py",
+      "kind": "extension",
+      "sha256": "865503b7986b3d0f2b80b91621603b109e968c2f427374e53d4af6ad0d219b06"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/ac_lock.py",
+      "kind": "extension",
+      "sha256": "3124dcf9a924ae15b29907a23dd5ae8ac6b6356dc8fcf1982734efb5692e2339"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/aclib.py",
+      "kind": "extension",
+      "sha256": "23e57695a8f2d9f239f3a1f80f9fea24882bf3c284c5490576a6f7b6f203a0d0"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/changed_files.py",
+      "kind": "extension",
+      "sha256": "be2a4da6cf692c28d17c6503614c5a1f568af53379ecd50ed95e2c4179b405a9"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/check_acceptance.py",
+      "kind": "extension",
+      "sha256": "c62e87f813d7868057facc2b54eaab1dc3c7f134fe43473a2feb14fdf093351b"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/check_features.py",
+      "kind": "extension",
+      "sha256": "57f15c0533d66f97e2496409708df851ba56ad50f585a160bb6ba32a60cc4ade"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/clear_generated.py",
+      "kind": "extension",
+      "sha256": "452f2c47c985aca7a8cf6c6edffe20b1b6761794ee892fd1ec10f9573758c90c"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/export_refs.py",
+      "kind": "extension",
+      "sha256": "83a83712849b30a7bd2ba1388c02b97a2ba8f2b00c5d2289dd63ee105625b487"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/extract_feedback.py",
+      "kind": "extension",
+      "sha256": "55fecf6bdb22ca45a8a47a204209f36595daeb7064f295ff2a4cf6f12aaa9de8"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/init_config.py",
+      "kind": "extension",
+      "sha256": "73afc5c12540e833cf992891fb24665bea3f79e450ca009336de6302ced867b7"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/init_detect.py",
+      "kind": "extension",
+      "sha256": "5bb529039a55ec570a526a76d102e77f504732f4d9aed6d5fb4ed57accef8693"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/init_scaffold.py",
+      "kind": "extension",
+      "sha256": "6687f2ba2312d44a2bf4f65e74b36248dc7ada47342b5e972f7c33d13703cea7"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/init_verify.py",
+      "kind": "extension",
+      "sha256": "2c021aa40cefef659c81593ab790b3f637c8ab216bf8948ccd7a587efea8b7a8"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/new_analyze.py",
+      "kind": "extension",
+      "sha256": "127e5955760bc25977fd713135aea3e3438ccb3795624696dcd79ba1eca46a77"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/new_run.py",
+      "kind": "extension",
+      "sha256": "0c2adbd36eda123bcaf6b54222c97d99f791ac5f75781969c1f3e3a95848a2d5"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/record_skips.py",
+      "kind": "extension",
+      "sha256": "49bdaea46fe1291b6017112a8213d0f4a71f4c7f0f6c5bff9e0a8f7715078670"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/smoke_test.py",
+      "kind": "extension",
+      "sha256": "764757ba2d0893efb86931e3fe14aae948dbf28e82ac8ede72b379f39adf9d6d"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/summarize_trx.py",
+      "kind": "extension",
+      "sha256": "9a9642cd067c7d50ff95ce2cf30c0f3b8cf6d10889b4e4d72aec42274051ee06"
+    },
+    {
+      "path": ".specify/extensions/ac/scripts/task_message.py",
+      "kind": "extension",
+      "sha256": "947e6469ca59928ca3283fd7bb8a24fa4f68351a7d835001727310d4bba7ec98"
+    },
+    {
+      "path": ".specify/extensions/ac/templates/ac-project/AcceptanceTests.csproj.template",
+      "kind": "extension",
+      "sha256": "8094c7a144ca707c4eeedf30f45ab3b416676bf24aa25f3b089536efb34a277b"
+    },
+    {
+      "path": ".specify/extensions/ac/templates/ac-project/Directory.Build.props.template",
+      "kind": "extension",
+      "sha256": "f246a1888dea5bb62c628d8d51d32294c2fa5415b84cd4e90eb748b09ea9fcb2"
+    },
+    {
+      "path": ".specify/extensions/ac/templates/ac-project/reqnroll.json",
+      "kind": "extension",
+      "sha256": "d63f81a87f1d3f36178c00783ecc2ce4973ec86e1fd86ec6c762133bd46da95a"
+    },
+    {
+      "path": ".specify/extensions/ac/templates/acceptance-template.md",
+      "kind": "extension",
+      "sha256": "67f9435c84f4153ab926c078e7f7ccfa89014dbd039f773467088be0eac0c61a"
+    }
+  ]
+}
