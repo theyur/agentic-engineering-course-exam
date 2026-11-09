@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "version": "0.1.0.dev0",
   "command": "uv run --no-project python -I \"$CLAUDE_PROJECT_DIR/.specify/extensions/ac/hooks/guard.py\"",
-  "installedAt": "2026-11-09T19:21:57+00:00",
+  "installedAt": "2026-11-09T19:49:03+00:00",
   "preexisting": {
     ".claude/settings.json": true,
     ".claude/agents": false,
@@ -186,7 +186,7 @@
     {
       "path": ".specify/extensions/ac/scripts/init_config.py",
       "kind": "extension",
-      "sha256": "a8113613a9f299e9f4bd8eff7bef34c5368e1c6ac4793774ec5011537082e1eb"
+      "sha256": "c1518118a431b518c1a96be6e71e7d1953b86d751403642c2e883a2958dc9f51"
     },
     {
       "path": ".specify/extensions/ac/scripts/init_detect.py",
