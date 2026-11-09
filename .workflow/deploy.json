@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "version": "0.1.0.dev0",
   "command": "uv run --no-project python -I \"$CLAUDE_PROJECT_DIR/.specify/extensions/ac/hooks/guard.py\"",
-  "installedAt": "2026-11-09T14:12:29+00:00",
+  "installedAt": "2026-11-09T16:15:42+00:00",
   "preexisting": {
     ".claude/settings.json": true,
     ".claude/agents": false,
@@ -136,7 +136,7 @@
     {
       "path": ".specify/extensions/ac/hooks/guard.py",
       "kind": "extension",
-      "sha256": "de44539f898318979c0455c5afeac6a954332e4b062f904d8a405b1b71fee463"
+      "sha256": "f5861ed99ba255a0d6f7b8610bdf59f27c9686394b5fc459f4b5ff667d731d22"
     },
     {
       "path": ".specify/extensions/ac/scripts/ac_feature.py",
@@ -151,7 +151,7 @@
     {
       "path": ".specify/extensions/ac/scripts/aclib.py",
       "kind": "extension",
-      "sha256": "23e57695a8f2d9f239f3a1f80f9fea24882bf3c284c5490576a6f7b6f203a0d0"
+      "sha256": "dd8b14cb8a3f2d3b77b2aef550d25c210f8ad56fab08a7bb77e907709c5052fb"
     },
     {
       "path": ".specify/extensions/ac/scripts/changed_files.py",
@@ -196,7 +196,7 @@
     {
       "path": ".specify/extensions/ac/scripts/init_scaffold.py",
       "kind": "extension",
-      "sha256": "6687f2ba2312d44a2bf4f65e74b36248dc7ada47342b5e972f7c33d13703cea7"
+      "sha256": "788ecac58ff9ba7881d95ce9018a891ae2e344d0b04a5df5bc1fdc326647e4c8"
     },
     {
       "path": ".specify/extensions/ac/scripts/init_verify.py",
