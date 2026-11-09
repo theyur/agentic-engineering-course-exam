@@ -92,6 +92,7 @@ jobs:
         # gate is red. The authoritative gate signal is still the "SonarCloud Code Analysis" check
         # (a run without SONAR_TOKEN succeeds without analyzing); tools/pr-gates reads that check.
         # .specify/ is vendored Spec Kit tooling, refreshed by the Specify CLI; we don't maintain it.
+        # tests/HT.AcceptanceTests/ is written by isolated AC subagents the main agent may not edit (ADR 0003).
         # Coverage is measured for .NET only, so repo scripts (tools/, .claude/hooks/) are excluded from
         # the coverage metric; they are still analyzed for issues and are tested by their own self-tests.
         run: |
@@ -101,7 +102,7 @@ jobs:
             /d:sonar.token="$SONAR_TOKEN" \
             /d:sonar.host.url="https://sonarcloud.io" \
             /d:sonar.qualitygate.wait=true \
-            /d:sonar.exclusions=".specify/**" \
+            /d:sonar.exclusions=".specify/**,tests/HT.AcceptanceTests/**" \
             /d:sonar.coverage.exclusions="tools/**,.claude/hooks/**" \
             /d:sonar.cs.vscoveragexml.reportsPaths="coverage/coverage.xml" \
             /d:sonar.cs.vstest.reportsPaths="**/TestResults/*.trx"

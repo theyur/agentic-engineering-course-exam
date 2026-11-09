@@ -1,0 +1,50 @@
+installed:
+- ac
+settings:
+  auto_execute_hooks: true
+hooks:
+  after_clarify:
+  - extension: ac
+    command: speckit.ac.critic
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Type /speckit-ac-critic spec to have the spec reviewed before drafting
+      acceptance criteria
+    description: Critic review of the clarified spec
+    condition: null
+  - extension: ac
+    command: speckit.ac.translate
+    enabled: true
+    optional: true
+    priority: 20
+    prompt: Type /speckit-ac-translate to draft this feature's acceptance criteria
+    description: Draft the feature's acceptance criteria (acceptance.md)
+    condition: null
+  after_plan:
+  - extension: ac
+    command: speckit.ac.critic
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Type /speckit-ac-critic plan to have the plan reviewed
+    description: Critic review of the plan
+    condition: null
+  after_tasks:
+  - extension: ac
+    command: speckit.ac.critic
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Type /speckit-ac-critic tasks to have the tasks reviewed
+    description: Critic review of the tasks
+    condition: null
+  after_implement:
+  - extension: ac
+    command: speckit.ac.tests-write
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Type /speckit-ac-tests-write to write this feature's acceptance step definitions
+    description: Write the feature's acceptance step definitions
+    condition: null

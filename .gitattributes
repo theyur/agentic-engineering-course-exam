@@ -1,2 +1,9 @@
 # Git hooks run under sh; keep LF endings regardless of core.autocrlf.
 .githooks/* text eol=lf
+
+# >>> speckit-ac (managed; do not edit)
+tests/HT.AcceptanceTests/Samples/** binary
+tests/HT.AcceptanceTests/Features/**/*.feature text eol=lf
+specs/*/acceptance.md text eol=lf
+specs/*/spec.md text eol=lf
+# <<< speckit-ac

@@ -1,0 +1,534 @@
+"""Fail-closed PreToolUse guard of the spec-kit `ac` extension (docs/WORKFLOW.md §3).
+
+Registered once in .claude/settings.json with matcher "*" (installed as .specify/extensions/ac/hooks/guard.py).
+Hooks from settings also fire inside subagents, so the policy is picked from `agent_type`: the three AC roles get
+default-deny allowlists pinned to the active run (.workflow/active-run.json), everything else (main agent and every
+other subagent type) gets the main rules. A main-agent `Agent` call that starts an AC role must carry exactly the task
+message task_message.py recorded in the marker, in the foreground; such a call is exempt from the step-definition
+text rule, since that message names those folders by design.
+
+Block = reason on stderr + exit 2. Allow = exit 0, no output. Any error = exit 2 (fail closed).
+This file is self-contained on purpose: it is the security boundary and imports no project code.
+"""
+import json
+import os
+import posixpath
+import re
+import sys
+from pathlib import Path
+
+TRANSLATOR, WRITER, JUDGE = "ac-feature-translator", "ac-test-writer", "ac-test-fail-judge"
+AC_ROLES = (TRANSLATOR, WRITER, JUDGE)
+WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+SHELL_TOOLS = ("Bash", "PowerShell")  # main agent only; the AC roles have no PowerShell, and only one Bash command
+HANDBACK = "SubagentHandback"  # how a subagent delivers its final message to the main agent
+# Code in a hand-back: a fence, a Reqnroll attribute (also qualified: [Reqnroll.Binding], [global::Reqnroll.Then]),
+# a C# member or type declaration with an access modifier, or an expression-bodied member. Markers only: prose that
+# describes code still passes (WORKFLOW §6); the prompts ask for a short summary.
+CODE = re.compile(
+    r"```"
+    r"|\[\s*(?:global::)?(?:\w+\.)*(?:Binding|Given|When|Then|StepArgumentTransformation|BeforeScenario|AfterScenario"
+    r"|BeforeFeature|AfterFeature|BeforeTestRun|AfterTestRun|Scope)(?:Attribute)?\b"
+    r"|\b(?:public|private|protected|internal)\s+(?:(?:static|async|override|virtual|sealed|partial|readonly|abstract)"
+    r"\s+)*[\w.<>\[\],?]+\s+\w+\s*[({]"
+    r"|\)\s*=>")
+AC_ROLE_SUFFIX = (" This restriction is intentional. Do not try to work around it."
+                  " If you cannot continue, record the problem in your report.")
+CONSTITUTION = ".specify/memory/constitution.md"
+MARKER = ".workflow/active-run.json"
+CONFIG = ".workflow/config.json"
+SCHEMA_VERSION = 1
+STRING_KEYS = ("python", "solution", "acProjectDir", "acProject", "refsDir", "acRefBuildCommand",
+               "unitTestCommand", "acTestCommand")
+LIST_KEYS = ("specInputs", "acSurfaceProjects", "unitTestProjects")
+ENUM_KEYS = {"testFramework": ("xunit2", "xunit3", "nunit", "mstest")}
+FEATURE_DIR = re.compile(r"^specs/(\d{3,})-[^/\\]+$")
+TIMESTAMP_NAME = re.compile(r"^\d{8}-\d{6}-")
+RUN_ID = {TRANSLATOR: re.compile(r"^translate-\d{3,}$"), WRITER: re.compile(r"^run-\d{3,}$"),
+          JUDGE: re.compile(r"^run-\d{3,}$")}
+ANALYZE_ID = re.compile(r"^analyze-\d+$")
+SKILL_PREFIXES = ("speckit-ac-", "speckit.ac.")
+LAUNCH_TOOLS = ("Agent", "Task")  # `Task` is the older name of the subagent tool
+LAUNCH_RULE = ("Start AC subagents only from the /speckit-ac-* commands: prompt = the exact output of task_message.py, "
+               "run_in_background false.")
+
+
+class Deny(Exception):
+    pass
+
+
+def norm(path):
+    """Absolute, symlink-free, case-folded on Windows, forward slashes."""
+    return os.path.normcase(os.path.realpath(path)).replace("\\", "/")
+
+
+def fold(path):
+    """A project-relative path in the same case and slash form as norm() output."""
+    return os.path.normcase(path).replace("\\", "/").strip("/")
+
+
+def normalise_message(text):
+    """Line ends to LF, trailing spaces per line and surrounding blank lines removed (task-message comparison)."""
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    return "\n".join(line.rstrip() for line in lines).strip("\n")
+
+
+def project_root(project, cwd):
+    """The worktree under <project>/.claude/worktrees/ that holds `cwd`, else `project` itself.
+
+    CLAUDE_PROJECT_DIR stays the main checkout when a session runs in a worktree, so without this every worktree
+    path would be `.claude/worktrees/<name>/...` and match none of the project-relative rules.
+    """
+    prefix = project + "/.claude/worktrees/"
+    if cwd.startswith(prefix):
+        candidate = prefix + cwd[len(prefix):].split("/")[0]
+        if Path(candidate, CONFIG).is_file():
+            return candidate
+    return project
+
+
+def installed_root():
+    """The project root for a guard installed at <root>/.specify/extensions/ac/hooks/guard.py."""
+    path = Path(__file__).resolve()
+    if len(path.parents) < 5 or path.parents[3].name != ".specify":
+        raise ValueError(f"CLAUDE_PROJECT_DIR is not set and {path} is not under <project>/.specify/extensions/ac/")
+    return path.parents[4]
+
+
+def timestamp_numbering(root):
+    try:
+        options = json.loads(Path(root, ".specify", "init-options.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(options, dict) and (options.get("feature_numbering") or options.get("branch_numbering")) == "timestamp"
+
+
+def glob_regex(pattern):
+    # `**` crosses folders, `*` stays inside one path segment.
+    return re.compile("^" + re.escape(pattern).replace(r"\*\*", ".*").replace(r"\*", "[^/]*") + "$", re.IGNORECASE)
+
+
+def relative_clean(value, key):
+    """A config path in normalised project-relative posix form; anything else is an error (fail closed)."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"config key {key} must be a non-empty string")
+    raw = value.strip().replace("\\", "/")
+    posix = posixpath.normpath(raw)
+    if (raw.startswith("/") or re.match(r"^[A-Za-z]:", raw) or posix in (".", "")
+            or posix == ".." or posix.startswith("../")):
+        raise ValueError(f"config key {key} must be a project-relative path below the project root: {value}")
+    return posix
+
+
+def load_config(root):
+    """The validated config, or None when the AC workflow is not initialised yet (no config file)."""
+    path = Path(root, CONFIG)
+    if not path.exists():
+        return None
+    cfg = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(cfg, dict) or cfg.get("schemaVersion") != SCHEMA_VERSION:
+        raise ValueError(f"{CONFIG}: schemaVersion must be {SCHEMA_VERSION}")
+    for key in STRING_KEYS:
+        if not isinstance(cfg.get(key), str) or not cfg[key].strip():
+            raise ValueError(f"{CONFIG}: missing or empty key {key}")
+    for key in LIST_KEYS:
+        if not isinstance(cfg.get(key), list) or not all(isinstance(v, str) and v.strip() for v in cfg[key]):
+            raise ValueError(f"{CONFIG}: key {key} must be a list of non-empty strings")
+    for key, allowed in ENUM_KEYS.items():
+        if cfg.get(key) not in allowed:
+            raise ValueError(f"{CONFIG}: missing or invalid key {key} (one of {', '.join(allowed)})")
+    for key in ("solution", "acProjectDir", "acProject", "refsDir"):
+        cfg[key] = relative_clean(cfg[key], key)
+    for key in ("specInputs", "acSurfaceProjects", "unitTestProjects"):
+        cfg[key] = [relative_clean(value, key) for value in cfg[key]]
+    check_ac_project(root, cfg)
+    # export_refs.py deletes refsDir before every export, so it must hold nothing else (same rule as aclib).
+    for folder in ("specs", ".specify", ".workflow", ".git", cfg["acProjectDir"]):
+        if overlaps(cfg["refsDir"], folder):
+            raise ValueError(f"{CONFIG}: refsDir {cfg['refsDir']} overlaps {folder}; it is deleted before every export")
+    folder = implementation_overlap(root, cfg["refsDir"], root_project=False)
+    if folder is not None:
+        raise ValueError(f"{CONFIG}: refsDir {cfg['refsDir']} overlaps the implementation folder {folder}; it is "
+                         "deleted before every export")
+    protected = ["specs", ".specify", ".workflow", cfg["acProjectDir"], cfg["refsDir"]]
+    for value in cfg["specInputs"]:
+        for folder in protected:
+            if overlaps(value, folder):
+                raise ValueError(f"{CONFIG}: specInputs entry {value} overlaps {folder}; spec inputs must be extra "
+                                 "project documents outside specs/, .specify/, .workflow/, the AC project and refsDir")
+        folder = implementation_overlap(root, value)
+        if folder is not None:
+            raise ValueError(f"{CONFIG}: specInputs entry {value} overlaps the implementation folder {folder}; spec "
+                             "inputs must describe the domain, never the code")
+    return cfg
+
+
+def overlaps(a, b):
+    """True if one project-relative path equals or contains the other (case-insensitive)."""
+    a, b = a.lower(), b.lower()
+    return a == b or a.startswith(b + "/") or b.startswith(a + "/")
+
+
+BUILD_FOLDER = re.compile(r"^(bin|obj)([-_.].*)?$", re.IGNORECASE)
+# `StepDefinitions` as a word, or `Support/` as a path segment ("support" alone is ordinary prose).
+ISOLATED_SEGMENT = re.compile(r"(?<![\w.-])(?:stepdefinitions(?![\w.-])|support/)", re.IGNORECASE)
+
+
+def path_text(text):
+    """Text with path spellings folded, so `AC/./StepDefinitions` or `AC\\StepDefinitions` match like
+    `AC/StepDefinitions`. Variables and globs still get through: a documented limit (WORKFLOW §6)."""
+    text = text.replace("\\", "/")
+    while "/./" in text:
+        text = text.replace("/./", "/")
+    return text
+
+
+def check_ac_project(root, cfg):
+    """Same rule as aclib.check_ac_project: the AC project is a folder of its own, outside the spec-kit folders and
+    every other project folder, its .csproj directly inside, and the ref build is exactly the generated command.
+    Otherwise a hand-edited config would move the writer's allowlist or widen the AC roles' only Bash command."""
+    ac, project = cfg["acProjectDir"], cfg["acProject"]
+    for folder in ("specs", ".specify", ".workflow", ".git", "src"):
+        if overlaps(ac, folder):
+            raise ValueError(f"{CONFIG}: acProjectDir {ac} overlaps {folder}")
+    if posixpath.dirname(project) != ac or not project.lower().endswith(".csproj"):
+        raise ValueError(f"{CONFIG}: acProject {project} must be a .csproj directly inside acProjectDir {ac}")
+    if project.lower() in {p.lower() for p in cfg["acSurfaceProjects"] + cfg["unitTestProjects"]}:
+        raise ValueError(f"{CONFIG}: acProject {project} is a surface or unit-test project")
+    expected = f"dotnet build {project} -p:AcRefMode=true -nologo -v q"
+    if " ".join(cfg["acRefBuildCommand"].split()) != expected:
+        raise ValueError(f"{CONFIG}: acRefBuildCommand must be exactly: {expected}")
+    parts = ac.split("/")
+    for depth in range(1, len(parts)):
+        if any(Path(root, *parts[:depth]).glob("*.csproj")):
+            raise ValueError(f"{CONFIG}: acProjectDir {ac} lies inside the project folder {'/'.join(parts[:depth])}")
+    target = Path(root, *parts)
+    if target.is_dir():
+        for csproj in target.rglob("*.csproj"):
+            rel = csproj.parent.relative_to(target).parts
+            # Another project file next to acProject: the AC folder is an existing project (src/App.Domain, …).
+            if not rel and csproj.name.lower() != posixpath.basename(project).lower():
+                raise ValueError(f"{CONFIG}: acProjectDir {ac} holds another project: {csproj.name}")
+            if rel and not any(BUILD_FOLDER.match(p) for p in rel):
+                raise ValueError(f"{CONFIG}: acProjectDir {ac} contains another project: "
+                                 f"{csproj.relative_to(Path(root)).as_posix()}")
+
+
+def implementation_overlap(root, value, root_project=True):
+    """The implementation folder (`src`, or a folder holding a .csproj) that `value` equals, contains or lies inside,
+    or None (same rule as aclib.implementation_overlap). The config is changed by hand after init.
+    `root_project=False` ignores a .csproj at the root itself."""
+    if overlaps(value, "src"):
+        return "src"
+    parts = value.split("/")
+    for depth in range(0 if root_project else 1, len(parts) + 1):
+        folder = Path(root, *parts[:depth])
+        if folder.is_dir() and any(folder.glob("*.csproj")):
+            return "/".join(parts[:depth]) or "."
+    target = Path(root, *parts)
+    if target.is_dir():
+        for csproj in target.rglob("*.csproj"):
+            rel = csproj.parent.relative_to(Path(root)).as_posix()
+            if not any(BUILD_FOLDER.match(p) for p in rel.split("/")):
+                return rel
+    return None
+
+
+class Guard:
+    def __init__(self, payload):
+        if not isinstance(payload, dict):
+            raise ValueError("hook input is not a JSON object")
+        project = norm(os.environ.get("CLAUDE_PROJECT_DIR") or installed_root())
+        self.cwd = payload.get("cwd") or project
+        self.root = project_root(project, norm(self.cwd))
+        self.cfg = load_config(self.root)
+        self.tool = payload.get("tool_name") or ""
+        self.input = payload.get("tool_input") or {}
+        if not isinstance(self.input, dict):
+            raise ValueError("tool_input is not a JSON object")
+        if self.cfg is None:
+            return
+        self.ac = fold(self.cfg["acProjectDir"])
+        self.refs = fold(self.cfg["refsDir"])
+        self.spec_inputs = [fold(p) for p in self.cfg["specInputs"]]
+        self.features = f"{self.ac}/features"
+        self.samples = f"{self.ac}/samples"
+        self.isolated = [f"{self.ac}/stepdefinitions", f"{self.ac}/support"]
+        self.isolated_text = re.compile(
+            re.escape(self.ac.split("/")[-1]) + r"/+(stepdefinitions|support)(?![a-z0-9_.])", re.IGNORECASE)
+        # A shell command naming the AC folder and, anywhere else, an isolated folder (`cd <ac> && cat Support/x`).
+        self.ac_name_text = re.compile(r"(?<![\w.-])" + re.escape(self.ac.split("/")[-1]) + r"(?![\w-]|\.\w)",
+                                       re.IGNORECASE)
+
+    # ---- paths -------------------------------------------------------------------------------------------------
+
+    def rel(self, path):
+        """Project-relative, case-folded posix path, or raise Deny if outside the project."""
+        if not isinstance(path, str) or not path.strip():
+            raise Deny("Missing path.")
+        full = norm(os.path.join(self.cwd, path))
+        if full != self.root and not full.startswith(self.root + "/"):
+            raise Deny(f"Path is outside the project directory: {path}")
+        return full[len(self.root) + 1:] if full != self.root else ""
+
+    def project_rel(self, path):
+        """Like rel(), but None for a missing path or one outside the project."""
+        try:
+            return self.rel(path)
+        except Deny:
+            return None
+
+    @staticmethod
+    def under(rel, folder):
+        folder = fold(folder)
+        return rel == folder or rel.startswith(folder + "/")
+
+    @staticmethod
+    def matches(rel, pattern):
+        return bool(glob_regex(fold(pattern)).match(rel))
+
+    def exists(self, rel):
+        return Path(self.root, rel).is_file()
+
+    def path_field(self):
+        return self.input.get("file_path") or self.input.get("notebook_path")
+
+    def strings(self, value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for v in value.values():
+                yield from self.strings(v)
+        elif isinstance(value, list):
+            for v in value:
+                yield from self.strings(v)
+
+    # ---- main policy ------------------------------------------------------------------------------------------
+
+    def skill_rule(self):
+        if self.tool != "Skill":
+            return
+        name = self.input.get("skill")
+        name = name.strip().lstrip("/").lower() if isinstance(name, str) else ""
+        if name.startswith(SKILL_PREFIXES):
+            raise Deny(f"/{name} is started only by the user. Ask the user to type /{name} themselves.")
+
+    def sources_locked(self, number):
+        """True if any feature folder numbered `number` has its sources lock."""
+        specs = Path(self.root, "specs")
+        return specs.is_dir() and any(Path(d, "ac", "sources.lock").is_file()
+                                      for d in specs.glob(f"{number}-*") if d.is_dir())
+
+    def main_writes(self, rel):
+        if self.matches(rel, "specs/*/ac/*.lock"):
+            raise Deny(f"{rel} is written only by the lock script (ac_lock.py).")
+        if self.matches(rel, "specs/*/ac/runs/**") or self.under(rel, self.refs) or rel == fold(MARKER):
+            raise Deny(f"{rel} is produced only by the workflow scripts and AC subagents. Do not write it.")
+        match = re.match(r"^specs/([^/]+)/acceptance\.md$", rel)
+        if match and self.exists(f"specs/{match[1]}/ac/sources.lock"):
+            raise Deny(f"{rel} is locked (sources). It changes only after the user asks for an unlock.")
+        match = re.match(re.escape(self.samples) + r"/f(\d{3,})(/|$)", rel)
+        if match and self.sources_locked(match[1]):
+            raise Deny(f"{rel} is locked (sources). It changes only after the user asks for an unlock.")
+        # G3: Reqnroll compiles every .feature in the AC project, so none may come from the main agent.
+        if self.under(rel, self.features) or (self.under(rel, self.ac) and rel.lower().endswith(".feature")):
+            raise Deny("Feature files are generated by ac-feature-translator. Change the feature's acceptance.md "
+                       "and run /speckit-ac-translate again.")
+
+    def main(self):
+        self.skill_rule()
+        if self.cfg is None:
+            return  # AC workflow not initialised: nothing else to protect yet
+
+        if self.tool in LAUNCH_TOOLS:
+            kind = self.input.get("subagent_type")
+            kind = kind.strip().lower() if isinstance(kind, str) else ""
+            if kind in AC_ROLES:
+                self.launch_rule(kind)
+                return  # exempt from the step-definition text rule: the task message names those folders
+
+        # Writes outside the project (scratchpad, memory, …) are none of this guard's business for the main agent.
+        rel = self.project_rel(self.path_field()) if self.tool in WRITE_TOOLS else None
+        if rel is not None:
+            self.main_writes(rel)
+
+        # G2: step definitions are hidden from the main agent.
+        message = ("Main agent must not look at AC step definitions (isolation rule). "
+                   "Use test results and the judge report instead.")
+        if self.tool in WRITE_TOOLS:
+            texts = [self.path_field() or ""]  # file content may legitimately mention the folders
+        elif self.tool in SHELL_TOOLS:
+            texts = [self.input.get("command") or ""]
+            # Inside the AC project folder, a bare `StepDefinitions/…` or `Support/…` is enough to reach them.
+            cwd = norm(self.cwd)
+            ac_dir = norm(os.path.join(self.root, self.ac))
+            if (cwd == ac_dir or cwd.startswith(ac_dir + "/")) and re.search(
+                    r"stepdefinitions|support", texts[0], re.IGNORECASE):
+                raise Deny(message)
+            # The same reach from elsewhere: `cd <ac folder> && cat StepDefinitions/…` (Copilot on HT PR 16).
+            command = path_text(texts[0])
+            if self.ac_name_text.search(command) and ISOLATED_SEGMENT.search(command):
+                raise Deny(message)
+        else:
+            texts = list(self.strings(self.input))
+            if self.tool == "Glob":
+                texts.append(os.path.join(self.input.get("path") or self.cwd, self.input.get("pattern") or ""))
+
+        for text in texts:
+            if isinstance(text, str) and self.isolated_text.search(path_text(text)):
+                raise Deny(message)
+        for key in ("file_path", "notebook_path", "path"):
+            value = self.input.get(key)
+            if isinstance(value, str) and value.strip():
+                rel = self.project_rel(value)
+                if rel is None:
+                    continue  # outside the project: not this rule's concern
+                # A search rooted at the AC project folder itself would read StepDefinitions/ and Support/ too.
+                if any(self.under(rel, f) for f in self.isolated) or (key == "path" and rel == self.ac):
+                    raise Deny(message)
+
+    # ---- AC roles ---------------------------------------------------------------------------------------------
+
+    def load_marker(self, role):
+        try:
+            marker = json.loads(Path(self.root, MARKER).read_text(encoding="utf-8"))
+            feature, tag, run, analyze = marker["feature"], marker["tag"], marker["run"], marker.get("analyze")
+            match = FEATURE_DIR.match(feature) if isinstance(feature, str) else None
+            ok = (marker.get("role") == role and match is not None and ".." not in feature
+                  and not TIMESTAMP_NAME.match(feature[len("specs/"):])
+                  and Path(self.root, feature).is_dir()
+                  and len([d for d in Path(self.root, "specs").glob(f"{match[1]}-*") if d.is_dir()]) == 1
+                  and not timestamp_numbering(self.root)
+                  and tag == "F" + match[1]
+                  and isinstance(run, str) and RUN_ID[role].match(run)
+                  and ((isinstance(analyze, str) and ANALYZE_ID.match(analyze)) if role == JUDGE else analyze is None))
+        except (OSError, ValueError, KeyError, TypeError):
+            ok = False
+        if not ok:
+            raise Deny(f"No valid active run for {role} ({MARKER}). AC subagents run only inside the AC commands.")
+        self.feature, self.tag = fold(feature), fold(tag)
+        self.run_dir = f"{self.feature}/ac/runs/{fold(run)}"
+        self.analyze_dir = f"{self.run_dir}/{fold(analyze)}" if analyze else None
+        return marker
+
+    def launch_rule(self, role):
+        """The main agent starts an AC role only with the recorded task message, in the foreground."""
+        marker = self.load_marker(role)
+        message, prompt = marker.get("taskMessage"), self.input.get("prompt")
+        if not isinstance(message, str) or not message.strip():
+            raise Deny(f"No task message for {role} in {MARKER} (run task_message.py first). {LAUNCH_RULE}")
+        if self.input.get("run_in_background") not in (None, False):
+            raise Deny(f"{role} must run in the foreground. {LAUNCH_RULE}")
+        if not isinstance(prompt, str) or normalise_message(prompt) != normalise_message(message):
+            raise Deny(f"The prompt for {role} is not the recorded task message. {LAUNCH_RULE}")
+
+    def folders(self, role):
+        """Folders the role may read and search (search roots)."""
+        if role == TRANSLATOR:
+            return self.spec_inputs + [f"{self.samples}/{self.tag}", f"{self.features}/{self.tag}"]
+        return self.spec_inputs + [self.features, self.samples, *self.isolated, self.refs]
+
+    def readable_file(self, rel, role):
+        files = [fold(CONSTITUTION)]
+        if role == JUDGE:
+            if self.matches(rel, "specs/*/spec.md") or self.matches(rel, "specs/*/acceptance.md"):
+                return True
+            files += [f"{self.run_dir}/writer-report.md", f"{self.analyze_dir}/ac-results.md"]
+        else:
+            files += [f"{self.feature}/spec.md", f"{self.feature}/acceptance.md"]
+            files += ([f"{self.run_dir}/translation-report.md"] if role == TRANSLATOR else
+                      [f"{self.run_dir}/input-feedback.md", f"{self.run_dir}/writer-report.md"])
+        if rel in files:
+            return True
+        # Project files directly in the AC project root (csproj, reqnroll.json, Directory.Build.props); never the
+        # folders there (bin/, obj/ hold the real assemblies and generated code).
+        return (role != TRANSLATOR and rel.startswith(self.ac + "/") and "/" not in rel[len(self.ac) + 1:]
+                and self.exists(rel))
+
+    def readable(self, rel, role):
+        return any(self.under(rel, f) for f in self.folders(role)) or self.readable_file(rel, role)
+
+    def writable(self, rel, role):
+        if role == TRANSLATOR:
+            if self.under(rel, f"{self.features}/{self.tag}") and rel.lower().endswith(".feature"):
+                if self.exists(f"{self.feature}/ac/features.lock"):
+                    raise Deny(f"{rel} is locked (features). It changes only after the user asks for an unlock.")
+                return True
+            return rel == f"{self.run_dir}/translation-report.md"
+        if role == WRITER:
+            # Never a .feature file: Reqnroll compiles every one, so it would add scenarios nobody locked.
+            return ((any(self.under(rel, f) for f in self.isolated) and not rel.lower().endswith(".feature"))
+                    or rel == f"{self.run_dir}/writer-report.md")
+        return self.tool == "Write" and rel == f"{self.analyze_dir}/judge-report.md"
+
+    def ac_role(self, role):
+        if self.cfg is None:
+            raise Deny(f"The AC workflow is not initialised ({CONFIG} is missing).")
+        self.load_marker(role)
+        tool = self.tool
+        if tool == "Read":
+            rel = self.rel(self.input.get("file_path"))
+            if not self.readable(rel, role):
+                raise Deny(f"{role} may not read {rel}.")
+        elif tool in ("Grep", "Glob"):
+            if not self.input.get("path"):
+                raise Deny(f"{tool} needs an explicit `path` inside a readable folder.")
+            rel = self.rel(self.input["path"])
+            if rel == self.ac or not (any(self.under(rel, f) for f in self.folders(role))
+                                      or self.readable_file(rel, role)):
+                raise Deny(f"{role} may not search {rel or '.'}.")
+            pattern = self.input.get("pattern" if tool == "Glob" else "glob") or ""
+            if not isinstance(pattern, str) or ".." in pattern or os.path.isabs(pattern) \
+                    or pattern.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:", pattern):
+                raise Deny(f"{tool} pattern must be relative and must not contain '..'.")
+        elif tool in ("Write", "Edit", "MultiEdit"):
+            rel = self.rel(self.path_field())
+            if not self.writable(rel, role):
+                raise Deny(f"{role} may not write {rel}.")
+        elif tool == "Bash" and role in (TRANSLATOR, WRITER):
+            allowed = " ".join(self.cfg["acRefBuildCommand"].split())
+            command = self.input.get("command")
+            if not isinstance(command, str) or " ".join(command.split()) != allowed:
+                raise Deny(f"The only allowed Bash command is: {allowed}")
+        elif tool == HANDBACK:
+            # The final message reaches the main agent, which must never see step-definition code.
+            if any(CODE.search(text) for text in self.strings(self.input)):
+                raise Deny("Hand back a short summary without code. Details belong in your report file.")
+        else:
+            raise Deny(f"{role} may not use the {tool} tool.")
+
+
+def log(root, agent_type, tool, decision):
+    try:
+        with open(os.path.join(root, ".workflow", "guard.log"), "a", encoding="utf-8") as f:
+            f.write(f"{agent_type}\t{tool}\t{decision}\n")
+    except OSError:
+        pass
+
+
+def main():
+    payload = json.loads(sys.stdin.read())
+    guard = Guard(payload)
+    agent_type = payload.get("agent_type") or ""
+    role = agent_type if agent_type in AC_ROLES else "main"
+    try:
+        guard.main() if role == "main" else guard.ac_role(role)
+    except Deny as deny:
+        reason = str(deny) + (AC_ROLE_SUFFIX if role != "main" else "")
+        if agent_type:
+            log(guard.root, agent_type, guard.tool, "deny")
+        print(reason, file=sys.stderr)
+        sys.exit(2)
+    if agent_type:
+        log(guard.root, agent_type, guard.tool, "allow")
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException as error:  # fail closed
+        print(f"AC guard error, call blocked: {error!r}", file=sys.stderr)
+        sys.exit(2)

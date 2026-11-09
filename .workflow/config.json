@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "python": "uv run --no-project python -I",
+  "solution": "HabitTracker.slnx",
+  "specInputs": [
+    "SPEC.md",
+    "docs/adr/0003-acceptance-tests.md"
+  ],
+  "acSurfaceProjects": [
+    "src/HT.Application/HT.Application.csproj",
+    "src/HT.Domain/HT.Domain.csproj",
+    "src/HT.Persistence/HT.Persistence.csproj"
+  ],
+  "unitTestProjects": [
+    "tests/HT.ArchitectureTests/HT.ArchitectureTests.csproj",
+    "tests/HT.UnitTests/HT.UnitTests.csproj"
+  ],
+  "acProjectDir": "tests/HT.AcceptanceTests",
+  "acProject": "tests/HT.AcceptanceTests/HT.AcceptanceTests.csproj",
+  "refsDir": "artifacts/refs",
+  "acRefBuildCommand": "dotnet build tests/HT.AcceptanceTests/HT.AcceptanceTests.csproj -p:AcRefMode=true -nologo -v q",
+  "unitTestCommand": "dotnet test {project}",
+  "acTestCommand": "dotnet test {acProject} --no-build --results-directory {analyzeDir} --logger \"trx;LogFileName=ac-results.trx\"",
+  "testFramework": "xunit2"
+}

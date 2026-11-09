@@ -66,3 +66,29 @@ A feature is not done without tests: unit (domain rules — targets, grace perio
 - Never request Copilot (or any AI) review yourself and never merge — the user does both.
 - Resolve review threads only via `tools/pr-gates/pr-resolve.ps1 -AcceptApproval -Apply`, after a Copilot re-review of the head and with a verified `Fixed in <sha>` reply. Never resolve by hand or because of a push alone (ADR 0002).
 - Changed `tools/pr-gates/` or `.claude/hooks/block-pr-review.ps1`? Run `pwsh -NoProfile -File tools/pr-gates/selftest.ps1` — it must print `PASSED`.
+
+<!-- >>> speckit-ac (managed; do not edit) -->
+## Acceptance tests (spec-kit extension `ac`)
+
+This project uses the isolated acceptance-test workflow of spec-kit-ac. These rules are for the main agent; the
+AC subagents never load this file.
+
+- Flow per feature: /speckit-specify -> /speckit-clarify -> /speckit-ac-translate (draft `acceptance.md`, user
+  review, lock; then translate to `.feature` files, lock) -> /speckit-plan -> /speckit-tasks -> /speckit-implement
+  -> /speckit-ac-tests-write -> /speckit-ac-tests-analyze. /speckit-ac-critic reviews on request.
+- The /speckit-ac-* commands are started only by the user, who types them. Never start them yourself, and never
+  start the AC subagents (ac-feature-translator, ac-test-writer, ac-test-fail-judge) except from those commands,
+  with the exact task message their scripts print.
+- After each step: report, then stop and wait for the user. Never start the next step on your own.
+- Never read, search, list, diff or review the step definitions and AC support code: the `StepDefinitions/` and
+  `Support/` folders of the AC project (`acProjectDir` in `.workflow/config.json`). This holds for every tool,
+  including Bash, PowerShell, `git diff` / `git show` / `git log -p` and code-review tools. Use the test results
+  and the judge report instead.
+- Never edit `.feature` files, lock files (`specs/*/ac/*.lock`), run records (`specs/*/ac/runs/`), the reference
+  assemblies (`refsDir`) or `.workflow/active-run.json`. Locked acceptance criteria change only after the user
+  asks for an unlock.
+- Every domain rule the acceptance criteria depend on belongs in the feature's `spec.md` or in the constitution,
+  not only in this file.
+- The extension's files are in `.specify/extensions/ac/` (see its README.md). Setup and checks: /speckit-ac-init;
+  `speckit-ac doctor` in a terminal.
+<!-- <<< speckit-ac -->

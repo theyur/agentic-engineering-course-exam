@@ -40,6 +40,17 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --no-project python -I \"$CLAUDE_PROJECT_DIR/.specify/extensions/ac/hooks/guard.py\"",
+            "timeout": 30,
+            "onFailure": "block"
+          }
+        ]
       }
     ],
     "UserPromptExpansion": [

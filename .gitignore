@@ -494,3 +494,12 @@ CLAUDE.local.md
 .env
 .env.*
 appsettings.*.local.json
+
+# >>> speckit-ac (managed; do not edit)
+/artifacts/refs/
+**/bin-ref/
+**/obj-ref/
+/.workflow/guard.log
+/.workflow/active-run.json
+/.specify/extensions/ac/**/__pycache__/
+# <<< speckit-ac
