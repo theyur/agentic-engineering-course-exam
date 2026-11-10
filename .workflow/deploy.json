@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "version": "0.1.0.dev0",
+  "version": "0.1.0",
   "command": "uv run --no-project python -I \"$CLAUDE_PROJECT_DIR/.specify/extensions/ac/hooks/guard.py\"",
-  "installedAt": "2026-11-09T20:47:30+00:00",
+  "installedAt": "2026-11-10T14:07:59+00:00",
   "preexisting": {
     ".claude/settings.json": true,
     ".claude/agents": false,
@@ -131,7 +131,7 @@
     {
       "path": ".specify/extensions/ac/extension.yml",
       "kind": "extension",
-      "sha256": "2fde4950033b078d86c613ab8e898ad042002dd6dc7f388b7e4234343215e825"
+      "sha256": "bcf07605de261518b600a2f5d8d8ec903f043baab1dba29fc2774e60f4e55aac"
     },
     {
       "path": ".specify/extensions/ac/hooks/guard.py",
@@ -161,7 +161,7 @@
     {
       "path": ".specify/extensions/ac/scripts/check_acceptance.py",
       "kind": "extension",
-      "sha256": "c62e87f813d7868057facc2b54eaab1dc3c7f134fe43473a2feb14fdf093351b"
+      "sha256": "2610fd660185cd83ed4926fe4c7041780f558e8230c05071c556ac935d151c34"
     },
     {
       "path": ".specify/extensions/ac/scripts/check_features.py",
