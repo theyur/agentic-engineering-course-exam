@@ -19,7 +19,8 @@ C# / .NET 10, Blazor Interactive Server, EF Core + SQL Server (only provider —
 
 - Build: `dotnet build HabitTracker.slnx`
 - Test: `dotnet test HabitTracker.slnx`; single test: `dotnet test HabitTracker.slnx --filter "FullyQualifiedName~<TestName>"`
-- Run UI: `dotnet run --project src/HT.Ui`
+  - The integration and UI tests need SQL Server: `.\COLL1` with integrated security, or `HT_IT_CONNECTION` and `HT_UI_CONNECTION` pointing elsewhere (ADR 0006).
+- Run UI: `dotnet run --project src/HT.Ui --launch-profile https`, then open `https://localhost:7194` (the session cookie is `Secure`). The operator values are User Secrets of `HT.Ui` (`Operator:AdministratorEmail`, `Operator:AdministratorPassword`, `Operator:DemoPassword`); never read or print their values.
 - Changed `.claude/hooks/architecture-gate.ps1`? Run `pwsh tools/guard-oracle/oracle.ps1` — it must print `PASSED` (see `tools/guard-oracle/README.md`).
 - `TreatWarningsAsErrors` is on — any warning fails the build; fix it, don't suppress it.
 - `TargetFramework`, `Nullable`, `ImplicitUsings` live in root `Directory.Build.props`; don't repeat them in `.csproj` files.

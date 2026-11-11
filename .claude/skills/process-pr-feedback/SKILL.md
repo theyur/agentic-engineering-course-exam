@@ -54,14 +54,14 @@ the turn with one line saying what you are waiting for; you are re-invoked when 
 Do not poll it yourself. If it is already settled (no PENDING), use the result directly.
 
 Gate states: `GREEN`, `RED` (real findings), `PENDING`, `MISSING` (no analysis for this SHA - e.g.
-CodeQL default setup disabled), `SKIPPED` (Sonar ran without `SONAR_TOKEN` - **not green**),
+CodeQL default setup disabled), `SKIPPED` (Sonar ran without `SONAR_TOKEN` or `CI_SQL_SA_PASSWORD` - **not green**),
 `BUILD_FAILED` (build/tests broke before analysis), `INFRA_FAILED` (cancelled, timed out,
 unexpected conclusion).
 
 - `STALE` -> start again at step 1.
 - `PENDING` after the timeout -> report which gate is stuck, with its check URL; stop.
 - `MISSING` / `SKIPPED` / `INFRA_FAILED` -> infrastructure, not code. Report the diagnostic and the
-  likely user action (enable CodeQL default setup, restore `SONAR_TOKEN`, re-run the workflow with
+  likely user action (enable CodeQL default setup, restore `SONAR_TOKEN` or `CI_SQL_SA_PASSWORD`, re-run the workflow with
   `gh run rerun <id>` - re-running is fine, it changes no settings). Do not "fix" code for these.
 - `BUILD_FAILED` -> read the failed job log (`gh run view <id> --log-failed`), fix it like any
   other finding (step 3).

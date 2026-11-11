@@ -694,20 +694,20 @@ see that nothing is duplicated or changed.
 
 ## Phase 10: Polish and cross-cutting concerns
 
-- [ ] T122 Update `.github/workflows/sonar.yml` (research R-14):
+- [X] T122 Update `.github/workflows/sonar.yml` (research R-14):
   - the `Check prerequisites` step also requires the secret `CI_SQL_SA_PASSWORD` and skips with a notice when it or `SONAR_TOKEN` is missing;
   - after that check, under the same condition, a step runs `mcr.microsoft.com/mssql/server:2022-latest` with `ACCEPT_EULA=Y` and the SA password from the secret, then waits in a readiness loop;
   - the test step gets `HT_IT_CONNECTION` and `HT_UI_CONNECTION` built from the secret;
   - nothing echoes the value;
   - the file's setup comment lists the new repository secret and says the job also skips without it, and the inline comment at the analysis step ("a run without SONAR_TOKEN succeeds without analyzing") names both secrets;
   - `.claude/skills/process-pr-feedback/SKILL.md`: the `SKIPPED` gate state and its likely user action name both `SONAR_TOKEN` and `CI_SQL_SA_PASSWORD`.
-- [ ] T123 [P] Update `README.md`:
+- [X] T123 [P] Update `README.md`:
   - the "PR review flow" gate row: a run without `SONAR_TOKEN` or `CI_SQL_SA_PASSWORD` is skipped, not green;
   - prerequisites: SQL Server `.\COLL1` or the `HT_*_CONNECTION` variables, and the three `Operator:*` User Secrets names, without values;
   - getting started: `dotnet run --project src/HT.Ui --launch-profile https`;
   - the layer-rules and status sentences for slice 1.
-- [ ] T124 [P] Update "Build and test" in `CLAUDE.md`: run the UI with `--launch-profile https`; the solution's tests need SQL Server (`.\COLL1` or `HT_IT_CONNECTION` and `HT_UI_CONNECTION`)
-- [ ] T125 Review the accessibility and wording of every page and of `SiteNav` (SC-007, HP-016):
+- [X] T124 [P] Update "Build and test" in `CLAUDE.md`: run the UI with `--launch-profile https`; the solution's tests need SQL Server (`.\COLL1` or `HT_IT_CONNECTION` and `HT_UI_CONNECTION`)
+- [X] T125 Review the accessibility and wording of every page and of `SiteNav` (SC-007, HP-016):
   - a visible focus ring from tokens;
   - text contrast of at least 4.5:1, from the token pairs;
   - labelled icon-only buttons;
@@ -715,9 +715,9 @@ see that nothing is duplicated or changed.
   - brand-book wording.
 
   Also search `src/HT.Ui` for hard-coded colours or sizes outside `wwwroot/css/` and remove them. T060 keeps `wwwroot/css/` equal to `design/css/` (constitution IV).
-- [ ] T126 Check for secrets (HP-017, HP-019): no password or connection secret in a tracked file, in `appsettings*.json` or in a log template. Only names in `README.md` and `quickstart.md`
-- [ ] T127 Run `dotnet build HabitTracker.slnx` and `dotnet test HabitTracker.slnx`. Every project must pass: unit, architecture, integration and UI. Record the counts for the report (constitution V)
-- [ ] T128 Walk through [quickstart.md](quickstart.md) section 3 with `dotnet run --project src/HT.Ui --launch-profile https`: check the startup log lines and each row of its browser table, including that registering (SC-001) and signing in (SC-002) are single-form steps; note anything left unverified
+- [X] T126 Check for secrets (HP-017, HP-019): no password or connection secret in a tracked file, in `appsettings*.json` or in a log template. Only names in `README.md` and `quickstart.md`
+- [X] T127 Run `dotnet build HabitTracker.slnx` and `dotnet test HabitTracker.slnx`. Every project must pass: unit, architecture, integration and UI. Record the counts for the report (constitution V)
+- [X] T128 Walk through [quickstart.md](quickstart.md) section 3 with `dotnet run --project src/HT.Ui --launch-profile https`: check the startup log lines and each row of its browser table, including that registering (SC-001) and signing in (SC-002) are single-form steps; note anything left unverified
 
 ---
 

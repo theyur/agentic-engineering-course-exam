@@ -4,10 +4,13 @@
 #   - SonarQube Cloud project: Administration > Analysis Method > turn Automatic Analysis OFF
 #     (CI analysis fails while it is on).
 #   - Repo secret SONAR_TOKEN: a SonarQube Cloud token with "Execute Analysis" on this project.
+#   - Repo secret CI_SQL_SA_PASSWORD: a throwaway SA password for the SQL Server container that the
+#     integration and host tests run against (research R-14, ADR 0006). It must meet SQL Server's
+#     password policy; use letters, digits and - or _ only, because it goes into connection strings.
 #   - Optional repo variables SONAR_ORGANIZATION / SONAR_PROJECT_KEY if the keys differ from
 #     the defaults below.
 #
-# The job skips cleanly while SONAR_TOKEN is not set.
+# The job skips cleanly while SONAR_TOKEN or CI_SQL_SA_PASSWORD is not set.
 
 name: SonarQube Cloud
 
@@ -47,13 +50,41 @@ jobs:
         id: pre
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          CI_SQL_SA_PASSWORD: ${{ secrets.CI_SQL_SA_PASSWORD }}
         run: |
-          if [ -z "$SONAR_TOKEN" ]; then
-            echo "::notice::SONAR_TOKEN is not set; skipping SonarQube analysis."
+          missing=""
+          if [ -z "$SONAR_TOKEN" ]; then missing="SONAR_TOKEN"; fi
+          if [ -z "$CI_SQL_SA_PASSWORD" ]; then missing="${missing:+$missing and }CI_SQL_SA_PASSWORD"; fi
+          if [ -n "$missing" ]; then
+            echo "::notice::$missing not set; skipping SonarQube analysis."
             echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Start SQL Server
+        if: steps.pre.outputs.run == 'true'
+        # A step, not a job-level service container: a service would start before the check above and
+        # fail without the secret (research R-14). The password reaches docker through the environment
+        # only (-e NAME without a value), so it is never on a command line or in the log.
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.CI_SQL_SA_PASSWORD }}
+          SQLCMDPASSWORD: ${{ secrets.CI_SQL_SA_PASSWORD }}
+        run: |
+          docker run --detach --name ht-sql --publish 1433:1433 \
+            -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD \
+            mcr.microsoft.com/mssql/server:2022-latest
+          for _ in $(seq 1 60); do
+            if docker exec -e SQLCMDPASSWORD ht-sql \
+                 /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q "SELECT 1" > /dev/null 2>&1; then
+              echo "SQL Server is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::SQL Server did not become ready within 120 seconds."
+          docker logs ht-sql | tail -50
+          exit 1
 
       - name: Set up JDK (required by the scanner)
         if: steps.pre.outputs.run == 'true'
@@ -88,9 +119,12 @@ jobs:
         if: steps.pre.outputs.run == 'true'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # The integration and host tests run against the container (ADR 0006); the value is never echoed.
+          HT_IT_CONNECTION: Server=localhost,1433;Database=HT-IT;User Id=sa;Password=${{ secrets.CI_SQL_SA_PASSWORD }};TrustServerCertificate=True
+          HT_UI_CONNECTION: Server=localhost,1433;Database=HT-UI;User Id=sa;Password=${{ secrets.CI_SQL_SA_PASSWORD }};TrustServerCertificate=True
         # sonar.qualitygate.wait makes `end` block on the quality gate and fail this job when the
         # gate is red. The authoritative gate signal is still the "SonarCloud Code Analysis" check
-        # (a run without SONAR_TOKEN succeeds without analyzing); tools/pr-gates reads that check.
+        # (a run without SONAR_TOKEN or CI_SQL_SA_PASSWORD succeeds without analyzing); tools/pr-gates reads that check.
         # .specify/ is vendored Spec Kit tooling, refreshed by the Specify CLI; we don't maintain it.
         # tests/HT.AcceptanceTests/ is written by isolated AC subagents the main agent may not edit (ADR 0003).
         # Coverage is measured for .NET only, so repo scripts (tools/, .claude/hooks/) are excluded from
