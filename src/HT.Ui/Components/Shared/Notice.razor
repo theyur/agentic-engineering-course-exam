@@ -1,0 +1,26 @@
+@* design/components/Notice: an invitation (accent-soft) or a neutral rule (surface-2). Not for form errors. *@
+<div class="@(Neutral ? "ht-notice ht-notice--neutral" : "ht-notice")" role="@Role">
+    <span>@ChildContent</span>
+    @if (Action is not null)
+    {
+        <span class="ht-spacer"></span>
+        @Action
+    }
+</div>
+
+@code {
+    /// <summary>The grey variant, for rules people must know.</summary>
+    [Parameter]
+    public bool Neutral { get; set; }
+
+    /// <summary>An ARIA role, such as <c>status</c> for a result the page reports.</summary>
+    [Parameter]
+    public string? Role { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>At most one primary button, on the right.</summary>
+    [Parameter]
+    public RenderFragment? Action { get; set; }
+}

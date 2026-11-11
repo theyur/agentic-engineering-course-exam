@@ -100,8 +100,8 @@ not edit the plan artifacts; the owner's decision is recorded here.
 
 **Purpose**: packages, tools and configuration the later phases build on.
 
-- [ ] T001 Set slice 1's Status to `implementing` and `updated_at` to today in `docs/roadmap.md`
-- [ ] T002 [P] Write `docs/adr/0010-public-account-store-port.md` in the format of ADR 0009 (Status Accepted, 2026-11-11; Context; Options; Decision; Consequences), recording "Plan discrepancies" 1:
+- [X] T001 Set slice 1's Status to `implementing` and `updated_at` to today in `docs/roadmap.md`
+- [X] T002 [P] Write `docs/adr/0010-public-account-store-port.md` in the format of ADR 0009 (Status Accepted, 2026-11-11; Context; Options; Decision; Consequences), recording "Plan discrepancies" 1:
   - the AC export refuses `InternalsVisibleTo` in AC surface projects;
   - the port and the service constructors become public, while `AccountStore`, `HtDbContext`, the design-time factory and the migration stay internal;
   - the replacement rules are T053's rule (no `HT.Ui` type depends on `IAccountStore`) and T090's rule (only `HT.Ui.Operator` uses the operator services), with T026's `AcSurfaceTests`;
@@ -114,11 +114,11 @@ not edit the plan artifacts; the owner's decision is recorded here.
   Also draft the dated `## Clarifications` line below and show it to the owner. Do not write it into `spec.md` until the owner approves it, and do it before T127:
 
   `- Q: Is the account store port internal, given that the AC reference export refuses InternalsVisibleTo? → A: No. IAccountStore and the service constructors are public; architecture rules keep HT.Ui away from the port and from the operator services. Detail: [ADR 0010](../../docs/adr/0010-public-account-store-port.md).`
-- [ ] T003 [P] Add `dotnet-ef` (the current 10.0.x, `rollForward: false`, like `ilspycmd`) to `dotnet-tools.json`, then run `dotnet tool restore`
-- [ ] T004 [P] In `src/HT.Application/HT.Application.csproj`, add `Microsoft.Extensions.DependencyInjection.Abstractions` (10.0.x). No `InternalsVisibleTo` (see Conventions and "Plan discrepancies" 1)
-- [ ] T005 [P] In `src/HT.Persistence/HT.Persistence.csproj`, add `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.AspNetCore.Identity.EntityFrameworkCore` and `Microsoft.EntityFrameworkCore.Design` (`PrivateAssets="all"`). Use the same 10.0.x patch for all three (research R-01). No `InternalsVisibleTo` (see Conventions)
-- [ ] T006 [P] Add `Microsoft.Extensions.TimeProvider.Testing` (`10.11.0`, see Conventions) to `tests/HT.UnitTests/HT.UnitTests.csproj`
-- [ ] T007 [P] Configure the host (research R-11):
+- [X] T003 [P] Add `dotnet-ef` (the current 10.0.x, `rollForward: false`, like `ilspycmd`) to `dotnet-tools.json`, then run `dotnet tool restore`
+- [X] T004 [P] In `src/HT.Application/HT.Application.csproj`, add `Microsoft.Extensions.DependencyInjection.Abstractions` (10.0.x). No `InternalsVisibleTo` (see Conventions and "Plan discrepancies" 1)
+- [X] T005 [P] In `src/HT.Persistence/HT.Persistence.csproj`, add `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.AspNetCore.Identity.EntityFrameworkCore` and `Microsoft.EntityFrameworkCore.Design` (`PrivateAssets="all"`). Use the same 10.0.x patch for all three (research R-01). No `InternalsVisibleTo` (see Conventions)
+- [X] T006 [P] Add `Microsoft.Extensions.TimeProvider.Testing` (`10.11.0`, see Conventions) to `tests/HT.UnitTests/HT.UnitTests.csproj`
+- [X] T007 [P] Configure the host (research R-11):
   - in `src/HT.Ui/HT.Ui.csproj`, add a `<UserSecretsId>` with a new GUID, and an `<InternalsVisibleTo>` item for `HT.UiTests` (for T109's stamp check);
   - in `src/HT.Ui/appsettings.Development.json`, add `ConnectionStrings:HabitTracker` = `Server=.\COLL1;Database=HT;Integrated Security=True;TrustServerCertificate=True`. It holds no secret.
 
@@ -136,72 +136,72 @@ needs them.
 
 ### Design first (constitution IV; spec "Design changes before build")
 
-- [ ] T008 [P] In `design/pages/PageSignIn.html` and `.md`, remove "Forgot password?". Replace the note "Built on ASP.NET Core Identity pages" with one saying that Sign in is the app's own page. Show the failure message under the password field with the email kept (HP-003)
-- [ ] T009 [P] Add the error states of HP-001 to `design/pages/PageRegister.html` and `.md`:
+- [X] T008 [P] In `design/pages/PageSignIn.html` and `.md`, remove "Forgot password?". Replace the note "Built on ASP.NET Core Identity pages" with one saying that Sign in is the app's own page. Show the failure message under the password field with the email kept (HP-003)
+- [X] T009 [P] Add the error states of HP-001 to `design/pages/PageRegister.html` and `.md`:
   - taken email: the message next to the email field, with a "Sign in" link;
   - "The passwords do not match." next to the repeated password;
   - invalid email;
   - the password rule.
 
   The entered email is kept in every state.
-- [ ] T010 [P] Add the slice-1 state to `design/pages/PageProfile.html` and `.md`:
+- [X] T010 [P] Add the slice-1 state to `design/pages/PageProfile.html` and `.md`:
   - a header with the avatar letter and the email, without a name or "member since";
   - the Account content: the email and the change-password form, with its error states and the notice "Your password is changed." (HP-014);
   - how Profile looks with a single section and no Tabs, because `design/components/Tabs` asks for 2–5 tabs.
-- [ ] T011 [P] Add the slice-1 state to `design/pages/PageHomeSignedIn.html` and `.md`: the heading "Today" only (HP-013)
-- [ ] T012 [P] Add the avatar menu (Profile, Sign out), the avatar letter, and the menu's open, closed and focus states to `design/components/TopNav.html` and `.md` and `design/components/MobileNav.html` and `.md`. Include `aria-expanded`, `aria-controls` and `aria-label`, and closing on Esc, on an outside click and on choosing an item (US5-AS2 to AS5). The styles go in T015
-- [ ] T013 [P] Create `design/pages/PagePrivacy.html` and `.md`. It states what stays private (goals, records, notes, custom habits), that community comparison is opt-in and off by default, and that administrators cannot see private tracking data. Use only SPEC's promises and the brand-book wording (HP-012)
-- [ ] T014 [P] Add design guidance for the reconnect notice and the unexpected-error bar to `design/components/Notice.html` and `.md`. Add guidance for the Error and NotFound pages (EmptyState in the normal layout, brand-book wording) to `design/components/EmptyState.md`. The styles go in T015
-- [ ] T015 Add the styles this slice needs to `design/css/ht-components.css`, from existing tokens, and update `design/tokens.json` and `design/css/tokens.css` only if a new token is needed. After T054 the copied design files are the app's only stylesheets, so every rule the shell needs must exist here first (constitution IV). The styles:
+- [X] T011 [P] Add the slice-1 state to `design/pages/PageHomeSignedIn.html` and `.md`: the heading "Today" only (HP-013)
+- [X] T012 [P] Add the avatar menu (Profile, Sign out), the avatar letter, and the menu's open, closed and focus states to `design/components/TopNav.html` and `.md` and `design/components/MobileNav.html` and `.md`. Include `aria-expanded`, `aria-controls` and `aria-label`, and closing on Esc, on an outside click and on choosing an item (US5-AS2 to AS5). The styles go in T015
+- [X] T013 [P] Create `design/pages/PagePrivacy.html` and `.md`. It states what stays private (goals, records, notes, custom habits), that community comparison is opt-in and off by default, and that administrators cannot see private tracking data. Use only SPEC's promises and the brand-book wording (HP-012)
+- [X] T014 [P] Add design guidance for the reconnect notice and the unexpected-error bar to `design/components/Notice.html` and `.md`. Add guidance for the Error and NotFound pages (EmptyState in the normal layout, brand-book wording) to `design/components/EmptyState.md`. The styles go in T015
+- [X] T015 Add the styles this slice needs to `design/css/ht-components.css`, from existing tokens, and update `design/tokens.json` and `design/css/tokens.css` only if a new token is needed. After T054 the copied design files are the app's only stylesheets, so every rule the shell needs must exist here first (constitution IV). The styles:
   - a floating avatar menu anchored to the TopNav avatar (T012); `.ht-avatar`, `.ht-menu` and `.ht-mobile-menu` do not cover it;
   - a transparent click-away layer for both menus; `.ht-backdrop` is the dialog overlay and is not reused;
   - the unexpected-error bar `#blazor-error-ui`, hidden by default (Blazor shows it by setting `display: block`), with its dismiss control (T014);
   - the reconnect notice `#components-reconnect-modal`, with the per-state visibility rules for the `components-reconnect-*`, `components-pause-visible` and `components-resume-failed-visible` classes that `ReconnectModal.razor.css` holds today (T014).
 
   This task depends on T012 and T014.
-- [ ] T016 Update `design/pages.md` with the slice-1 structure of Sign in, Register, Profile, the signed-in Home, the visitor Home (hero and "How it works" only, ADR 0008) and Privacy. In `design/README.md`, add `PagePrivacy` to the page list and remove "password reset pages" from "Not designed yet" (depends on T008–T014 and T015)
+- [X] T016 Update `design/pages.md` with the slice-1 structure of Sign in, Register, Profile, the signed-in Home, the visitor Home (hero and "How it works" only, ADR 0008) and Privacy. In `design/README.md`, add `PagePrivacy` to the page list and remove "password reset pages" from "Not designed yet" (depends on T008–T014 and T015)
 
 ### Domain (`src/HT.Domain/Accounts/`, namespace `HT.Domain.Accounts`)
 
-- [ ] T017 [P] Create `AccountId.cs` (a readonly record struct over a `Guid`) and `Role.cs` (enum `RegisteredUser`, `Administrator`) in `src/HT.Domain/Accounts/`
-- [ ] T018 [P] Create `Email.cs` in `src/HT.Domain/Accounts/`. `Email.TryParse(string? text, out Email email)` follows [data-model.md](data-model.md#email):
+- [X] T017 [P] Create `AccountId.cs` (a readonly record struct over a `Guid`) and `Role.cs` (enum `RegisteredUser`, `Administrator`) in `src/HT.Domain/Accounts/`
+- [X] T018 [P] Create `Email.cs` in `src/HT.Domain/Accounts/`. `Email.TryParse(string? text, out Email email)` follows [data-model.md](data-model.md#email):
   - trim, then check at most 254 characters, no `char.IsWhiteSpace`, exactly one `@`, at least one character before it, and a domain split on `.` into at least two parts, all non-empty;
   - the value is the trimmed text in `ToLowerInvariant()` form;
   - equality is ordinal by value (FR-003, FR-006).
-- [ ] T019 [P] Create `PasswordRule.cs` in `src/HT.Domain/Accounts/`. `IsMet(string? password)` is true for at least 8 characters with at least one `'0'`–`'9'`. No trimming (FR-002)
-- [ ] T020 [P] Create `SignInBlock.cs` in `src/HT.Domain/Accounts/` as a readonly record struct with:
+- [X] T019 [P] Create `PasswordRule.cs` in `src/HT.Domain/Accounts/`. `IsMet(string? password)` is true for at least 8 characters with at least one `'0'`–`'9'`. No trimming (FR-002)
+- [X] T020 [P] Create `SignInBlock.cs` in `src/HT.Domain/Accounts/` as a readonly record struct with:
   - `FailedCount` and `BlockedSince`;
   - `None`, `FailuresToBlock = 5` and `Duration = 5 minutes`;
   - `IsBlockedAt`, `SettledAt`, `AfterFailureAt` and `AfterSuccess`, exactly as the transition table of [data-model.md](data-model.md#signinblock) gives them.
 
   It reads no clock (FR-008).
-- [ ] T021 Create `Account.cs` (immutable: `Id`, `Email`, `Role`, `SignInBlock`) and `ActingUser.cs` (`Anonymous`, `ForAccount(AccountId, Role)`, `IsAnonymous`, nullable `AccountId` and `Role`) in `src/HT.Domain/Accounts/` (depends on T017–T020)
-- [ ] T022 [P] Create `tests/HT.UnitTests/Domain/Accounts/EmailTests.cs`:
+- [X] T021 Create `Account.cs` (immutable: `Id`, `Email`, `Role`, `SignInBlock`) and `ActingUser.cs` (`Anonymous`, `ForAccount(AccountId, Role)`, `IsAnonymous`, nullable `AccountId` and `Role`) in `src/HT.Domain/Accounts/` (depends on T017–T020)
+- [X] T022 [P] Create `tests/HT.UnitTests/Domain/Accounts/EmailTests.cs`:
   - the valid and invalid examples of data-model.md and US1-AS5;
   - `ana@example..com`, `ana@.example.com` and `ana@example.com.` are invalid;
   - ` Taken@Example.com ` equals `taken@example.com`;
   - a trimmed text of 254 characters is accepted and one of 255 is refused (constitution II, both sides);
   - `null`, `""` and `"   "` are refused.
-- [ ] T023 [P] Create `tests/HT.UnitTests/Domain/Accounts/PasswordRuleTests.cs`: 7 and 8 characters with a digit, `walkingfar` (no digit), `walk4`, `null`, and leading or trailing spaces that count as characters
-- [ ] T024 [P] Create `tests/HT.UnitTests/Domain/Accounts/SignInBlockTests.cs` with every row of the transition table, plus:
+- [X] T023 [P] Create `tests/HT.UnitTests/Domain/Accounts/PasswordRuleTests.cs`: 7 and 8 characters with a digit, `walkingfar` (no digit), `walk4`, `null`, and leading or trailing spaces that count as characters
+- [X] T024 [P] Create `tests/HT.UnitTests/Domain/Accounts/SignInBlockTests.cs` with every row of the transition table, plus:
   - 4 failures are unblocked and the 5th blocks at `t`;
   - blocked at `t + 4:59`, ended at `t + 5:00`;
   - a failure during the block leaves the state unchanged;
   - `SettledAt` at the end resets to `None`;
   - `AfterSuccess` gives `None`.
-- [ ] T025 [P] Create `tests/HT.UnitTests/Domain/Accounts/ActingUserTests.cs`: `Anonymous` has no id and no role; `ForAccount` keeps both
-- [ ] T026 [P] Create `tests/HT.ArchitectureTests/ArchitectureModel.cs` with one shared `Architecture` that loads the HT.Domain, HT.Application, HT.Persistence and HT.Ui assemblies, and switch `UiDependencyTests.cs` to it. Then create `tests/HT.ArchitectureTests/DomainDependencyTests.cs`: `HT.Domain` depends on no other `HT.*` assembly and on no `Microsoft.*` type (research R-13). Also create `tests/HT.ArchitectureTests/AcSurfaceTests.cs`: the gate checks both conditions `export_refs.py` checks, so the pre-commit run catches what the export would refuse later (Conventions):
+- [X] T025 [P] Create `tests/HT.UnitTests/Domain/Accounts/ActingUserTests.cs`: `Anonymous` has no id and no role; `ForAccount` keeps both
+- [X] T026 [P] Create `tests/HT.ArchitectureTests/ArchitectureModel.cs` with one shared `Architecture` that loads the HT.Domain, HT.Application, HT.Persistence and HT.Ui assemblies, and switch `UiDependencyTests.cs` to it. Then create `tests/HT.ArchitectureTests/DomainDependencyTests.cs`: `HT.Domain` depends on no other `HT.*` assembly and on no `Microsoft.*` type (research R-13). Also create `tests/HT.ArchitectureTests/AcSurfaceTests.cs`: the gate checks both conditions `export_refs.py` checks, so the pre-commit run catches what the export would refuse later (Conventions):
   - the `HT.Domain`, `HT.Application` and `HT.Persistence` assemblies carry no `InternalsVisibleToAttribute`;
   - no `.cs`, `.csproj`, `.props` or `.targets` file under `src/HT.Domain`, `src/HT.Application` or `src/HT.Persistence` (outside `bin/` and `obj/`), and neither root `Directory.Build.props` nor `Directory.Build.targets`, contains the text `InternalsVisibleTo`, not even in a comment. The export rejects the bare word. The test finds the repository root as the folder that holds `HabitTracker.slnx`.
 
 ### Application port, texts and composition (`src/HT.Application/`)
 
-- [ ] T027 Create `src/HT.Application/Accounts/IAccountStore.cs` as a `public` interface ("Plan discrepancies" 1) with the six methods of [data-model.md](data-model.md#application-port-htapplication-namespace-htapplicationaccounts), and `CreateAccountOutcome.cs` (`Created` with the `Account`, or `EmailTaken`)
-- [ ] T028 [P] Create `src/HT.Application/Accounts/AccountTexts.cs` and `src/HT.Application/Operator/OperatorTexts.cs`: `public static class` with the `public const string` texts of [contracts/application-api.md](contracts/application-api.md#texts), worded exactly as there
-- [ ] T029 Create `src/HT.Application/Accounts/AccountService.cs`: a public sealed class with a public constructor `(IAccountStore store, TimeProvider timeProvider)` and no use cases yet. Create `src/HT.Application/ApplicationServiceCollectionExtensions.cs`, where `AddHtApplication` does two things:
+- [X] T027 Create `src/HT.Application/Accounts/IAccountStore.cs` as a `public` interface ("Plan discrepancies" 1) with the six methods of [data-model.md](data-model.md#application-port-htapplication-namespace-htapplicationaccounts), and `CreateAccountOutcome.cs` (`Created` with the `Account`, or `EmailTaken`)
+- [X] T028 [P] Create `src/HT.Application/Accounts/AccountTexts.cs` and `src/HT.Application/Operator/OperatorTexts.cs`: `public static class` with the `public const string` texts of [contracts/application-api.md](contracts/application-api.md#texts), worded exactly as there
+- [X] T029 Create `src/HT.Application/Accounts/AccountService.cs`: a public sealed class with a public constructor `(IAccountStore store, TimeProvider timeProvider)` and no use cases yet. Create `src/HT.Application/ApplicationServiceCollectionExtensions.cs`, where `AddHtApplication` does two things:
   - registers `AccountService` scoped;
   - registers `TimeProvider.System` with `TryAddSingleton`.
-- [ ] T030 Create `tests/HT.UnitTests/Fakes/FakeAccountStore.cs`, a hand-written in-memory `IAccountStore`:
+- [X] T030 Create `tests/HT.UnitTests/Fakes/FakeAccountStore.cs`, a hand-written in-memory `IAccountStore`:
   - it keys accounts by `Email` and keeps passwords as given;
   - `ChangePasswordAsync` returns `false` on a wrong current password;
   - `TrySaveSignInBlockAsync` compares against `expected`;
@@ -209,45 +209,45 @@ needs them.
   - `BlockOnNextSave(DateTimeOffset at)` makes the next save return `false` after storing (5, `at`), as a parallel fifth failure would;
   - `TakeEmailOnNextCreate()` makes the next `CreateAsync` store the account as a parallel registration would, then return `EmailTaken`. `FindByEmailAsync` before it still finds nothing, so `RegisterAsync` reaches the store's `EmailTaken` branch;
   - counters for saves and password checks let tests assert "nothing saved" and "password not checked".
-- [ ] T031 [P] Create `tests/HT.ArchitectureTests/ApplicationDependencyTests.cs`: `HT.Application` depends only on `HT.Domain` among `HT.*`, and on no type in `Microsoft.EntityFrameworkCore`, `Microsoft.AspNetCore` or `Microsoft.Extensions.Identity`
-- [ ] T032 [P] Create `tests/HT.ArchitectureTests/ClockReadTests.cs`: no type in `HT.Domain` or `HT.Application` calls `DateTime.Now`, `DateTime.UtcNow`, `DateTime.Today`, `DateTimeOffset.Now`, `DateTimeOffset.UtcNow`, `TimeZoneInfo.Local` or `CultureInfo.CurrentCulture` (constitution II)
+- [X] T031 [P] Create `tests/HT.ArchitectureTests/ApplicationDependencyTests.cs`: `HT.Application` depends only on `HT.Domain` among `HT.*`, and on no type in `Microsoft.EntityFrameworkCore`, `Microsoft.AspNetCore` or `Microsoft.Extensions.Identity`
+- [X] T032 [P] Create `tests/HT.ArchitectureTests/ClockReadTests.cs`: no type in `HT.Domain` or `HT.Application` calls `DateTime.Now`, `DateTime.UtcNow`, `DateTime.Today`, `DateTimeOffset.Now`, `DateTimeOffset.UtcNow`, `TimeZoneInfo.Local` or `CultureInfo.CurrentCulture` (constitution II)
 
 ### Persistence (`src/HT.Persistence/`)
 
-- [ ] T033 [P] Create `src/HT.Persistence/Identity/HtUser.cs`: `HtUser : IdentityUser<Guid>` with `Role`, `FailedSignInCount` and `SignInBlockedSince` (data-model.md)
-- [ ] T034 [P] Create `src/HT.Persistence/Identity/EmailLookupNormalizer.cs`: an `ILookupNormalizer` that returns the name and the email unchanged (research R-04)
-- [ ] T035 Create `src/HT.Persistence/HtDbContext.cs`: `internal sealed class HtDbContext : IdentityUserContext<HtUser, Guid>` (depends on T033). No test uses it; tests use plain SQL (Conventions). In `OnModelCreating`:
+- [X] T033 [P] Create `src/HT.Persistence/Identity/HtUser.cs`: `HtUser : IdentityUser<Guid>` with `Role`, `FailedSignInCount` and `SignInBlockedSince` (data-model.md)
+- [X] T034 [P] Create `src/HT.Persistence/Identity/EmailLookupNormalizer.cs`: an `ILookupNormalizer` that returns the name and the email unchanged (research R-04)
+- [X] T035 Create `src/HT.Persistence/HtDbContext.cs`: `internal sealed class HtDbContext : IdentityUserContext<HtUser, Guid>` (depends on T033). No test uses it; tests use plain SQL (Conventions). In `OnModelCreating`:
   - `NormalizedUserName` and `NormalizedEmail` use collation `Latin1_General_100_BIN2`;
   - `Role` is stored as its enum name in `nvarchar(32)`, not null;
   - `FailedSignInCount` defaults to 0;
   - `FailedSignInCount` and `SignInBlockedSince` have `SetAfterSaveBehavior(PropertySaveBehavior.Ignore)` (research R-05).
-- [ ] T036 Create `src/HT.Persistence/HtDbContextFactory.cs`: an `internal sealed` `IDesignTimeDbContextFactory<HtDbContext>` that reads `HT_DESIGN_CONNECTION`, or uses the local `HT` default (research R-15) (depends on T035)
-- [ ] T037 Create `src/HT.Persistence/Identity/HtUserClaimsPrincipalFactory.cs`: a `UserClaimsPrincipalFactory<HtUser>` that adds a role claim with the `Role` name to Identity's `NameIdentifier`, `Name` (from `UserName`) and security-stamp claims (research R-07) (depends on T033)
-- [ ] T038 Create `src/HT.Persistence/Identity/AccountStore.cs`: an `internal sealed` `IAccountStore` with a public constructor taking `HtDbContext` and `UserManager<HtUser>` (research R-05):
+- [X] T036 Create `src/HT.Persistence/HtDbContextFactory.cs`: an `internal sealed` `IDesignTimeDbContextFactory<HtDbContext>` that reads `HT_DESIGN_CONNECTION`, or uses the local `HT` default (research R-15) (depends on T035)
+- [X] T037 Create `src/HT.Persistence/Identity/HtUserClaimsPrincipalFactory.cs`: a `UserClaimsPrincipalFactory<HtUser>` that adds a role claim with the `Role` name to Identity's `NameIdentifier`, `Name` (from `UserName`) and security-stamp claims (research R-07) (depends on T033)
+- [X] T038 Create `src/HT.Persistence/Identity/AccountStore.cs`: an `internal sealed` `IAccountStore` with a public constructor taking `HtDbContext` and `UserManager<HtUser>` (research R-05):
   - Reads (`FindByEmailAsync`, `FindByIdAsync`) are `AsNoTracking` and map `HtUser` to `Account`.
   - `CreateAsync`, `CheckPasswordAsync` and `ChangePasswordAsync` call `ChangeTracker.Clear()` before and after their work, also after a failure.
   - `CreateAsync` sets `UserName` and `Email` to the normal form and returns `EmailTaken` in two cases: an Identity `DuplicateUserName` error, or a `DbUpdateException` from the unique index (SQL error 2601 or 2627). Any other Identity error is thrown as a fault.
   - `ChangePasswordAsync` uses `UserManager.ChangePasswordAsync`, which renews the security stamp.
   - `TrySaveSignInBlockAsync` is one `ExecuteUpdateAsync`, filtered on `Id`, the expected count and the expected `SignInBlockedSince` (`IS NULL` for none). It returns whether exactly one row changed.
-- [ ] T039 Create `src/HT.Persistence/PersistenceServiceCollectionExtensions.cs` with `AddHtPersistence(this IServiceCollection, string connectionString)`. It registers:
+- [X] T039 Create `src/HT.Persistence/PersistenceServiceCollectionExtensions.cs` with `AddHtPersistence(this IServiceCollection, string connectionString)`. It registers:
   - `HtDbContext` on SQL Server;
   - `AddIdentityCore<HtUser>` with the options of research R-03 and `AddEntityFrameworkStores<HtDbContext>()`;
   - `EmailLookupNormalizer` as `ILookupNormalizer` and `HtUserClaimsPrincipalFactory`;
   - `AccountStore` as a scoped `IAccountStore`.
 
   It returns `IServiceCollection` and adds no token providers, roles or sign-in manager (research R-02).
-- [ ] T040 Create `src/HT.Persistence/HtDatabase.cs`:
+- [X] T040 Create `src/HT.Persistence/HtDatabase.cs`:
   - `ResetAsync(string connectionString, CancellationToken)` drops the database and applies all migrations;
   - `Task<int> MigrateAsync(IServiceProvider services, CancellationToken)` counts the pending migrations in a scope, applies them and returns that count (research R-12).
-- [ ] T041 Run `dotnet ef migrations add InitialAccounts --project src/HT.Persistence --startup-project src/HT.Persistence --output-dir Migrations` to create `src/HT.Persistence/Migrations/`. Change the generated migration class from `public` to `internal` (the model snapshot already is): EF Core finds non-public migrations, and a public migration would put the schema, and a `typeof(HtDbContext)` attribute naming an internal type, into the AC reference listing. Check that the migration:
+- [X] T041 Run `dotnet ef migrations add InitialAccounts --project src/HT.Persistence --startup-project src/HT.Persistence --output-dir Migrations` to create `src/HT.Persistence/Migrations/`. Change the generated migration class from `public` to `internal` (the model snapshot already is): EF Core finds non-public migrations, and a public migration would put the schema, and a `typeof(HtDbContext)` attribute naming an internal type, into the AC reference listing. Check that the migration:
   - creates `AspNetUsers`, `AspNetUserClaims`, `AspNetUserLogins` and `AspNetUserTokens`, and no role table;
   - creates the three added columns;
   - creates both binary collations and the unique index on `NormalizedUserName`.
-- [ ] T042 Create the integration-test project:
+- [X] T042 Create the integration-test project:
   - `tests/HT.IntegrationTests/HT.IntegrationTests.csproj`, with xUnit 2.9.3 as in `HT.UnitTests`, `Microsoft.Extensions.TimeProvider.Testing` (`10.11.0`), `Microsoft.Extensions.Logging`, and references to `HT.Domain`, `HT.Application` and `HT.Persistence`. Add it to the `/tests/` folder of `HabitTracker.slnx`.
   - `tests/HT.IntegrationTests/DatabaseFixture.cs`: a collection fixture that calls `HtDatabase.ResetAsync` once per run, and builds services with `new ServiceCollection().AddLogging().AddHtApplication().AddHtPersistence(cs)` and a fake `TimeProvider` registered last. Mark the collection `DisableParallelization = true` (ADR 0006).
   - `tests/HT.IntegrationTests/Sql.cs`: small plain-SQL helpers over the fixture's connection string (`Microsoft.Data.SqlClient`, which comes with `HT.Persistence`'s SQL Server provider). They read an `AspNetUsers` row's columns, delete rows by `UserName`, and check whether a table exists (Conventions).
-- [ ] T043 Create `tests/HT.IntegrationTests/Accounts/AccountStoreTests.cs` (depends on T038–T042). Each test uses emails of its own:
+- [X] T043 Create `tests/HT.IntegrationTests/Accounts/AccountStoreTests.cs` (depends on T038–T042). Each test uses emails of its own:
   - `CreateAsync`, then `FindByEmailAsync` and `FindByIdAsync`, return the same account with role and `SignInBlock.None`;
   - `UserName`, `Email`, `NormalizedUserName` and `NormalizedEmail` all hold the normal form (read with `Sql.cs`);
   - a second `CreateAsync` with the same email gives `EmailTaken`;
@@ -257,42 +257,42 @@ needs them.
   - a no-tracking read in the same scope sees a block written by `TrySaveSignInBlockAsync`;
   - `ChangePasswordAsync` leaves a stored count of 3 at 3;
   - the database has no `AspNetRoles` table (`Sql.cs`).
-- [ ] T044 [P] Create `tests/HT.ArchitectureTests/PersistenceDependencyTests.cs`: `HT.Persistence` does not depend on `HT.Ui`
+- [X] T044 [P] Create `tests/HT.ArchitectureTests/PersistenceDependencyTests.cs`: `HT.Persistence` does not depend on `HT.Ui`
 
 ### Host composition (`src/HT.Ui/`)
 
-- [ ] T045 Create `src/HT.Ui/Account/AccountSession.cs`, the only code that writes the cookie. It wraps `SignInManager<HtUser>` and `UserManager<HtUser>` with three members ([contracts/host.md](contracts/host.md#accountsession-htuiaccount-the-only-code-that-writes-the-cookie)):
+- [X] T045 Create `src/HT.Ui/Account/AccountSession.cs`, the only code that writes the cookie. It wraps `SignInManager<HtUser>` and `UserManager<HtUser>` with three members ([contracts/host.md](contracts/host.md#accountsession-htuiaccount-the-only-code-that-writes-the-cookie)):
   - `SignInAsync(ActingUser signedIn, bool keepSignedIn)` loads the user by id and calls `SignInAsync(user, isPersistent: keepSignedIn)`;
   - `RefreshSignInAsync(ActingUser actingUser)`;
   - `SignOutAsync()`.
-- [ ] T046 Compose the session in `src/HT.Ui/Program.cs` (research R-02 and R-09):
+- [X] T046 Compose the session in `src/HT.Ui/Program.cs` (research R-02 and R-09):
   - read `ConnectionStrings:HabitTracker` from `builder.Configuration` before building the services, then call `AddHtApplication()` and `AddHtPersistence(cs)`;
   - add `new IdentityBuilder(typeof(HtUser), builder.Services).AddSignInManager()`;
   - add cookie authentication under `IdentityConstants.ApplicationScheme` with the R-09 options and `OnValidatePrincipal = SecurityStampValidator.ValidatePrincipalAsync`, and set `SecurityStampValidatorOptions.ValidationInterval = TimeSpan.Zero`;
   - add `AddAuthorization`, `AddCascadingAuthenticationState` and scoped `AccountSession`;
   - call `UseAuthentication` and `UseAuthorization` before `UseAntiforgery`;
   - end the file with `public partial class Program;` for `WebApplicationFactory`.
-- [ ] T047 Create `src/HT.Ui/Operator/StartupTasks.cs` with `RunAsync(IServiceProvider, IHostEnvironment, ILogger)` (logger category `HT.Ui.Operator.StartupTasks`):
+- [X] T047 Create `src/HT.Ui/Operator/StartupTasks.cs` with `RunAsync(IServiceProvider, IHostEnvironment, ILogger)` (logger category `HT.Ui.Operator.StartupTasks`):
   - it reads every operator value from `IConfiguration`, resolved from the `IServiceProvider` it is given (the host registers it; tests register an in-memory one);
   - in Development only, it runs `HtDatabase.MigrateAsync` in its own scope and logs `Schema migrations applied: {Count}`;
   - a fault is caught and logged at Error as `{Step} failed; the app starts without it`, with the exception, and the start goes on (HP-018, HP-022).
 
   Call it from `Program.cs` after `Build()` and before `Run()`.
-- [ ] T048 Create the UI-test project:
+- [X] T048 Create the UI-test project:
   - `tests/HT.UiTests/HT.UiTests.csproj`, with xUnit 2.9.3, `bunit` (current stable), `Microsoft.AspNetCore.Mvc.Testing` (10.0.x), `Microsoft.Extensions.TimeProvider.Testing` (`10.11.0`), and references to `HT.Ui`, `HT.Application` and `HT.Persistence`. Link `../HT.UnitTests/Fakes/FakeAccountStore.cs` as a `Compile` item, and add the project to `HabitTracker.slnx`.
   - `tests/HT.UiTests/Host/HostFixture.cs`: one `WebApplicationFactory<Program>` per run in one xUnit collection (research R-16). It sets the environment `Testing` and passes `ConnectionStrings:HabitTracker` and throwaway `Operator:*` values with `builder.UseSetting`. It calls `HtDatabase.ResetAsync` before the host starts, adds a hand-written `ListLoggerProvider` to capture logs (`tests/HT.UiTests/Fakes/ListLogger.cs`, which holds both `ListLoggerProvider` and `ListLogger`), and creates clients with base address `https://localhost`, `AllowAutoRedirect = false` and cookies handled.
-- [ ] T049 Create `tests/HT.UiTests/Host/HostClient.cs`, helpers for host tests:
+- [X] T049 Create `tests/HT.UiTests/Host/HostClient.cs`, helpers for host tests:
   - GET a page, read its `__RequestVerificationToken` and `_handler` form name, and POST the form fields with them;
   - read `Set-Cookie` attributes;
   - create an account directly through the host's public `IAccountStore`, so that a story's host tests do not depend on another story's page;
   - plain-SQL helpers over a given connection string, like `tests/HT.IntegrationTests/Sql.cs` (delete a row by `UserName`, check that a table exists), for the host and `StartupTasks` tests (Conventions).
-- [ ] T050 [P] Create `tests/HT.UiTests/Host/HostDatabaseGuardTests.cs`. It checks the database the host's own context uses, not the configuration. In a scope of the factory's services:
+- [X] T050 [P] Create `tests/HT.UiTests/Host/HostDatabaseGuardTests.cs`. It checks the database the host's own context uses, not the configuration. In a scope of the factory's services:
   - resolve `IUserStore<HtUser>` (Identity's EF store, which `AddHtPersistence` built over `HtDbContext`);
   - read its public `Context` property by reflection as a `DbContext`;
   - take `context.Database.GetDbConnection().Database`.
 
   Assert that this is the host-test database (`HT-UI`, or the one in `HT_UI_CONNECTION`) and never `HT`. So a setting that reached the configuration too late for `Program.cs`'s top-level read still fails the guard (research R-16; "Plan discrepancies" 2)
-- [ ] T051 Create `tests/HT.UiTests/Operator/StartupTasksHarness.cs`, used by every `StartupTasks` test, plus a hand-written `tests/HT.UiTests/Fakes/FakeHostEnvironment.cs`:
+- [X] T051 Create `tests/HT.UiTests/Operator/StartupTasksHarness.cs`, used by every `StartupTasks` test, plus a hand-written `tests/HT.UiTests/Fakes/FakeHostEnvironment.cs`:
   - an xUnit collection `StartupTasks` with `DisableParallelization = true`;
   - the `HT-UI-MIGRATE` connection string, derived as in Conventions;
   - `RunAsync(environmentName, IDictionary<string, string?> operatorValues, string? connectionString = null)`. It drops `HT-UI-MIGRATE` first, so every test starts from no database whatever order xUnit runs the classes in. `HtDatabase.ResetAsync` cannot do this, because it also migrates, so the harness drops with SQL of its own:
@@ -301,36 +301,36 @@ needs them.
 
   It also offers `DatabaseExists()` (`SELECT DB_ID(N'HT-UI-MIGRATE')` on `master`). It builds services from `new ServiceCollection().AddLogging().AddHtApplication().AddHtPersistence(cs)` plus `AddSingleton<IConfiguration>` over `ConfigurationBuilder().AddInMemoryCollection(operatorValues)`. It calls `StartupTasks.RunAsync` with a `ListLogger` and returns the captured entries;
   - a test that runs startup twice passes its second run through an overload that does not drop the database.
-- [ ] T052 Create `tests/HT.UiTests/Operator/StartupTasksMigrationTests.cs` (HP-022) in the `StartupTasks` collection, using T051's harness (depends on T051):
+- [X] T052 Create `tests/HT.UiTests/Operator/StartupTasksMigrationTests.cs` (HP-022) in the `StartupTasks` collection, using T051's harness (depends on T051):
   - with `Development`, the log has `Schema migrations applied:` with a count above 0, and `AspNetUsers` exists (T049's SQL helper);
   - with `Testing` and no operator values, no migration is applied: there is no `Schema migrations applied:` line, and `DatabaseExists()` is false. Administrator creation and demo loading return their "not configured" results before they touch the store.
-- [ ] T053 [P] In `tests/HT.ArchitectureTests/UiDependencyTests.cs`, add two rules:
+- [X] T053 [P] In `tests/HT.ArchitectureTests/UiDependencyTests.cs`, add two rules:
   - types in `HT.Ui.Components` do not depend on `SignInManager<>` or `UserManager<>` (research R-13);
   - no type of the `HT.Ui` assembly depends on `IAccountStore`, which replaces R-13's internal port ("Plan discrepancies" 1).
 
 ### Shell and shared components (`src/HT.Ui/`)
 
-- [ ] T054 Replace the template styles (depends on T015):
+- [X] T054 Replace the template styles (depends on T015):
   - copy `design/css/tokens.css` and `design/css/ht-components.css` to `src/HT.Ui/wwwroot/css/` unchanged; any later style change is made in `design/css/` and copied again;
   - in `src/HT.Ui/Components/App.razor`, link both instead of `app.css` and `HT.Ui.styles.css`;
   - delete `src/HT.Ui/wwwroot/app.css`, `src/HT.Ui/Components/Layout/MainLayout.razor.css` and `src/HT.Ui/Components/Layout/ReconnectModal.razor.css`.
-- [ ] T055 [P] Create the shared components in `src/HT.Ui/Components/Shared/` from their `design/components/` markup:
+- [X] T055 [P] Create the shared components in `src/HT.Ui/Components/Shared/` from their `design/components/` markup:
   - `HtButton.razor`;
   - `HtCard.razor`;
   - `TextField.razor`: label, help text, an error message next to the field, and `aria-describedby` that links help and error;
   - `Notice.razor`;
   - `Avatar.razor`: the first character of the email, upper-cased with `ToUpperInvariant`, and an `aria-label`;
   - `EmptyState.razor`.
-- [ ] T056 Restyle the layout from the design and T014's guidance: `src/HT.Ui/Components/Layout/MainLayout.razor` (a `main` landmark, a navigation slot and a footer slot), `ReconnectModal.razor` (the reconnect notice) and the unexpected-error bar (depends on T054, T055)
-- [ ] T057 Rebuild `src/HT.Ui/Components/Pages/NotFound.razor` and `Error.razor` as EmptyState in the normal layout, with brand-book wording. The Error page shows no request id, exception detail or configuration value (HP-016, HP-017) (depends on T055)
-- [ ] T058 Create `tests/HT.UiTests/Components/Shared/SharedComponentTests.cs` (bUnit) (depends on T055):
+- [X] T056 Restyle the layout from the design and T014's guidance: `src/HT.Ui/Components/Layout/MainLayout.razor` (a `main` landmark, a navigation slot and a footer slot), `ReconnectModal.razor` (the reconnect notice) and the unexpected-error bar (depends on T054, T055)
+- [X] T057 Rebuild `src/HT.Ui/Components/Pages/NotFound.razor` and `Error.razor` as EmptyState in the normal layout, with brand-book wording. The Error page shows no request id, exception detail or configuration value (HP-016, HP-017) (depends on T055)
+- [X] T058 Create `tests/HT.UiTests/Components/Shared/SharedComponentTests.cs` (bUnit) (depends on T055):
   - `TextField` renders its label, help text and error with `aria-describedby`;
   - `Avatar` shows "A" for `ana@example.com`;
   - `EmptyState` renders its heading and text.
-- [ ] T059 Create `tests/HT.UiTests/Host/ErrorPagesTests.cs` (depends on T057):
+- [X] T059 Create `tests/HT.UiTests/Host/ErrorPagesTests.cs` (depends on T057):
   - an unknown path gives 404 with the NotFound content inside the layout;
   - GET `/Error` renders the EmptyState in the layout, without "Request ID", "Development Mode", `ASPNETCORE_ENVIRONMENT`, the host's connection string or any `Operator:*` value from `HostFixture` (HP-017).
-- [ ] T060 [P] Create `tests/HT.UiTests/DesignSyncTests.cs`: `src/HT.Ui/wwwroot/css/tokens.css` and `ht-components.css` equal their `design/css/` sources, compared with line endings normalised. The test finds the repository root as the folder that holds `HabitTracker.slnx`. A style written only in the app copy therefore fails the build gate (constitution IV, V) (depends on T054)
+- [X] T060 [P] Create `tests/HT.UiTests/DesignSyncTests.cs`: `src/HT.Ui/wwwroot/css/tokens.css` and `ht-components.css` equal their `design/css/` sources, compared with line endings normalised. The test finds the repository root as the folder that holds `HabitTracker.slnx`. A style written only in the app copy therefore fails the build gate (constitution IV, V) (depends on T054)
 
 **Checkpoint**: `dotnet build HabitTracker.slnx` and `dotnet test HabitTracker.slnx` pass. A local `dotnet run --project src/HT.Ui --launch-profile https` migrates the `HT` database and serves the restyled shell.
 

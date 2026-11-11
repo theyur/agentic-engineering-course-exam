@@ -43,6 +43,7 @@ All `.html` files open directly in a browser (they link `../css/*.css`). They ar
 - `PageHomeSignedIn` — The signed-in Home (Today): greeting, four StatTiles, the Today list and active goals. ([notes](pages/PageHomeSignedIn.md), [preview](pages/PageHomeSignedIn.html))
 - `PageHomeVisitor` — The visitor Home in layout A: hero with an example goal, How it works, catalog preview and community bands. ([notes](pages/PageHomeVisitor.md), [preview](pages/PageHomeVisitor.html))
 - `PageNewGoal` — The New goal form, opened from "Use this habit" (pre-filled with the suggested start) or "+ New goal". ([notes](pages/PageNewGoal.md), [preview](pages/PageNewGoal.html))
+- `PagePrivacy` — Privacy: what stays private, that community comparison is opt-in and off by default, and what administrators cannot see. ([notes](pages/PagePrivacy.md), [preview](pages/PagePrivacy.html))
 - `PageProfile` — The personal profile: header with avatar, name and email, then Tabs for Account, Community, Goal history and Custom habits. ([notes](pages/PageProfile.md), [preview](pages/PageProfile.html))
 - `PageRegister` — Register: same `ht-auth` layout as Sign in. ([notes](pages/PageRegister.md), [preview](pages/PageRegister.html))
 - `PageSignIn` — Sign in: a centered 420px column (`ht-auth`) with one Card form. ([notes](pages/PageSignIn.md), [preview](pages/PageSignIn.html))
@@ -120,4 +121,4 @@ All `.html` files open directly in a browser (they link `../css/*.css`). They ar
 
 ## Not designed yet
 
-A dark theme (not needed for version 1), password reset pages (use the Sign in layout), and a "Not found" page (use EmptyState inside the normal layout). Edit goal settings reuses the New goal form (see `pages.md`).
+A dark theme (not needed for version 1). The "Not found" and Error pages use EmptyState inside the normal layout (see `components/EmptyState.md`). Edit goal settings reuses the New goal form (see `pages.md`).

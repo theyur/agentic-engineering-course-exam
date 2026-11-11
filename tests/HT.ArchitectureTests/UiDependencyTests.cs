@@ -1,8 +1,5 @@
-using ArchUnitNET.Domain;
-using ArchUnitNET.Fluent;
-using ArchUnitNET.Loader;
 using ArchUnitNET.xUnit;
-using HT.Persistence;
+using HT.Application.Accounts;
 using Xunit;
 
 using static ArchUnitNET.Fluent.ArchRuleDefinition;
@@ -11,24 +8,37 @@ namespace HT.ArchitectureTests;
 
 public sealed class UiDependencyTests
 {
-    private static readonly Architecture Architecture = new ArchLoader()
-        .LoadAssemblies(
-            typeof(PersistenceAssemblyMarker).Assembly,
-            typeof(HT.Ui.Components.App).Assembly)
-        .Build();
-
     [Fact]
     public void BlazorComponentsMustNotDependOnPersistenceTypes()
     {
         var components = Types().That()
             .ResideInNamespaceMatching(@"^HT\.Ui\.Components(\..*)?$");
 
-        var persistence = Types().That()
+        var persistence = Types(true).That()
             .ResideInNamespaceMatching(@"^HT\.Persistence(\..*)?$");
 
         Types().That().Are(components)
             .Should().NotDependOnAny(persistence)
             .Because("Blazor components must use Application abstractions, not Persistence implementations")
-            .Check(Architecture);
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
+    public void BlazorComponentsMustNotDependOnIdentityManagers()
+    {
+        Types().That().ResideInNamespaceMatching(@"^HT\.Ui\.Components(\..*)?$")
+            .Should().NotDependOnAny(Types(true).That()
+                .HaveFullNameMatching(@"^Microsoft\.AspNetCore\.Identity\.(SignInManager|UserManager)`1$"))
+            .Because("only AccountSession writes the cookie; components never touch Identity's managers (research R-13)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
+    public void NoUiTypeMayDependOnTheAccountStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IAccountStore)))
+            .Because("the port is persistence plumbing, not a use case; the host reaches accounts only through the use cases (ADR 0010)")
+            .Check(ArchitectureModel.Architecture);
     }
 }

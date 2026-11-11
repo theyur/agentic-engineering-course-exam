@@ -1,0 +1,98 @@
+@using System.Linq.Expressions
+@implements IDisposable
+@* design/components/TextField: a label, an input, and help or error text, stacked. Used inside an EditForm.
+   The error goes into the form's validation messages, so InputText sets aria-invalid itself. The account forms
+   take their refusals from the use cases, so they submit with OnSubmit, not OnValidSubmit. *@
+<label class="ht-field">
+    <span class="ht-field__label">@Label</span>
+    <InputText id="@Id"
+               type="@Type"
+               class="ht-input"
+               autocomplete="@AutoComplete"
+               aria-describedby="@DescribedBy"
+               Value="@Value"
+               ValueChanged="@ValueChanged"
+               ValueExpression="@ValueExpression" />
+    @if (HasError)
+    {
+        <span class="ht-field__error" id="@ErrorId">@Error@ErrorContent</span>
+    }
+    else if (Help is not null)
+    {
+        <span class="ht-field__help" id="@HelpId">@Help</span>
+    }
+</label>
+
+@code {
+    /// <summary>The input's id; the help and error texts get ids derived from it.</summary>
+    [Parameter, EditorRequired]
+    public string Id { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>Why or where the value is used, or the rule it must meet.</summary>
+    [Parameter]
+    public string? Help { get; set; }
+
+    /// <summary>The error text; shown in place of the help text.</summary>
+    [Parameter]
+    public string? Error { get; set; }
+
+    /// <summary>More error content after the text, such as a link.</summary>
+    [Parameter]
+    public RenderFragment? ErrorContent { get; set; }
+
+    /// <summary>The input type: text, email or password.</summary>
+    [Parameter]
+    public string Type { get; set; } = "text";
+
+    [Parameter]
+    public string? AutoComplete { get; set; }
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public Expression<Func<string?>>? ValueExpression { get; set; }
+
+    [CascadingParameter]
+    private EditContext? EditContext { get; set; }
+
+    private ValidationMessageStore? _messages;
+    private EditContext? _messagesContext;
+
+    private bool HasError => Error is not null || ErrorContent is not null;
+
+    protected override void OnParametersSet()
+    {
+        if (EditContext is null || ValueExpression is null)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(EditContext, _messagesContext))
+        {
+            _messages = new ValidationMessageStore(EditContext);
+            _messagesContext = EditContext;
+        }
+
+        var field = FieldIdentifier.Create(ValueExpression);
+        _messages!.Clear(field);
+        if (HasError)
+        {
+            _messages.Add(field, Error ?? Label);
+        }
+    }
+
+    public void Dispose() => _messages?.Clear();
+
+    private string HelpId => Id + "-help";
+
+    private string ErrorId => Id + "-error";
+
+    private string? DescribedBy => HasError ? ErrorId : Help is not null ? HelpId : null;
+}

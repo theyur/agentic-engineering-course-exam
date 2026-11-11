@@ -1,9 +1,18 @@
 ﻿@inherits LayoutComponentBase
 
-@Body
+<div class="ht ht-page">
+    @* Navigation slot: SiteNav (TopNav and MobileNav) goes here (T094). *@
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+    <main id="main">
+        @Body
+    </main>
+
+    @* Footer slot: Footer goes here (T094). *@
+
+    @* The unexpected-error bar (design/components/Notice.md); Blazor shows it by setting display:block. *@
+    <div id="blazor-error-ui" data-nosnippet>
+        Something went wrong. Reload the page to continue.
+        <a href="." class="reload">Reload</a>
+        <button type="button" class="dismiss" aria-label="Dismiss"><HtIcon Name="x" /></button>
+    </div>
 </div>

@@ -87,3 +87,21 @@ Every page follows layout A: TopNav, a page head, content centered at `container
 ## More dialogs
 - PauseDialog (From, Until, reason), EndGoalDialog (outcome + note), FeedbackDialog (topic + message), SuggestDialog (custom habit → catalog), DeactivateDialog (admin, reason required).
 - Edit goal settings reuses the New goal form with the title "Edit goal" and a Notice: "Changes apply from the next commitment. Past results keep their rules."
+
+## Privacy (`PagePrivacy`)
+1. TopNav (the variant of the session), page head `heading-1` "Privacy", one lead sentence.
+2. Three Cards in one column: What stays private · Community comparison is opt-in · What administrators can see.
+3. Footer. Anyone can open it from the Footer's "Privacy" link.
+
+## Slice 1 (accounts and access)
+
+What slice 1 builds of the pages above. A page shows only the sections and links whose slice has shipped (ADR 0008); the full previews stay as they are.
+
+- Shell: TopNav and MobileNav with "Habit Tracker" linking to Home. Visitor: "Sign in", "Register". Registered user and administrator: "Today" and the avatar menu (Profile, Sign out); the narrow-screen menu lists Today, Profile, Sign out. Footer: the project line and "Privacy".
+- Sign in (`PageSignIn`): Email, Password, "Keep me signed in", "Sign in", "New here? Create an account". No "Forgot password?". The failure message sits under the password field, the email is kept.
+- Register (`PageRegister`): Email, Password with the rule as help text, Repeat password, the neutral Notice, "Create account". Error states next to their fields (taken email with a "Sign in" link, invalid email, the password rule, "The passwords do not match."); the email is kept.
+- Home, visitor (`PageHomeVisitor`): the hero (headline, sentence, "Register free", privacy line) and "How it works" only. No "Browse the catalog", no example goal card, no catalog or community sections.
+- Home, signed in (`PageHomeSignedIn`): the heading "Today" only.
+- Profile (`PageProfile`): header with the avatar letter and the email, one "Account" Card without Tabs: the email and the "Change password" form with its error states and the Notice "Your password is changed.".
+- Privacy (`PagePrivacy`): as above.
+- Not found and Error: an EmptyState in the normal layout (see `components/EmptyState.md`).
