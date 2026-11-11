@@ -3,7 +3,9 @@ using HT.UiTests.Fakes;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 
 namespace HT.UiTests.Host;
 
@@ -35,6 +37,12 @@ public sealed class HostFixture : WebApplicationFactory<Program>, IAsyncLifetime
 
     public ListLoggerProvider Logs { get; } = new();
 
+    /// <summary>
+    /// The host's clock: the use cases and the cookie handler read it. It starts at the real time and only moves
+    /// when a test advances it.
+    /// </summary>
+    public FakeTimeProvider Clock { get; } = new(DateTimeOffset.UtcNow);
+
     public async Task InitializeAsync() => await HtDatabase.ResetAsync(ConnectionString, CancellationToken.None);
 
     Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
@@ -55,6 +63,7 @@ public sealed class HostFixture : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Operator:AdministratorPassword", AdministratorPassword);
         builder.UseSetting("Operator:DemoPassword", DemoPassword);
         builder.ConfigureLogging(logging => logging.AddProvider(Logs));
+        builder.ConfigureServices(services => services.AddSingleton<TimeProvider>(Clock));
     }
 }
 

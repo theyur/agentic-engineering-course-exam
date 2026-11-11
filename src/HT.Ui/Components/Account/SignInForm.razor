@@ -1,0 +1,57 @@
+@using HT.Application.Accounts
+@inject AccountService AccountService
+@* design/pages/PageSignIn: the form card. A static SSR form (research R-08): a failure shows the single message
+   under the password field with the email kept and the password emptied; on success it raises OnSucceeded with
+   the result and the "Keep me signed in" choice. There is no "Forgot password?" (ADR 0009). *@
+<EditForm Model="Input" method="post" FormName="sign-in" OnSubmit="SubmitAsync" class="ht-card ht-stack" novalidate>
+    <TextField Id="sign-in-email"
+               Label="Email"
+               Type="email"
+               AutoComplete="email"
+               Placeholder="you@example.com"
+               @bind-Value="Input.Email" />
+    <TextField Id="sign-in-password"
+               Label="Password"
+               Type="password"
+               AutoComplete="current-password"
+               Error="@_error"
+               @bind-Value="Input.Password" />
+    <label class="ht-check"><InputCheckbox id="sign-in-keep" @bind-Value="Input.KeepSignedIn" /> Keep me signed in</label>
+    <HtButton Type="submit" Block="true">Sign in</HtButton>
+</EditForm>
+
+@code {
+    [SupplyParameterFromForm(FormName = "sign-in")]
+    private SignInInput Input { get; set; } = default!;
+
+    /// <summary>Raised once when the sign-in succeeds.</summary>
+    [Parameter]
+    public EventCallback<SignInSuccess> OnSucceeded { get; set; }
+
+    private string? _error;
+
+    protected override void OnInitialized() => Input ??= new SignInInput();
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+        var result = await AccountService.SignInAsync(Input.Email, Input.Password, CancellationToken.None);
+        if (result.Outcome == SignInOutcome.SignedIn)
+        {
+            await OnSucceeded.InvokeAsync(new SignInSuccess(result, Input.KeepSignedIn));
+            return;
+        }
+
+        _error = result.Message;
+        Input.Password = null;
+    }
+
+    private sealed class SignInInput
+    {
+        public string? Email { get; set; }
+
+        public string? Password { get; set; }
+
+        public bool KeepSignedIn { get; set; }
+    }
+}

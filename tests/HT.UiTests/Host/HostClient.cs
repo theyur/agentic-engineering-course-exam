@@ -1,14 +1,22 @@
 using System.Net;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 using HT.Application.Accounts;
 using HT.Domain.Accounts;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace HT.UiTests.Host;
 
 /// <summary>A form read from a page: its antiforgery token and its handler name.</summary>
 public sealed record FormPage(HttpStatusCode Status, string Html, string Token, string? Handler);
+
+/// <summary>An antiforgery cookie (name and value) and the request token that goes with it.</summary>
+public sealed record AntiforgeryTokens(string CookieName, string CookieToken, string RequestToken);
 
 /// <summary>Helpers for host tests (T049).</summary>
 public static partial class HostClient
@@ -82,6 +90,31 @@ public static partial class HostClient
         var store = scope.ServiceProvider.GetRequiredService<IAccountStore>();
         var outcome = await store.CreateAsync(parsed, role, password, CancellationToken.None);
         return outcome.Account ?? throw new InvalidOperationException($"The email {email} already has an account.");
+    }
+
+    /// <summary>
+    /// Antiforgery tokens for a signed-in account. A request token is bound to its user, and until SiteNav (T092)
+    /// no page renders a form for a signed-in user, so the test asks the host's antiforgery service for one, as
+    /// the account's own cookie would identify it (its user id claim).
+    /// </summary>
+    public static AntiforgeryTokens SignedInAntiforgery(this HostFixture host, AccountId accountId)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        using var scope = host.Services.CreateScope();
+        var context = new DefaultHttpContext
+        {
+            RequestServices = scope.ServiceProvider,
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, accountId.Value.ToString())],
+                IdentityConstants.ApplicationScheme)),
+        };
+        var tokens = scope.ServiceProvider.GetRequiredService<IAntiforgery>().GetTokens(context);
+        var cookieName = scope.ServiceProvider.GetRequiredService<IOptions<AntiforgeryOptions>>().Value.Cookie.Name
+            ?? throw new InvalidOperationException("The antiforgery cookie has no name.");
+        return new AntiforgeryTokens(
+            cookieName,
+            tokens.CookieToken ?? throw new InvalidOperationException("No antiforgery cookie token."),
+            tokens.RequestToken ?? throw new InvalidOperationException("No antiforgery request token."));
     }
 
     /// <summary>Deletes the <c>AspNetUsers</c> rows with this user name.</summary>

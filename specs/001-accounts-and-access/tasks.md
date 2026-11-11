@@ -408,7 +408,7 @@ minutes have passed; sign out and be anonymous again.
 
 ### Tests for User Story 2
 
-- [ ] T069 [P] [US2] Create `tests/HT.UnitTests/Application/Accounts/SignInTests.cs` (`FakeAccountStore`, `FakeTimeProvider` set to each scenario's times):
+- [X] T069 [P] [US2] Create `tests/HT.UnitTests/Application/Accounts/SignInTests.cs` (`FakeAccountStore`, `FakeTimeProvider` set to each scenario's times):
   - US2-AS1 to AS8 with their literal values;
   - an unknown email gives `Failed` and saves nothing;
   - a blocked account gives `Failed` with no password check;
@@ -417,15 +417,15 @@ minutes have passed; sign out and be anonymous again.
   - the race limit, both sides (constitution II), with the correct password and `LoseNextSaves`: 9 lost races then a won save gives `SignedIn`; 10 lost races give `Failed` with no save won;
   - the text is identical for an unknown email, a wrong password and a block (SC-004);
   - `SignedIn` carries the account's `ActingUser` with its role, and its `Message` is null.
-- [ ] T070 [P] [US2] Create `tests/HT.IntegrationTests/Accounts/SignInBlockTests.cs`:
+- [X] T070 [P] [US2] Create `tests/HT.IntegrationTests/Accounts/SignInBlockTests.cs`:
   - 10 wrong attempts started in parallel in separate scopes at one fake time leave count 5 and `SignInBlockedSince` set;
   - the correct password at that time fails, and succeeds at +5:00;
   - `ANA@example.com` signs in to `ana@example.com`'s account.
 
 ### Implementation for User Story 2
 
-- [ ] T071 [US2] Create `src/HT.Application/Accounts/SignInResult.cs`, with `SignInOutcome` (`Failed`, `SignedIn`), `Message` and `ActingUser?`
-- [ ] T072 [US2] Add `SignInAsync(string? email, string? password, CancellationToken)` to `src/HT.Application/Accounts/AccountService.cs`. It follows the five steps of research R-05:
+- [X] T071 [US2] Create `src/HT.Application/Accounts/SignInResult.cs`, with `SignInOutcome` (`Failed`, `SignedIn`), `Message` and `ActingUser?`
+- [X] T072 [US2] Add `SignInAsync(string? email, string? password, CancellationToken)` to `src/HT.Application/Accounts/AccountService.cs`. It follows the five steps of research R-05:
   - it reads `t` from the `TimeProvider` once per attempt;
   - an invalid or unknown email gives `Failed`;
   - it settles the state, and a blocked account gives `Failed`;
@@ -434,24 +434,24 @@ minutes have passed; sign out and be anonymous again.
   - after 10 lost races it fails closed (FR-005 to FR-008; the text is the same for every failure, FR-007).
 
   It depends on T071.
-- [ ] T073 [US2] Create `src/HT.Ui/Components/Account/SignInForm.razor`, a static SSR `EditForm` with `FormName="sign-in"`. It has:
+- [X] T073 [US2] Create `src/HT.Ui/Components/Account/SignInForm.razor`, a static SSR `EditForm` with `FormName="sign-in"`. It has:
   - the fields `Email`, `Password` and `KeepSignedIn` (labelled "Keep me signed in"), the button "Sign in", and "New here? Create an account" (`/register`);
   - no "Forgot password?".
 
   It calls `AccountService.SignInAsync`. A failure shows the single message under the password field, with the email kept. On `SignedIn` it raises `OnSucceeded` with the result and `KeepSignedIn` (HP-003).
-- [ ] T074 [US2] Create `src/HT.Ui/Components/Pages/SignIn.razor` (`@page "/sign-in"`):
+- [X] T074 [US2] Create `src/HT.Ui/Components/Pages/SignIn.razor` (`@page "/sign-in"`):
   - it reads the `returnUrl` query parameter and redirects a signed-in user to `/`;
   - in `OnSucceeded` it calls `AccountSession.SignInAsync(actingUser, keepSignedIn)`;
   - it then redirects to `returnUrl` only when `RedirectHttpResult.IsLocalUrl(returnUrl)` is true, otherwise to `/` (HP-005, research R-10).
-- [ ] T075 [US2] Create `src/HT.Ui/Account/SignOutEndpoint.cs`, with `MapSignOut(this IEndpointRouteBuilder)`. It maps `POST /account/sign-out` with antiforgery validation, calls `AccountSession.SignOutAsync()` and redirects to `/`. Call it in `src/HT.Ui/Program.cs` (HP-006)
+- [X] T075 [US2] Create `src/HT.Ui/Account/SignOutEndpoint.cs`, with `MapSignOut(this IEndpointRouteBuilder)`. It maps `POST /account/sign-out` with antiforgery validation, calls `AccountSession.SignOutAsync()` and redirects to `/`. Call it in `src/HT.Ui/Program.cs` (HP-006)
 
 ### UI tests for User Story 2
 
-- [ ] T076 [P] [US2] Create `tests/HT.UiTests/Components/Account/SignInFormTests.cs` (bUnit):
+- [X] T076 [P] [US2] Create `tests/HT.UiTests/Components/Account/SignInFormTests.cs` (bUnit):
   - "Keep me signed in" is present and "Forgot password?" is absent;
   - a failure shows "Email or password is not correct." under the password field, with the email kept;
   - `OnSucceeded` carries the `KeepSignedIn` value.
-- [ ] T077 [P] [US2] Create `tests/HT.UiTests/Host/SignInPageTests.cs`:
+- [X] T077 [P] [US2] Create `tests/HT.UiTests/Host/SignInPageTests.cs`:
   - with "Keep me signed in", the cookie has an `Expires` about 14 days ahead; without it, there is no `Expires`;
   - an authenticated request re-issues the cookie with a full window (HP-004);
   - `returnUrl` `/profile` goes to `/profile`, while `//evil.example`, `/\evil.example`, `https://evil.example` and an empty value go to `/`;
