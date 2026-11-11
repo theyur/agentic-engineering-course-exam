@@ -594,47 +594,47 @@ the new password.
 
 ### Tests for User Story 6
 
-- [ ] T102 [P] [US6] Create `tests/HT.UnitTests/Application/Accounts/ChangePasswordTests.cs`:
+- [X] T102 [P] [US6] Create `tests/HT.UnitTests/Application/Accounts/ChangePasswordTests.cs`:
   - US6-AS1 to AS7 with their literal values and texts;
   - the check order NotSignedIn → CurrentPasswordWrong → PasswordRuleNotMet;
   - an acting user whose account no longer exists gets `NotSignedIn`, not `CurrentPasswordWrong` ([contracts/application-api.md](contracts/application-api.md#accountservice-anonymous-visitors-and-signed-in-users));
   - only the acting user's password changes;
   - `Message` is null for `Changed` (FR-011, SC-005).
-- [ ] T103 [P] [US6] Create `tests/HT.IntegrationTests/Accounts/PasswordChangeTests.cs`:
+- [X] T103 [P] [US6] Create `tests/HT.IntegrationTests/Accounts/PasswordChangeTests.cs`:
   - after a change, the new password signs in and the old one fails;
   - `SecurityStamp` changed;
   - a stored failed count of 3 is still 3 (research R-05).
 
 ### Implementation for User Story 6
 
-- [ ] T104 [US6] Create `src/HT.Application/Accounts/PasswordChangeResult.cs`, with `PasswordChangeOutcome` (`NotSignedIn`, `CurrentPasswordWrong`, `PasswordRuleNotMet`, `Changed`) and `Message`
-- [ ] T105 [US6] Add `ChangePasswordAsync(ActingUser actingUser, string? currentPassword, string? newPassword, CancellationToken)` to `src/HT.Application/Accounts/AccountService.cs`. An anonymous visitor, or an `actingUser.AccountId` for which `FindByIdAsync` finds no account, gives `NotSignedIn`. It then checks in FR-013's order: `CheckPasswordAsync`, then `PasswordRule.IsMet`, then the store's `ChangePasswordAsync`. A `false` from the store gives `CurrentPasswordWrong` (depends on T104)
-- [ ] T106 [US6] Create `src/HT.Ui/Components/Account/ChangePasswordForm.razor` (`FormName="change-password"`) with `CurrentPassword`, `NewPassword` (the rule as help text) and `RepeatNewPassword`:
+- [X] T104 [US6] Create `src/HT.Application/Accounts/PasswordChangeResult.cs`, with `PasswordChangeOutcome` (`NotSignedIn`, `CurrentPasswordWrong`, `PasswordRuleNotMet`, `Changed`) and `Message`
+- [X] T105 [US6] Add `ChangePasswordAsync(ActingUser actingUser, string? currentPassword, string? newPassword, CancellationToken)` to `src/HT.Application/Accounts/AccountService.cs`. An anonymous visitor, or an `actingUser.AccountId` for which `FindByIdAsync` finds no account, gives `NotSignedIn`. It then checks in FR-013's order: `CheckPasswordAsync`, then `PasswordRule.IsMet`, then the store's `ChangePasswordAsync`. A `false` from the store gives `CurrentPasswordWrong` (depends on T104)
+- [X] T106 [US6] Create `src/HT.Ui/Components/Account/ChangePasswordForm.razor` (`FormName="change-password"`) with `CurrentPassword`, `NewPassword` (the rule as help text) and `RepeatNewPassword`:
   - a mismatch shows "The passwords do not match." next to the repeated password, before the use case is called;
   - refusals appear next to the current or the new password;
   - on `Changed` it shows "Your password is changed.", empties all three fields and raises `OnSucceeded`.
 
   It takes the `ActingUser` as a parameter (HP-014).
-- [ ] T107 [US6] Create `src/HT.Ui/Components/Pages/Profile.razor` (`@page "/profile"`, `[Authorize]`), following T010's design. It:
+- [X] T107 [US6] Create `src/HT.Ui/Components/Pages/Profile.razor` (`@page "/profile"`, `[Authorize]`), following T010's design. It:
   - gets the `ActingUser` from `ActingUserAccessor` and calls `GetAccountDetailsAsync`;
   - shows the header (the `Avatar` letter and the email, no name, no "member since") and the Account content (the email and `ChangePasswordForm`), as a single section without Tabs;
   - in `OnSucceeded`, calls `AccountSession.RefreshSignInAsync(actingUser)` (HP-007, HP-014).
-- [ ] T108 [US6] Add the signed-in variant to `src/HT.Ui/Components/Pages/Home.razor` (the `Authorized` content): the heading "Today" only, with no greeting, name, date, stat tiles, Today list, goal summary or notes (HP-013, HP-015)
-- [ ] T109 [US6] Create `src/HT.Ui/Account/IdentityRevalidatingAuthenticationStateProvider.cs`, a `RevalidatingServerAuthenticationStateProvider` with `RevalidationInterval = 30 minutes`. Its protected `ValidateAuthenticationStateAsync` calls an `internal` method `IsSecurityStampCurrentAsync(ClaimsPrincipal, CancellationToken)`, which compares the principal's security-stamp claim with `UserManager.GetSecurityStampAsync` in a new scope and is false for a missing account. `HT.UiTests` reaches it through T007's `InternalsVisibleTo`. Register it in `src/HT.Ui/Program.cs` (HP-007, research R-09)
+- [X] T108 [US6] Add the signed-in variant to `src/HT.Ui/Components/Pages/Home.razor` (the `Authorized` content): the heading "Today" only, with no greeting, name, date, stat tiles, Today list, goal summary or notes (HP-013, HP-015)
+- [X] T109 [US6] Create `src/HT.Ui/Account/IdentityRevalidatingAuthenticationStateProvider.cs`, a `RevalidatingServerAuthenticationStateProvider` with `RevalidationInterval = 30 minutes`. Its protected `ValidateAuthenticationStateAsync` calls an `internal` method `IsSecurityStampCurrentAsync(ClaimsPrincipal, CancellationToken)`, which compares the principal's security-stamp claim with `UserManager.GetSecurityStampAsync` in a new scope and is false for a missing account. `HT.UiTests` reaches it through T007's `InternalsVisibleTo`. Register it in `src/HT.Ui/Program.cs` (HP-007, research R-09)
 
 ### UI tests for User Story 6
 
-- [ ] T110 [P] [US6] Create `tests/HT.UiTests/Components/Account/ChangePasswordFormTests.cs` (bUnit):
+- [X] T110 [P] [US6] Create `tests/HT.UiTests/Components/Account/ChangePasswordFormTests.cs` (bUnit):
   - each refusal appears next to its field;
   - a mismatch shows "The passwords do not match." and the use case is not called;
   - success shows "Your password is changed." and empty fields, and `OnSucceeded` fires.
-- [ ] T111 [P] [US6] Create `tests/HT.UiTests/Components/Pages/HomeSignedInTests.cs`: a signed-in user sees the heading "Today" and none of the absent parts of US6-AS10
-- [ ] T112 [P] [US6] Create `tests/HT.UiTests/Account/RevalidationProviderTests.cs` in the host collection (T048), using the factory's services and the `HT-UI` database. It creates an account through `IAccountStore`, builds its principal with the claims factory, and calls `IsSecurityStampCurrentAsync`:
+- [X] T111 [P] [US6] Create `tests/HT.UiTests/Components/Pages/HomeSignedInTests.cs`: a signed-in user sees the heading "Today" and none of the absent parts of US6-AS10
+- [X] T112 [P] [US6] Create `tests/HT.UiTests/Account/RevalidationProviderTests.cs` in the host collection (T048), using the factory's services and the `HT-UI` database. It creates an account through `IAccountStore`, builds its principal with the claims factory, and calls `IsSecurityStampCurrentAsync`:
   - an unchanged stamp is current;
   - after the store's `ChangePasswordAsync`, the stamp is not current;
   - after the account's row is deleted with T049's SQL helper, the stamp is not current;
   - `RevalidationInterval` is 30 minutes, read by reflection from the protected property (`BindingFlags.NonPublic | BindingFlags.Instance`), because an override cannot widen its access.
-- [ ] T113 [P] [US6] Create `tests/HT.UiTests/Host/ProfilePageTests.cs`. Sign in through the Sign in page of US2 using `HostClient`:
+- [X] T113 [P] [US6] Create `tests/HT.UiTests/Host/ProfilePageTests.cs`. Sign in through the Sign in page of US2 using `HostClient`:
   - an anonymous GET `/profile` gives 302 to `/sign-in?returnUrl=%2Fprofile` with no Profile content (US3-AS6, HP-008);
   - a signed-in GET `/profile` shows the avatar letter and the email, and no "member since";
   - `/profile` and `/` for a signed-in user have `Cache-Control` with `no-store` (HP-008, research R-09);

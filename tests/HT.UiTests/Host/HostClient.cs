@@ -93,9 +93,9 @@ public static partial class HostClient
     }
 
     /// <summary>
-    /// Antiforgery tokens for a signed-in account. A request token is bound to its user, and until SiteNav (T092)
-    /// no page renders a form for a signed-in user, so the test asks the host's antiforgery service for one, as
-    /// the account's own cookie would identify it (its user id claim).
+    /// Antiforgery tokens for a signed-in account, for a client that sends its cookies by hand. A request token is
+    /// bound to its user, so the test asks the host's antiforgery service for one, as the account's own cookie
+    /// would identify it (its user id claim).
     /// </summary>
     public static AntiforgeryTokens SignedInAntiforgery(this HostFixture host, AccountId accountId)
     {

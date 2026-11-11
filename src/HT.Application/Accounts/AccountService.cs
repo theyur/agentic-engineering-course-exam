@@ -114,6 +114,37 @@ public sealed class AccountService
         return AccountDetailsResult.Found(new AccountDetails(account.Email.Value, account.Role));
     }
 
+    /// <summary>
+    /// Changes the acting user's own password (FR-010, FR-011, FR-013). Checks, in order: a signed-in account
+    /// that still exists, the current password, the password rule. Only the account of
+    /// <paramref name="actingUser"/> is changed; the store renews its security stamp, so its other sessions end.
+    /// </summary>
+    public async Task<PasswordChangeResult> ChangePasswordAsync(
+        ActingUser actingUser, string? currentPassword, string? newPassword, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        if (await FindActingAccountAsync(actingUser, cancellationToken) is not { } account)
+        {
+            return PasswordChangeResult.NotSignedIn;
+        }
+
+        var current = currentPassword ?? string.Empty;
+        if (!await _store.CheckPasswordAsync(account.Id, current, cancellationToken))
+        {
+            return PasswordChangeResult.CurrentPasswordWrong;
+        }
+
+        if (!PasswordRule.IsMet(newPassword))
+        {
+            return PasswordChangeResult.PasswordRuleNotMet;
+        }
+
+        // False when the password changed between the check and the change, for example in another session.
+        return await _store.ChangePasswordAsync(account.Id, current, newPassword!, cancellationToken)
+            ? PasswordChangeResult.Changed
+            : PasswordChangeResult.CurrentPasswordWrong;
+    }
+
     /// <summary>The acting user's own account, or null for the anonymous visitor or an account that is gone.</summary>
     private async Task<Account?> FindActingAccountAsync(ActingUser actingUser, CancellationToken cancellationToken) =>
         actingUser.AccountId is { } id ? await _store.FindByIdAsync(id, cancellationToken) : null;

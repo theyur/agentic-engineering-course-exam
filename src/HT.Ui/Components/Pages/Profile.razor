@@ -1,0 +1,57 @@
+@page "/profile"
+@attribute [Authorize]
+@using HT.Application.Accounts
+@using HT.Domain.Accounts
+@using HT.Ui.Account
+@using HT.Ui.Components.Account
+@using Microsoft.AspNetCore.Authorization
+@inject ActingUserAccessor ActingUsers
+@inject AccountService AccountService
+@inject AccountSession AccountSession
+@inject NavigationManager Navigation
+@* design/pages/PageProfile, slice 1 state: the header (avatar letter and email) and one Account card, so no Tabs
+   (HP-014). An anonymous request never gets here: the endpoint's [Authorize] sends it to Sign in (HP-008).
+   After a change the session that made it is re-issued with the new security stamp (HP-007). *@
+<PageTitle>Profile · Habit Tracker</PageTitle>
+
+@if (_details is { } details)
+{
+    <div class="ht-container">
+        <div class="ht-page-head ht-profile-head">
+            <Avatar Email="@details.Email" Large="true" />
+            <div>
+                <h1>@details.Email</h1>
+                <span class="ht-muted">Profile</span>
+            </div>
+        </div>
+        <div class="ht-grid-2">
+            <section class="ht-card">
+                <h2 class="ht-card__title">Account</h2>
+                <div class="ht-form-section">
+                    <dl class="ht-kv"><dt>Email</dt><dd>@details.Email</dd></dl>
+                </div>
+                <ChangePasswordForm ActingUser="_actingUser" OnSucceeded="RefreshSessionAsync" />
+            </section>
+        </div>
+    </div>
+}
+
+@code {
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private AccountDetails? _details;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _actingUser = await ActingUsers.GetAsync();
+        var result = await AccountService.GetAccountDetailsAsync(_actingUser, CancellationToken.None);
+        if (result.Outcome != AccountDetailsOutcome.Found)
+        {
+            Navigation.NavigateTo("/sign-in?returnUrl=%2Fprofile");
+            return;
+        }
+
+        _details = result.AccountDetails;
+    }
+
+    private Task RefreshSessionAsync(PasswordChangeResult result) => AccountSession.RefreshSignInAsync(_actingUser);
+}

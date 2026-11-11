@@ -5,6 +5,12 @@
 <PageTitle>Habit Tracker</PageTitle>
 
 <AuthorizeView>
+    <Authorized>
+        @* design/pages/PageHomeSignedIn, slice 1 state: the heading only; no greeting, name or date (HP-013, HP-015). *@
+        <div class="ht-container">
+            <div class="ht-page-head"><h1>Today</h1></div>
+        </div>
+    </Authorized>
     <NotAuthorized>
         <section class="ht-hero">
             <div class="ht-hero__inner">

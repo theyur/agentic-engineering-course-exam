@@ -5,6 +5,7 @@ using HT.Ui.Account;
 using HT.Ui.Components;
 using HT.Ui.Operator;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,10 +40,15 @@ builder.Services
         {
             OnValidatePrincipal = SecurityStampValidator.ValidatePrincipalAsync,
         };
-    });
+    })
+    // Not used for sign-in: SecurityStampValidator signs this scheme out when it rejects a stale session
+    // (HP-007), and an unregistered scheme would throw instead of sending the browser to Sign in.
+    .AddCookie(IdentityConstants.TwoFactorRememberMeScheme);
 builder.Services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero);
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
+// The circuit's session is revalidated against the security stamp every 30 minutes (HP-007).
+builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 builder.Services.AddScoped<AccountSession>();
 builder.Services.AddScoped<ActingUserAccessor>();
 
