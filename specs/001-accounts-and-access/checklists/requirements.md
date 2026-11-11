@@ -20,7 +20,7 @@
 - [x] All acceptance scenarios are defined
 - [x] Edge cases are identified
 - [x] Scope is clearly bounded
-- [ ] Dependencies and assumptions identified — open decisions remain (see qualifications)
+- [x] Dependencies and assumptions identified — see qualifications
 
 ## Feature Readiness
 
@@ -41,15 +41,21 @@
 - Revision after `critic-spec-pass-3.md` (APPROVE, 9 MINOR applied): owner answers added for the kept session
   (framework sliding renewal), the block as the app's own rule with supplied time, the block details and the
   email rule (confirmed), and R7 (sections and links only; preview wording stays).
+- `/speckit-clarify` (2026-11-11): five owner answers, one per technical decision the roadmap places before
+  `/speckit-ac-translate` (account model, application surface, result text, integration tests with the
+  test-project layout, demo loading), recorded in `## Clarifications` and detailed in ADRs 0004 to 0007.
+  ADRs 0008 (R7) and 0009 (no outbound email) record two earlier owner answers.
+- Revision after `critic-spec-pass-4.md` (APPROVE, 6 MINOR applied): owner answers added for the local schema
+  at start (HP-022) and for UI tests and mocking (UI-test project with bUnit and host tests; hand-written
+  fakes, no mocking library).
 - Qualifications to the items above:
   - *Non-technical stakeholders* and both *no implementation details* items: not met on purpose. The sections
-    "What acceptance tests can reach" and "Decisions due before acceptance criteria" are written for the agents
-    and the owner that run the AC workflow, and name ADR 0003, project names, Spec Kit commands and framework
-    defaults. The requirements themselves (FR-NNN, HP-NNN) name no technology beyond the design files.
-  - *No markers*: no `[NEEDS CLARIFICATION]` marker remains. The open ARCHITECTURE §9 decisions are not marked
-    inline: they are listed in "Decisions due before acceptance criteria", together with the constraints the
-    owner already fixed for them, and must be answered before `/speckit-ac-translate`. When and how demo
-    loading runs is one of them; FR-016 specifies what it does.
+    "What acceptance tests can reach" and "Decisions due before acceptance criteria", and the technical answers
+    in `## Clarifications`, are written for the agents and the owner that run the AC workflow, and name ADRs,
+    project names, Spec Kit commands and framework defaults. The requirements themselves (FR-NNN, HP-NNN) name
+    no technology beyond the design files, except HP-022 ("schema migrations", "Development environment").
+  - *No markers*: no `[NEEDS CLARIFICATION]` marker remains. Every ARCHITECTURE §9 decision this slice owns is
+    answered in `## Clarifications` and linked to its ADR ("Decisions due before acceptance criteria").
   - *Testable*: FR-NNN are application behaviours that acceptance tests reach through the use cases (owner
     answer, ADR 0003), with literal values. Page, host, configuration, log and concurrency rules are HP-NNN and
     are verified by unit, integration and selective UI tests. Scenarios marked *(page)* are expected to be "Not
@@ -58,7 +64,10 @@
   - *Design references*: references to `design/` are the project's UI source of truth (constitution IV).
     FR-010 restates constitution III and names the scenarios that show it. HP-018 says when and from where
     administrator creation gets its values, as the owner decided; how is left to the plan.
-  - *Dependencies*: the technical decisions the roadmap places before `/speckit-ac-translate` are still open.
+  - *Dependencies*: the technical decisions the roadmap places before `/speckit-ac-translate` are answered by
+    the owner and recorded in ADRs 0004 to 0009. Decisions owned by later slices (hosting, migration rollout
+    on deployment, how reviewers sign in to the hosted demo, account name, time zones) are named where the spec
+    depends on them.
 
 ### Critic pass 1: verification
 
@@ -101,3 +110,14 @@
 | MINOR-7 | confirmed | FR-012 limited to use cases for signed-in users; operator results are about the supplied email (Edge Cases); who calls administrator creation and demo loading is stated once, in "What acceptance tests can reach". |
 | MINOR-8 | confirmed | Roadmap page tracker: Shell row updated, `PagePrivacy` row added (the Register sentence stays, so nothing returns in slice 9). `MobileNav` added to the design list; HP-014 and US6-AS9 give the change-password states. |
 | MINOR-9 | confirmed | Both "no implementation details" items unticked with the same reason; qualifications rewritten; rows MINOR-3 and MINOR-9 of pass 2 corrected. |
+
+### Critic pass 4: verification (APPROVE; MINOR notes applied at the owner's request)
+
+| Note | Verdict | Evidence and change |
+|---|---|---|
+| MINOR-1 | confirmed | Item annotation, the *No markers*, *Dependencies* and *no implementation details* qualifications rewritten; Notes entries added for `/speckit-clarify` and for this revision. |
+| MINOR-2 | confirmed | Identity's default password options (upper case, non-alphanumeric required) and its allowed user-name characters would refuse values FR-002 and FR-003 accept. ADR 0004 now sets Identity no stricter than the domain rules and adds an integration-test consequence. |
+| MINOR-3 | confirmed | A cookie cannot be reissued over an interactive circuit. ADR 0004 now makes Sign in, Sign out and change password server-rendered form posts, reissues the cookie after a password change (refresh sign-in), names the security-stamp validator with a zero interval, and limits the Identity user type in `HT.Ui` to composition code and the account endpoints. |
+| MINOR-4 | confirmed | Owner answer: in Development the host applies pending migrations at start (HP-022, ADR 0007); other environments stay with slice 3. The fault rule of ADR 0007 is now in HP-018 and HP-021. |
+| MINOR-5 | confirmed | Owner answers: `tests/HT.UiTests` with bUnit and `WebApplicationFactory` host tests on database `HT-UI`, no browser automation in this slice, no mocking library (ADR 0006); roadmap library rows decided. |
+| MINOR-6 | confirmed | Roadmap slice note 1 and the spec's AC-surface answer no longer say "open"; the technical clarification lines are shortened to the decision plus its ADR link (the AC-relevant facts of ADR 0005 stay, because ADRs are not among the `specInputs`); the first-administrator lines link ADR 0007; ADR 0007 limits the shared demo accounts to the local demo and points to the open hosted-sign-in row; ADR 0009 describes the design changes as still to be made. |

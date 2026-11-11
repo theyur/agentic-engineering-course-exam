@@ -22,7 +22,7 @@ signed-in registered users and administrators (SPEC §3; ARCHITECTURE §4).
   placeholder content. The full design preview is reached when the last extending slice ships.
 - Q: Does R7 also remove sentences that point to a control that has not shipped (for example "You can opt in
   later in your profile")? → A: No. R7 covers sections and links only; sentences keep the wording of the
-  previews.
+  previews. Detail: [ADR 0008](../../docs/adr/0008-partly-built-pages.md).
 - Q: Roadmap R6: do other slices need an idea brief? → A: Optional. This slice has none.
 - Q: Roadmap R9: should `CLAUDE.md` point to `docs/roadmap.md`? → A: Yes, one line under "Docs and git
   workflow", added in this change.
@@ -30,19 +30,20 @@ signed-in registered users and administrators (SPEC §3; ARCHITECTURE §4).
   sign-in check with its block, password change, account details, administrator creation and demo loading
   are Application use cases. The host keeps only the browser session. Sign in and Register are the app's own
   pages, styled with the design, not the framework's built-in account pages. Where the account model lives
-  and how the acting user reaches the use cases stays for the ADR (see "Decisions due before acceptance
-  criteria").
+  and how the acting user reaches the use cases are answered below (ADR 0004, ADR 0005).
 - Q: How does the first administrator account come to exist? → A: At startup, the system creates the
   administrator account if it does not exist yet, from an email and password held in the deployment's secret
   configuration (never in source control). There is no UI for it, and registration never creates an
-  administrator.
+  administrator. Detail: [ADR 0007](../../docs/adr/0007-startup-operator-tasks.md).
 - Q: The configured administrator email is later changed to an address that has no account. What happens?
   → A: Startup creates an administrator for the new email; the earlier administrator stays an administrator.
-  Version 1 can therefore have several administrators; removing the role is out of scope.
+  Version 1 can therefore have several administrators; removing the role is out of scope. Detail:
+  [ADR 0007](../../docs/adr/0007-startup-operator-tasks.md).
 - Q: Authentication UX (ARCHITECTURE §9): email verification, password recovery, outbound email, "Keep me
   signed in"? → A: No outbound email in this slice: no email verification and no password recovery. "Forgot
   password?" is removed from `design/pages/PageSignIn` first. "Keep me signed in" stays and keeps the session
-  across browser restarts. Users change their password on the Profile Account tab.
+  across browser restarts. Users change their password on the Profile Account tab. Detail:
+  [ADR 0009](../../docs/adr/0009-no-outbound-email.md).
 - Q: How long does "Keep me signed in" last? → A: 14 days, with the framework's sliding renewal: a kept
   session ends at least 7 and at most 14 days after the last visit. No custom session handling.
 - Q: Is there a temporary block after failed sign-ins, and what does the user see? → A: Yes. After 5 failed
@@ -71,6 +72,32 @@ signed-in registered users and administrators (SPEC §3; ARCHITECTURE §4).
   What does this slice show? → A: No name and no time-dependent text. The signed-in Home head is a plain
   "Today" heading; the Profile header shows initials and email, without "member since". The greeting, the
   date and "member since" arrive once time zones are decided; whether accounts get a name stays undecided.
+- Q: Where do the account and its rules live? → A: In the domain: the account (email, role, sign-in block
+  state, later the deactivated state) and its rules (sign-in block, email, password). Detail:
+  [ADR 0004](../../docs/adr/0004-account-model.md).
+- Q: What shape does the application surface have, and how does the acting user reach it? → A: Services
+  grouped by area, one method per use case. Use cases for signed-in users take the acting user as an explicit
+  parameter, with the anonymous visitor as one of its values; each use case returns a result with named
+  outcomes, and expected refusals are outcomes, not errors. Detail:
+  [ADR 0005](../../docs/adr/0005-use-case-convention.md).
+- Q: Does a result carry the spec's message text, or only a named outcome? → A: Both. Every refusal and every
+  operator result has a named outcome and carries the literal text this spec gives for it (for example "At
+  least 8 characters, with a number.", "administrator created"); pages show that text as given. Acceptance
+  tests can therefore check the exact results of FR-002 to FR-016. Detail:
+  [ADR 0005](../../docs/adr/0005-use-case-convention.md).
+- Q: Where do integration tests live, which database do they use, and do they run in CI? → A: Their own
+  project and database, run locally and in CI. Detail: [ADR 0006](../../docs/adr/0006-integration-tests.md).
+- Q: When and how does demo loading run, and where does the demo password come from? → A: At every start,
+  right after administrator creation, with the demo password from the deployment's secret configuration
+  (HP-021). Detail: [ADR 0007](../../docs/adr/0007-startup-operator-tasks.md).
+- Q: How does a local database get its schema before the startup tasks run? → A: In the Development
+  environment the host applies pending migrations at start, before administrator creation (HP-022). Other
+  environments apply none; hosted rollout stays slice 3's decision. Detail:
+  [ADR 0007](../../docs/adr/0007-startup-operator-tasks.md).
+- Q: How are the host and page requirements (HP-NNN) tested, and is a mocking library used? → A: A UI-test
+  project in the solution with component tests (bUnit) and tests of the running host, no browser automation in
+  this slice, and no mocking library: hand-written fakes. Detail:
+  [ADR 0006](../../docs/adr/0006-integration-tests.md).
 
 ## What acceptance tests can reach
 
@@ -80,9 +107,8 @@ its requirements:
 
 - **FR-NNN** are application behaviours. Each is reachable through an Application use case, so acceptance
   tests can verify it. Administrator creation (FR-014) and demo loading (FR-016) are operator capabilities:
-  no page offers them. The host runs administrator creation at every start (HP-018); how and when demo
-  loading runs is decided with demo-data seeding (see "Decisions due before acceptance criteria"). Acceptance
-  tests call both directly.
+  no page offers them. The host runs administrator creation at every start (HP-018) and demo loading right
+  after it (HP-021). Acceptance tests call both directly.
 - **HP-NNN** are host, page and integration requirements: what pages show, navigation, browser sessions,
   startup, configuration, logs and concurrency. They are verified by unit, integration and selective UI tests,
   not by acceptance tests.
@@ -388,6 +414,9 @@ and confirm that nothing is duplicated or changed.
 5. *(page)* **Given** the demo data, **When** someone inspects it, **Then** no demo account uses a real person's
    name or an address outside the reserved `example.com` domain, and the demo password is not in source
    control.
+6. *(page)* **Given** a demo password in the secret configuration, **When** the system starts, **Then** demo
+   loading runs right after administrator creation, its result is written to the operator log without the
+   password, and the system starts normally whatever the result.
 
 ---
 
@@ -536,11 +565,18 @@ and confirm that nothing is duplicated or changed.
   password or other secret.
 - **HP-018**: At every start, the host MUST run administrator creation with the email and password from the
   deployment's secret configuration, write the result to the operator log, and start normally whatever the
-  result.
+  result. An unexpected fault, such as an unreachable database, is logged without secrets and does not stop the
+  start either.
 - **HP-019**: The administrator credentials and the demo password MUST come from configuration outside source
   control.
 - **HP-020**: Two registrations with the same email at almost the same time MUST result in exactly one
   account; this is verified by an integration test against the real database.
+- **HP-021**: At every start, right after administrator creation, the host MUST run demo loading with the demo
+  password from the deployment's secret configuration, write the result to the operator log, and start
+  normally whatever the result. An unexpected fault is handled as in HP-018.
+- **HP-022**: In the Development environment, the host MUST apply pending schema migrations at start, before
+  administrator creation, so that a new local database works without a manual step. In other environments
+  the host applies no migrations.
 
 ### Design changes before build
 
@@ -596,19 +632,20 @@ Constitution IV requires `design/` to change before the app does. Before the aff
 The roadmap places these decisions in this slice, before `/speckit-ac-translate`. Each is decided with the
 owner and recorded as a dated line in `## Clarifications` that links its ADR; the detail stays in the ADR.
 
-- Where the account model lives, and how the acting user, the administrator role and (for slice 11) the
-  deactivated state reach Application use cases (ADR). Already fixed by owner answers and to be respected:
-  account behaviour is Application use cases; the sign-in block is the app's own rule with supplied time, not
-  the framework's lockout (FR-008); a password change must take effect at the next page load of other
-  sessions (HP-007), which needs session revalidation on every page load rather than the framework's default
-  30-minute interval.
-- The use-case convention: the shape of the Application surface that the UI and acceptance tests call (ADR).
-- The integration-test database approach (ADR).
-- The test-project layout.
-- Re-runnable demo-data seeding: how and when demo loading is run, and where the demo password is configured.
-- ADRs for decisions of this spec that bind later slices: R7 (partly built pages, sections and links only),
-  no outbound email and no password recovery, administrator creation at startup, and account behaviour as
-  Application use cases.
+- Decided, with their ADRs:
+  - where the account model lives, and how the acting user, the administrator role and (for slice 11) the
+    deactivated state reach Application use cases, including account behaviour as Application use cases:
+    [ADR 0004](../../docs/adr/0004-account-model.md);
+  - the use-case convention, the shape of the Application surface that the UI and acceptance tests call:
+    [ADR 0005](../../docs/adr/0005-use-case-convention.md);
+  - the integration-test database approach, the test-project layout, and the UI-test and mocking libraries:
+    [ADR 0006](../../docs/adr/0006-integration-tests.md);
+  - re-runnable demo-data seeding, administrator creation at startup, and the local schema at start:
+    [ADR 0007](../../docs/adr/0007-startup-operator-tasks.md);
+  - R7, partly built pages with sections and links only:
+    [ADR 0008](../../docs/adr/0008-partly-built-pages.md);
+  - no outbound email, no email verification and no password recovery:
+    [ADR 0009](../../docs/adr/0009-no-outbound-email.md).
 
 ## Assumptions
 
