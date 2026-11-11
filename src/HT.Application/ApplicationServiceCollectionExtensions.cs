@@ -17,6 +17,7 @@ public static class ApplicationServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         services.AddScoped<AccountService>();
         services.AddScoped<OperatorService>();
+        services.AddScoped<DemoDataService>();
         services.TryAddSingleton(TimeProvider.System);
         return services;
     }

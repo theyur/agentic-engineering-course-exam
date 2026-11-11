@@ -655,31 +655,31 @@ see that nothing is duplicated or changed.
 
 ### Tests for User Story 7
 
-- [ ] T114 [P] [US7] Create `tests/HT.UnitTests/Application/Operator/DemoLoadingTests.cs`:
+- [X] T114 [P] [US7] Create `tests/HT.UnitTests/Application/Operator/DemoLoadingTests.cs`:
   - US7-AS1 to AS4 with their literal values and texts;
   - an existing account of either role is reported `AlreadyExists` and left unchanged;
   - a second run leaves the same accounts and passwords (SC-006);
   - `DemoEmails` are exactly `demo1@example.com`, `demo2@example.com` and `demo3@example.com`, in that order, all in `example.com` (US7-AS5);
   - `Message` is null for `Loaded`.
-- [ ] T115 [P] [US7] Create `tests/HT.IntegrationTests/Operator/DemoLoadingTests.cs` on the real database. Clear the three demo emails first with `Sql.cs` (`DELETE` by `UserName`), so the test is independent of other tests:
+- [X] T115 [P] [US7] Create `tests/HT.IntegrationTests/Operator/DemoLoadingTests.cs` on the real database. Clear the three demo emails first with `Sql.cs` (`DELETE` by `UserName`), so the test is independent of other tests:
   - load, change `demo3@example.com`'s password, then load again;
   - the second load gives "already exists" three times, still three accounts, and the changed password still signs in.
 
 ### Implementation for User Story 7
 
-- [ ] T116 [US7] Create `src/HT.Application/Operator/DemoLoadingResult.cs` (`DemoLoadingOutcome`: `NoPassword`, `PasswordRuleNotMet`, `Loaded`; `Message`; `IReadOnlyList<DemoAccountResult>`) and `DemoAccountResult.cs` (`Email` as `string`, `Outcome`: `Created` or `AlreadyExists`, `Message`)
-- [ ] T117 [US7] Create `src/HT.Application/Operator/DemoDataService.cs` with a public constructor `(IAccountStore)`, `public static IReadOnlyList<string> DemoEmails`, and `LoadAsync(string? demoPassword, CancellationToken)`, following FR-016. Register it scoped in `src/HT.Application/ApplicationServiceCollectionExtensions.cs` (depends on T116)
-- [ ] T118 [US7] Add the demo step to `src/HT.Ui/Operator/StartupTasks.cs`, right after administrator creation, in its own scope and `try/catch`. It reads `Operator:DemoPassword` and logs:
+- [X] T116 [US7] Create `src/HT.Application/Operator/DemoLoadingResult.cs` (`DemoLoadingOutcome`: `NoPassword`, `PasswordRuleNotMet`, `Loaded`; `Message`; `IReadOnlyList<DemoAccountResult>`) and `DemoAccountResult.cs` (`Email` as `string`, `Outcome`: `Created` or `AlreadyExists`, `Message`)
+- [X] T117 [US7] Create `src/HT.Application/Operator/DemoDataService.cs` with a public constructor `(IAccountStore)`, `public static IReadOnlyList<string> DemoEmails`, and `LoadAsync(string? demoPassword, CancellationToken)`, following FR-016. Register it scoped in `src/HT.Application/ApplicationServiceCollectionExtensions.cs` (depends on T116)
+- [X] T118 [US7] Add the demo step to `src/HT.Ui/Operator/StartupTasks.cs`, right after administrator creation, in its own scope and `try/catch`. It reads `Operator:DemoPassword` and logs:
   - `Demo loading: {Result}` for `NoPassword` and `PasswordRuleNotMet`;
   - `Demo account {Email}: {Result}`, one line per email, for `Loaded`.
 
   A fault is logged as in T047 (HP-021).
-- [ ] T119 [P] [US7] In `tests/HT.ArchitectureTests/UiDependencyTests.cs`, extend T090's rule to `DemoDataService`, with the same scope: the types of the `HT.Ui` assembly
-- [ ] T120 [P] [US7] Add "Demo account" to `## Glossary` in `CONTEXT.md`: a synthetic account created by demo loading, NOT a real person's account (constitution I)
+- [X] T119 [P] [US7] In `tests/HT.ArchitectureTests/UiDependencyTests.cs`, extend T090's rule to `DemoDataService`, with the same scope: the types of the `HT.Ui` assembly
+- [X] T120 [P] [US7] Add "Demo account" to `## Glossary` in `CONTEXT.md`: a synthetic account created by demo loading, NOT a real person's account (constitution I)
 
 ### UI tests for User Story 7
 
-- [ ] T121 [US7] Create `tests/HT.UiTests/Operator/StartupTasksDemoTests.cs`, in the `StartupTasks` collection, using T051's harness. Each test starts from a dropped `HT-UI-MIGRATE`, so the three demo emails have no account:
+- [X] T121 [US7] Create `tests/HT.UiTests/Operator/StartupTasksDemoTests.cs`, in the `StartupTasks` collection, using T051's harness. Each test starts from a dropped `HT-UI-MIGRATE`, so the three demo emails have no account:
   - `Development` with `Operator:DemoPassword` set logs three `Demo account demo1@example.com: created`-style lines after the `Administrator creation:` line;
   - a second run through the harness's no-drop overload logs `already exists` for all three;
   - no `Operator:DemoPassword` logs `Demo loading: no demo password configured`;

@@ -18,6 +18,9 @@ internal static class StartupTasks
 
     public const string AdministratorPasswordKey = "Operator:AdministratorPassword";
 
+    /// <summary>The configuration key of the demo password (research R-11), kept out of source control.</summary>
+    public const string DemoPasswordKey = "Operator:DemoPassword";
+
     public static async Task RunAsync(IServiceProvider services, IHostEnvironment environment, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -34,6 +37,28 @@ internal static class StartupTasks
         }
 
         await RunStepAsync("Administrator creation", logger, () => CreateAdministratorAsync(services, logger));
+        await RunStepAsync("Demo loading", logger, () => LoadDemoDataAsync(services, logger));
+    }
+
+    // HP-021: at every start, right after administrator creation. The demo password is passed on and never logged.
+    private static async Task LoadDemoDataAsync(IServiceProvider services, ILogger logger)
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+
+        await using var scope = services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<DemoDataService>()
+            .LoadAsync(configuration[DemoPasswordKey], CancellationToken.None);
+
+        if (result.Outcome != DemoLoadingOutcome.Loaded)
+        {
+            logger.LogInformation("Demo loading: {Result}", result.Message);
+            return;
+        }
+
+        foreach (var account in result.Accounts)
+        {
+            logger.LogInformation("Demo account {Email}: {Result}", account.Email, account.Message);
+        }
     }
 
     // HP-018: at every start. The password is passed on and never logged.

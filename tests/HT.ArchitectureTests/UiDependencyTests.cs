@@ -44,12 +44,12 @@ public sealed class UiDependencyTests
     }
 
     [Fact]
-    public void OnlyTheHostsOperatorTypesMayDependOnTheOperatorService()
+    public void OnlyTheHostsOperatorTypesMayDependOnTheOperatorServices()
     {
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
             .And().DoNotResideInNamespaceMatching(@"^HT\.Ui\.Operator(\..*)?$")
-            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService)))
-            .Because("no page offers administrator creation or demo loading; only the startup tasks run them (FR-014, research R-13)")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService), typeof(DemoDataService)))
+            .Because("no page offers administrator creation or demo loading; only the startup tasks run them (FR-014, FR-016, research R-13)")
             .Check(ArchitectureModel.Architecture);
     }
 }
