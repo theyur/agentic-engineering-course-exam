@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "command": "uv run --no-project python -I \"$CLAUDE_PROJECT_DIR/.specify/extensions/ac/hooks/guard.py\"",
-  "installedAt": "2026-11-10T14:07:59+00:00",
+  "installedAt": "2026-11-11T15:02:39+00:00",
   "preexisting": {
     ".claude/settings.json": true,
     ".claude/agents": false,
@@ -36,7 +36,7 @@
     {
       "path": ".claude/skills/speckit-ac-critic/SKILL.md",
       "kind": "skill",
-      "sha256": "faf912ea1cddbc97de6999fdd0ee10a402c326983e1dbb2f26a03e2958ba27f3"
+      "sha256": "a1feff715dd7512c948a326d058d5cbf7c682b39e8aaeb753852f77800fcc82e"
     },
     {
       "path": ".claude/skills/speckit-ac-init/SKILL.md",
@@ -61,7 +61,7 @@
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-critic/SKILL.md",
       "kind": "extension",
-      "sha256": "6feac9b5cd69e268d2f8494d45724a350d8f6e8bdcc593a4f25ffa489c1f0489"
+      "sha256": "62a3b9291c8e3aac8cb5db487cc0c17e2dc934c02483102810a4bfda8c85b48f"
     },
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-init/SKILL.md",
@@ -106,7 +106,7 @@
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.critic.md",
       "kind": "extension",
-      "sha256": "291930631bce541183cf832e4808bbf48b38f4737455181a072f3ac5b7873ccd"
+      "sha256": "d520c4b6361ccc1d2a0a7231ef932d96a0c6496684d5c9cb2c84d01a287fb050"
     },
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.init.md",
@@ -131,7 +131,7 @@
     {
       "path": ".specify/extensions/ac/extension.yml",
       "kind": "extension",
-      "sha256": "bcf07605de261518b600a2f5d8d8ec903f043baab1dba29fc2774e60f4e55aac"
+      "sha256": "32447763db19551d3f9dedbeeee697cf06ff1e6c93d650921decb919ac7fb8a7"
     },
     {
       "path": ".specify/extensions/ac/hooks/guard.py",
