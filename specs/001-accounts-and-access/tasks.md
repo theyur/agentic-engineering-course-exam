@@ -549,34 +549,34 @@ screen. Check the navigation variant, the footer, Privacy and the visitor Home s
 
 ### Implementation for User Story 5
 
-- [ ] T092 [US5] Create `src/HT.Ui/Components/Layout/SiteNav.razor`, the only interactive component (`@rendermode InteractiveServer`). It renders TopNav and MobileNav from T012's markup and reads the cascading authentication state (research R-08):
+- [X] T092 [US5] Create `src/HT.Ui/Components/Layout/SiteNav.razor`, the only interactive component (`@rendermode InteractiveServer`). It renders TopNav and MobileNav from T012's markup and reads the cascading authentication state (research R-08):
   - the visitor sees "Habit Tracker" (→ `/`), "Sign in" and "Register";
   - a registered user or an administrator sees "Habit Tracker", "Today" and the `Avatar` menu with "Profile" and "Sign out", and no Admin, Catalog, Community, Goals or "+ New goal";
   - the narrow-screen menu lists the same items;
   - each menu button has `aria-expanded`, `aria-controls` and `aria-label`;
   - a menu closes on Esc (`@onkeydown`), on a click outside (a backdrop element) and on choosing an item, and focus returns to its button (`ElementReference.FocusAsync`);
   - Sign out is a form with `<AntiforgeryToken />` posting to `/account/sign-out` (HP-010).
-- [ ] T093 [P] [US5] Create `src/HT.Ui/Components/Layout/Footer.razor`, with the project line "Habit Tracker · Agentic Engineering course project" and a "Privacy" link (`/privacy`), and no "Send feedback"
-- [ ] T094 [US5] Put `SiteNav` and `Footer` in their slots in `src/HT.Ui/Components/Layout/MainLayout.razor` (depends on T092, T093)
-- [ ] T095 [US5] Build the visitor variant of `src/HT.Ui/Components/Pages/Home.razor` (`@page "/"`, the `NotAuthorized` content of an `AuthorizeView`) with the wording of `design/pages/PageHomeVisitor`. It has:
+- [X] T093 [P] [US5] Create `src/HT.Ui/Components/Layout/Footer.razor`, with the project line "Habit Tracker · Agentic Engineering course project" and a "Privacy" link (`/privacy`), and no "Send feedback"
+- [X] T094 [US5] Put `SiteNav` and `Footer` in their slots in `src/HT.Ui/Components/Layout/MainLayout.razor` (depends on T092, T093)
+- [X] T095 [US5] Build the visitor variant of `src/HT.Ui/Components/Pages/Home.razor` (`@page "/"`, the `NotAuthorized` content of an `AuthorizeView`) with the wording of `design/pages/PageHomeVisitor`. It has:
   - the hero: the headline "Keep the habits you choose", its one sentence, the primary "Register free" (→ `/register`) and the privacy line;
   - the three "How it works" steps;
   - nothing else from the preview (HP-009, HP-011, ADR 0008).
-- [ ] T096 [P] [US5] Create `src/HT.Ui/Components/Pages/Privacy.razor` (`@page "/privacy"`, anonymous access) from `design/pages/PagePrivacy` (HP-012)
+- [X] T096 [P] [US5] Create `src/HT.Ui/Components/Pages/Privacy.razor` (`@page "/privacy"`, anonymous access) from `design/pages/PagePrivacy` (HP-012)
 
 ### UI tests for User Story 5
 
-- [ ] T097 [P] [US5] Create `tests/HT.UiTests/Components/Layout/SiteNavTests.cs` (bUnit with test authorization):
+- [X] T097 [P] [US5] Create `tests/HT.UiTests/Components/Layout/SiteNavTests.cs` (bUnit with test authorization):
   - the items for each of the three audiences (US5-AS1 to AS3), with the absent links asserted;
   - the narrow menu lists the same items (AS4);
   - the avatar menu shows "A" for `ana@example.com`;
   - Esc, an outside click and choosing an item close each menu (AS5), and focus returns to its button;
   - `aria-expanded` follows the menu state;
   - the sign-out form posts to `/account/sign-out` with an antiforgery field.
-- [ ] T098 [P] [US5] Create `tests/HT.UiTests/Components/Layout/FooterTests.cs`: the project line and the "Privacy" link, and no "Send feedback" (US5-AS6)
-- [ ] T099 [P] [US5] Create `tests/HT.UiTests/Components/Pages/HomeVisitorTests.cs`: the hero texts, "Register free" links to `/register`, the three steps, and the absence of "Browse the catalog", the example goal card, the catalog preview and the bands (US5-AS8, AS9)
-- [ ] T100 [P] [US5] Create `tests/HT.UiTests/Components/Pages/PrivacyTests.cs`: the page states the three promises of HP-012
-- [ ] T101 [P] [US5] Create `tests/HT.UiTests/Host/ShellTests.cs`:
+- [X] T098 [P] [US5] Create `tests/HT.UiTests/Components/Layout/FooterTests.cs`: the project line and the "Privacy" link, and no "Send feedback" (US5-AS6)
+- [X] T099 [P] [US5] Create `tests/HT.UiTests/Components/Pages/HomeVisitorTests.cs`: the hero texts, "Register free" links to `/register`, the three steps, and the absence of "Browse the catalog", the example goal card, the catalog preview and the bands (US5-AS8, AS9)
+- [X] T100 [P] [US5] Create `tests/HT.UiTests/Components/Pages/PrivacyTests.cs`: the page states the three promises of HP-012
+- [X] T101 [P] [US5] Create `tests/HT.UiTests/Host/ShellTests.cs`:
   - an anonymous GET `/` returns 200 with "Sign in", "Register" and the footer's "Privacy";
   - GET `/privacy` returns 200 without a cookie (US5-AS7, AS10).
 

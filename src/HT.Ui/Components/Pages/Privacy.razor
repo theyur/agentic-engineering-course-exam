@@ -1,0 +1,26 @@
+@page "/privacy"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@* design/pages/PagePrivacy: only promises SPEC makes (HP-012). *@
+<PageTitle>Privacy · Habit Tracker</PageTitle>
+
+<div class="ht-container">
+    <div class="ht-page-head"><h1>Privacy</h1></div>
+    <div class="ht-prose">
+        <p class="ht-lead">Habit Tracker is a personal tracker. What you track is yours.</p>
+        <div class="ht-stack">
+            <section class="ht-card">
+                <h2 class="ht-card__title">What stays private</h2>
+                <p class="ht-card__text">Your goals, records, notes and custom habits are private. Only you can see them.</p>
+            </section>
+            <section class="ht-card">
+                <h2 class="ht-card__title">Community comparison is opt-in</h2>
+                <p class="ht-card__text">Community comparison is off by default. You take part only if you turn it on, and you can turn it off at any time. When you stop, you are removed from the community views; your private history stays. Custom habits never appear in community statistics.</p>
+            </section>
+            <section class="ht-card">
+                <h2 class="ht-card__title">What administrators can see</h2>
+                <p class="ht-card__text">Administrators manage the public catalog and accounts. They cannot see your goals, records, notes or personal reports.</p>
+            </section>
+        </div>
+    </div>
+</div>

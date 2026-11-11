@@ -1,0 +1,142 @@
+@rendermode InteractiveServer
+@implements IDisposable
+@using HT.Ui.Account
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@* design/components/TopNav and MobileNav, slice 1 (HP-010, research R-08). The only interactive component: it
+   holds the state of the avatar menu and the narrow-screen menu. Each closes on Esc, on a click outside (the
+   click-away layer) and on choosing an item, and focus goes back to its button. Opening one closes the other. *@
+<div @onkeydown="OnKeyDownAsync">
+    <header class="ht-nav">
+        <div class="ht-nav__inner">
+            <a class="ht-nav__brand" href="/">Habit Tracker</a>
+            @if (_email is null)
+            {
+                <div class="ht-nav__end">
+                    <a class="ht-btn ht-btn--ghost ht-hide-sm" href="/sign-in">Sign in</a>
+                    <a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="/register">Register</a>
+                    @MenuButton
+                </div>
+            }
+            else
+            {
+                <nav class="ht-nav__links" aria-label="Main">
+                    <a href="/" aria-current="@TodayCurrent" @onclick="ChooseItemAsync">Today</a>
+                </nav>
+                <div class="ht-nav__end">
+                    <div class="ht-account ht-layer-top">
+                        <button type="button" class="ht-avatar ht-avatar-btn" id="@AccountButtonId"
+                                aria-label="@("Account menu for " + _email)" aria-haspopup="true"
+                                aria-expanded="@AriaBool(_open == Menu.Account)" aria-controls="@AccountMenuId"
+                                @ref="_accountButton" @onclick="() => Toggle(Menu.Account)">@Avatar.LetterOf(_email)</button>
+                        @if (_open == Menu.Account)
+                        {
+                            <div class="ht-popover" id="@AccountMenuId">
+                                <a href="/profile" @onclick="ChooseItemAsync"><HtIcon Name="user" />Profile</a>
+                                @SignOutForm
+                            </div>
+                        }
+                    </div>
+                    @MenuButton
+                </div>
+            }
+        </div>
+    </header>
+    @if (_open == Menu.Mobile)
+    {
+        <nav class="ht-mobile-menu ht-layer-top" id="@MobileMenuId" aria-label="Menu">
+            @if (_email is null)
+            {
+                <a href="/sign-in" @onclick="ChooseItemAsync">Sign in</a>
+                <a href="/register" @onclick="ChooseItemAsync">Register</a>
+            }
+            else
+            {
+                <a href="/" aria-current="@TodayCurrent" @onclick="ChooseItemAsync"><HtIcon Name="list-checks" />Today</a>
+                <hr />
+                <a href="/profile" @onclick="ChooseItemAsync"><HtIcon Name="user" />Profile</a>
+                @SignOutForm
+            }
+        </nav>
+    }
+    @if (_open != Menu.None)
+    {
+        <div class="ht-clickaway" aria-hidden="true" @onclick="CloseAsync"></div>
+    }
+</div>
+
+@code {
+    public const string AccountButtonId = "account-menu-button";
+    public const string AccountMenuId = "account-menu";
+    public const string MobileButtonId = "mobile-menu-button";
+    public const string MobileMenuId = "mobile-menu";
+
+    private enum Menu
+    {
+        None,
+        Account,
+        Mobile,
+    }
+
+    private Menu _open;
+    private string? _email;
+    private ElementReference _accountButton;
+    private ElementReference _mobileButton;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    private RenderFragment MenuButton => @<button type="button" class="ht-nav__menu-btn" id="@MobileButtonId"
+                                                  aria-label="@(_open == Menu.Mobile ? "Close menu" : "Menu")"
+                                                  aria-expanded="@AriaBool(_open == Menu.Mobile)" aria-controls="@MobileMenuId"
+                                                  @ref="_mobileButton" @onclick="() => Toggle(Menu.Mobile)"><HtIcon Name="@(_open == Menu.Mobile ? "x" : "menu")" /></button>;
+
+    // A form, never a link (HP-006); the browser posts it, so the cookie is ended in an HTTP response.
+    private RenderFragment SignOutForm => @<form method="post" action="@SignOutEndpoint.Path"><AntiforgeryToken /><button type="submit"><HtIcon Name="log-out" />Sign out</button></form>;
+
+    private string? TodayCurrent => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Length == 0 ? "page" : null;
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        _email = user?.Identity?.IsAuthenticated == true ? user.Identity.Name ?? string.Empty : null;
+    }
+
+    private static string AriaBool(bool value) => value ? "true" : "false";
+
+    private void Toggle(Menu menu) => _open = _open == menu ? Menu.None : menu;
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await CloseAsync();
+        }
+    }
+
+    private Task ChooseItemAsync() => CloseAsync();
+
+    private async Task CloseAsync()
+    {
+        var closed = _open;
+        _open = Menu.None;
+        if (closed == Menu.Account)
+        {
+            await _accountButton.FocusAsync();
+        }
+        else if (closed == Menu.Mobile)
+        {
+            await _mobileButton.FocusAsync();
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _open = Menu.None;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}
