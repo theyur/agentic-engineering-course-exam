@@ -1,0 +1,7 @@
+{
+  "group": "features",
+  "feature": "specs/001-accounts-and-access",
+  "files": {
+    "tests/HT.AcceptanceTests/Features/F001/accounts-and-access.feature": "8a87656012b774ca898c3e3a380ff8128da840e23b3b8f3592e91c9cc09641b6"
+  }
+}

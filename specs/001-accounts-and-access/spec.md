@@ -59,6 +59,12 @@ signed-in registered users and administrators (SPEC §3; ARCHITECTURE §4).
 - Q: What is a valid email address? → A: After trimming: no spaces, exactly one "@", at least one character
   before it, and after it a domain of at least two non-empty parts separated by dots (`ana@example.com` is
   valid; `ana@`, `ana@example`, `ana@.` and `ana @example.com` are not).
+- Q: Is a domain with an empty part valid when two other parts are non-empty (`ana@example..com`,
+  `ana@.example.com`, `ana@example.com.`)? → A: No. Every part of the domain must be non-empty, so all three are
+  "Enter a valid email address.".
+- Q: Which email does an account keep when it is registered as `Mixed.Case@Example.com`? → A: Its trimmed,
+  lower-case form, `mixed.case@example.com`. Account details return that form, and the avatar letter comes from
+  it.
 - Q: What does Register say for an email that already has an account? → A: "An account with this email
   already exists." with a link to Sign in. Without email verification this cannot be hidden anyway.
 - Q: After a password change, how fast do the account's other sessions lose access? → A: Any new page load
@@ -448,9 +454,10 @@ and confirm that nothing is duplicated or changed.
 - **FR-002**: Every password the system sets (registration, password change, administrator, demo accounts)
   MUST have at least 8 characters and contain at least one digit. A password that does not is refused with
   "At least 8 characters, with a number."
-- **FR-003**: The system MUST treat an email as its trimmed, case-insensitive form and accept it only if it has
-  no spaces, exactly one "@", at least one character before it, and after it a domain of at least two
-  non-empty parts separated by dots; otherwise the result is "Enter a valid email address." Emails MUST be
+- **FR-003**: The system MUST treat an email as its trimmed, lower-case form and accept it only if it has
+  no spaces, exactly one "@", at least one character before it, and after it a domain of at least two parts
+  separated by dots, every part non-empty; otherwise the result is "Enter a valid email address." An account
+  keeps its email in that trimmed, lower-case form, and account details (FR-012) return it. Emails MUST be
   unique: a registration with an email that already belongs to an account is refused with "An account with
   this email already exists." Registration gives one result, checking in this order: valid email, password
   rule (FR-002), email not taken.
