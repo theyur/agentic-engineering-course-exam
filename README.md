@@ -50,7 +50,7 @@ Directory.Build.props    shared build settings (net10.0, nullable, warnings as e
 src/                     production projects
 tests/                   test projects
 docs/adr/                architecture decision records (0001-initial-setup.md)
-specs/                   Spec Kit feature folders: spec, plan, tasks (001-habit-catalog/)
+specs/                   Spec Kit feature folders: spec, plan, tasks (001-accounts-and-access/)
 .specify/                Spec Kit templates, scripts and the project constitution
 ```
 

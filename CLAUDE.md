@@ -60,6 +60,7 @@ A feature is not done without tests: unit (domain rules — targets, grace perio
 - `specs/NNN-<name>/` — Spec Kit feature folders (spec, plan, tasks) for features and bug fixes, created by `/speckit-specify`. `docs/tasks/` is legacy: don't add to it.
 - `.specify/memory/constitution.md` — engineering principles and quality gates; change only via `/speckit-constitution`.
 - `docs/adr/` — numbered ADRs: `0001-initial-setup.md`.
+- `docs/roadmap.md` — slice order, status and open decisions; keep it current as its "Updating this file" section says.
 - One branch per task; open PRs against `master`.
 
 ## PR review
