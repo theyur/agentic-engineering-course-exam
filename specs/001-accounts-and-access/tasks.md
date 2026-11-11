@@ -347,7 +347,7 @@ its exact text.
 
 ### Tests for User Story 1
 
-- [ ] T061 [P] [US1] Create `tests/HT.UnitTests/Application/Accounts/RegisterTests.cs`. Use `AccountService` over `FakeAccountStore` and a fake clock:
+- [X] T061 [P] [US1] Create `tests/HT.UnitTests/Application/Accounts/RegisterTests.cs`. Use `AccountService` over `FakeAccountStore` and a fake clock:
   - each of US1-AS1 to AS6 with its literal values and texts;
   - the check order InvalidEmail → PasswordRuleNotMet → EmailTaken;
   - ` Taken@Example.com ` is refused as taken;
@@ -355,15 +355,15 @@ its exact text.
   - 254 characters are accepted and 255 refused;
   - a lost race (`TakeEmailOnNextCreate`) gives `EmailTaken` with FR-003's text, and the store holds exactly one account for that email;
   - `Message` is null and `AccountId` is set for `Registered`.
-- [ ] T062 [P] [US1] Create `tests/HT.IntegrationTests/Accounts/RegistrationTests.cs` against the real database:
+- [X] T062 [P] [US1] Create `tests/HT.IntegrationTests/Accounts/RegistrationTests.cs` against the real database:
   - registering `Mixed.Case@Example.com` stores `mixed.case@example.com`, with the role registered user;
   - HP-020: two `RegisterAsync` calls with one email, started together in two scopes, give exactly one `Registered`, one `EmailTaken` and one row.
 
 ### Implementation for User Story 1
 
-- [ ] T063 [US1] Create `src/HT.Application/Accounts/RegistrationResult.cs`, with `RegistrationOutcome` (`InvalidEmail`, `PasswordRuleNotMet`, `EmailTaken`, `Registered`), `Message` and `AccountId?` ([contracts/application-api.md](contracts/application-api.md#result-shape))
-- [ ] T064 [US1] Add `RegisterAsync(string? email, string? password, CancellationToken)` to `src/HT.Application/Accounts/AccountService.cs`, following FR-001 to FR-004. It checks `Email.TryParse`, then `PasswordRule.IsMet`, then `FindByEmailAsync`, then `CreateAsync(email, Role.RegisteredUser, password)`. A store `EmailTaken` gives `EmailTaken` (depends on T063)
-- [ ] T065 [US1] Create `src/HT.Ui/Components/Account/RegisterForm.razor`, a static SSR `EditForm` with `method="post"`, `FormName="register"` and `[SupplyParameterFromForm]`. Initialise its model when it is null. It has:
+- [X] T063 [US1] Create `src/HT.Application/Accounts/RegistrationResult.cs`, with `RegistrationOutcome` (`InvalidEmail`, `PasswordRuleNotMet`, `EmailTaken`, `Registered`), `Message` and `AccountId?` ([contracts/application-api.md](contracts/application-api.md#result-shape))
+- [X] T064 [US1] Add `RegisterAsync(string? email, string? password, CancellationToken)` to `src/HT.Application/Accounts/AccountService.cs`, following FR-001 to FR-004. It checks `Email.TryParse`, then `PasswordRule.IsMet`, then `FindByEmailAsync`, then `CreateAsync(email, Role.RegisteredUser, password)`. A store `EmailTaken` gives `EmailTaken` (depends on T063)
+- [X] T065 [US1] Create `src/HT.Ui/Components/Account/RegisterForm.razor`, a static SSR `EditForm` with `method="post"`, `FormName="register"` and `[SupplyParameterFromForm]`. Initialise its model when it is null. It has:
   - the fields `Email`, `Password` (the password rule as help text) and `RepeatPassword`;
   - the neutral notice "Community comparison is off. You can opt in later in your profile.";
   - the button "Create account".
@@ -373,20 +373,20 @@ its exact text.
   - otherwise it calls `AccountService.RegisterAsync` and shows each refusal next to its field, with a "Sign in" link (`/sign-in`) for a taken email;
   - it keeps the entered email in every case;
   - on `Registered` it raises `OnSucceeded` with the result (HP-001, research R-08).
-- [ ] T066 [US1] Create `src/HT.Ui/Components/Pages/Register.razor` (`@page "/register"`), following `design/pages/PageRegister`:
+- [X] T066 [US1] Create `src/HT.Ui/Components/Pages/Register.razor` (`@page "/register"`), following `design/pages/PageRegister`:
   - it redirects a signed-in user to `/`;
   - it hosts `RegisterForm`;
   - in `OnSucceeded` it calls `AccountSession.SignInAsync(ActingUser.ForAccount(id, Role.RegisteredUser), keepSignedIn: false)` and redirects to `/` (HP-002; plan, spec discrepancy 2).
 
 ### UI tests for User Story 1
 
-- [ ] T067 [P] [US1] Create `tests/HT.UiTests/Components/Account/RegisterFormTests.cs` (bUnit, the real `AccountService` over `FakeAccountStore`):
+- [X] T067 [P] [US1] Create `tests/HT.UiTests/Components/Account/RegisterFormTests.cs` (bUnit, the real `AccountService` over `FakeAccountStore`):
   - the help text and the neutral notice are shown;
   - each refusal appears next to its field, with the email kept;
   - a taken email shows the "Sign in" link;
   - mismatched passwords show "The passwords do not match." and the use case is not called;
   - `OnSucceeded` fires once on success.
-- [ ] T068 [P] [US1] Create `tests/HT.UiTests/Host/RegisterPageTests.cs`:
+- [X] T068 [P] [US1] Create `tests/HT.UiTests/Host/RegisterPageTests.cs`:
   - a valid POST gives 302 to `/` and an `Identity.Application` cookie that is `Secure`, `HttpOnly`, `SameSite=Lax` and has no `Expires` (session cookie);
   - a signed-in GET `/register` gives 302 to `/`;
   - an invalid POST gives 200 with the message and the email kept;

@@ -9,6 +9,7 @@
                type="@Type"
                class="ht-input"
                autocomplete="@AutoComplete"
+               placeholder="@Placeholder"
                aria-describedby="@DescribedBy"
                Value="@Value"
                ValueChanged="@ValueChanged"
@@ -49,6 +50,10 @@
 
     [Parameter]
     public string? AutoComplete { get; set; }
+
+    /// <summary>An example value, such as <c>you@example.com</c>.</summary>
+    [Parameter]
+    public string? Placeholder { get; set; }
 
     [Parameter]
     public string? Value { get; set; }

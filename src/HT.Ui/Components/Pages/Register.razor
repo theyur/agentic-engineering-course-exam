@@ -1,0 +1,39 @@
+@page "/register"
+@using HT.Application.Accounts
+@using HT.Domain.Accounts
+@using HT.Ui.Account
+@using HT.Ui.Components.Account
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AccountSession AccountSession
+@inject NavigationManager Navigation
+@* design/pages/PageRegister. A signed-in user is sent to Home; a new account is signed in with a session cookie
+   and sent to Home (HP-001, HP-002, HP-009). *@
+<PageTitle>Create your account · Habit Tracker</PageTitle>
+
+<div class="ht-auth">
+    <h1>Create your account</h1>
+    <p class="ht-muted ht-auth__lead">Free. Your goals, records and notes stay private.</p>
+    <RegisterForm OnSucceeded="SignInAsync" />
+    <p class="ht-auth__alt">Already have an account? <a href="/sign-in">Sign in</a></p>
+</div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationState is not null && (await AuthenticationState).User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task SignInAsync(RegistrationResult result)
+    {
+        var accountId = result.AccountId
+            ?? throw new InvalidOperationException("A successful registration has an account.");
+        await AccountSession.SignInAsync(ActingUser.ForAccount(accountId, Role.RegisteredUser), keepSignedIn: false);
+        Navigation.NavigateTo("/");
+    }
+}

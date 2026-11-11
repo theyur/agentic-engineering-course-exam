@@ -1,0 +1,108 @@
+@using HT.Application.Accounts
+@inject AccountService AccountService
+@* design/pages/PageRegister: the form card. A static SSR form (research R-08): it calls the use case, shows each
+   refusal next to its field with the email kept and the passwords emptied, and on success raises OnSucceeded.
+   The page signs the new account in. *@
+<EditForm Model="Input" method="post" FormName="register" OnSubmit="SubmitAsync" class="ht-card ht-stack" novalidate>
+    <TextField Id="register-email"
+               Label="Email"
+               Type="email"
+               AutoComplete="email"
+               Placeholder="you@example.com"
+               Error="@_emailError"
+               ErrorContent="@(_emailTaken ? SignInLink : null)"
+               @bind-Value="Input.Email" />
+    <TextField Id="register-password"
+               Label="Password"
+               Type="password"
+               AutoComplete="new-password"
+               Help="@AccountTexts.PasswordRule"
+               Error="@_passwordError"
+               @bind-Value="Input.Password" />
+    <TextField Id="register-repeat-password"
+               Label="Repeat password"
+               Type="password"
+               AutoComplete="new-password"
+               Error="@_repeatError"
+               @bind-Value="Input.RepeatPassword" />
+    <Notice Neutral="true">Community comparison is <b>off</b>. You can opt in later in your profile.</Notice>
+    <HtButton Type="submit" Block="true">Create account</HtButton>
+</EditForm>
+
+@code {
+    /// <summary>Shown next to the repeated password when it differs; checked here, before the use case.</summary>
+    public const string PasswordsDoNotMatch = "The passwords do not match.";
+
+    [SupplyParameterFromForm(FormName = "register")]
+    private RegisterInput Input { get; set; } = default!;
+
+    /// <summary>Raised once with the <see cref="RegistrationOutcome.Registered"/> result.</summary>
+    [Parameter]
+    public EventCallback<RegistrationResult> OnSucceeded { get; set; }
+
+    private string? _emailError;
+    private bool _emailTaken;
+    private string? _passwordError;
+    private string? _repeatError;
+
+    private static readonly RenderFragment SignInLink = builder =>
+    {
+        builder.AddContent(0, " ");
+        builder.OpenElement(1, "a");
+        builder.AddAttribute(2, "href", "/sign-in");
+        builder.AddContent(3, "Sign in");
+        builder.CloseElement();
+    };
+
+    protected override void OnInitialized() => Input ??= new RegisterInput();
+
+    private async Task SubmitAsync()
+    {
+        _emailError = null;
+        _emailTaken = false;
+        _passwordError = null;
+        _repeatError = null;
+
+        if (!string.Equals(Input.Password, Input.RepeatPassword, StringComparison.Ordinal))
+        {
+            _repeatError = PasswordsDoNotMatch;
+            ClearPasswords();
+            return;
+        }
+
+        var result = await AccountService.RegisterAsync(Input.Email, Input.Password, CancellationToken.None);
+        switch (result.Outcome)
+        {
+            case RegistrationOutcome.Registered:
+                await OnSucceeded.InvokeAsync(result);
+                return;
+            case RegistrationOutcome.InvalidEmail:
+                _emailError = result.Message;
+                break;
+            case RegistrationOutcome.EmailTaken:
+                _emailError = result.Message;
+                _emailTaken = true;
+                break;
+            case RegistrationOutcome.PasswordRuleNotMet:
+                _passwordError = result.Message;
+                break;
+        }
+
+        ClearPasswords();
+    }
+
+    private void ClearPasswords()
+    {
+        Input.Password = null;
+        Input.RepeatPassword = null;
+    }
+
+    private sealed class RegisterInput
+    {
+        public string? Email { get; set; }
+
+        public string? Password { get; set; }
+
+        public string? RepeatPassword { get; set; }
+    }
+}
