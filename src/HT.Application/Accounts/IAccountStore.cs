@@ -18,12 +18,19 @@ public interface IAccountStore
     /// <summary>Creates an account. An email that already has an account gives <see cref="CreateAccountOutcome.EmailTaken"/>.</summary>
     Task<CreateAccountOutcome> CreateAsync(Email email, Role role, string password, CancellationToken cancellationToken);
 
-    /// <summary>True when the password is the account's password.</summary>
-    Task<bool> CheckPasswordAsync(AccountId id, string password, CancellationToken cancellationToken);
+    /// <summary>
+    /// The version of the account's password when <paramref name="password"/> is that password; null when it is
+    /// not, or when the account does not exist.
+    /// </summary>
+    Task<PasswordVersion?> CheckPasswordAsync(AccountId id, string password, CancellationToken cancellationToken);
 
     /// <summary>Changes the password and renews the security stamp; false when the current password no longer matches.</summary>
     Task<bool> ChangePasswordAsync(AccountId id, string currentPassword, string newPassword, CancellationToken cancellationToken);
 
-    /// <summary>Saves <paramref name="next"/> only when the stored state is still <paramref name="expected"/>.</summary>
-    Task<bool> TrySaveSignInBlockAsync(AccountId id, SignInBlock expected, SignInBlock next, CancellationToken cancellationToken);
+    /// <summary>
+    /// Saves <paramref name="next"/> only when the stored state is still <paramref name="expected"/> and, when
+    /// <paramref name="passwordVersion"/> is given, the password still has that version.
+    /// </summary>
+    Task<bool> TrySaveSignInBlockAsync(
+        AccountId id, SignInBlock expected, SignInBlock next, PasswordVersion? passwordVersion, CancellationToken cancellationToken);
 }

@@ -231,6 +231,38 @@ public sealed class SiteNavTests : BunitContext
         });
     }
 
+    [Fact]
+    public void HP_007_a_session_that_ends_while_the_page_is_open_reloads_the_page()
+    {
+        SignIn("RegisteredUser");
+        var navigation = Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo("/profile");
+        var cut = Render<SiteNav>();
+        Assert.DoesNotContain(navigation.History, entry => entry.Options.ForceLoad);
+
+        _authorization.SetNotAuthorized();
+
+        cut.WaitForAssertion(() =>
+        {
+            var reload = navigation.History.First();
+            Assert.True(reload.Options.ForceLoad);
+            Assert.Equal(navigation.BaseUri + "profile", reload.Uri);
+        });
+    }
+
+    [Fact]
+    public void A_signed_in_page_is_not_reloaded_while_the_session_stays_valid()
+    {
+        SignIn("RegisteredUser");
+        var navigation = Services.GetRequiredService<BunitNavigationManager>();
+        var cut = Render<SiteNav>();
+
+        cut.Render();
+        cut.Find(AccountButton).Click();
+
+        Assert.DoesNotContain(navigation.History, entry => entry.Options.ForceLoad);
+    }
+
     private const string AccountButton = "#" + SiteNav.AccountButtonId;
     private const string MobileButton = "#" + SiteNav.MobileButtonId;
     private const string MobileItems = "#" + SiteNav.MobileMenuId + " a, #" + SiteNav.MobileMenuId + " button";

@@ -52,8 +52,9 @@ public sealed class AccountService
     /// <summary>
     /// Signs an account in by email and password (FR-005 to FR-008), following research R-05: one time per
     /// attempt, a blocked account is refused without a password check, the password is checked once, and the
-    /// next block state is saved with compare-and-swap, re-reading after a lost race. Every failure gives the
-    /// same result.
+    /// next block state is saved with compare-and-swap, re-reading after a lost race. A correct check is bound to
+    /// the password version it was made against: after a password change every save loses, so the attempt fails
+    /// closed (HP-007). Every failure gives the same result.
     /// </summary>
     public async Task<SignInResult> SignInAsync(string? email, string? password, CancellationToken cancellationToken)
     {
@@ -71,14 +72,14 @@ public sealed class AccountService
             return SignInResult.Failed;
         }
 
-        var passwordIsCorrect = await _store.CheckPasswordAsync(account.Id, password ?? string.Empty, cancellationToken);
+        var passwordVersion = await _store.CheckPasswordAsync(account.Id, password ?? string.Empty, cancellationToken);
 
         for (var save = 0; save < MaxSignInSaves; save++)
         {
-            var next = passwordIsCorrect ? SignInBlock.AfterSuccess() : state.AfterFailureAt(now);
-            if (await _store.TrySaveSignInBlockAsync(account.Id, account.SignInBlock, next, cancellationToken))
+            var next = passwordVersion is not null ? SignInBlock.AfterSuccess() : state.AfterFailureAt(now);
+            if (await _store.TrySaveSignInBlockAsync(account.Id, account.SignInBlock, next, passwordVersion, cancellationToken))
             {
-                return passwordIsCorrect ? SignInResult.SignedIn(account) : SignInResult.Failed;
+                return passwordVersion is not null ? SignInResult.SignedIn(account, passwordVersion) : SignInResult.Failed;
             }
 
             if (await _store.FindByIdAsync(account.Id, cancellationToken) is not { } reread)
@@ -94,7 +95,7 @@ public sealed class AccountService
             }
         }
 
-        // Ten lost races in a row: fail closed, nothing saved.
+        // Ten lost races in a row, or a password changed after the check: fail closed, nothing saved.
         return SignInResult.Failed;
     }
 
@@ -129,7 +130,7 @@ public sealed class AccountService
         }
 
         var current = currentPassword ?? string.Empty;
-        if (!await _store.CheckPasswordAsync(account.Id, current, cancellationToken))
+        if (await _store.CheckPasswordAsync(account.Id, current, cancellationToken) is null)
         {
             return PasswordChangeResult.CurrentPasswordWrong;
         }

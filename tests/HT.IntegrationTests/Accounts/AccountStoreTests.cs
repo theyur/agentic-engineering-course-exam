@@ -77,8 +77,8 @@ public sealed class AccountStoreTests(DatabaseFixture database)
         var store = Store(scope);
         var account = await CreateAsync(store, "store-check@example.com");
 
-        Assert.True(await store.CheckPasswordAsync(account.Id, Password, CancellationToken.None));
-        Assert.False(await store.CheckPasswordAsync(account.Id, "walking13", CancellationToken.None));
+        Assert.NotNull(await store.CheckPasswordAsync(account.Id, Password, CancellationToken.None));
+        Assert.Null(await store.CheckPasswordAsync(account.Id, "walking13", CancellationToken.None));
     }
 
     [Fact]
@@ -89,11 +89,47 @@ public sealed class AccountStoreTests(DatabaseFixture database)
         var account = await CreateAsync(store, "store-cas@example.com");
         var blockedAt = database.Clock.GetUtcNow();
 
-        Assert.True(await store.TrySaveSignInBlockAsync(account.Id, SignInBlock.None, new SignInBlock(4, null), CancellationToken.None));
-        Assert.False(await store.TrySaveSignInBlockAsync(account.Id, SignInBlock.None, new SignInBlock(1, null), CancellationToken.None));
-        Assert.True(await store.TrySaveSignInBlockAsync(account.Id, new SignInBlock(4, null), new SignInBlock(5, blockedAt), CancellationToken.None));
-        Assert.False(await store.TrySaveSignInBlockAsync(account.Id, new SignInBlock(4, null), SignInBlock.None, CancellationToken.None));
-        Assert.True(await store.TrySaveSignInBlockAsync(account.Id, new SignInBlock(5, blockedAt), SignInBlock.None, CancellationToken.None));
+        Assert.True(await store.TrySaveSignInBlockAsync(account.Id, SignInBlock.None, new SignInBlock(4, null), null, CancellationToken.None));
+        Assert.False(await store.TrySaveSignInBlockAsync(account.Id, SignInBlock.None, new SignInBlock(1, null), null, CancellationToken.None));
+        Assert.True(await store.TrySaveSignInBlockAsync(account.Id, new SignInBlock(4, null), new SignInBlock(5, blockedAt), null, CancellationToken.None));
+        Assert.False(await store.TrySaveSignInBlockAsync(account.Id, new SignInBlock(4, null), SignInBlock.None, null, CancellationToken.None));
+        Assert.True(await store.TrySaveSignInBlockAsync(account.Id, new SignInBlock(5, blockedAt), SignInBlock.None, null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HP_007_a_save_bound_to_a_password_version_is_refused_after_a_password_change()
+    {
+        await using var scope = database.CreateScope();
+        var store = Store(scope);
+        var account = await CreateAsync(store, "store-version@example.com");
+
+        var checkedVersion = await store.CheckPasswordAsync(account.Id, Password, CancellationToken.None);
+        Assert.NotNull(checkedVersion);
+        Assert.True(await store.ChangePasswordAsync(account.Id, Password, "running34", CancellationToken.None));
+
+        Assert.False(await store.TrySaveSignInBlockAsync(
+            account.Id, SignInBlock.None, SignInBlock.AfterSuccess(), checkedVersion, CancellationToken.None));
+        var newVersion = await store.CheckPasswordAsync(account.Id, "running34", CancellationToken.None);
+        Assert.NotEqual(checkedVersion, newVersion);
+        Assert.True(await store.TrySaveSignInBlockAsync(
+            account.Id, SignInBlock.None, SignInBlock.AfterSuccess(), newVersion, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HP_007_a_sign_in_whose_password_changes_after_the_check_fails_and_saves_nothing()
+    {
+        await using var scope = database.CreateScope();
+        var store = Store(scope);
+        var account = await CreateAsync(store, "service-version@example.com");
+        await store.TrySaveSignInBlockAsync(account.Id, SignInBlock.None, new SignInBlock(2, null), null, CancellationToken.None);
+        var service = new AccountService(new PasswordChangingStore(store, account.Id, Password, "running34"), database.Clock);
+
+        var result = await service.SignInAsync("service-version@example.com", Password, CancellationToken.None);
+
+        Assert.Equal(SignInOutcome.Failed, result.Outcome);
+        Assert.Null(result.ActingUser);
+        var row = await Sql.ReadUserAsync(database.ConnectionString, "service-version@example.com");
+        Assert.Equal(2, row!["FailedSignInCount"]);
     }
 
     [Fact]
@@ -105,7 +141,7 @@ public sealed class AccountStoreTests(DatabaseFixture database)
         var blockedAt = database.Clock.GetUtcNow();
 
         await store.FindByIdAsync(account.Id, CancellationToken.None);
-        await store.TrySaveSignInBlockAsync(account.Id, SignInBlock.None, new SignInBlock(5, blockedAt), CancellationToken.None);
+        await store.TrySaveSignInBlockAsync(account.Id, SignInBlock.None, new SignInBlock(5, blockedAt), null, CancellationToken.None);
         var reread = await store.FindByIdAsync(account.Id, CancellationToken.None);
 
         Assert.Equal(new SignInBlock(5, blockedAt), reread!.SignInBlock);
@@ -117,14 +153,14 @@ public sealed class AccountStoreTests(DatabaseFixture database)
         await using var scope = database.CreateScope();
         var store = Store(scope);
         var account = await CreateAsync(store, "store-change@example.com");
-        await store.TrySaveSignInBlockAsync(account.Id, SignInBlock.None, new SignInBlock(3, null), CancellationToken.None);
+        await store.TrySaveSignInBlockAsync(account.Id, SignInBlock.None, new SignInBlock(3, null), null, CancellationToken.None);
 
         Assert.True(await store.ChangePasswordAsync(account.Id, Password, "running34", CancellationToken.None));
         Assert.False(await store.ChangePasswordAsync(account.Id, Password, "running56", CancellationToken.None));
 
         var row = await Sql.ReadUserAsync(database.ConnectionString, "store-change@example.com");
         Assert.Equal(3, row!["FailedSignInCount"]);
-        Assert.True(await store.CheckPasswordAsync(account.Id, "running34", CancellationToken.None));
+        Assert.NotNull(await store.CheckPasswordAsync(account.Id, "running34", CancellationToken.None));
     }
 
     [Fact]
@@ -135,6 +171,43 @@ public sealed class AccountStoreTests(DatabaseFixture database)
     }
 
     private static IAccountStore Store(AsyncServiceScope scope) => scope.ServiceProvider.GetRequiredService<IAccountStore>();
+
+    /// <summary>
+    /// The real store, with one interleaving forced: right after the first password check returns, the password
+    /// is changed in the database, as another session's password change would (HP-007).
+    /// </summary>
+    private sealed class PasswordChangingStore(IAccountStore inner, AccountId id, string current, string changed) : IAccountStore
+    {
+        private bool _changed;
+
+        public Task<Account?> FindByEmailAsync(Email email, CancellationToken cancellationToken) =>
+            inner.FindByEmailAsync(email, cancellationToken);
+
+        public Task<Account?> FindByIdAsync(AccountId accountId, CancellationToken cancellationToken) =>
+            inner.FindByIdAsync(accountId, cancellationToken);
+
+        public Task<CreateAccountOutcome> CreateAsync(Email email, Role role, string password, CancellationToken cancellationToken) =>
+            inner.CreateAsync(email, role, password, cancellationToken);
+
+        public async Task<PasswordVersion?> CheckPasswordAsync(AccountId accountId, string password, CancellationToken cancellationToken)
+        {
+            var version = await inner.CheckPasswordAsync(accountId, password, cancellationToken);
+            if (!_changed)
+            {
+                _changed = true;
+                Assert.True(await inner.ChangePasswordAsync(id, current, changed, cancellationToken));
+            }
+
+            return version;
+        }
+
+        public Task<bool> ChangePasswordAsync(AccountId accountId, string currentPassword, string newPassword, CancellationToken cancellationToken) =>
+            inner.ChangePasswordAsync(accountId, currentPassword, newPassword, cancellationToken);
+
+        public Task<bool> TrySaveSignInBlockAsync(
+            AccountId accountId, SignInBlock expected, SignInBlock next, PasswordVersion? passwordVersion, CancellationToken cancellationToken) =>
+            inner.TrySaveSignInBlockAsync(accountId, expected, next, passwordVersion, cancellationToken);
+    }
 
     private static Email EmailOf(string text) =>
         Email.TryParse(text, out var email) ? email : throw new ArgumentException("Not a valid email.", nameof(text));

@@ -16,6 +16,7 @@ public sealed class FakeAccountStore : IAccountStore
     private bool _nextLostSaveIsOne = true;
     private DateTimeOffset? _blockOnNextSave;
     private bool _takeEmailOnNextCreate;
+    private string? _passwordAfterNextCheck;
 
     /// <summary>Calls of <see cref="TrySaveSignInBlockAsync"/>, lost ones included.</summary>
     public int SaveCount { get; private set; }
@@ -73,6 +74,18 @@ public sealed class FakeAccountStore : IAccountStore
         lock (_gate)
         {
             _takeEmailOnNextCreate = true;
+        }
+    }
+
+    /// <summary>
+    /// Makes the next password check return its verdict and then change the password to
+    /// <paramref name="newPassword"/>, as a password change in another session right after the check would.
+    /// </summary>
+    public void ChangePasswordAfterNextCheck(string newPassword)
+    {
+        lock (_gate)
+        {
+            _passwordAfterNextCheck = newPassword;
         }
     }
 
@@ -164,13 +177,23 @@ public sealed class FakeAccountStore : IAccountStore
         }
     }
 
-    public Task<bool> CheckPasswordAsync(AccountId id, string password, CancellationToken cancellationToken)
+    public Task<PasswordVersion?> CheckPasswordAsync(AccountId id, string password, CancellationToken cancellationToken)
     {
         lock (_gate)
         {
             PasswordCheckCount++;
             var entry = FindEntry(id);
-            return Task.FromResult(entry is not null && string.Equals(entry.Password, password, StringComparison.Ordinal));
+            var version = entry is not null && string.Equals(entry.Password, password, StringComparison.Ordinal)
+                ? entry.PasswordVersion
+                : null;
+
+            if (entry is not null && _passwordAfterNextCheck is { } changed)
+            {
+                _passwordAfterNextCheck = null;
+                entry.ChangePassword(changed);
+            }
+
+            return Task.FromResult(version);
         }
     }
 
@@ -185,12 +208,13 @@ public sealed class FakeAccountStore : IAccountStore
                 return Task.FromResult(false);
             }
 
-            entry.Password = newPassword;
+            entry.ChangePassword(newPassword);
             return Task.FromResult(true);
         }
     }
 
-    public Task<bool> TrySaveSignInBlockAsync(AccountId id, SignInBlock expected, SignInBlock next, CancellationToken cancellationToken)
+    public Task<bool> TrySaveSignInBlockAsync(
+        AccountId id, SignInBlock expected, SignInBlock next, PasswordVersion? passwordVersion, CancellationToken cancellationToken)
     {
         lock (_gate)
         {
@@ -217,7 +241,8 @@ public sealed class FakeAccountStore : IAccountStore
                 return Task.FromResult(false);
             }
 
-            if (entry.Account.SignInBlock != expected)
+            if (entry.Account.SignInBlock != expected
+                || (passwordVersion is not null && passwordVersion != entry.PasswordVersion))
             {
                 return Task.FromResult(false);
             }
@@ -232,8 +257,19 @@ public sealed class FakeAccountStore : IAccountStore
 
     private sealed class Entry(Account account, string password)
     {
+        private int _passwordChanges;
+
         public Account Account { get; set; } = account;
 
-        public string Password { get; set; } = password;
+        public string Password { get; private set; } = password;
+
+        /// <summary>Renewed by every password change, like the security stamp.</summary>
+        public PasswordVersion PasswordVersion => new($"{Account.Id.Value:N}-{_passwordChanges}");
+
+        public void ChangePassword(string newPassword)
+        {
+            Password = newPassword;
+            _passwordChanges++;
+        }
     }
 }

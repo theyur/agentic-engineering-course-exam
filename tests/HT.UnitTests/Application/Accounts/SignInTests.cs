@@ -218,6 +218,34 @@ public sealed class SignInTests
     }
 
     [Fact]
+    public async Task A_sign_in_carries_the_password_version_it_was_checked_against()
+    {
+        _store.Add("version@example.com", Password);
+
+        var result = await SignInAsync("version@example.com", Password);
+
+        Assert.Equal(SignInOutcome.SignedIn, result.Outcome);
+        Assert.NotNull(result.PasswordVersion);
+        Assert.Null((await SignInAsync("version@example.com", WrongPassword)).PasswordVersion);
+    }
+
+    [Fact]
+    public async Task HP_007_a_password_change_right_after_a_correct_check_fails_the_sign_in_closed()
+    {
+        var account = _store.Add("stale@example.com", Password, block: new SignInBlock(2, null));
+        _store.ChangePasswordAfterNextCheck("running34");
+
+        var result = await SignInAsync("stale@example.com", Password);
+
+        AssertFailed(result);
+        Assert.Null(result.PasswordVersion);
+        Assert.Equal(1, _store.PasswordCheckCount);
+        Assert.Equal(0, _store.SuccessfulSaveCount);
+        Assert.Equal(new SignInBlock(2, null), _store.Find("stale@example.com")!.SignInBlock);
+        Assert.Equal("running34", _store.PasswordOf(account.Id));
+    }
+
+    [Fact]
     public async Task SC_004_unknown_email_wrong_password_and_block_give_the_identical_result()
     {
         _store.Add("same-wrong@example.com", Password);

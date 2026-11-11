@@ -100,8 +100,17 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        var wasSignedIn = _email is not null;
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
         _email = user?.Identity?.IsAuthenticated == true ? user.Identity.Name ?? string.Empty : null;
+
+        // The circuit's revalidation ended the session while the page stays open, for example after a password
+        // change in another browser (HP-007). The page body is rendered statically, so reload it: the new request
+        // has no valid session, and Profile sends the browser to Sign in, Home shows the visitor Home.
+        if (wasSignedIn && _email is null)
+        {
+            Navigation.Refresh(forceReload: true);
+        }
     }
 
     private static string AriaBool(bool value) => value ? "true" : "false";

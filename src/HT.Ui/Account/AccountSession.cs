@@ -1,3 +1,4 @@
+using HT.Application.Accounts;
 using HT.Domain.Accounts;
 using HT.Persistence.Identity;
 using Microsoft.AspNetCore.Identity;
@@ -15,6 +16,24 @@ internal sealed class AccountSession(SignInManager<HtUser> signInManager, UserMa
     {
         var user = await LoadAsync(signedIn);
         await signInManager.SignInAsync(user, isPersistent: keepSignedIn);
+    }
+
+    /// <summary>
+    /// Signs in the account of a successful sign-in, but only while its password still has the version the
+    /// sign-in was checked against; false, with no cookie, after a password change in between (HP-007). The
+    /// cookie carries the stamp of the loaded account, so it is exactly that version.
+    /// </summary>
+    public async Task<bool> SignInAsync(ActingUser signedIn, PasswordVersion passwordVersion, bool keepSignedIn)
+    {
+        ArgumentNullException.ThrowIfNull(passwordVersion);
+        var user = await LoadAsync(signedIn);
+        if (!string.Equals(await userManager.GetSecurityStampAsync(user), passwordVersion.Value, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        await signInManager.SignInAsync(user, isPersistent: keepSignedIn);
+        return true;
     }
 
     /// <summary>Re-issues the cookie with the account's current security stamp, keeping its persistence.</summary>

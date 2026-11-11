@@ -35,7 +35,15 @@
     {
         var actingUser = success.Result.ActingUser
             ?? throw new InvalidOperationException("A successful sign-in has an acting user.");
-        await AccountSession.SignInAsync(actingUser, success.KeepSignedIn);
+        var passwordVersion = success.Result.PasswordVersion
+            ?? throw new InvalidOperationException("A successful sign-in has a password version.");
+        if (!await AccountSession.SignInAsync(actingUser, passwordVersion, success.KeepSignedIn))
+        {
+            // The password changed after it was checked (HP-007): no session; Sign in again, without a cookie.
+            Navigation.NavigateTo("/sign-in");
+            return;
+        }
+
         Navigation.NavigateTo(RedirectHttpResult.IsLocalUrl(ReturnUrl) ? ReturnUrl! : "/");
     }
 }

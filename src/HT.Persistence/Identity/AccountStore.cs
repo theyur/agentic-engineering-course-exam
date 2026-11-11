@@ -82,13 +82,23 @@ internal sealed class AccountStore : IAccountStore
         }
     }
 
-    public async Task<bool> CheckPasswordAsync(AccountId id, string password, CancellationToken cancellationToken)
+    // The password version is the security stamp read with the hash that was checked: every password change
+    // renews it, and the session cookie carries it (HP-007).
+    public async Task<PasswordVersion?> CheckPasswordAsync(AccountId id, string password, CancellationToken cancellationToken)
     {
         _db.ChangeTracker.Clear();
         try
         {
             var user = await _users.FindByIdAsync(id.Value.ToString()).ConfigureAwait(false);
-            return user is not null && await _users.CheckPasswordAsync(user, password).ConfigureAwait(false);
+            if (user is null || !await _users.CheckPasswordAsync(user, password).ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            var stamp = await _users.GetSecurityStampAsync(user).ConfigureAwait(false);
+            return string.IsNullOrEmpty(stamp)
+                ? throw new InvalidOperationException("A stored account has no security stamp.")
+                : new PasswordVersion(stamp);
         }
         finally
         {
@@ -126,12 +136,18 @@ internal sealed class AccountStore : IAccountStore
         }
     }
 
-    public async Task<bool> TrySaveSignInBlockAsync(AccountId id, SignInBlock expected, SignInBlock next, CancellationToken cancellationToken)
+    public async Task<bool> TrySaveSignInBlockAsync(
+        AccountId id, SignInBlock expected, SignInBlock next, PasswordVersion? passwordVersion, CancellationToken cancellationToken)
     {
         var query = _db.Users.Where(u => u.Id == id.Value && u.FailedSignInCount == expected.FailedCount);
         query = expected.BlockedSince is { } since
             ? query.Where(u => u.SignInBlockedSince == since)
             : query.Where(u => u.SignInBlockedSince == null);
+        if (passwordVersion is not null)
+        {
+            var stamp = passwordVersion.Value;
+            query = query.Where(u => u.SecurityStamp == stamp);
+        }
 
         var rows = await query.ExecuteUpdateAsync(
                 setters => setters
