@@ -105,10 +105,15 @@ not edit the plan artifacts; the owner's decision is recorded here.
   - the AC export refuses `InternalsVisibleTo` in AC surface projects;
   - the port and the service constructors become public, while `AccountStore`, `HtDbContext`, the design-time factory and the migration stay internal;
   - the replacement rules are T053's rule (no `HT.Ui` type depends on `IAccountStore`) and T090's rule (only `HT.Ui.Operator` uses the operator services), with T026's `AcSurfaceTests`;
+  - how constitution III still holds with a public `IAccountStore.FindByIdAsync`: the port is persistence plumbing that only `HT.Application` calls and `HT.Persistence` implements, not a use case. No `HT.Ui` type may depend on it (T053). Every use case for signed-in users still takes the acting user and acts only on its account, and none takes an `AccountId` (T078's reflection test). The plan's internal port had the same method, so no new lookup is added;
   - tests reach the database with plain SQL;
   - the rejected options: the internal port of research R-13 (fails the export), and changing the speckit-ac package to accept `InternalsVisibleTo`.
 
   It supersedes research R-13's choice for this and later slices. Link it from `docs/roadmap.md`'s decision rows only if the roadmap has a row for it.
+
+  Also draft the dated `## Clarifications` line below and show it to the owner. Do not write it into `spec.md` until the owner approves it, and do it before T127:
+
+  `- Q: Is the account store port internal, given that the AC reference export refuses InternalsVisibleTo? → A: No. IAccountStore and the service constructors are public; architecture rules keep HT.Ui away from the port and from the operator services. Detail: [ADR 0010](../../docs/adr/0010-public-account-store-port.md).`
 - [ ] T003 [P] Add `dotnet-ef` (the current 10.0.x, `rollForward: false`, like `ilspycmd`) to `dotnet-tools.json`, then run `dotnet tool restore`
 - [ ] T004 [P] In `src/HT.Application/HT.Application.csproj`, add `Microsoft.Extensions.DependencyInjection.Abstractions` (10.0.x). No `InternalsVisibleTo` (see Conventions and "Plan discrepancies" 1)
 - [ ] T005 [P] In `src/HT.Persistence/HT.Persistence.csproj`, add `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.AspNetCore.Identity.EntityFrameworkCore` and `Microsoft.EntityFrameworkCore.Design` (`PrivateAssets="all"`). Use the same 10.0.x patch for all three (research R-01). No `InternalsVisibleTo` (see Conventions)
@@ -202,6 +207,7 @@ needs them.
   - `TrySaveSignInBlockAsync` compares against `expected`;
   - `LoseNextSaves(int n)` makes the next `n` saves return `false`. Before each lost save it moves the stored state to another unblocked value, alternating between (1, none) and (0, none) as a parallel failure and a parallel success would, so the account never becomes blocked and only the race limit can end the retries;
   - `BlockOnNextSave(DateTimeOffset at)` makes the next save return `false` after storing (5, `at`), as a parallel fifth failure would;
+  - `TakeEmailOnNextCreate()` makes the next `CreateAsync` store the account as a parallel registration would, then return `EmailTaken`. `FindByEmailAsync` before it still finds nothing, so `RegisterAsync` reaches the store's `EmailTaken` branch;
   - counters for saves and password checks let tests assert "nothing saved" and "password not checked".
 - [ ] T031 [P] Create `tests/HT.ArchitectureTests/ApplicationDependencyTests.cs`: `HT.Application` depends only on `HT.Domain` among `HT.*`, and on no type in `Microsoft.EntityFrameworkCore`, `Microsoft.AspNetCore` or `Microsoft.Extensions.Identity`
 - [ ] T032 [P] Create `tests/HT.ArchitectureTests/ClockReadTests.cs`: no type in `HT.Domain` or `HT.Application` calls `DateTime.Now`, `DateTime.UtcNow`, `DateTime.Today`, `DateTimeOffset.Now`, `DateTimeOffset.UtcNow`, `TimeZoneInfo.Local` or `CultureInfo.CurrentCulture` (constitution II)
@@ -347,7 +353,7 @@ its exact text.
   - ` Taken@Example.com ` is refused as taken;
   - a new account is stored in normal form with `Role.RegisteredUser`;
   - 254 characters are accepted and 255 refused;
-  - a store `EmailTaken` (a lost race) gives `EmailTaken`;
+  - a lost race (`TakeEmailOnNextCreate`) gives `EmailTaken` with FR-003's text, and the store holds exactly one account for that email;
   - `Message` is null and `AccountId` is set for `Registered`.
 - [ ] T062 [P] [US1] Create `tests/HT.IntegrationTests/Accounts/RegistrationTests.cs` against the real database:
   - registering `Mixed.Case@Example.com` stores `mixed.case@example.com`, with the role registered user;
@@ -821,7 +827,7 @@ Task: "T070 [US2] Parallel block test in tests/HT.IntegrationTests/Accounts/Sign
 - Create the repository secret `CI_SQL_SA_PASSWORD` (a throwaway SA password) before the PR's CI run.
   Without it, T122's job skips. The Sonar gate then stays unanswered (skipped, not green), and the PR cannot
   pass its gates (plan, Risks). Only the owner can create it; no task here sets or reads its value.
-- Approve the dated `## Clarifications` line in `spec.md` that names the public-port decision and links
+- Approve the dated `## Clarifications` line that T002 drafts (under `### Session 2026-11-11` in `spec.md`). It names the public-port decision and links
   ADR 0010 (T002), as the constitution's Decision Discipline asks. `spec.md` is under the `sources` lock, so
   after the edit, `ac_lock.py verify sources` reports spec drift (exit 3). The owner confirms it with
   `ac_lock.py confirm-spec sources`, as was done on 2026-11-11 for the email length. The line names a
