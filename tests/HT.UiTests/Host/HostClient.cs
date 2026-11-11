@@ -77,7 +77,7 @@ public static partial class HostClient
     /// Creates an account directly through the host's account store, so a story's host tests do not depend on
     /// another story's page.
     /// </summary>
-    public static async Task<Account> CreateAccountAsync(
+    public static async Task<HT.Domain.Accounts.Account> CreateAccountAsync(
         this HostFixture host, string email, string password, Role role = Role.RegisteredUser)
     {
         ArgumentNullException.ThrowIfNull(host);

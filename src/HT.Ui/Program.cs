@@ -44,6 +44,7 @@ builder.Services.Configure<SecurityStampValidatorOptions>(options => options.Val
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<AccountSession>();
+builder.Services.AddScoped<ActingUserAccessor>();
 
 var app = builder.Build();
 

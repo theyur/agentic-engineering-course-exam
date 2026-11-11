@@ -97,4 +97,24 @@ public sealed class AccountService
         // Ten lost races in a row: fail closed, nothing saved.
         return SignInResult.Failed;
     }
+
+    /// <summary>
+    /// Reads the acting user's own email and role (FR-009 to FR-012, FR-015). It reads only the account of
+    /// <paramref name="actingUser"/>, whatever its role. An anonymous visitor, or an account that no longer
+    /// exists, is not signed in.
+    /// </summary>
+    public async Task<AccountDetailsResult> GetAccountDetailsAsync(ActingUser actingUser, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        if (await FindActingAccountAsync(actingUser, cancellationToken) is not { } account)
+        {
+            return AccountDetailsResult.NotSignedIn;
+        }
+
+        return AccountDetailsResult.Found(new AccountDetails(account.Email.Value, account.Role));
+    }
+
+    /// <summary>The acting user's own account, or null for the anonymous visitor or an account that is gone.</summary>
+    private async Task<Account?> FindActingAccountAsync(ActingUser actingUser, CancellationToken cancellationToken) =>
+        actingUser.AccountId is { } id ? await _store.FindByIdAsync(id, cancellationToken) : null;
 }

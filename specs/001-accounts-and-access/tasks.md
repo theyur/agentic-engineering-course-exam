@@ -475,22 +475,22 @@ an administrator (each gets only their own email and role).
 
 ### Tests for User Story 3
 
-- [ ] T078 [P] [US3] Create `tests/HT.UnitTests/Application/Accounts/AccountDetailsTests.cs`:
+- [X] T078 [P] [US3] Create `tests/HT.UnitTests/Application/Accounts/AccountDetailsTests.cs`:
   - US3-AS1 to AS5 with their literal values;
   - an acting user whose account no longer exists gets `NotSignedIn`;
   - a reflection test checks that no public method of `AccountService` takes an `AccountId` or `Guid` parameter, which keeps FR-010 visible (SC-005).
-- [ ] T079 [P] [US3] Create `tests/HT.IntegrationTests/Accounts/AccountDetailsTests.cs`: US3-AS4 and AS5 against the real store. A registered user and an administrator each get only their own normal-form email and role
-- [ ] T080 [P] [US3] Create `tests/HT.IntegrationTests/Accounts/ClaimsPrincipalFactoryTests.cs`: the `IUserClaimsPrincipalFactory<HtUser>` from `AddHtPersistence` issues `NameIdentifier` = the id, `Name` = the normal-form email, the role claim for each role, and the security-stamp claim
+- [X] T079 [P] [US3] Create `tests/HT.IntegrationTests/Accounts/AccountDetailsTests.cs`: US3-AS4 and AS5 against the real store. A registered user and an administrator each get only their own normal-form email and role
+- [X] T080 [P] [US3] Create `tests/HT.IntegrationTests/Accounts/ClaimsPrincipalFactoryTests.cs`: the `IUserClaimsPrincipalFactory<HtUser>` from `AddHtPersistence` issues `NameIdentifier` = the id, `Name` = the normal-form email, the role claim for each role, and the security-stamp claim
 
 ### Implementation for User Story 3
 
-- [ ] T081 [US3] Create `src/HT.Application/Accounts/AccountDetailsResult.cs` (`AccountDetailsOutcome`: `NotSignedIn`, `Found`; `Message`; `AccountDetails?`) and `AccountDetails.cs` (`Email` as `string` in normal form, `Role`)
-- [ ] T082 [US3] Add `GetAccountDetailsAsync(ActingUser actingUser, CancellationToken)` to `src/HT.Application/Accounts/AccountService.cs`. An anonymous visitor, or an account that is not found, gives `NotSignedIn` with "You are not signed in.". Otherwise it is `Found` with the store's account for `actingUser.AccountId` only (FR-009 to FR-012, FR-015; SC-003) (depends on T081)
-- [ ] T083 [US3] Create `src/HT.Ui/Account/ActingUserAccessor.cs`. It turns the current `ClaimsPrincipal` into `ActingUser`: `ForAccount` from `NameIdentifier` and the role claim, and `Anonymous` when the principal is not authenticated or a claim is missing or invalid (research R-07). Register it scoped in `src/HT.Ui/Program.cs`
+- [X] T081 [US3] Create `src/HT.Application/Accounts/AccountDetailsResult.cs` (`AccountDetailsOutcome`: `NotSignedIn`, `Found`; `Message`; `AccountDetails?`) and `AccountDetails.cs` (`Email` as `string` in normal form, `Role`)
+- [X] T082 [US3] Add `GetAccountDetailsAsync(ActingUser actingUser, CancellationToken)` to `src/HT.Application/Accounts/AccountService.cs`. An anonymous visitor, or an account that is not found, gives `NotSignedIn` with "You are not signed in.". Otherwise it is `Found` with the store's account for `actingUser.AccountId` only (FR-009 to FR-012, FR-015; SC-003) (depends on T081)
+- [X] T083 [US3] Create `src/HT.Ui/Account/ActingUserAccessor.cs`. It turns the current `ClaimsPrincipal` into `ActingUser`: `ForAccount` from `NameIdentifier` and the role claim, and `Anonymous` when the principal is not authenticated or a claim is missing or invalid (research R-07). Register it scoped in `src/HT.Ui/Program.cs`
 
 ### UI tests for User Story 3
 
-- [ ] T084 [P] [US3] Create `tests/HT.UiTests/Account/ActingUserAccessorTests.cs`: an authenticated principal for each role, an anonymous principal, and principals with a missing or malformed id or role
+- [X] T084 [P] [US3] Create `tests/HT.UiTests/Account/ActingUserAccessorTests.cs`: an authenticated principal for each role, an anonymous principal, and principals with a missing or malformed id or role
 
 **Checkpoint**: US1–US3 (the P1 MVP) pass. The page side of US3 (Profile's redirect, AS6) is tested with
 Profile in US6; AS7 is covered by T068 and T077.
