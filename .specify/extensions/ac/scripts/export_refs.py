@@ -22,8 +22,9 @@ ROOT = None  # the project root, set by main() (not at import, so the pure funct
 CONFIGURATION = "Debug"
 # Build output folders only (bin, obj, obj-ref, bin_x, …); not source folders such as Bindings/ or objectives/.
 BUILD_FOLDER = re.compile(r"^(bin|obj)([-_.].*)?$", re.IGNORECASE)
-# Statements that can't appear in a reference-assembly listing, where every body is `throw null`.
-LOGIC = re.compile(r"\breturn\b|\bif\s*\(|\bfor(each)?\s*\(|\bwhile\s*\(|\bswitch\b|\bawait\b|\btry\b")
+# Statements that can't appear in a reference-assembly listing, where every body is `throw null`. `return` followed
+# by `:` is the attribute target of `[return: NotNullIfNotNull(...)]`, not a statement.
+LOGIC = re.compile(r"\breturn\b(?!\s*:)|\bif\s*\(|\bfor(each)?\s*\(|\bwhile\s*\(|\bswitch\b|\bawait\b|\btry\b")
 # A type declaration as ilspycmd writes it: tab indentation, modifiers, keyword. Body braces are on their own lines.
 TYPE_DECL = re.compile(r"^(?P<indent>\t*)(?P<mods>(?:(?:public|internal|private|protected|sealed|abstract|static|"
                        r"readonly|partial|file|unsafe|ref|new)\s+)*)(?:class|struct|interface|enum|record|delegate)\s")
