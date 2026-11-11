@@ -6,9 +6,9 @@ namespace HT.Ui.Operator;
 /// <summary>
 /// The operator steps the host runs after <c>Build()</c> and before <c>Run()</c> (ADR 0007, research R-11).
 /// Each step runs in its own scope and its own <c>try/catch</c>; a fault is logged without secrets and the start
-/// goes on (HP-018, HP-021, HP-022). Log lines: contracts/host.md.
+/// goes on (HP-018, HP-021, HP-022). Log lines: contracts/host.md, written by source-generated log methods.
 /// </summary>
-internal static class StartupTasks
+internal static partial class StartupTasks
 {
     /// <summary>The logger category of the operator log.</summary>
     public const string LoggerCategory = "HT.Ui.Operator.StartupTasks";
@@ -32,7 +32,7 @@ internal static class StartupTasks
             await RunStepAsync("Schema migrations", logger, async () =>
             {
                 var count = await HtDatabase.MigrateAsync(services, CancellationToken.None);
-                logger.LogInformation("Schema migrations applied: {Count}", count);
+                LogMigrationsApplied(logger, count);
             });
         }
 
@@ -51,13 +51,13 @@ internal static class StartupTasks
 
         if (result.Outcome != DemoLoadingOutcome.Loaded)
         {
-            logger.LogInformation("Demo loading: {Result}", result.Message);
+            LogDemoLoading(logger, result.Message);
             return;
         }
 
         foreach (var account in result.Accounts)
         {
-            logger.LogInformation("Demo account {Email}: {Result}", account.Email, account.Message);
+            LogDemoAccount(logger, account.Email, account.Message);
         }
     }
 
@@ -73,11 +73,12 @@ internal static class StartupTasks
 
         if (string.IsNullOrWhiteSpace(email))
         {
-            logger.LogInformation("Administrator creation: {Result}", result.Message);
+            LogAdministratorCreation(logger, result.Message);
         }
         else
         {
-            logger.LogInformation("Administrator creation: {Result} ({Email})", result.Message, email.Trim());
+            var configuredEmail = email.Trim();
+            LogAdministratorCreationFor(logger, result.Message, configuredEmail);
         }
     }
 
@@ -89,7 +90,25 @@ internal static class StartupTasks
         }
         catch (Exception exception) // A fault in one step must not stop the start (HP-018, HP-021).
         {
-            logger.LogError(exception, "{Step} failed; the app starts without it", step);
+            LogStepFailed(logger, exception, step);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Schema migrations applied: {Count}")]
+    private static partial void LogMigrationsApplied(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Administrator creation: {Result}")]
+    private static partial void LogAdministratorCreation(ILogger logger, string result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Administrator creation: {Result} ({Email})")]
+    private static partial void LogAdministratorCreationFor(ILogger logger, string result, string email);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo loading: {Result}")]
+    private static partial void LogDemoLoading(ILogger logger, string? result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo account {Email}: {Result}")]
+    private static partial void LogDemoAccount(ILogger logger, string email, string result);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "{Step} failed; the app starts without it")]
+    private static partial void LogStepFailed(ILogger logger, Exception exception, string step);
 }

@@ -21,7 +21,7 @@ public sealed class HostDatabaseGuardTests(HostFixture host)
 
         var contextProperty = store.GetType().GetProperty("Context", BindingFlags.Public | BindingFlags.Instance);
         Assert.NotNull(contextProperty);
-        var context = Assert.IsAssignableFrom<DbContext>(contextProperty.GetValue(store));
+        var context = Assert.IsType<DbContext>(contextProperty.GetValue(store), exactMatch: false);
         var database = context.Database.GetDbConnection().Database;
 
         Assert.Equal(host.DatabaseName, database);

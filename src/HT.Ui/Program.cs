@@ -79,6 +79,3 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 await app.RunAsync();
-
-/// <summary>The entry point; public for <c>WebApplicationFactory</c> in host tests.</summary>
-public partial class Program;

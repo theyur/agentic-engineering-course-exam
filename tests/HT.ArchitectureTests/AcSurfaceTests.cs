@@ -16,6 +16,8 @@ public sealed class AcSurfaceTests
 
     private static readonly string[] CheckedExtensions = [".cs", ".csproj", ".props", ".targets"];
 
+    private static readonly string[] RootBuildFiles = ["Directory.Build.props", "Directory.Build.targets"];
+
     public static TheoryData<string> SurfaceAssemblies =>
         new(ArchitectureModel.Domain.GetName().Name!, ArchitectureModel.Application.GetName().Name!, ArchitectureModel.Persistence.GetName().Name!);
 
@@ -37,7 +39,7 @@ public sealed class AcSurfaceTests
             .SelectMany(project => Directory.EnumerateFiles(Path.Combine(root, "src", project), "*", SearchOption.AllDirectories))
             .Where(path => CheckedExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
             .Where(path => !IsBuildOutput(root, path))
-            .Concat(new[] { "Directory.Build.props", "Directory.Build.targets" }
+            .Concat(RootBuildFiles
                 .Select(name => Path.Combine(root, name))
                 .Where(File.Exists));
 
