@@ -507,27 +507,27 @@ administrator, run it again and see that nothing changed.
 
 ### Tests for User Story 4
 
-- [ ] T085 [P] [US4] Create `tests/HT.UnitTests/Application/Operator/AdministratorCreationTests.cs`:
+- [X] T085 [P] [US4] Create `tests/HT.UnitTests/Application/Operator/AdministratorCreationTests.cs`:
   - US4-AS1 to AS9 with their literal values and texts;
   - the check order of FR-014;
   - "missing" is `null`, `""` or spaces only, for either value;
   - an existing administrator's password is unchanged;
   - registering `fifth.admin@example.com` and `seventh.admin@example.com` afterwards succeeds.
-- [ ] T086 [P] [US4] Create `tests/HT.IntegrationTests/Operator/AdministratorCreationTests.cs`:
+- [X] T086 [P] [US4] Create `tests/HT.IntegrationTests/Operator/AdministratorCreationTests.cs`:
   - a created administrator signs in through `AccountService.SignInAsync` with the role administrator;
   - a second run gives `AlreadyExists` and the first password still signs in;
   - a new email adds a second administrator, and both keep the role.
 
 ### Implementation for User Story 4
 
-- [ ] T087 [US4] Create `src/HT.Application/Operator/AdministratorCreationResult.cs`, with `AdministratorCreationOutcome` (`NotConfigured`, `InvalidEmail`, `AlreadyExists`, `BelongsToRegisteredUser`, `PasswordRuleNotMet`, `Created`) and `Message`
-- [ ] T088 [US4] Create `src/HT.Application/Operator/OperatorService.cs` with a public constructor `(IAccountStore)` and `CreateAdministratorAsync(string? email, string? password, CancellationToken)`, checking in FR-014's order. Register it scoped in `src/HT.Application/ApplicationServiceCollectionExtensions.cs` (depends on T087)
-- [ ] T089 [US4] Add the administrator step to `src/HT.Ui/Operator/StartupTasks.cs`. After migrations, in its own scope and `try/catch`, it reads `Operator:AdministratorEmail` and `Operator:AdministratorPassword` from `IConfiguration` and calls `CreateAdministratorAsync`. It logs `Administrator creation: {Result} ({Email})`, leaving out `({Email})` when no email is configured. A fault is logged as in T047 (HP-018)
-- [ ] T090 [P] [US4] Add a rule to `tests/HT.ArchitectureTests/UiDependencyTests.cs`, scoped to the types of the `HT.Ui` assembly: among them, only types in `HT.Ui.Operator` depend on `OperatorService`, so `HT.Ui.Components` cannot. `HT.Application`'s own `AddHtApplication`, which registers the service, is outside the rule's scope (research R-13)
+- [X] T087 [US4] Create `src/HT.Application/Operator/AdministratorCreationResult.cs`, with `AdministratorCreationOutcome` (`NotConfigured`, `InvalidEmail`, `AlreadyExists`, `BelongsToRegisteredUser`, `PasswordRuleNotMet`, `Created`) and `Message`
+- [X] T088 [US4] Create `src/HT.Application/Operator/OperatorService.cs` with a public constructor `(IAccountStore)` and `CreateAdministratorAsync(string? email, string? password, CancellationToken)`, checking in FR-014's order. Register it scoped in `src/HT.Application/ApplicationServiceCollectionExtensions.cs` (depends on T087)
+- [X] T089 [US4] Add the administrator step to `src/HT.Ui/Operator/StartupTasks.cs`. After migrations, in its own scope and `try/catch`, it reads `Operator:AdministratorEmail` and `Operator:AdministratorPassword` from `IConfiguration` and calls `CreateAdministratorAsync`. It logs `Administrator creation: {Result} ({Email})`, leaving out `({Email})` when no email is configured. A fault is logged as in T047 (HP-018)
+- [X] T090 [P] [US4] Add a rule to `tests/HT.ArchitectureTests/UiDependencyTests.cs`, scoped to the types of the `HT.Ui` assembly: among them, only types in `HT.Ui.Operator` depend on `OperatorService`, so `HT.Ui.Components` cannot. `HT.Application`'s own `AddHtApplication`, which registers the service, is outside the rule's scope (research R-13)
 
 ### UI tests for User Story 4
 
-- [ ] T091 [US4] Create `tests/HT.UiTests/Operator/StartupTasksAdministratorTests.cs`, in the `StartupTasks` collection, using T051's harness. Each test starts from a dropped `HT-UI-MIGRATE` and runs `Development`, so migrations run first:
+- [X] T091 [US4] Create `tests/HT.UiTests/Operator/StartupTasksAdministratorTests.cs`, in the `StartupTasks` collection, using T051's harness. Each test starts from a dropped `HT-UI-MIGRATE` and runs `Development`, so migrations run first:
   - `Operator:AdministratorEmail` and `Operator:AdministratorPassword` set log `Administrator creation: administrator created (…)`;
   - an empty dictionary logs `Administrator creation: no administrator configured` without parentheses;
   - no captured log entry contains the configured password;

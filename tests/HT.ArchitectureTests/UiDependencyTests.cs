@@ -1,5 +1,6 @@
 using ArchUnitNET.xUnit;
 using HT.Application.Accounts;
+using HT.Application.Operator;
 using Xunit;
 
 using static ArchUnitNET.Fluent.ArchRuleDefinition;
@@ -39,6 +40,16 @@ public sealed class UiDependencyTests
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
             .Should().NotDependOnAny(Types(true).That().Are(typeof(IAccountStore)))
             .Because("the port is persistence plumbing, not a use case; the host reaches accounts only through the use cases (ADR 0010)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
+    public void OnlyTheHostsOperatorTypesMayDependOnTheOperatorService()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .And().DoNotResideInNamespaceMatching(@"^HT\.Ui\.Operator(\..*)?$")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService)))
+            .Because("no page offers administrator creation or demo loading; only the startup tasks run them (FR-014, research R-13)")
             .Check(ArchitectureModel.Architecture);
     }
 }

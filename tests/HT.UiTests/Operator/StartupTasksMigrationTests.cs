@@ -33,6 +33,8 @@ public sealed class StartupTasksMigrationTests
         var log = await StartupTasksHarness.RunAsync("Testing", new Dictionary<string, string?>());
 
         Assert.DoesNotContain(log, e => e.Message.StartsWith(MigrationsLine, StringComparison.Ordinal));
+        // Administrator creation runs at every start; with no operator values it never touches the store.
+        Assert.Contains(log, e => e.Message == "Administrator creation: no administrator configured");
         Assert.False(await StartupTasksHarness.DatabaseExistsAsync());
     }
 }
