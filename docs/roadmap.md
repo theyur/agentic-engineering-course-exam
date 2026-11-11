@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-11-11"
+updated_at: "2026-11-12"
 ---
 
 # Roadmap — Habit Tracker
@@ -27,7 +27,7 @@ in its idea brief, which assumed the catalog also carried the account foundation
 
 | # | Slice | Outcome (the why) | SPEC | Needs | Better after | Horizon | Status | Spec |
 |---|---|---|---|---|---|---|---|---|
-| 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | Now | implementing | [001](../specs/001-accounts-and-access/spec.md) |
+| 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | Now | AC tests green | [001](../specs/001-accounts-and-access/spec.md) |
 | 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | Next | not started (idea brief confirmed) | — |
 | 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | Next | not started | — |
 | 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Later | not started | — |
