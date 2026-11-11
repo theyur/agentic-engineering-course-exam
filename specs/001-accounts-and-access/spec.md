@@ -106,6 +106,9 @@ signed-in registered users and administrators (SPEC §3; ARCHITECTURE §4).
   project in the solution with component tests (bUnit) and tests of the running host, no browser automation in
   this slice, and no mocking library: hand-written fakes. Detail:
   [ADR 0006](../../docs/adr/0006-integration-tests.md).
+- Q: Is the account store port internal, given that the AC reference export refuses InternalsVisibleTo? → A: No.
+  IAccountStore and the service constructors are public; architecture rules keep HT.Ui away from the port and
+  from the operator services. Detail: [ADR 0010](../../docs/adr/0010-public-account-store-port.md).
 
 ## What acceptance tests can reach
 
