@@ -1,0 +1,49 @@
+@page "/sign-in"
+@using HT.Ui.Account
+@using HT.Ui.Components.Account
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Http.HttpResults
+@inject AccountSession AccountSession
+@inject NavigationManager Navigation
+@* design/pages/PageSignIn. A signed-in user is sent to Home. After a sign-in the user goes to returnUrl when it
+   is a local URL, otherwise to Home (HP-003, HP-005, HP-009, research R-10). *@
+<PageTitle>Sign in · Habit Tracker</PageTitle>
+
+<div class="ht-auth">
+    <h1>Sign in</h1>
+    <p class="ht-muted ht-auth__lead">Welcome back. Your goals are waiting.</p>
+    <SignInForm OnSucceeded="SignInAsync" />
+    <p class="ht-auth__alt">New here? <a href="/register">Create an account</a></p>
+</div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationState is not null && (await AuthenticationState).User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task SignInAsync(SignInSuccess success)
+    {
+        var actingUser = success.Result.ActingUser
+            ?? throw new InvalidOperationException("A successful sign-in has an acting user.");
+        var passwordVersion = success.Result.PasswordVersion
+            ?? throw new InvalidOperationException("A successful sign-in has a password version.");
+        if (!await AccountSession.SignInAsync(actingUser, passwordVersion, success.KeepSignedIn))
+        {
+            // The password changed after it was checked (HP-007): no session; Sign in again, without a cookie.
+            Navigation.NavigateTo("/sign-in");
+            return;
+        }
+
+        Navigation.NavigateTo(RedirectHttpResult.IsLocalUrl(ReturnUrl) ? ReturnUrl! : "/");
+    }
+}

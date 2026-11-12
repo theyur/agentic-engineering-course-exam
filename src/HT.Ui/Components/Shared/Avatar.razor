@@ -1,0 +1,18 @@
+@* The avatar: the first letter of the account's email in upper case (HP-014). *@
+<span class="@(Large ? "ht-avatar ht-avatar--lg" : "ht-avatar")" role="img" aria-label="@AriaLabel">@LetterOf(Email)</span>
+
+@code {
+    /// <summary>The account's email (normal form).</summary>
+    [Parameter, EditorRequired]
+    public string? Email { get; set; }
+
+    /// <summary>The 56px size of the Profile header.</summary>
+    [Parameter]
+    public bool Large { get; set; }
+
+    private string AriaLabel => "Account of " + Email;
+
+    /// <summary>The first character of the email, upper-cased with the invariant culture.</summary>
+    public static string LetterOf(string? email) =>
+        string.IsNullOrEmpty(email) ? string.Empty : char.ToUpperInvariant(email[0]).ToString();
+}

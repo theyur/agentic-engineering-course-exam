@@ -1,0 +1,11 @@
+{
+  "group": "sources",
+  "feature": "specs/001-accounts-and-access",
+  "files": {
+    "specs/001-accounts-and-access/acceptance.md": "53f03bbba42556be1ac12ed71ff2298de411fa1307d80d007b553ea21e788a17"
+  },
+  "spec": {
+    "path": "specs/001-accounts-and-access/spec.md",
+    "sha256": "f7d9208c9e31dac09f9166c9ced73ebe9c3d66939e0a5b0dc9ee47e41017be12"
+  }
+}

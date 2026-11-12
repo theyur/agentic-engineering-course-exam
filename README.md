@@ -41,7 +41,8 @@ HT.Domain  ←  HT.Application  ←  HT.Persistence
 | `HT.Persistence` | EF Core / SQL Server implementation of persistence contracts. |
 | `HT.Ui` | Blazor UI, authentication/authorization, application startup. |
 
-Layer rules will be enforced by architecture tests added with future feature tasks. Details and rationale: [ARCHITECTURE.md](ARCHITECTURE.md).
+Layer rules are enforced by the ArchUnitNET tests in `tests/HT.ArchitectureTests/`, which also run before every commit (`.githooks/pre-commit`). Details and rationale: [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Repository layout
 
 ```text
@@ -50,19 +51,46 @@ Directory.Build.props    shared build settings (net10.0, nullable, warnings as e
 src/                     production projects
 tests/                   test projects
 docs/adr/                architecture decision records (0001-initial-setup.md)
-specs/                   Spec Kit feature folders: spec, plan, tasks (001-habit-catalog/)
+specs/                   Spec Kit feature folders: spec, plan, tasks (001-accounts-and-access/)
 .specify/                Spec Kit templates, scripts and the project constitution
 ```
 
 ## Getting started
 
-Prerequisites: [.NET 10 SDK](https://dotnet.microsoft.com/download). SQL Server will be required once persistence is implemented.
+Prerequisites:
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download), then `dotnet tool restore`.
+- SQL Server reachable as `.\COLL1` with integrated security. On another server, set the environment
+  variables `HT_IT_CONNECTION` (integration tests), `HT_UI_CONNECTION` (UI and host tests) and
+  `HT_AC_CONNECTION` (acceptance tests); the app itself uses `ConnectionStrings:HabitTracker` from
+  `appsettings.Development.json`.
+- The operator values in the User Secrets store of `HT.Ui`, kept out of source control. Choose your own
+  values; each password needs at least 8 characters, with a number:
+  - `Operator:AdministratorEmail` and `Operator:AdministratorPassword`: the first administrator, created at
+    start;
+  - `Operator:DemoPassword`: the password of the demo accounts `demo1@example.com` to `demo3@example.com`,
+    created at start.
+
+  ```bash
+  dotnet user-secrets set "Operator:DemoPassword" "<your value>" --project src/HT.Ui
+  ```
 
 ```bash
 dotnet build HabitTracker.slnx
-dotnet test HabitTracker.slnx
-dotnet run --project src/HT.Ui
 ```
+
+```bash
+dotnet test HabitTracker.slnx
+```
+
+```bash
+dotnet run --project src/HT.Ui --launch-profile https
+```
+
+Open `https://localhost:7194`; the session cookie is `Secure`, so use HTTPS. In Development the app applies
+pending schema migrations at start, then creates the administrator and the demo accounts; the console shows
+the results, never a password. The full walk-through:
+[specs/001-accounts-and-access/quickstart.md](specs/001-accounts-and-access/quickstart.md).
 
 Warnings are treated as errors — the build must stay warning-free.
 
@@ -81,8 +109,11 @@ Two static analyzers run in parallel on every PR revision and on pushes to `mast
 
 | Gate | Source | Green means |
 | --- | --- | --- |
-| SonarQube Cloud | `.github/workflows/sonar.yml` → check `SonarCloud Code Analysis` | quality gate passed on the PR head (a run without `SONAR_TOKEN` is *skipped*, not green) |
+| SonarQube Cloud | `.github/workflows/sonar.yml` → check `SonarCloud Code Analysis` | quality gate passed on the PR head (a run without `SONAR_TOKEN` or `CI_SQL_SA_PASSWORD` is *skipped*, not green) |
 | CodeQL | GitHub code scanning default setup (C#, JS/TS, Actions) → check `CodeQL` | analysis finished and the PR adds no alert at or above the failure threshold |
+
+The Sonar job also runs the integration and host tests against a SQL Server container. It needs two
+repository secrets: `SONAR_TOKEN` and `CI_SQL_SA_PASSWORD` (a throwaway SA password for that container).
 
 Then a human-controlled AI review:
 
@@ -97,4 +128,4 @@ Gate status alone: `pwsh tools/pr-gates/pr-gates.ps1 -Pr <N>` (add `-Wait` to bl
 
 ## Status
 
-Foundation stage: specification, architecture, and an empty compiling solution. Features are implemented task by task.
+Slice 1, accounts and access ([specs/001-accounts-and-access](specs/001-accounts-and-access/spec.md)), is implemented: registration, sign-in with a temporary block after failed attempts, sign-out, Profile with password change, the visitor and signed-in Home, the first administrator and the demo accounts at start. The next slices follow [docs/roadmap.md](docs/roadmap.md); features are implemented task by task.

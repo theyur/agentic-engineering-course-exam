@@ -16,7 +16,26 @@
     <button class="ht-btn ht-btn--primary ht-btn--block">Create account</button>
   </form>
   <p class="ht-auth__alt">Already have an account? <a href="#">Sign in</a></p>
-</main><footer class="ht-footer"><div class="ht-footer__inner"><span>Habit Tracker · Agentic Engineering course project</span><span class="ht-spacer"></span><a href="#">Privacy</a><a href="#">Send feedback</a></div></footer>
+</main>
+<!-- Error states (HP-001). Each state keeps the entered email; the password fields are emptied. -->
+<section class="ht-auth" aria-label="Error states">
+  <div class="ht-eyebrow" style="margin-bottom:8px">State · email already has an account, passwords do not match</div>
+  <form class="ht-card ht-stack">
+    <label class="ht-field"><span class="ht-field__label">Email</span><input class="ht-input" type="email" value="ana@example.com" aria-invalid="true" aria-describedby="reg-email-error" autocomplete="email"><span class="ht-field__error" id="reg-email-error">An account with this email already exists. <a href="#">Sign in</a></span></label>
+    <label class="ht-field"><span class="ht-field__label">Password</span><input class="ht-input" type="password" aria-describedby="reg-pw-help" autocomplete="new-password"><span class="ht-field__help" id="reg-pw-help">At least 8 characters, with a number.</span></label>
+    <label class="ht-field"><span class="ht-field__label">Repeat password</span><input class="ht-input" type="password" aria-invalid="true" aria-describedby="reg-repeat-error" autocomplete="new-password"><span class="ht-field__error" id="reg-repeat-error">The passwords do not match.</span></label>
+    <div class="ht-notice ht-notice--neutral"><span>Community comparison is <b>off</b>. You can opt in later in your profile.</span></div>
+    <button class="ht-btn ht-btn--primary ht-btn--block">Create account</button>
+  </form>
+  <div class="ht-eyebrow" style="margin:24px 0 8px">State · invalid email, password rule not met</div>
+  <form class="ht-card ht-stack">
+    <label class="ht-field"><span class="ht-field__label">Email</span><input class="ht-input" type="email" value="ana@example" aria-invalid="true" aria-describedby="reg2-email-error" autocomplete="email"><span class="ht-field__error" id="reg2-email-error">Enter a valid email address.</span></label>
+    <label class="ht-field"><span class="ht-field__label">Password</span><input class="ht-input" type="password" aria-invalid="true" aria-describedby="reg2-pw-error" autocomplete="new-password"><span class="ht-field__error" id="reg2-pw-error">At least 8 characters, with a number.</span></label>
+    <label class="ht-field"><span class="ht-field__label">Repeat password</span><input class="ht-input" type="password" autocomplete="new-password"></label>
+    <div class="ht-notice ht-notice--neutral"><span>Community comparison is <b>off</b>. You can opt in later in your profile.</span></div>
+    <button class="ht-btn ht-btn--primary ht-btn--block">Create account</button>
+  </form>
+</section><footer class="ht-footer"><div class="ht-footer__inner"><span>Habit Tracker · Agentic Engineering course project</span><span class="ht-spacer"></span><a href="#">Privacy</a><a href="#">Send feedback</a></div></footer>
 </div>
 </body>
 </html>

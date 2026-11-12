@@ -1,0 +1,24 @@
+@* design/components/Card: one topic per card, never nested. *@
+<section class="@("ht-card" + (Class is null ? string.Empty : " " + Class))" @attributes="AdditionalAttributes">
+    @if (Title is not null)
+    {
+        <h2 class="ht-card__title">@Title</h2>
+    }
+    @ChildContent
+</section>
+
+@code {
+    /// <summary>The card title (heading-3 style).</summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>Extra ht- classes, such as <c>ht-stack</c>.</summary>
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+}

@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-11-10"
+updated_at: "2026-11-12"
 ---
 
 # Roadmap — Habit Tracker
@@ -27,7 +27,7 @@ in its idea brief, which assumed the catalog also carried the account foundation
 
 | # | Slice | Outcome (the why) | SPEC | Needs | Better after | Horizon | Status | Spec |
 |---|---|---|---|---|---|---|---|---|
-| 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | Next | not started | — |
+| 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | — | shipped | [001](../specs/001-accounts-and-access/spec.md) |
 | 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | Next | not started (idea brief confirmed) | — |
 | 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | Next | not started | — |
 | 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Later | not started | — |
@@ -65,8 +65,9 @@ Only what the order depends on. Scope is decided in each spec.
    - the first demo data: synthetic accounts on `example.com`;
    - for anonymous visitors, the parts of the visitor Home that need no catalog (hero with "Register free", how it works).
 
-   Where the account model lives, and how the acting user reaches Application use cases, is still open
-   (see the decision table). That answer also decides how much of this slice AC tests can reach.
+   The spec settles how much of this slice AC tests can reach: account behaviour is Application use cases
+   (spec `## Clarifications`). Where the account model lives and how the acting user reaches those use cases
+   are decided in ADR 0004 and ADR 0005 (see the decision table).
 2. **`habit-catalog`** keeps the confirmed idea brief (Approach C and its three demo scenarios), minus the
    foundation slice 1 now carries. The brief, SPEC §4 and the design disagree on details (see the decision
    table). Seed content: at least 20 published habits in at least 4 categories.
@@ -107,10 +108,11 @@ decision R7.
 
 | Page or shell (`design/`) | Created in | Extended in |
 |---|---|---|
-| Shell: `TopNav` (visitor, signed-in, admin), `MobileNav`, `Footer` | 1 (Today) | each slice adds its links (Catalog and Admin 2, Goals and "+ New goal" 4, Community 9); "Send feedback" 11; "Privacy" has no page design yet (decision table) |
+| Shell: `TopNav` (visitor, signed-in, admin), `MobileNav`, `Footer` | 1 (Today, avatar menu, "Privacy") | each slice adds its links (Catalog and Admin 2, Goals and "+ New goal" 4, Community 9); "Send feedback" 11 |
 | `PageSignIn`, `PageRegister` | 1 | 11 (deactivated notice) |
+| `PagePrivacy` (new, designed in 1) | 1 | — |
 | `PageHomeVisitor` | 1 (hero with "Register free", how it works) | 2 ("Browse the catalog", catalog preview), 6 (GoalStats card from demo data), 9 (BandSummary) |
-| `PageHomeSignedIn` | 1 (greeting) | 2 (empty state pointing to the catalog), 6 (stat tiles, Today list, GoalSummary, recent notes), 7 ("Excuse" on Pending rows) |
+| `PageHomeSignedIn` | 1 ("Today" heading; the greeting and date wait for the time-zone decision of slice 4) | 2 (empty state pointing to the catalog), 6 (stat tiles, Today list, GoalSummary, recent notes), 7 ("Excuse" on Pending rows) |
 | `PageProfile` | 1 (Account tab) | 2 (Custom habits), 8 (Goal history), 9 (Community) |
 | `PageCatalogVisitor` | 2 | — |
 | `PageCatalogSignedIn` | 2 | 4 ("Use this habit", "N goals", "Add another goal", "Only habits I track"), 10 ("Suggest for catalog" on custom-habit cards) |
@@ -154,20 +156,22 @@ How this works with the Spec Kit commands:
 
 | Decision | Source | Settled in | Status | Recorded in |
 |---|---|---|---|---|
-| Where the account model lives, and how the acting user, the administrator role and the deactivated state reach Application use cases (ADR) | ARCH §3, §4, §9 | `accounts-and-access` | open | — |
-| Use-case convention: shape of the Application surface that UI and AC tests call (ADR) | ARCH §9; ADR 0003 | `accounts-and-access` | open | — |
-| How the first administrator account comes to exist | new | `accounts-and-access` | open | — |
-| Authentication UX: email verification, password recovery, outbound email, "keep me signed in". `design/pages/PageSignIn` already shows "Forgot password?" and "Keep me signed in" and says "Built on ASP.NET Core Identity pages"; if the decision differs, `design/` changes first. | ARCH §9; design | `accounts-and-access` | open | — |
-| Integration-test database approach (ADR) | ARCH §9; ADR 0003 | `accounts-and-access` | open | — |
-| Test-project layout | ARCH §9 | `accounts-and-access` | open | — |
-| Re-runnable demo-data seeding | ARCH §7 | `accounts-and-access` | open | — |
-| Privacy page: `design/components/Footer` links to it, but no page design exists | new; design | `accounts-and-access` | open | — |
+| Where the account model lives, and how the acting user, the administrator role and the deactivated state reach Application use cases (ADR) | ARCH §3, §4, §9 | `accounts-and-access` | decided | [ADR 0004](adr/0004-account-model.md) |
+| Use-case convention: shape of the Application surface that UI and AC tests call (ADR) | ARCH §9; ADR 0003 | `accounts-and-access` | decided | [ADR 0005](adr/0005-use-case-convention.md) |
+| How the first administrator account comes to exist | new | `accounts-and-access` | decided | [spec](../specs/001-accounts-and-access/spec.md#clarifications); [ADR 0007](adr/0007-startup-operator-tasks.md) |
+| Authentication UX: email verification, password recovery, outbound email, "keep me signed in". `design/pages/PageSignIn` already shows "Forgot password?" and "Keep me signed in" and says "Built on ASP.NET Core Identity pages"; if the decision differs, `design/` changes first. | ARCH §9; design | `accounts-and-access` | decided | [spec](../specs/001-accounts-and-access/spec.md#clarifications); [ADR 0009](adr/0009-no-outbound-email.md) |
+| Integration-test database approach (ADR) | ARCH §9; ADR 0003 | `accounts-and-access` | decided | [ADR 0006](adr/0006-integration-tests.md) |
+| Test-project layout | ARCH §9 | `accounts-and-access` | decided | [ADR 0006](adr/0006-integration-tests.md) |
+| Re-runnable demo-data seeding | ARCH §7 | `accounts-and-access` | decided | [ADR 0007](adr/0007-startup-operator-tasks.md) |
+| Privacy page: `design/components/Footer` links to it, but no page design exists | new; design | `accounts-and-access` | decided | [spec](../specs/001-accounts-and-access/spec.md#clarifications) |
+| Whether an account has a name, and the time-dependent text of the signed-in Home greeting and the Profile "member since". Slice 1 shows neither ([spec](../specs/001-accounts-and-access/spec.md#clarifications)). | new; design | `goals` | open | — |
+| Whether an administrator account can also track its own goals. `design/components/TopNav` gives administrators no Goals link. | SPEC §3; design | `goals` | open | — |
 | One or several suggested starting goals per catalog habit, and whether the catalog page has search, an Intent filter and sort. The idea brief says "at most one" and "search can wait". SPEC §4 says "suggested starting goals" while SPEC §2 is singular, so SPEC is ambiguous. `design/pages/PageHabitDetail` shows several; `PageCatalogVisitor` and `HabitCard` show one per card, plus search, an Intent filter and sort. If the brief wins, `design/` changes first (constitution IV). | idea brief §7, §8; SPEC §2, §4; design | `habit-catalog` | open | — |
 | Shape of a suggested starting goal, compatible with goals | idea brief §15 | `habit-catalog` | open | — |
 | How goals behave when their catalog habit is edited or unpublished; `goals` cites the answer | idea brief §15 | `habit-catalog` | open | — |
 | Who writes the seed catalog content | idea brief §15 | `habit-catalog` | open | — |
 | Hosting services, deployment, pipelines, monitoring, secrets mechanics (ADR). Scheduled evaluation (slice 5) may need more; changing this then needs a superseding ADR. | ARCH §7, §9 | `demo-hosting` | open | — |
-| Schema migration rollout on each deployment | ARCH §5 | `demo-hosting` | open | — |
+| Schema migration rollout on each deployment | ARCH §5 | `demo-hosting` | open; locally the host applies migrations at start in Development ([ADR 0007](adr/0007-startup-operator-tasks.md)) | — |
 | When and how hosted demo data is refreshed. Time-relative generation (slice 5) may reopen it with a new or superseding ADR. | ARCH §7 | `demo-hosting` | open | — |
 | How reviewers get demo sign-ins, with no secret in source control | ARCH §7; CLAUDE.md | `demo-hosting` | open | — |
 | Commitment deadlines and time zones (ADR) | SPEC §11.1 (first part); ARCH §9 | `goals` | open | — |
@@ -185,8 +189,8 @@ How this works with the Spec Kit commands:
 | Aggregating Catalog Habit Performance | SPEC §11.5 | `community` | open | — |
 | Whether community contributions are limited to catalog-habit goals | SPEC §11.6 | `community` | open | — |
 | Where and how a user sends feedback. SPEC §8 has administrators review it, but §3 does not list sending it; `design/components/Footer` and `FeedbackDialog` show a "Send feedback" form. | new; design | `administration` | open | — |
-| Mocking library | ARCH §9 | the first slice that needs one | open | — |
-| UI-test library | ARCH §9 | the first slice that needs one | open | — |
+| Mocking library | ARCH §9 | the first slice that needs one (`accounts-and-access`) | decided: none, hand-written fakes | [ADR 0006](adr/0006-integration-tests.md) |
+| UI-test library | ARCH §9 | the first slice that needs one (`accounts-and-access`) | decided: bUnit and host tests, no browser automation yet | [ADR 0006](adr/0006-integration-tests.md) |
 
 Domain and persistence models and the schema (ARCH §9) are decided in each slice's plan, for its own part,
 and are not tracked here.
@@ -197,15 +201,15 @@ For the owner. *Before* says which slice cannot start until the decision is made
 
 | # | Decision | Before | Recommended | Alternative | Owner answer |
 |---|---|---|---|---|---|
-| R1 | Accounts as their own first slice | slice 1 | Yes: it isolates the idea brief's top risk, foundation drag, from the catalog. The catalog's 3 person-week estimate and RICE 5.3 included that foundation, so both need re-estimating after the split. README's example folder `001-habit-catalog/` changes too. | Fold minimal sign-in into `habit-catalog`, as the brief's estimate assumed. The catalog then becomes `001`. | — |
+| R1 | Accounts as their own first slice | slice 1 | Yes: it isolates the idea brief's top risk, foundation drag, from the catalog. The catalog's 3 person-week estimate and RICE 5.3 included that foundation, so both need re-estimating after the split. README's example folder `001-habit-catalog/` changes too. | Fold minimal sign-in into `habit-catalog`, as the brief's estimate assumed. The catalog then becomes `001`. | Yes (2026-11-11) |
 | R2 | When to host the demo | slice 3 | Right after `habit-catalog` | At the end, which risks a late deployment surprise | — |
 | R3 | Reports before excusals and pauses | slice 6 | Yes: the core value is demonstrable sooner. The cost: SPEC §11.2 may rework period evaluation in slice 7 (slice note 7). | After them, with less rework | — |
 | R4 | Splitting goal changes (§5.4) out of `goals` | slice 4 | Yes, as slice 8: its rules can only be verified once evaluations and streaks exist. The cost: between slices 4 and 8 a goal cannot be edited or ended, and SPEC has no delete, so a mistaken demo goal stays. | Keep them in `goals` and name, per rule, the later slice that verifies it | — |
-| R5 | Cutting scope if time runs short | after R8 | No cut now; decide after R8. Any cut needs a SPEC amendment by the owner (constitution, Governance). Stopping after slice 6 would remove §5.3, §5.4 changes, §7, Suggest for catalog (§4) and §8 feedback and deactivation. SPEC §10 requires the demo to show community views, and design pages already show Pause, Excuse, Ended and Community. | Name a cut line now | — |
-| R6 | Idea briefs for other slices | slice 1 | Optional. Idea brief §14 asks for one for Suggest for catalog. | Required for every slice | — |
-| R7 | Partly built pages and navigation (see [Pages across slices](#pages-across-slices)) | slice 1 | A page or the navigation shows only the sections and links whose slice has shipped, with no placeholder content. The full preview is reached when the last extending slice ships. | Build each page in full in one slice, which moves work earlier | — |
-| R8 | Delivery time against the exam deadline | slice 1's `/speckit-tasks` (idea brief §15 set it for the course's break-tasks stage) | — (Feasibility "Time TBD") | — | — |
-| R9 | Point to this file from `CLAUDE.md` so every session keeps it current | slice 1 | Yes, one line under "Docs and git workflow" | Leave it to the user to ask for updates | — |
+| R5 | Cutting scope if time runs short | after R8 | No cut now; decide after R8. Any cut needs a SPEC amendment by the owner (constitution, Governance). Stopping after slice 6 would remove §5.3, §5.4 changes, §7, Suggest for catalog (§4) and §8 feedback and deactivation. SPEC §10 requires the demo to show community views, and design pages already show Pause, Excuse, Ended and Community. | Name a cut line now | No cut (2026-11-11): slices ship in roadmap order; what has shipped by 2026-11-23 is what the exam shows. SPEC stays unchanged. |
+| R6 | Idea briefs for other slices | slice 1 | Optional. Idea brief §14 asks for one for Suggest for catalog. | Required for every slice | Optional (2026-11-11) |
+| R7 | Partly built pages and navigation (see [Pages across slices](#pages-across-slices)) | slice 1 | A page or the navigation shows only the sections and links whose slice has shipped, with no placeholder content. The full preview is reached when the last extending slice ships. | Build each page in full in one slice, which moves work earlier | As recommended: only shipped sections and links (2026-11-11); [ADR 0008](adr/0008-partly-built-pages.md) |
+| R8 | Delivery time against the exam deadline | slice 1's `/speckit-tasks` (idea brief §15 set it for the course's break-tasks stage) | — (Feasibility "Time TBD") | — | Out of scope for planning (2026-11-11): the exam is on 2026-11-23, and whatever has shipped by then is presented, together with the speckit-ac extension this repo uses. No slice waits on a time estimate. |
+| R9 | Point to this file from `CLAUDE.md` so every session keeps it current | slice 1 | Yes, one line under "Docs and git workflow" | Leave it to the user to ask for updates | Yes, one line (2026-11-11) |
 
 ## Every slice
 
@@ -250,4 +254,4 @@ Every change to this file also sets `updated_at`.
 
 | Outcome | Slice | Spec | PR |
 |---|---|---|---|
-| — | — | — | — |
+| People can register, sign in and sign out; the app tells visitors, registered users and administrators apart. | `accounts-and-access` | [001](../specs/001-accounts-and-access/spec.md) | [#21](https://github.com/theyur/agentic-engineering-course-exam/pull/21) |

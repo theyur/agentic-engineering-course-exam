@@ -1,0 +1,59 @@
+@* design/components/Button: <button> for actions, <a class="ht-btn"> for navigation. *@
+@if (Href is null)
+{
+    <button type="@Type" class="@CssClass" @attributes="AdditionalAttributes">@ChildContent</button>
+}
+else
+{
+    <a href="@Href" class="@CssClass" @attributes="AdditionalAttributes">@ChildContent</a>
+}
+
+@code {
+    [Parameter]
+    public ButtonVariant Variant { get; set; } = ButtonVariant.Primary;
+
+    /// <summary>The 32px size, for rows, tables and the nav.</summary>
+    [Parameter]
+    public bool Small { get; set; }
+
+    /// <summary>Full width.</summary>
+    [Parameter]
+    public bool Block { get; set; }
+
+    /// <summary>The button type; ignored for a link.</summary>
+    [Parameter]
+    public string Type { get; set; } = "button";
+
+    /// <summary>When set, renders a link to this address.</summary>
+    [Parameter]
+    public string? Href { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private string CssClass
+    {
+        get
+        {
+            var variant = Variant switch
+            {
+                ButtonVariant.Secondary => "ht-btn--secondary",
+                ButtonVariant.Ghost => "ht-btn--ghost",
+                ButtonVariant.Danger => "ht-btn--danger",
+                _ => "ht-btn--primary",
+            };
+            return "ht-btn " + variant + (Small ? " ht-btn--sm" : string.Empty) + (Block ? " ht-btn--block" : string.Empty);
+        }
+    }
+
+    public enum ButtonVariant
+    {
+        Primary,
+        Secondary,
+        Ghost,
+        Danger,
+    }
+}

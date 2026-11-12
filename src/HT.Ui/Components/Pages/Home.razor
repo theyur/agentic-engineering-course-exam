@@ -1,7 +1,36 @@
-﻿@page "/"
+@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@* One address for both Homes (HP-009). The visitor Home: the hero and "How it works" with the wording of
+   design/pages/PageHomeVisitor, and nothing else from that preview (HP-011, ADR 0008). *@
+<PageTitle>Habit Tracker</PageTitle>
 
-<PageTitle>Home</PageTitle>
-
-<h1>Hello, world!</h1>
-
-Welcome to your new app.
+<AuthorizeView>
+    <Authorized>
+        @* design/pages/PageHomeSignedIn, slice 1 state: the heading only; no greeting, name or date (HP-013, HP-015). *@
+        <div class="ht-container">
+            <div class="ht-page-head"><h1>Today</h1></div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <section class="ht-hero">
+            <div class="ht-hero__inner">
+                <div>
+                    <h1>Keep the habits you choose</h1>
+                    <p class="ht-hero__text">Set a goal to build or reduce a habit, record what really happened, and see how consistent you are over time.</p>
+                    <div class="ht-hero__cta"><HtButton Href="/register">Register free</HtButton></div>
+                    <p class="ht-hero__fine">Your goals and notes stay private. Community comparison is opt-in.</p>
+                </div>
+            </div>
+        </section>
+        <div class="ht-container">
+            <section class="ht-section">
+                <div class="ht-section__head"><h2>How it works</h2></div>
+                <div class="ht-steps">
+                    <div class="ht-step"><div class="ht-step__n">1</div><h3>Pick a habit</h3><p>Start from the catalog or write your own. Choose build or reduce.</p></div>
+                    <div class="ht-step"><div class="ht-step__n">2</div><h3>Record what happened</h3><p>Yes/no, a count or minutes. Partial progress is kept. You have 48 hours to add late records.</p></div>
+                    <div class="ht-step"><div class="ht-step__n">3</div><h3>See your consistency</h3><p>Streaks and a clear percentage, like 90% (18 of 20).</p></div>
+                </div>
+            </section>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>

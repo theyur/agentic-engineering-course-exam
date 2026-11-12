@@ -340,3 +340,59 @@
 .ht-select-row { display:flex; align-items:center; gap:var(--space-3); padding:10px 8px; border-radius:var(--radius-sm); cursor:pointer; }
 .ht-select-row[aria-current="true"] { background:var(--surface-2); }
 @media (max-width:860px) { .ht-grid-2--list { grid-template-columns:1fr; } }
+
+/* ---------- avatar menu and click-away layer (TopNav, MobileNav) ---------- */
+.ht-account { position:relative; }
+.ht-avatar-btn { font:inherit; font-weight:700; font-size:12px; line-height:1; border:0; padding:0; cursor:pointer; }
+.ht-avatar-btn:hover { box-shadow:0 0 0 1px var(--accent); }
+.ht-popover { position:absolute; right:0; top:calc(100% + var(--space-2)); min-width:180px; display:flex; flex-direction:column; gap:2px; padding:var(--space-2); background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); box-shadow:var(--shadow-raised); z-index:41; }
+.ht-popover a, .ht-popover button { font:inherit; font-size:14px; line-height:20px; font-weight:600; display:flex; align-items:center; gap:var(--space-2); width:100%; padding:8px 10px; border:0; border-radius:var(--radius-sm); background:transparent; color:var(--ink); text-decoration:none; text-align:left; cursor:pointer; white-space:nowrap; }
+.ht-popover a:hover, .ht-popover button:hover { background:var(--surface-2); }
+.ht-popover form, .ht-mobile-menu form { margin:0; }
+.ht-mobile-menu button { font:inherit; font-weight:600; display:flex; align-items:center; gap:var(--space-3); width:100%; padding:12px 8px; border:0; border-radius:var(--radius-sm); background:transparent; color:var(--ink); text-align:left; cursor:pointer; }
+.ht-mobile-menu a:hover, .ht-mobile-menu button:hover { background:var(--surface-2); }
+.ht-clickaway { position:fixed; inset:0; z-index:30; background:transparent; }
+.ht-layer-top { position:relative; z-index:31; }
+@media (min-width:861px) { .ht-mobile-menu, .ht-clickaway--mobile { display:none; } }
+
+/* ---------- page helpers (slice 1) ---------- */
+.ht-auth__lead { margin:0 0 20px; }
+.ht-profile-head { align-items:center; }
+.ht-profile-head h1 { font-size:24px; line-height:30px; }
+.ht-prose { max-width:720px; }
+.ht-prose .ht-lead { margin:0 0 20px; }
+.ht-card__text { margin:0; }
+.ht-empty-page { max-width:560px; margin:var(--space-7) auto 0; }
+.ht-empty-page h1 { font-size:18px; line-height:24px; margin-bottom:4px; }
+.ht-empty .ht-inline { justify-content:center; }
+.ht-field__error a { font-weight:700; }
+
+/* ---------- unexpected-error bar (Blazor shows it by setting display:block) ---------- */
+#blazor-error-ui { display:none; position:fixed; left:0; right:0; bottom:0; z-index:60; padding:12px 56px 12px var(--space-6); background:var(--surface); border-top:1px solid var(--line); box-shadow:var(--shadow-raised); color:var(--ink); font-family:var(--font-body); font-size:14px; line-height:20px; }
+#blazor-error-ui .reload { margin-left:var(--space-2); color:var(--accent); font-weight:700; }
+#blazor-error-ui .dismiss { position:absolute; right:var(--space-4); top:50%; transform:translateY(-50%); display:inline-grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:var(--radius-sm); background:transparent; color:var(--ink-muted); cursor:pointer; }
+#blazor-error-ui .dismiss:hover { background:var(--surface-2); color:var(--ink); }
+#blazor-error-ui :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+/* ---------- reconnect notice (#components-reconnect-modal, a dialog) ---------- */
+.components-reconnect-first-attempt-visible,
+.components-reconnect-repeated-attempt-visible,
+.components-reconnect-failed-visible,
+.components-pause-visible,
+.components-resume-failed-visible,
+.components-rejoining-animation { display:none; }
+#components-reconnect-modal.components-reconnect-show .components-reconnect-first-attempt-visible,
+#components-reconnect-modal.components-reconnect-show .components-rejoining-animation,
+#components-reconnect-modal.components-reconnect-paused .components-pause-visible,
+#components-reconnect-modal.components-reconnect-resume-failed .components-resume-failed-visible,
+#components-reconnect-modal.components-reconnect-retrying,
+#components-reconnect-modal.components-reconnect-retrying .components-reconnect-repeated-attempt-visible,
+#components-reconnect-modal.components-reconnect-retrying .components-rejoining-animation,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-failed .components-reconnect-failed-visible { display:block; }
+#components-reconnect-modal { width:min(360px, calc(100% - 32px)); margin:20vh auto; padding:var(--space-6); border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); color:var(--ink); box-shadow:var(--shadow-raised); font-family:var(--font-body); font-size:15px; line-height:22px; text-align:center; }
+#components-reconnect-modal::backdrop { background:var(--overlay); }
+#components-reconnect-modal p { margin:0; }
+#components-reconnect-modal button { font:inherit; font-size:14px; line-height:20px; font-weight:700; min-height:var(--control-height); margin:var(--space-4) auto 0; padding:8px 16px; border:1px solid transparent; border-radius:var(--radius-sm); background:var(--accent); color:var(--on-accent); cursor:pointer; }
+#components-reconnect-modal button:hover { background:var(--accent-hover); }
+#components-reconnect-modal button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }

@@ -2,7 +2,12 @@
 
   <PropertyGroup>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>5426d2b9-45a5-4478-96a5-a547e6b8b45d</UserSecretsId>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="HT.UiTests" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\HT.Application\HT.Application.csproj" />

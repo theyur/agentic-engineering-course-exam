@@ -1,0 +1,17 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using HT.Ui.Components.Shared
+@* Hosts a TextField inside an EditForm, as the account forms do. *@
+<EditForm Model="this">
+    <TextField Id="email" Label="Email" Help="@Help" Error="@Error" Type="email" @bind-Value="Value" />
+</EditForm>
+
+@code {
+    [Parameter]
+    public string? Help { get; set; }
+
+    [Parameter]
+    public string? Error { get; set; }
+
+    [Parameter]
+    public string? Value { get; set; }
+}

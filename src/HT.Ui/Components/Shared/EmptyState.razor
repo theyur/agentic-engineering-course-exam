@@ -1,0 +1,37 @@
+@* design/components/EmptyState: an icon, a short title, one or two sentences and the next step. *@
+<div class="ht-card ht-empty">
+    <div class="ht-empty__icon"><HtIcon Name="@Icon" Size="HtIcon.IconSize.Large" /></div>
+    @if (IsPageHeading)
+    {
+        <h1>@Title</h1>
+    }
+    else
+    {
+        <h3>@Title</h3>
+    }
+    <p>@Text</p>
+    @if (ChildContent is not null)
+    {
+        <div class="ht-inline">@ChildContent</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+
+    /// <summary>A Lucide icon name known to <see cref="HtIcon"/>.</summary>
+    [Parameter]
+    public string Icon { get; set; } = "circle-alert";
+
+    /// <summary>True when the title is the page's heading-1 (Not found and Error pages).</summary>
+    [Parameter]
+    public bool IsPageHeading { get; set; }
+
+    /// <summary>One primary action, plus one secondary at most.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

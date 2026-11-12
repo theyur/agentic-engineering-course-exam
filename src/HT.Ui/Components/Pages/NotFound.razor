@@ -1,5 +1,14 @@
 ﻿@page "/not-found"
 @layout MainLayout
 
-<h3>Not Found</h3>
-<p>Sorry, the content you are looking for does not exist.</p>
+<PageTitle>Page not found · Habit Tracker</PageTitle>
+
+<div class="ht-container">
+    <div class="ht-empty-page">
+        <EmptyState IsPageHeading="true"
+                    Title="Page not found"
+                    Text="The page you asked for does not exist. Check the address, or go to Home.">
+            <HtButton Href="/">Go to Home</HtButton>
+        </EmptyState>
+    </div>
+</div>
