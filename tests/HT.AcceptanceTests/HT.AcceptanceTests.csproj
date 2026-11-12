@@ -37,9 +37,13 @@
     <ProjectReference Include="../../src/HT.Persistence/HT.Persistence.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Composes the application through AddHtPersistence / AddHtApplication (ADR 0003). Normal mode gets it
-         transitively through HT.Persistence; ref mode references only the refs folder, so it is named here. -->
+    <!-- Composes the application through AddHtPersistence / AddHtApplication (ADR 0003). Normal mode gets the
+         DI, EF Core and Identity packages transitively through the surface projects; ref mode references only the
+         refs folder, so they are named here (export_refs.py checks that every public surface package is). -->
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.15" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.15" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.15" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Reqnroll.xUnit" Version="3.3.4" />
