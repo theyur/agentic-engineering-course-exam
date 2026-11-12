@@ -232,6 +232,35 @@ public sealed class SiteNavTests : BunitContext
     }
 
     [Fact]
+    public void The_mobile_menu_layer_is_marked_to_hide_with_the_menu_and_its_button_stays_above_it()
+    {
+        SignIn("RegisteredUser");
+        var cut = Render<SiteNav>();
+
+        cut.Find(MobileButton).Click();
+        Assert.Contains("ht-clickaway--mobile", cut.Find(".ht-clickaway").ClassList);
+        Assert.Contains("ht-layer-top", cut.Find(MobileButton).ClassList);
+
+        cut.Find(AccountButton).Click();
+        Assert.DoesNotContain("ht-clickaway--mobile", cut.Find(".ht-clickaway").ClassList);
+    }
+
+    [Fact]
+    public void The_wide_breakpoint_hides_the_mobile_menu_layer_with_the_menu()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "HabitTracker.slnx")))
+        {
+            root = root.Parent;
+        }
+
+        Assert.NotNull(root);
+        var css = File.ReadAllText(Path.Combine(root.FullName, "src", "HT.Ui", "wwwroot", "css", "ht-components.css"));
+
+        Assert.Contains("@media (min-width:861px) { .ht-mobile-menu, .ht-clickaway--mobile { display:none; } }", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void HP_007_a_session_that_ends_while_the_page_is_open_reloads_the_page()
     {
         SignIn("RegisteredUser");

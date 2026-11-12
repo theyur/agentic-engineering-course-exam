@@ -61,7 +61,8 @@
     }
     @if (_open != Menu.None)
     {
-        <div class="ht-clickaway" aria-hidden="true" @onclick="CloseAsync"></div>
+        @* The mobile menu's layer is hidden with the menu at the wide breakpoint, so a widened window stays clickable. *@
+        <div class="@(_open == Menu.Mobile ? "ht-clickaway ht-clickaway--mobile" : "ht-clickaway")" aria-hidden="true" @onclick="CloseAsync"></div>
     }
 </div>
 
@@ -86,7 +87,8 @@
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationState { get; set; }
 
-    private RenderFragment MenuButton => @<button type="button" class="ht-nav__menu-btn" id="@MobileButtonId"
+    // Above the click-away layer, like the account button, so "Close menu" itself takes the click.
+    private RenderFragment MenuButton => @<button type="button" class="ht-nav__menu-btn ht-layer-top" id="@MobileButtonId"
                                                   aria-label="@(_open == Menu.Mobile ? "Close menu" : "Menu")"
                                                   aria-expanded="@AriaBool(_open == Menu.Mobile)" aria-controls="@MobileMenuId"
                                                   @ref="_mobileButton" @onclick="() => Toggle(Menu.Mobile)"><HtIcon Name="@(_open == Menu.Mobile ? "x" : "menu")" /></button>;

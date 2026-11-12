@@ -20,6 +20,8 @@ public sealed class HostFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public const string AdministratorPassword = "throwaway-admin-7";
     public const string DemoPassword = "throwaway-demo-7";
 
+    private static readonly string[] ForbiddenDatabases = ["HT", "HT-AC", "HT-IT"];
+
     private const string LocalDefault =
         @"Server=.\COLL1;Database=HT-UI;Integrated Security=True;TrustServerCertificate=True";
 
@@ -28,6 +30,7 @@ public sealed class HostFixture : WebApplicationFactory<Program>, IAsyncLifetime
         var fromEnvironment = Environment.GetEnvironmentVariable("HT_UI_CONNECTION");
         ConnectionString = string.IsNullOrWhiteSpace(fromEnvironment) ? LocalDefault : fromEnvironment;
         DatabaseName = new SqlConnectionStringBuilder(ConnectionString).InitialCatalog;
+        EnsureResettable(DatabaseName);
     }
 
     public string ConnectionString { get; }
@@ -44,6 +47,18 @@ public sealed class HostFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public FakeTimeProvider Clock { get; } = new(DateTimeOffset.UtcNow);
 
     public async Task InitializeAsync() => await HtDatabase.ResetAsync(ConnectionString, CancellationToken.None);
+
+    /// <summary>
+    /// <see cref="InitializeAsync"/> deletes the host-test database, so the app's database and the other test runs'
+    /// databases are refused before anything is reset.
+    /// </summary>
+    internal static void EnsureResettable(string databaseName)
+    {
+        if (ForbiddenDatabases.Contains(databaseName, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Host tests never use the HT, HT-AC or HT-IT database.");
+        }
+    }
 
     Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
 

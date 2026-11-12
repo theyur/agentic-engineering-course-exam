@@ -27,4 +27,18 @@ public sealed class HostDatabaseGuardTests(HostFixture host)
         Assert.Equal(host.DatabaseName, database);
         Assert.NotEqual("HT", database, StringComparer.OrdinalIgnoreCase);
     }
+
+    [Theory]
+    [InlineData("HT")]
+    [InlineData("ht")]
+    [InlineData("HT-AC")]
+    [InlineData("HT-IT")]
+    public void The_fixture_refuses_to_reset_the_app_or_another_test_database(string databaseName) =>
+        Assert.Throws<InvalidOperationException>(() => HostFixture.EnsureResettable(databaseName));
+
+    [Theory]
+    [InlineData("HT-UI")]
+    [InlineData("HT-UI-CI")]
+    public void The_fixture_resets_a_host_test_database(string databaseName) =>
+        HostFixture.EnsureResettable(databaseName);
 }

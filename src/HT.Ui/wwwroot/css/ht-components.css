@@ -353,7 +353,7 @@
 .ht-mobile-menu a:hover, .ht-mobile-menu button:hover { background:var(--surface-2); }
 .ht-clickaway { position:fixed; inset:0; z-index:30; background:transparent; }
 .ht-layer-top { position:relative; z-index:31; }
-@media (min-width:861px) { .ht-mobile-menu { display:none; } }
+@media (min-width:861px) { .ht-mobile-menu, .ht-clickaway--mobile { display:none; } }
 
 /* ---------- page helpers (slice 1) ---------- */
 .ht-auth__lead { margin:0 0 20px; }
