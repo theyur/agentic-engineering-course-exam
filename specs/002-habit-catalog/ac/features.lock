@@ -1,0 +1,7 @@
+{
+  "group": "features",
+  "feature": "specs/002-habit-catalog",
+  "files": {
+    "tests/HT.AcceptanceTests/Features/F002/habit-catalog.feature": "37ab8346a4138253252e38e781352cc5158e701595298c25f0376e98556d5149"
+  }
+}

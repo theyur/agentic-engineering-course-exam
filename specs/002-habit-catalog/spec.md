@@ -69,6 +69,8 @@ recorded decisions; the owner confirmed them on 2026-11-12, before `/speckit-ac-
 - The text and kind of a suggested starting goal follow fixed rules (FR-017), and the card label becomes
   "Suggested starting goal: …" (constitution I).
 - Names are compared ordinally, ignoring case (FR-004).
+- A count unit is stored trimmed; "as entered" means its spelling and case only (FR-007; owner, after
+  [critic ac pass 2](critic-ac-pass-2.md) MINOR-1).
 - The administrator's catalog table keeps its search and "Showing N of M" line (FR-012).
 
 ## Decisions this slice cites
@@ -89,6 +91,34 @@ Recorded in earlier slices and not decided again here:
 - Integration and UI tests: [ADR 0006](../../docs/adr/0006-integration-tests.md). Acceptance tests:
   [ADR 0003](../../docs/adr/0003-acceptance-tests.md).
 - No time-dependent text until slice 4 (`goals`) decides time zones (slice 1, Clarifications).
+
+## Slice 1 behaviour these tests use
+
+The scenarios of this slice set up their acting users and demo data with slice 1's use cases
+(`specs/001-accounts-and-access/spec.md`). Restated here, unchanged, so that this spec alone gives the rules
+and texts its acceptance tests depend on:
+
+- **Password rule** (slice 1 FR-002): every password the system sets has at least 8 characters and contains at
+  least one digit; otherwise the result is "At least 8 characters, with a number." (`walking42` and
+  `admin2026` meet it; `walk4` does not).
+- **Registration** (slice 1 FR-001, FR-003, FR-004): an anonymous visitor creates an account with an email and
+  a password that meets the password rule. The email is kept trimmed and in lower case, and is unique. A new
+  account has the role registered user.
+- **Sign-in** (slice 1 FR-005 to FR-007): signing in with an account's email (matched ignoring case and
+  surrounding spaces) and its password makes that account, with its role, the acting user. Every failed
+  sign-in gives "Email or password is not correct."
+- **Administrator creation** (slice 1 FR-014): an operator capability that takes an email and a password. For
+  an email that has no account and a password that meets the password rule, the result is "administrator
+  created" and an account with the role administrator exists. Its other results are "no administrator
+  configured", "configured email is not valid", "administrator already exists", "email belongs to a
+  registered user" and "configured password does not meet the password rule", in that order of checks.
+- **Demo loading** (slice 1 FR-016): an operator capability that takes a demo password. With no demo password
+  (absent, empty or only spaces) the result is "no demo password configured"; with one that fails the password
+  rule, "demo password does not meet the password rule"; in both cases nothing is created. Otherwise, for each
+  of the demo emails `demo1@example.com`, `demo2@example.com` and `demo3@example.com`, the account result is
+  "created" (a registered user with the demo password as its password is created) or "already exists" (the
+  existing account, of either role, is left unchanged). This slice adds the catalog result and the custom-habit
+  results (FR-030, FR-031).
 
 ## What acceptance tests can reach
 
@@ -502,7 +532,8 @@ custom habits; run it again and confirm nothing changed.
   - Build or Reduce. A Build target means "at least" the amount, a Reduce target "at most" (SPEC §5.2).
   - The measurement: yes/no, count or duration. Yes/no carries no amount and no unit.
   - For count and duration, the amount: a whole number from 1 to 999 for Build, from 0 to 999 for Reduce. For
-    count, a unit of 1 to 20 characters after trimming, kept as entered (for example "pages", "sweet"); for
+    count, a unit of 1 to 20 characters after trimming, stored trimmed and otherwise as entered, with its
+    spelling and case unchanged (for example "pages", "sweet"; `"  pages  "` is stored as "pages"); for
     duration, the unit minutes or hours.
   - The schedule: either fixed days (one or more days of the week), or N times (1 to 20) per day or per week.
 
@@ -568,7 +599,7 @@ custom habits; run it again and confirm nothing changed.
   uniqueness (FR-004).
 - **FR-017**: Browsing and details MUST give each suggested starting goal a text and a kind, produced from its
   FR-007 fields by these rules:
-  - Amount part: count "N unit" with the unit as entered ("20 pages", "1 sweet"); duration "N min" for minutes
+  - Amount part: count "N unit" with the unit as stored ("20 pages", "1 sweet"); duration "N min" for minutes
     and "N h" for hours; yes/no has none.
   - Schedule part: fixed days on all seven days "daily", on one day "once a week", otherwise "N days a week";
     1 time per day "a day" ("once a day" for yes/no); N times per day "N times a day"; 1 time per week "once a

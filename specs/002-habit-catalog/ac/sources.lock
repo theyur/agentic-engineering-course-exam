@@ -1,0 +1,11 @@
+{
+  "group": "sources",
+  "feature": "specs/002-habit-catalog",
+  "files": {
+    "specs/002-habit-catalog/acceptance.md": "02deff060c24a5b7c7b0b94fef137d2fc3037bcdbd19e502b94175d6bf3ecf19"
+  },
+  "spec": {
+    "path": "specs/002-habit-catalog/spec.md",
+    "sha256": "32d2d7a30d10ceef7d8a12413245d7cfae204bbd4a0d2a01386a80029491141b"
+  }
+}
