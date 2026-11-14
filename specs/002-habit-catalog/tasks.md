@@ -258,23 +258,23 @@ the list; open `/catalog` and change the filters.
 
 > Write these first; they must fail before T061–T064 exist.
 
-- [ ] T058 [P] [US1] Create `tests/HT.UnitTests/Application/Habits/CatalogBrowseTests.cs` with `FakeCatalogHabitStore`:
+- [X] T058 [P] [US1] Create `tests/HT.UnitTests/Application/Habits/CatalogBrowseTests.cs` with `FakeCatalogHabitStore`:
   - US1-AS1: only Published habits, each with category, intent, icon, description and the marked suggested starting goal with its text and kind; no Draft, no Unpublished;
   - US1-AS2: name order ignoring case; ordinal order (`"Éclair"` after `"Zest"`);
   - US1-AS3, US1-AS4, US1-AS5 (`" morning "`), and all three filters together;
   - US1-AS7: no match gives `Found` with an empty list and `Count` 0;
   - US2-AS2 for browsing: a habit with no suggested starting goal has `MarkedSuggestedStartingGoal` null;
   - US1-AS8 and US1-AS9: the category filter is "All" first, then only categories with a Published habit, in FR-002 order; a Draft's category is absent.
-- [ ] T059 [P] [US1] Create `tests/HT.IntegrationTests/Habits/CatalogBrowseTests.cs` (collection `Database`, prefix `It-Br`) through `CatalogService` against SQL Server, arranging habits through `ICatalogHabitStore`: US1-AS1 to US1-AS5 by inclusion, exclusion and relative order
-- [ ] T060 [P] [US1] Create `tests/HT.ArchitectureTests/UseCaseParameterTests.cs` (plain reflection, research R-12): no public method of `CatalogService` takes an `ActingUser` or an `AccountId`. T077 and T097 extend it
+- [X] T059 [P] [US1] Create `tests/HT.IntegrationTests/Habits/CatalogBrowseTests.cs` (collection `Database`, prefix `It-Br`) through `CatalogService` against SQL Server, arranging habits through `ICatalogHabitStore`: US1-AS1 to US1-AS5 by inclusion, exclusion and relative order
+- [X] T060 [P] [US1] Create `tests/HT.ArchitectureTests/UseCaseParameterTests.cs` (plain reflection, research R-12): no public method of `CatalogService` takes an `ActingUser` or an `AccountId`. T077 and T097 extend it
 
 ### Implementation for User Story 1
 
-- [ ] T061 [US1] Create in `src/HT.Application/Habits/`: the views `CatalogHabitSummary`, `SuggestedStartingGoalView` and `CategoryFilterOption` of [contracts/application-api.md](contracts/application-api.md#view-types), and an internal `CatalogViews` that maps a `CatalogHabit` to them, taking each suggested starting goal's `Text` and `Kind` from `SuggestedStartingGoalText` (ADR 0011)
-- [ ] T062 [US1] Create the results `CatalogBrowseResult` (`Outcome` `Found`, `Habits`, `Count`, `Message` null) and `CategoryFilterResult` (`Found`, `Options`) in `src/HT.Application/Habits/`, following slice 1's result shape (its research R-06)
-- [ ] T063 [US1] Create `src/HT.Application/Habits/CatalogService.cs` with `BrowseAsync(CatalogFilter filter, CancellationToken)` and `GetCategoryFilterAsync(CancellationToken)`, taking no acting user (research R-07): read `ListPublishedAsync`, filter in memory (category, intent, `HabitName.Matches`), order with `HabitName.Order`. Register it (scoped) in `src/HT.Application/ApplicationServiceCollectionExtensions.cs` (depends on T061, T062)
-- [ ] T064 [US1] In `tests/HT.UiTests/HT.UiTests.csproj`, link T039's `..\HT.UnitTests\Fakes\FakeCatalogHabitStore.cs` (`<Compile Include … Link="Fakes\FakeCatalogHabitStore.cs" />`), as the project already links `FakeAccountStore.cs`, so the bUnit tests use the real services over the same fake (ADR 0006)
-- [ ] T065 [US1] Create `src/HT.Ui/Components/Pages/Catalog.razor` at `/catalog`, Interactive Server with prerendering (research R-11, [contracts/host.md](contracts/host.md)):
+- [X] T061 [US1] Create in `src/HT.Application/Habits/`: the views `CatalogHabitSummary`, `SuggestedStartingGoalView` and `CategoryFilterOption` of [contracts/application-api.md](contracts/application-api.md#view-types), and an internal `CatalogViews` that maps a `CatalogHabit` to them, taking each suggested starting goal's `Text` and `Kind` from `SuggestedStartingGoalText` (ADR 0011)
+- [X] T062 [US1] Create the results `CatalogBrowseResult` (`Outcome` `Found`, `Habits`, `Count`, `Message` null) and `CategoryFilterResult` (`Found`, `Options`) in `src/HT.Application/Habits/`, following slice 1's result shape (its research R-06)
+- [X] T063 [US1] Create `src/HT.Application/Habits/CatalogService.cs` with `BrowseAsync(CatalogFilter filter, CancellationToken)` and `GetCategoryFilterAsync(CancellationToken)`, taking no acting user (research R-07): read `ListPublishedAsync`, filter in memory (category, intent, `HabitName.Matches`), order with `HabitName.Order`. Register it (scoped) in `src/HT.Application/ApplicationServiceCollectionExtensions.cs` (depends on T061, T062)
+- [X] T064 [US1] In `tests/HT.UiTests/HT.UiTests.csproj`, link T039's `..\HT.UnitTests\Fakes\FakeCatalogHabitStore.cs` (`<Compile Include … Link="Fakes\FakeCatalogHabitStore.cs" />`), as the project already links `FakeAccountStore.cs`, so the bUnit tests use the real services over the same fake (ADR 0006)
+- [X] T065 [US1] Create `src/HT.Ui/Components/Pages/Catalog.razor` at `/catalog`, Interactive Server with prerendering (research R-11, [contracts/host.md](contracts/host.md)):
   - `q`, `category` (lower-case category name) and `intent` (`build`, `reduce`) read with `[SupplyParameterFromQuery]`; an unknown value is ignored. Intent follows the two checkboxes: only "Build" checked is `intent=build` (filter Build), only "Reduce" is `intent=reduce`, and none or both checked is no `intent` value (both, FR-009);
   - a filter change applies at once and writes the address with `NavigationManager.NavigateTo(…, replace: true)`; the search does so 300 ms after the last keystroke, cancels a pending search on newer input, and ignores a result older than the latest request (research R-15);
   - every call through `UseCaseScope`;
@@ -283,8 +283,8 @@ the list; open `/catalog` and change the filters.
   - with no match, an EmptyState that says nothing matches and clears the filters (HP-004).
 
   Depends on T063.
-- [ ] T066 [P] [US1] Create `tests/HT.UiTests/Components/Pages/CatalogPageTests.cs` (bUnit, over T064's fake): the visitor structure of US1-AS10; a category and an intent change the cards without an Apply button and replace the address with the query (US1-AS11); checking both Intent boxes, or none, shows both intents and drops `intent` from the address; query values set the filters on open; an unknown value is ignored; the debounced search; the EmptyState and its clear action; the signed-in and administrator variants without the Notice (depends on T065)
-- [ ] T067 [P] [US1] Create `tests/HT.UiTests/Host/CatalogHostTests.cs`: `/catalog` answers 200 for an anonymous visitor with the prerendered heading and cards; `/catalog?category=money&intent=reduce&q=…` prerenders only matching habits (arranged through `ICatalogHabitStore` from the host's services, prefix `Ui-Br`) (depends on T065)
+- [X] T066 [P] [US1] Create `tests/HT.UiTests/Components/Pages/CatalogPageTests.cs` (bUnit, over T064's fake): the visitor structure of US1-AS10; a category and an intent change the cards without an Apply button and replace the address with the query (US1-AS11); checking both Intent boxes, or none, shows both intents and drops `intent` from the address; query values set the filters on open; an unknown value is ignored; the debounced search; the EmptyState and its clear action; the signed-in and administrator variants without the Notice (depends on T065)
+- [X] T067 [P] [US1] Create `tests/HT.UiTests/Host/CatalogHostTests.cs`: `/catalog` answers 200 for an anonymous visitor with the prerendered heading and cards; `/catalog?category=money&intent=reduce&q=…` prerenders only matching habits (arranged through `ICatalogHabitStore` from the host's services, prefix `Ui-Br`) (depends on T065)
 
 **Checkpoint**: full suite green; `/catalog` usable in the browser. Commit.
 

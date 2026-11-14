@@ -1,0 +1,222 @@
+@page "/catalog"
+@rendermode InteractiveServer
+@implements IDisposable
+@using HT.Application.Habits
+@using HT.Domain.Accounts
+@using HT.Domain.Habits
+@using HT.Ui.Account
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageCatalogVisitor and PageCatalogSignedIn, slice 2 (HP-001 to HP-004). The Public catalog for
+   every audience. Filters and the search live in the address (q, category, intent) and apply at once; the search
+   waits 300 ms after the last keystroke (research R-11, R-15). Every use case runs in its own scope. *@
+<PageTitle>Habit catalog · Habit Tracker</PageTitle>
+
+<div class="ht-container">
+    <div class="ht-page-head">
+        <h1>Habit catalog</h1>
+        <span class="ht-spacer"></span>
+        <SearchField Id="catalog-search" Label="Search habits" Value="@_search" ValueChanged="OnSearchChangedAsync" />
+    </div>
+    <div class="ht-stack">
+        @if (_actingUser.IsAnonymous)
+        {
+            <Notice>
+                <ChildContent>Ideas to start from. <b>Register</b> to turn any habit into your own goal.</ChildContent>
+                <Action><HtButton Href="/register" Small="true">Register</HtButton></Action>
+            </Notice>
+        }
+        <div class="ht-sidebar-layout">
+            <FilterPanel Id="catalog-filters" Categories="_categories" Category="_category" CategoryChanged="OnCategoryChangedAsync"
+                         Build="_build" Reduce="_reduce" IntentChanged="OnIntentChangedAsync" />
+            <div>
+                <div class="ht-results-bar">
+                    <span>@CountText</span>
+                    <span class="ht-spacer"></span>
+                    <span>Sort: A–Z</span>
+                </div>
+                @if (_habits.Count == 0 && _loaded)
+                {
+                    <EmptyState Icon="search" Title="No habits match"
+                                Text="No catalog habit matches your search and filters. Clear them to see the whole catalog.">
+                        <HtButton Variant="HtButton.ButtonVariant.Secondary" @onclick="ClearFiltersAsync">Clear filters</HtButton>
+                    </EmptyState>
+                }
+                else
+                {
+                    <div class="ht-grid-cards">
+                        @foreach (var habit in _habits)
+                        {
+                            <HabitCard Icon="@habit.Icon" Name="@habit.Name" Category="@habit.Category.ToString()"
+                                       Intent="@habit.Intent.ToString()" Description="@habit.Description"
+                                       SuggestedStartingGoal="@habit.MarkedSuggestedStartingGoal?.Text"
+                                       Variant="@(_actingUser.IsAnonymous ? HabitCard.HabitCardVariant.Visitor : HabitCard.HabitCardVariant.SignedIn)"
+                                       Href="@($"/catalog/{habit.Id.Value}")" />
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private const int SearchDelayMilliseconds = 300;
+
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private IReadOnlyList<CatalogHabitSummary> _habits = [];
+    private IReadOnlyList<FilterPanel.CategoryOption> _categories = [new(null, CatalogTexts.AllCategories)];
+    private string _search = string.Empty;
+    private Category? _category;
+    private bool _build;
+    private bool _reduce;
+    private bool _loaded;
+    private int _request;
+    private CancellationTokenSource? _pendingSearch;
+
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "category")]
+    public string? CategoryValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "intent")]
+    public string? IntentValue { get; set; }
+
+    private string CountText => _habits.Count == 1 ? "1 habit" : $"{_habits.Count} habits";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _actingUser = await ActingUsers.GetAsync();
+        var filter = await UseCases.RunAsync<CatalogService, CategoryFilterResult>(
+            (service, token) => service.GetCategoryFilterAsync(token), CancellationToken.None);
+        _categories = filter.Options.Select(o => new FilterPanel.CategoryOption(o.Category, o.Label)).ToList();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // The page writes its own filters to the address, so they come back here: compare what the address means,
+        // not the boxes, because both boxes and none checked are the same address (no intent).
+        var search = Query ?? string.Empty;
+        var category = ParseCategory(CategoryValue);
+        var (build, reduce) = ParseIntent(IntentValue);
+        var intent = build ? Intent.Build : reduce ? Intent.Reduce : (Intent?)null;
+        if (_loaded && SearchKey(search) == SearchKey(_search) && category == _category && intent == SelectedIntent)
+        {
+            return;
+        }
+
+        if (_pendingSearch is null)
+        {
+            _search = search;
+        }
+
+        _category = category;
+        if (intent != SelectedIntent)
+        {
+            (_build, _reduce) = (build, reduce);
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var request = ++_request;
+        var filter = new CatalogFilter { Category = _category, Intent = SelectedIntent, Search = _search };
+        var result = await UseCases.RunAsync<CatalogService, CatalogBrowseResult>(
+            (service, token) => service.BrowseAsync(filter, token), CancellationToken.None);
+        if (request != _request)
+        {
+            return;
+        }
+
+        _habits = result.Habits;
+        _loaded = true;
+    }
+
+    private static string? SearchKey(string? search) => string.IsNullOrWhiteSpace(search) ? null : search;
+
+    /// <summary>One box checked filters by it; none or both is no filter (both intents, FR-009).</summary>
+    private Intent? SelectedIntent => _build == _reduce ? null : _build ? Intent.Build : Intent.Reduce;
+
+    private async Task OnCategoryChangedAsync(Category? category)
+    {
+        _category = category;
+        await ApplyAsync();
+    }
+
+    private async Task OnIntentChangedAsync((bool Build, bool Reduce) intent)
+    {
+        (_build, _reduce) = intent;
+        await ApplyAsync();
+    }
+
+    private async Task OnSearchChangedAsync(string text)
+    {
+        _search = text;
+        _pendingSearch?.Cancel();
+        _pendingSearch?.Dispose();
+        var pending = _pendingSearch = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(SearchDelayMilliseconds, pending.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(pending, _pendingSearch))
+        {
+            _pendingSearch = null;
+            pending.Dispose();
+        }
+
+        await ApplyAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _pendingSearch?.Cancel();
+        _pendingSearch = null;
+        _search = string.Empty;
+        _category = null;
+        _build = false;
+        _reduce = false;
+        await ApplyAsync();
+    }
+
+    /// <summary>Shows the list for the current filters at once and writes them to the address, replacing it.</summary>
+    private async Task ApplyAsync()
+    {
+        await LoadAsync();
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["q"] = string.IsNullOrWhiteSpace(_search) ? null : _search,
+            ["category"] = _category?.ToString().ToLowerInvariant(),
+            ["intent"] = SelectedIntent?.ToString().ToLowerInvariant(),
+        }), replace: true);
+    }
+
+    /// <summary>The lower-case name of a category; anything else is ignored.</summary>
+    internal static Category? ParseCategory(string? value) =>
+        Enum.GetValues<Category>().Cast<Category?>()
+            .FirstOrDefault(c => string.Equals(c!.Value.ToString().ToLowerInvariant(), value, StringComparison.Ordinal));
+
+    /// <summary><c>build</c> or <c>reduce</c> checks that box alone; anything else checks none (both intents).</summary>
+    internal static (bool Build, bool Reduce) ParseIntent(string? value) => value switch
+    {
+        "build" => (true, false),
+        "reduce" => (false, true),
+        _ => (false, false),
+    };
+
+    public void Dispose()
+    {
+        _pendingSearch?.Cancel();
+        _pendingSearch?.Dispose();
+    }
+}

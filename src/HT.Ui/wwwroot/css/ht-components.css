@@ -28,6 +28,8 @@
 .ht-grid-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:var(--space-4); }
 .ht-sidebar-layout { display:grid; grid-template-columns:200px 1fr; gap:var(--space-6); align-items:start; }
 .ht-stack > * + * { margin-top:var(--space-4); }
+/* the line above a list: a count or a search on the left, a label or a count on the right */
+.ht-results-bar { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-3); margin-bottom:var(--space-3); color:var(--ink-muted); }
 
 /* ---------- top navigation ---------- */
 .ht-nav { background:var(--surface); border-bottom:1px solid var(--line); }
@@ -167,6 +169,8 @@ a.ht-tab { display:inline-block; text-decoration:none; }
 .ht-search { position:relative; }
 .ht-search .ht-input { padding-left:34px; }
 .ht-search svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--ink-muted); }
+/* a search in a page head or above a list keeps the previews' width */
+.ht-page-head .ht-search, .ht-results-bar .ht-search { width:260px; max-width:100%; }
 .ht-toggle { position:relative; width:40px; height:22px; border-radius:var(--radius-full); border:1px solid var(--line-strong); background:var(--surface-2); cursor:pointer; padding:0; flex:none; }
 .ht-toggle::after { content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:var(--surface); box-shadow:0 0 0 1px var(--line-strong); transition:left .15s; }
 .ht-toggle[aria-checked="true"] { background:var(--accent); border-color:var(--accent); }
