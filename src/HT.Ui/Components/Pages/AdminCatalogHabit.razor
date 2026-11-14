@@ -32,12 +32,16 @@
 }
 
 @code {
+    private const string NewSubtitle = "Created as a Draft. Publish it from the catalog table.";
+
     private ActingUser _actingUser = ActingUser.Anonymous;
     private HabitFormModel _model = new();
     private List<SuggestedStartingGoalFormModel> _goals = [];
     private FormError? _error;
-    private string _subtitle = "Created as a Draft. Publish it from the catalog table.";
+    private string _subtitle = NewSubtitle;
     private bool _ready;
+    private bool _loaded;
+    private Guid? _loadedId;
 
     /// <summary>The habit being edited; null on the create address.</summary>
     [Parameter]
@@ -45,9 +49,26 @@
 
     private string Title => Id is null ? "New catalog habit" : "Edit catalog habit";
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => _actingUser = await ActingUsers.GetAsync();
+
+    /// <summary>
+    /// Both addresses share this component, so the router keeps it when only the address changes: each new
+    /// <see cref="Id"/> starts from an empty form and loads that habit.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
     {
-        _actingUser = await ActingUsers.GetAsync();
+        if (_loaded && Id == _loadedId)
+        {
+            return;
+        }
+
+        _loaded = true;
+        _loadedId = Id;
+        _ready = false;
+        _model = new();
+        _goals = [];
+        _error = null;
+        _subtitle = NewSubtitle;
         if (Id is not { } id)
         {
             if (_actingUser.Role != Role.Administrator)

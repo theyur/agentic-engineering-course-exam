@@ -71,6 +71,8 @@
     private string _savedName = string.Empty;
     private bool _confirmDelete;
     private bool _ready;
+    private bool _loaded;
+    private Guid? _loadedId;
     private ElementReference _deleteButton;
 
     /// <summary>The habit being edited; null on the create address.</summary>
@@ -81,9 +83,27 @@
 
     private string? NameHelp => Id is null ? "Short and clear, for example \"Cold shower\" or \"No phone in bed\"." : null;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => _actingUser = await ActingUsers.GetAsync();
+
+    /// <summary>
+    /// Both addresses share this component, so the router keeps it when only the address changes: each new
+    /// <see cref="Id"/> starts from an empty form and loads that habit.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
     {
-        _actingUser = await ActingUsers.GetAsync();
+        if (_loaded && Id == _loadedId)
+        {
+            return;
+        }
+
+        _loaded = true;
+        _loadedId = Id;
+        _ready = false;
+        _model = new();
+        _error = null;
+        _gone = null;
+        _savedName = string.Empty;
+        _confirmDelete = false;
         if (Id is not { } id)
         {
             // Nothing to read yet: the list's outcome says whether this user may have custom habits at all.

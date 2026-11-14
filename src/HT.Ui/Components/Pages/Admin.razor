@@ -68,13 +68,29 @@
     private int _request;
     private CancellationTokenSource? _pendingSearch;
 
+    // The search the address last asked for, or that this page last wrote to it; null before the first load.
+    private string? _appliedQuery;
+
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => _actingUser = await ActingUsers.GetAsync();
+
+    /// <summary>
+    /// The address is the source of the search: a link or Back that changes "q" while the page stays open loads that
+    /// search. The page's own address update after a search changes nothing, so typing on is not undone.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
     {
-        _actingUser = await ActingUsers.GetAsync();
-        _search = Query ?? string.Empty;
+        var query = Query ?? string.Empty;
+        if (query == _appliedQuery)
+        {
+            return;
+        }
+
+        _appliedQuery = query;
+        CancelPendingSearch();
+        _search = query;
         await LoadAsync();
     }
 
@@ -136,12 +152,17 @@
         }
 
         await LoadAsync();
-        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("q", string.IsNullOrWhiteSpace(_search) ? null : _search), replace: true);
+        var query = string.IsNullOrWhiteSpace(_search) ? null : _search;
+        _appliedQuery = query ?? string.Empty;
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("q", query), replace: true);
     }
 
-    public void Dispose()
+    private void CancelPendingSearch()
     {
         _pendingSearch?.Cancel();
         _pendingSearch?.Dispose();
+        _pendingSearch = null;
     }
+
+    public void Dispose() => CancelPendingSearch();
 }

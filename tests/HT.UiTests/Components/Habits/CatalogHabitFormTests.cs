@@ -137,6 +137,46 @@ public sealed class CatalogHabitFormTests : BunitContext
         var error = items[1].QuerySelector(".ht-field__error")!;
         Assert.Equal("Enter a unit, for example pages.", error.TextContent);
         Assert.Equal(error.Id, items[1].QuerySelector("input[type=number]")!.GetAttribute("aria-describedby"));
+        var unit = items[1].QuerySelector("input.ht-unit-input")!;
+        Assert.Equal(error.Id, unit.GetAttribute("aria-describedby"));
+        Assert.Equal("true", unit.GetAttribute("aria-invalid"));
+        Assert.Null(items[0].QuerySelector("input.ht-unit-input")!.GetAttribute("aria-invalid"));
+    }
+
+    [Fact]
+    public void The_duration_unit_and_the_period_point_to_the_refusal_they_sit_under()
+    {
+        _goals.Add(new SuggestedStartingGoalFormModel
+        {
+            IsMarked = true, Measurement = Measurement.Duration, BuildOrReduce = BuildOrReduce.Build, ScheduleKind = ScheduleKind.Times,
+        });
+
+        var unit = RenderForm(FormError.Of("DurationUnitMissing", "Choose minutes or hours.", 1));
+        var unitError = unit.Find(".ht-editor-item .ht-field__error");
+        Assert.Equal(unitError.Id, unit.Find(".ht-seg[aria-label='Unit, suggested starting goal 1']").GetAttribute("aria-describedby"));
+
+        var period = RenderForm(FormError.Of("PeriodMissing", "Choose per day or per week.", 1));
+        var periodError = period.Find(".ht-editor-item .ht-field__error");
+        Assert.Equal(periodError.Id, period.Find(".ht-seg[aria-label='Per day or per week, suggested starting goal 1']").GetAttribute("aria-describedby"));
+    }
+
+    [Fact]
+    public void Each_suggested_starting_goal_has_its_own_control_ids()
+    {
+        for (var i = 0; i < 2; i++)
+        {
+            _goals.Add(new SuggestedStartingGoalFormModel
+            {
+                IsMarked = i == 0, Measurement = Measurement.Count, BuildOrReduce = BuildOrReduce.Build, ScheduleKind = ScheduleKind.Times,
+            });
+        }
+
+        var cut = RenderForm();
+
+        var ids = cut.FindAll("[id]").Select(e => e.Id).ToList();
+        Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(["suggested-1-amount", "suggested-1-times", "suggested-2-amount", "suggested-2-times"],
+            cut.FindAll(".ht-editor-item input[type=number]").Select(e => e.Id));
     }
 
     [Fact]

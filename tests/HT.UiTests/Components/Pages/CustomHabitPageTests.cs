@@ -181,6 +181,36 @@ public sealed class CustomHabitPageTests : BunitContext
     }
 
     [Fact]
+    public async Task A_new_Id_on_the_open_page_loads_that_habit_and_no_Id_gives_an_empty_form()
+    {
+        var owner = SignInOwner();
+        var first = _store.Add(owner, Definition("Cold shower", Category.Body));
+        var second = _store.Add(owner, Definition("No phone in bed", Category.Mind));
+        await _store.DeleteAsync(owner, first.Id, CancellationToken.None);
+        var cut = RenderEdit(first.Id);
+        Assert.Equal(1, _notFound);
+
+        Navigation.NavigateTo($"/custom-habits/{second.Id.Value}");
+        cut.Render(p => p.Add(x => x.Id, second.Id.Value));
+
+        Assert.Equal("Edit custom habit", cut.Find("h1").TextContent);
+        Assert.Equal("No phone in bed", cut.Find("#custom-habit-name").GetAttribute("value"));
+        Button(cut, "Delete").Click();
+        Assert.Equal("No phone in bed · Private", cut.Find("[role=dialog] .ht-dialog__sub").TextContent);
+        cut.Find(".ht-dialog__foot .ht-btn--danger").Click();
+        Assert.Null(_store.Get(second.Id));
+
+        Navigation.NavigateTo("/custom-habits/new");
+        cut.Render(p => p.Add(x => x.Id, (Guid?)null));
+
+        Assert.Equal("New custom habit", cut.Find("h1").TextContent);
+        Assert.True(string.IsNullOrEmpty(cut.Find("#custom-habit-name").GetAttribute("value")));
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.DoesNotContain("Delete", cut.Markup, StringComparison.Ordinal);
+        Assert.Equal(1, _notFound);
+    }
+
+    [Fact]
     public void HP_007_Delete_asks_first_in_a_Dialog_and_Cancel_keeps_the_habit_and_returns_focus_to_Delete()
     {
         var owner = SignInOwner();

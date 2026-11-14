@@ -40,19 +40,21 @@
                 <span class="ht-field__label">Amount</span>
                 <span class="ht-inline">
                     <span>@(Model.BuildOrReduce == BuildOrReduce.Reduce ? "At most" : "At least")</span>
-                    <Stepper Id="@($"{IdPrefix}-amount")" Label="@($"Amount, suggested starting goal {Position}")" Value="Model.Amount"
+                    @* The unit's refusals sit under Amount too, so the unit control points to the same error. *@
+                    <Stepper Id="@($"{Prefix}-amount")" Label="@($"Amount, suggested starting goal {Position}")" Value="Model.Amount"
                              ValueChanged="v => Model.Amount = v" Min="@(Model.BuildOrReduce == BuildOrReduce.Reduce ? 0 : 1)" Max="999"
                              Step="@(Model.Measurement == Measurement.Duration && Model.DurationUnit != DurationUnit.Hours ? 5 : 1)"
                              DescribedBy="@ErrorId(HabitFormErrors.Amount)" Invalid="@(ErrorId(HabitFormErrors.Amount) is not null)" />
                     @if (Model.Measurement == Measurement.Count)
                     {
                         <input class="ht-input ht-unit-input" value="@Model.CountUnit" placeholder="pages"
-                               aria-label="@($"Unit, suggested starting goal {Position}")" @onchange="e => Model.CountUnit = e.Value?.ToString()" />
+                               aria-label="@($"Unit, suggested starting goal {Position}")" @onchange="e => Model.CountUnit = e.Value?.ToString()"
+                               aria-describedby="@ErrorId(HabitFormErrors.Amount)" aria-invalid="@(ErrorId(HabitFormErrors.Amount) is null ? null : "true")" />
                     }
                     else
                     {
                         <SegmentedControl TValue="DurationUnit" Label="@($"Unit, suggested starting goal {Position}")" Options="Units"
-                                          Value="Model.DurationUnit" ValueChanged="v => Model.DurationUnit = v" />
+                                          Value="Model.DurationUnit" ValueChanged="v => Model.DurationUnit = v" DescribedBy="@ErrorId(HabitFormErrors.Amount)" />
                     }
                 </span>
                 @ErrorText(HabitFormErrors.Amount)
@@ -78,11 +80,12 @@
             <div class="ht-field">
                 <span class="ht-field__label">How many times</span>
                 <span class="ht-inline">
-                    <Stepper Id="@($"{IdPrefix}-times")" Label="@($"Times, suggested starting goal {Position}")" Value="Model.Times"
+                    @* "Choose per day or per week." sits under Times too, so the period control points to it as well. *@
+                    <Stepper Id="@($"{Prefix}-times")" Label="@($"Times, suggested starting goal {Position}")" Value="Model.Times"
                              ValueChanged="v => Model.Times = v" Min="1" Max="20"
                              DescribedBy="@ErrorId(HabitFormErrors.Times)" Invalid="@(ErrorId(HabitFormErrors.Times) is not null)" />
                     <SegmentedControl TValue="SchedulePeriod" Label="@($"Per day or per week, suggested starting goal {Position}")" Options="Periods"
-                                      Value="Model.Period" ValueChanged="v => Model.Period = v" />
+                                      Value="Model.Period" ValueChanged="v => Model.Period = v" DescribedBy="@ErrorId(HabitFormErrors.Times)" />
                 </span>
                 @ErrorText(HabitFormErrors.Times)
             </div>

@@ -3,6 +3,7 @@ using Bunit.TestDoubles;
 using HT.Domain.Habits;
 using HT.Ui.Components.Pages;
 using HT.UnitTests.Fakes;
+using Microsoft.Extensions.DependencyInjection;
 using static HT.UnitTests.Fakes.HabitSamples;
 
 namespace HT.UiTests.Components.Pages;
@@ -50,6 +51,23 @@ public sealed class AdminPageTests : BunitContext
         Assert.Contains("ht-chip--strong", rows[1].QuerySelector(".ht-chip")!.ClassList);
         Assert.DoesNotContain("ht-chip--strong", rows[2].QuerySelector(".ht-chip")!.ClassList);
         Assert.Equal("Edit Cold shower", rows[0].QuerySelector(".ht-actions a")!.GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void A_new_q_on_the_open_page_loads_that_search()
+    {
+        var navigation = Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo("/admin?q=read");
+        var cut = Render<Admin>();
+        Assert.Equal(["Reading"], cut.FindAll("tbody tr td b").Select(b => b.TextContent));
+        Assert.Equal("read", cut.Find("input[type=search]").GetAttribute("value"));
+
+        // The Admin link in the navigation: same page, no "q".
+        navigation.NavigateTo("/admin");
+
+        cut.WaitForAssertion(() => Assert.Equal(["Cold shower", "Reading", "Sugar"], cut.FindAll("tbody tr td b").Select(b => b.TextContent)));
+        Assert.True(string.IsNullOrEmpty(cut.Find("input[type=search]").GetAttribute("value")));
+        Assert.Contains("Showing 3 of 3", cut.Find(".ht-results-bar").TextContent, StringComparison.Ordinal);
     }
 
     [Fact]
