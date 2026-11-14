@@ -1,0 +1,106 @@
+@using Microsoft.AspNetCore.Components.Web
+@* design/components/Dialog: a modal for a short task of the current page. The title's id is generated per
+   instance, so two dialogs on one page never share it. Focus moves into the dialog when it opens; Esc and ×
+   ask the page to close it; when it closes, for any reason, focus returns to the control that opened it. *@
+@if (Open)
+{
+    <div class="ht-backdrop">
+        <div class="ht-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId" tabindex="-1"
+             @ref="_dialog" @onkeydown="OnKeyDownAsync">
+            <div class="ht-dialog__head">
+                <div>
+                    <h2 id="@TitleId">@Title</h2>
+                    @if (Subtitle is not null)
+                    {
+                        <div class="ht-dialog__sub">@Subtitle</div>
+                    }
+                </div>
+                <button type="button" class="ht-dialog__close" aria-label="Close" @onclick="CloseAsync">×</button>
+            </div>
+            <div class="ht-dialog__body">@ChildContent</div>
+            @if (Footer is not null)
+            {
+                <div class="ht-dialog__foot">@Footer</div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private ElementReference _dialog;
+    private bool _wasOpen;
+    private bool _focusDialog;
+    private bool _returnFocus;
+
+    /// <summary>The id of this dialog's title, unique on the page.</summary>
+    public string TitleId { get; } = $"ht-dialog-{Guid.NewGuid():N}";
+
+    /// <summary>Whether the dialog is shown; the page owns this value.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Esc or × was used: the page should set <see cref="Open"/> to false.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>The control that opened the dialog; it gets the focus back when the dialog closes.</summary>
+    [Parameter]
+    public ElementReference? ReturnFocus { get; set; }
+
+    /// <summary>The action and its object: "Delete this custom habit?".</summary>
+    [Parameter, EditorRequired]
+    public RenderFragment? Title { get; set; }
+
+    /// <summary>One muted line under the title.</summary>
+    [Parameter]
+    public RenderFragment? Subtitle { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The primary action first, then Cancel.</summary>
+    [Parameter]
+    public RenderFragment? Footer { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !_wasOpen)
+        {
+            _focusDialog = true;
+        }
+        else if (!Open && _wasOpen)
+        {
+            _returnFocus = true;
+        }
+
+        _wasOpen = Open;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusDialog)
+        {
+            _focusDialog = false;
+            await _dialog.FocusAsync();
+        }
+
+        if (_returnFocus)
+        {
+            _returnFocus = false;
+            if (ReturnFocus is { } control)
+            {
+                await control.FocusAsync();
+            }
+        }
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await CloseAsync();
+        }
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+}

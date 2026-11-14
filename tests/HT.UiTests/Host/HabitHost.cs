@@ -52,6 +52,35 @@ public static class HabitHost
         return id;
     }
 
+    /// <summary>Creates a custom habit of <paramref name="owner"/> through the host's store.</summary>
+    public static async Task<HabitId> ArrangeCustomHabitAsync(this HostFixture host, HT.Domain.Accounts.AccountId owner, HabitDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        await using var scope = host.Services.CreateAsyncScope();
+        var created = await scope.ServiceProvider.GetRequiredService<ICustomHabitStore>().CreateAsync(owner, definition, CancellationToken.None);
+        return created.Id ?? throw new InvalidOperationException("The custom habit name is taken.");
+    }
+
+    /// <summary>Deletes a custom habit of <paramref name="owner"/> through the host's store.</summary>
+    public static async Task DeleteCustomHabitAsync(this HostFixture host, HT.Domain.Accounts.AccountId owner, HabitId id)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        await using var scope = host.Services.CreateAsyncScope();
+        var deleted = await scope.ServiceProvider.GetRequiredService<ICustomHabitStore>().DeleteAsync(owner, id, CancellationToken.None);
+        Assert.Equal(DeleteCustomHabitOutcome.Deleted, deleted);
+    }
+
+    /// <summary>A new account of this role and a browser signed in as it.</summary>
+    public static async Task<(HttpClient Browser, HT.Domain.Accounts.AccountId Account)> SignedInAccountAsync(
+        this HostFixture host, string email, HT.Domain.Accounts.Role role, string password = "walking42")
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        var account = await host.CreateAccountAsync(email, password, role);
+        var browser = host.CreateBrowser();
+        await browser.SignInAsync(email, password);
+        return (browser, account.Id);
+    }
+
     /// <summary>GETs a page and returns its status and body.</summary>
     public static async Task<(HttpStatusCode Status, string Html)> GetPageAsync(this HttpClient browser, string path)
     {

@@ -19,7 +19,20 @@ public sealed class UseCaseParameterTests
     private static bool Takes(MethodInfo method, Type type) =>
         method.GetParameters().Any(p => p.ParameterType == type || Nullable.GetUnderlyingType(p.ParameterType) == type);
 
-    public static TheoryData<Type> SignedInServices => new(typeof(CatalogAdministrationService));
+    public static TheoryData<Type> SignedInServices => new(typeof(CatalogAdministrationService), typeof(CustomHabitService));
+
+    [Fact]
+    public void Every_method_of_the_custom_habit_port_takes_the_owner_first()
+    {
+        var methods = typeof(ICustomHabitStore).GetMethods();
+        Assert.NotEmpty(methods);
+
+        var offenders = methods
+            .Where(m => m.GetParameters() is not [{ } first, ..] || first.ParameterType != typeof(AccountId))
+            .Select(m => m.Name)
+            .ToList();
+        Assert.Empty(offenders);
+    }
 
     [Theory]
     [MemberData(nameof(SignedInServices))]

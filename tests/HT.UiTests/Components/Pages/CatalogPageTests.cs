@@ -13,6 +13,7 @@ public sealed class CatalogPageTests : BunitContext
 {
     private readonly BunitAuthorizationContext _authorization;
     private readonly FakeCatalogHabitStore _store;
+    private readonly FakeCustomHabitStore _customHabits;
 
     public CatalogPageTests()
     {
@@ -22,6 +23,7 @@ public sealed class CatalogPageTests : BunitContext
         _store.Add(Catalog("Saving money", category: Category.Money, icon: "piggy-bank"));
         _store.Add(Catalog("Sugar", category: Category.Health, intent: Intent.Reduce, icon: "candy"));
         _store.Add(Catalog("Old habit", CatalogHabitState.Unpublished, category: Category.Other));
+        _customHabits = this.AddCustomHabits();
     }
 
     private BunitNavigationManager Navigation => Services.GetRequiredService<BunitNavigationManager>();
@@ -160,5 +162,46 @@ public sealed class CatalogPageTests : BunitContext
 
         Assert.Empty(cut.FindAll(".ht-notice"));
         Assert.All(cut.FindAll(".ht-habit__actions a"), a => Assert.Equal("Details", a.TextContent));
+    }
+
+    [Fact]
+    public void US4_AS12_a_registered_user_gets_the_Tabs_with_counts_and_the_custom_habit_button()
+    {
+        var owner = new HT.Domain.Accounts.AccountId(_authorization.SignIn("RegisteredUser"));
+        _customHabits.Add(owner, Definition("Cold shower", Category.Body));
+        _customHabits.Add(new HT.Domain.Accounts.AccountId(Guid.NewGuid()), Definition("Someone else's habit"));
+
+        var cut = RenderAt("/catalog?category=money");
+
+        var create = cut.Find(".ht-page-head a.ht-btn");
+        Assert.Equal("+ Create custom habit", create.TextContent);
+        Assert.Equal("/custom-habits/new", create.GetAttribute("href"));
+        Assert.Contains("ht-btn--secondary", create.ClassList);
+        var tabs = cut.Find("nav.ht-tabs");
+        Assert.Equal("Catalog views", tabs.GetAttribute("aria-label"));
+        var links = tabs.QuerySelectorAll("a.ht-tab");
+        Assert.Equal(["/catalog", "/custom-habits"], links.Select(a => a.GetAttribute("href")));
+        Assert.Equal(["page", null], links.Select(a => a.GetAttribute("aria-current")));
+        // "Public catalog" counts every Published habit, whatever the filters; "My custom habits" the user's own.
+        Assert.Equal(["Public catalog3", "My custom habits1"], links.Select(a => a.TextContent));
+        Assert.Equal("1 habit", cut.Find(".ht-results-bar span").TextContent);
+        Assert.DoesNotContain("Cold shower", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Administrator")]
+    public void HP_002_visitors_and_administrators_get_no_Tabs_and_no_custom_habit_button(string? role)
+    {
+        if (role is not null)
+        {
+            _authorization.SignIn(role, "admin@example.com");
+        }
+
+        var cut = RenderAt("/catalog");
+
+        Assert.Empty(cut.FindAll(".ht-tabs"));
+        Assert.DoesNotContain("Create custom habit", cut.Markup, StringComparison.Ordinal);
+        Assert.Equal(role is null ? 1 : 0, cut.FindAll(".ht-notice").Count);
     }
 }

@@ -53,6 +53,7 @@ public static class PersistenceServiceCollectionExtensions
         services.Replace(ServiceDescriptor.Scoped<ILookupNormalizer, EmailLookupNormalizer>());
         services.AddScoped<IAccountStore, AccountStore>();
         services.AddScoped<ICatalogHabitStore, CatalogHabitStore>();
+        services.AddScoped<ICustomHabitStore, CustomHabitStore>();
         return services;
     }
 }

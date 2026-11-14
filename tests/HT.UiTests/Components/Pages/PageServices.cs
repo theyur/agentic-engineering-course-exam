@@ -27,6 +27,19 @@ public static class PageServices
         return store;
     }
 
+    /// <summary>
+    /// The custom-habit use cases over the unit tests' fake store, next to what <see cref="AddCatalog"/> registers
+    /// (the custom-habit pages also count the Published catalog habits).
+    /// </summary>
+    public static FakeCustomHabitStore AddCustomHabits(this BunitContext context, FakeCustomHabitStore? store = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        store ??= new FakeCustomHabitStore();
+        context.Services.AddSingleton<ICustomHabitStore>(store);
+        context.Services.AddScoped<CustomHabitService>();
+        return store;
+    }
+
     /// <summary>Signs the context in as an account with this role, with the claims ActingUserAccessor reads.</summary>
     public static Guid SignIn(this BunitAuthorizationContext authorization, string role, string email = "ana@example.com")
     {

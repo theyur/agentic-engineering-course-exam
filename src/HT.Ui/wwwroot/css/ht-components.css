@@ -250,6 +250,15 @@ a.ht-tab { display:inline-block; text-decoration:none; }
 /* the count unit after a Stepper, and a one-column form card */
 .ht-unit-input { width:140px; }
 .ht-form-card { max-width:760px; }
+/* a fieldset that only groups a form's controls, so one disabled attribute can stop the whole form */
+.ht-fieldset { border:0; margin:0; padding:0; min-width:0; }
+/* a card head with its title and an action on the right (Profile's Custom habits card) */
+.ht-card__head { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-3); margin-bottom:var(--space-2); }
+.ht-card__head .ht-card__title { margin:0; }
+/* the accent title of a side card (the custom habit page's "Private" card) */
+.ht-card__title--accent { color:var(--accent); margin-bottom:var(--space-2); }
+/* a habit glyph at the start of a list row */
+.ht-habit__glyph--row { width:36px; height:36px; margin:0; flex:none; }
 
 /* ---------- segmented control ---------- */
 .ht-seg { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-sm); overflow:hidden; background:var(--surface); }
@@ -293,6 +302,7 @@ a.ht-tab { display:inline-block; text-decoration:none; }
 .ht-dialog__body { padding:var(--space-4) var(--space-5); display:grid; gap:var(--space-4); }
 .ht-dialog__foot { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); padding:var(--space-4) var(--space-5) var(--space-5); border-top:1px solid var(--line); }
 .ht-dialog__foot .ht-spacer { flex:1; }
+.ht-dialog__body > p { margin:0; }
 .ht-target { display:flex; align-items:center; gap:var(--space-2); font-size:13px; line-height:18px; color:var(--ink-muted); }
 
 /* ---------- trend chart (CSS bars) ---------- */

@@ -5,13 +5,16 @@
 @using HT.Domain.Accounts
 @using HT.Domain.Habits
 @using HT.Ui.Account
+@using HT.Ui.Components.Habits
 @using HT.Ui.Habits
 @inject UseCaseScope UseCases
 @inject ActingUserAccessor ActingUsers
 @inject NavigationManager Navigation
 @* design/pages/PageCatalogVisitor and PageCatalogSignedIn, slice 2 (HP-001 to HP-004). The Public catalog for
    every audience. Filters and the search live in the address (q, category, intent) and apply at once; the search
-   waits 300 ms after the last keystroke (research R-11, R-15). Every use case runs in its own scope. *@
+   waits 300 ms after the last keystroke (research R-11, R-15). A registered user also gets "+ Create custom
+   habit" and the Tabs to My custom habits (HP-002, US4-AS12); an administrator gets neither, and no register
+   Notice. Every use case runs in its own scope. *@
 <PageTitle>Habit catalog · Habit Tracker</PageTitle>
 
 <div class="ht-container">
@@ -19,7 +22,15 @@
         <h1>Habit catalog</h1>
         <span class="ht-spacer"></span>
         <SearchField Id="catalog-search" Label="Search habits" Value="@_search" ValueChanged="OnSearchChangedAsync" />
+        @if (_customCount is not null)
+        {
+            <HtButton Variant="HtButton.ButtonVariant.Secondary" Href="/custom-habits/new">+ Create custom habit</HtButton>
+        }
     </div>
+    @if (_customCount is { } customCount)
+    {
+        <CatalogTabs PublicCount="_publicCount" CustomCount="customCount" />
+    }
     <div class="ht-stack">
         @if (_actingUser.IsAnonymous)
         {
@@ -73,6 +84,8 @@
     private bool _build;
     private bool _reduce;
     private bool _loaded;
+    private int _publicCount;
+    private int? _customCount;
     private int _request;
     private CancellationTokenSource? _pendingSearch;
 
@@ -93,6 +106,25 @@
         var filter = await UseCases.RunAsync<CatalogService, CategoryFilterResult>(
             (service, token) => service.GetCategoryFilterAsync(token), CancellationToken.None);
         _categories = filter.Options.Select(o => new FilterPanel.CategoryOption(o.Category, o.Label)).ToList();
+        if (_actingUser.IsAnonymous)
+        {
+            return;
+        }
+
+        // The Tabs and "+ Create custom habit" are for those who may have custom habits: the list's outcome says
+        // so, and an administrator's is a refusal (HP-002, FR-025).
+        var actingUser = _actingUser;
+        var custom = await UseCases.RunAsync<CustomHabitService, CustomHabitListResult>(
+            (service, token) => service.ListAsync(actingUser, token), CancellationToken.None);
+        if (custom.Outcome != CustomHabitListOutcome.Found)
+        {
+            return;
+        }
+
+        var published = await UseCases.RunAsync<CatalogService, CatalogBrowseResult>(
+            (service, token) => service.BrowseAsync(new CatalogFilter(), token), CancellationToken.None);
+        _publicCount = published.Count;
+        _customCount = custom.Habits.Count;
     }
 
     protected override async Task OnParametersSetAsync()
