@@ -1,0 +1,42 @@
+@* design/components/DayPicker: seven toggle buttons, button.ht-day[aria-pressed], Mon to Sun, the week starting on
+   Monday. *@
+<div class="ht-days" role="group" aria-label="@Label" aria-describedby="@DescribedBy">
+    @foreach (var (day, name) in Week)
+    {
+        <button type="button" class="ht-day" aria-pressed="@(Days.Contains(day) ? "true" : "false")"
+                @onclick="() => ToggleAsync(day)">@name</button>
+    }
+</div>
+
+@code {
+    private static readonly (DayOfWeek Day, string Name)[] Week =
+    [
+        (DayOfWeek.Monday, "Mon"), (DayOfWeek.Tuesday, "Tue"), (DayOfWeek.Wednesday, "Wed"), (DayOfWeek.Thursday, "Thu"),
+        (DayOfWeek.Friday, "Fri"), (DayOfWeek.Saturday, "Sat"), (DayOfWeek.Sunday, "Sun"),
+    ];
+
+    /// <summary>The chosen days.</summary>
+    [Parameter]
+    public IReadOnlySet<DayOfWeek> Days { get; set; } = new HashSet<DayOfWeek>();
+
+    /// <summary>Called with the new set when a day is toggled.</summary>
+    [Parameter]
+    public EventCallback<IReadOnlySet<DayOfWeek>> DaysChanged { get; set; }
+
+    [Parameter]
+    public string Label { get; set; } = "Days";
+
+    [Parameter]
+    public string? DescribedBy { get; set; }
+
+    private Task ToggleAsync(DayOfWeek day)
+    {
+        var next = Days.ToHashSet();
+        if (!next.Remove(day))
+        {
+            next.Add(day);
+        }
+
+        return DaysChanged.InvokeAsync(next);
+    }
+}

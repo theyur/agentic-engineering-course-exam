@@ -1,0 +1,90 @@
+@using HT.Domain.Habits
+@using HT.Ui.Habits
+@* design/pages/PageAdminCatalogHabit: the habit fields, then up to 5 suggested starting goals (add, remove, move up
+   and down, mark the card's one), Save and Cancel. The list refusals sit above the list; a suggested starting
+   goal's refusal sits under its field (HP-009). The page decides what Save does. *@
+<EditForm Model="Model" OnSubmit="OnSave" class="ht-card ht-form-card" FormName="@FormName">
+    <HabitFieldsEditor Model="Model" Error="Error" IdPrefix="catalog-habit" />
+    <div class="ht-form-section">
+        <h2 class="ht-form-section__title">Suggested starting goals</h2>
+        <p class="ht-form-section__help">Examples to adjust, not prescribed targets. Up to 5, in the order you give; mark the one the catalog card shows.</p>
+        @if (Error?.For(HabitFormErrors.List) is { } listError)
+        {
+            <p class="ht-field__error" role="alert">@listError</p>
+        }
+        <div class="ht-stack">
+            @for (var i = 0; i < Goals.Count; i++)
+            {
+                var index = i;
+                <SuggestedStartingGoalEditor @key="Goals[index]" Model="Goals[index]" Position="index + 1" IsFirst="index == 0"
+                                             IsLast="index == Goals.Count - 1" Error="Error" IdPrefix="suggested"
+                                             OnMark="() => Mark(index)" OnMoveUp="() => Move(index, -1)"
+                                             OnMoveDown="() => Move(index, 1)" OnRemove="() => Remove(index)" />
+            }
+            @if (Goals.Count < MaxGoals)
+            {
+                <div><HtButton Variant="HtButton.ButtonVariant.Secondary" Small="true" @onclick="Add">+ Add suggested starting goal</HtButton></div>
+            }
+            else
+            {
+                <p class="ht-form-section__help">A habit can have at most 5 suggested starting goals.</p>
+            }
+        </div>
+    </div>
+    <div class="ht-form-actions">
+        <HtButton Type="submit">Save</HtButton>
+        <HtButton Variant="HtButton.ButtonVariant.Ghost" Href="/admin">Cancel</HtButton>
+    </div>
+</EditForm>
+
+@code {
+    private const int MaxGoals = 5;
+
+    [Parameter, EditorRequired]
+    public HabitFormModel Model { get; set; } = new();
+
+    /// <summary>The suggested starting goals in order; the form changes this list.</summary>
+    [Parameter, EditorRequired]
+    public List<SuggestedStartingGoalFormModel> Goals { get; set; } = [];
+
+    [Parameter]
+    public FormError? Error { get; set; }
+
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    [Parameter]
+    public string FormName { get; set; } = "catalog-habit";
+
+    // The first suggested starting goal is the card's one until the administrator marks another.
+    private void Add() => Goals.Add(new SuggestedStartingGoalFormModel { IsMarked = Goals.Count == 0 });
+
+    private void Mark(int index)
+    {
+        for (var i = 0; i < Goals.Count; i++)
+        {
+            Goals[i].IsMarked = i == index;
+        }
+    }
+
+    private void Move(int index, int by)
+    {
+        var target = index + by;
+        if (target < 0 || target >= Goals.Count)
+        {
+            return;
+        }
+
+        (Goals[index], Goals[target]) = (Goals[target], Goals[index]);
+    }
+
+    private void Remove(int index)
+    {
+        var wasMarked = Goals[index].IsMarked;
+        Goals.RemoveAt(index);
+        if (wasMarked && Goals.Count > 0)
+        {
+            Goals[0].IsMarked = true;
+        }
+    }
+}

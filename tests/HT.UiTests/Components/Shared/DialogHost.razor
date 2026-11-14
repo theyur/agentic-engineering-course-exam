@@ -1,0 +1,25 @@
+@using HT.Ui.Components.Shared
+@using Microsoft.AspNetCore.Components.Web
+@* Hosts two HtDialogs on one page, each opened by its own button, as a page has them. *@
+<button type="button" id="open-first" @ref="_firstButton" @onclick="() => _firstOpen = true">Open first</button>
+<button type="button" id="open-second" @ref="_secondButton" @onclick="() => _secondOpen = true">Open second</button>
+<HtDialog Open="_firstOpen" OnClose="() => _firstOpen = false" ReturnFocus="_firstButton">
+    <Title>Delete this custom habit?</Title>
+    <Subtitle>Cold shower · Private</Subtitle>
+    <ChildContent><p>The habit is deleted for good. This cannot be undone.</p></ChildContent>
+    <Footer>
+        <button type="button" id="first-confirm">Delete</button>
+        <button type="button" id="first-cancel" @onclick="() => _firstOpen = false">Cancel</button>
+    </Footer>
+</HtDialog>
+<HtDialog Open="_secondOpen" OnClose="() => _secondOpen = false" ReturnFocus="_secondButton">
+    <Title>Second</Title>
+    <ChildContent><p>Body of the second dialog.</p></ChildContent>
+</HtDialog>
+
+@code {
+    private ElementReference _firstButton;
+    private ElementReference _secondButton;
+    private bool _firstOpen;
+    private bool _secondOpen;
+}

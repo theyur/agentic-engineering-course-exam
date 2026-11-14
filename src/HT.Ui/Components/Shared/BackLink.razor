@@ -1,0 +1,11 @@
+@* design/components/BackLink: a small link above the page title that goes one level up. It names the parent page. *@
+<a class="ht-back" href="@Href">← @Text</a>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Href { get; set; } = string.Empty;
+
+    /// <summary>The parent page's name: "Catalog", "My custom habits".</summary>
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+}

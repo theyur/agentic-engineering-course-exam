@@ -21,6 +21,9 @@
   <ItemGroup>
     <!-- The same hand-written fake as the unit tests (ADR 0006). -->
     <Compile Include="..\HT.UnitTests\Fakes\FakeAccountStore.cs" Link="Fakes\FakeAccountStore.cs" />
+    <Compile Include="..\HT.UnitTests\Fakes\FakeCatalogHabitStore.cs" Link="Fakes\FakeCatalogHabitStore.cs" />
+    <Compile Include="..\HT.UnitTests\Fakes\HabitSamples.cs" Link="Fakes\HabitSamples.cs" />
+    <Compile Include="..\HT.UnitTests\Fakes\FakeCustomHabitStore.cs" Link="Fakes\FakeCustomHabitStore.cs" />
   </ItemGroup>
 
   <ItemGroup>

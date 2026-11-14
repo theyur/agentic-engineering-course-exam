@@ -1,0 +1,209 @@
+@page "/custom-habits/new"
+@page "/custom-habits/{Id:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using HT.Application.Habits
+@using HT.Domain.Accounts
+@using HT.Domain.Habits
+@using HT.Ui.Account
+@using HT.Ui.Components.Habits
+@using HT.Ui.Habits
+@using Microsoft.AspNetCore.Authorization
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageCustomHabit, slice 2 (HP-007, US4-AS13, US4-AS15): create a custom habit, or edit one with
+   "Delete", which asks first in a Dialog. After Save or Delete the page goes to My custom habits. A habit that
+   is gone by then shows a Notice and the form can no longer be saved. Another user's, a deleted or an unknown
+   habit, and an administrator on either address, get the Not found page; the use cases refuse on their own
+   (FR-022, FR-025). Every use case runs in its own scope. *@
+<PageTitle>@Title · Habit Tracker</PageTitle>
+
+@if (_ready)
+{
+    <div class="ht-container">
+        <BackLink Href="/custom-habits" Text="My custom habits" />
+        <div class="ht-page-head ht-detail-head">
+            <div>
+                <h1>@Title</h1>
+                <span class="ht-muted">A private habit for your own goals.</span>
+            </div>
+        </div>
+        <div class="ht-stack">
+            @if (_gone is { } gone)
+            {
+                <Notice Role="alert">
+                    <ChildContent>@gone</ChildContent>
+                    <Action><HtButton Variant="HtButton.ButtonVariant.Secondary" Small="true" Href="/custom-habits">My custom habits</HtButton></Action>
+                </Notice>
+            }
+            <CustomHabitForm Model="_model" Error="_error" NameHelp="@NameHelp" Disabled="@(_gone is not null)" OnSave="SaveAsync">
+                <EndAction>
+                    @if (Id is not null)
+                    {
+                        <button type="button" class="ht-btn ht-btn--danger" @ref="_deleteButton" @onclick="OpenDelete">Delete</button>
+                    }
+                </EndAction>
+            </CustomHabitForm>
+        </div>
+        @if (Id is not null)
+        {
+            <HtDialog Open="_confirmDelete" OnClose="CloseDelete" ReturnFocus="_deleteButton">
+                <Title>Delete this custom habit?</Title>
+                <Subtitle>@_savedName · Private</Subtitle>
+                <ChildContent><p>The habit is deleted for good. This cannot be undone.</p></ChildContent>
+                <Footer>
+                    <HtButton Variant="HtButton.ButtonVariant.Danger" @onclick="DeleteAsync">Delete</HtButton>
+                    <HtButton Variant="HtButton.ButtonVariant.Secondary" @onclick="CloseDelete">Cancel</HtButton>
+                </Footer>
+            </HtDialog>
+        }
+    </div>
+}
+
+@code {
+    private const string CustomHabitsAddress = "/custom-habits";
+
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private HabitFormModel _model = new();
+    private FormError? _error;
+    private string? _gone;
+    private string _savedName = string.Empty;
+    private bool _confirmDelete;
+    private bool _ready;
+    private bool _loaded;
+    private Guid? _loadedId;
+    private ElementReference _deleteButton;
+
+    /// <summary>The habit being edited; null on the create address.</summary>
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    private string Title => Id is null ? "New custom habit" : "Edit custom habit";
+
+    private string? NameHelp => Id is null ? "Short and clear, for example \"Cold shower\" or \"No phone in bed\"." : null;
+
+    protected override async Task OnInitializedAsync() => _actingUser = await ActingUsers.GetAsync();
+
+    /// <summary>
+    /// Both addresses share this component, so the router keeps it when only the address changes: each new
+    /// <see cref="Id"/> starts from an empty form and loads that habit.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loaded && Id == _loadedId)
+        {
+            return;
+        }
+
+        _loaded = true;
+        _loadedId = Id;
+        _ready = false;
+        _model = new();
+        _error = null;
+        _gone = null;
+        _savedName = string.Empty;
+        _confirmDelete = false;
+        if (Id is not { } id)
+        {
+            // Nothing to read yet: the list's outcome says whether this user may have custom habits at all.
+            var list = await UseCases.RunAsync<CustomHabitService, CustomHabitListResult>(
+                (service, token) => service.ListAsync(_actingUser, token), CancellationToken.None);
+            if (list.Outcome != CustomHabitListOutcome.Found)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            _ready = true;
+            return;
+        }
+
+        var result = await UseCases.RunAsync<CustomHabitService, CustomHabitResult>(
+            (service, token) => service.GetAsync(_actingUser, new HabitId(id), token), CancellationToken.None);
+        if (result.Habit is not { } habit)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        _model = HabitFormModel.From(habit.Name, habit.Description, habit.Category, habit.Intent, habit.Icon);
+        _savedName = habit.Name;
+        _ready = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_gone is not null)
+        {
+            return;
+        }
+
+        var input = _model.ToHabitInput();
+        if (Id is not { } id)
+        {
+            var created = await UseCases.RunAsync<CustomHabitService, CustomHabitCreateResult>(
+                (service, token) => service.CreateAsync(_actingUser, input, token), CancellationToken.None);
+            Finish(created.Outcome == CustomHabitCreateOutcome.Created, notFound: false, created.Outcome.ToString(), created.Message);
+            return;
+        }
+
+        var edited = await UseCases.RunAsync<CustomHabitService, CustomHabitEditResult>(
+            (service, token) => service.EditAsync(_actingUser, new HabitId(id), input, token), CancellationToken.None);
+        Finish(edited.Outcome == CustomHabitEditOutcome.Saved, edited.Outcome == CustomHabitEditOutcome.NotFound, edited.Outcome.ToString(), edited.Message);
+    }
+
+    private void OpenDelete()
+    {
+        if (_gone is null)
+        {
+            _confirmDelete = true;
+        }
+    }
+
+    private void CloseDelete() => _confirmDelete = false;
+
+    private async Task DeleteAsync()
+    {
+        if (Id is not { } id || _gone is not null)
+        {
+            return;
+        }
+
+        var deleted = await UseCases.RunAsync<CustomHabitService, CustomHabitDeleteResult>(
+            (service, token) => service.DeleteAsync(_actingUser, new HabitId(id), token), CancellationToken.None);
+        if (deleted.Outcome == CustomHabitDeleteOutcome.Deleted)
+        {
+            // The page leaves, so the Dialog stays as it is: focus has nowhere to return to.
+            Navigation.NavigateTo(CustomHabitsAddress);
+            return;
+        }
+
+        _confirmDelete = false;
+        Finish(saved: false, deleted.Outcome == CustomHabitDeleteOutcome.NotFound, deleted.Outcome.ToString(), deleted.Message);
+    }
+
+    private void Finish(bool saved, bool notFound, string outcome, string? message)
+    {
+        if (saved)
+        {
+            Navigation.NavigateTo(CustomHabitsAddress);
+            return;
+        }
+
+        if (notFound)
+        {
+            // Deleted in another browser: no field to show it under (HP-007).
+            _error = null;
+            _gone = message;
+            return;
+        }
+
+        _error = FormError.Of(outcome, message);
+        if (_error is null)
+        {
+            // Not signed in any more, or an administrator: the use case refused before anything else.
+            Navigation.NotFound();
+        }
+    }
+}

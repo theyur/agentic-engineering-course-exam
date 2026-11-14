@@ -1,0 +1,69 @@
+@page "/custom-habits"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using HT.Application.Habits
+@using HT.Domain.Accounts
+@using HT.Ui.Account
+@using HT.Ui.Components.Habits
+@using HT.Ui.Habits
+@using Microsoft.AspNetCore.Authorization
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageCatalogSignedIn, slice 2, the "My custom habits" tab (HP-002, US4-AS12, US4-AS15): the
+   Catalog page head without the search, the Tabs, "+ Create custom habit", and the user's custom habits as
+   cards with the "Private" Tag and "Edit", or an EmptyState. An administrator gets the Not found page; the use
+   case refuses on its own (FR-025). Every use case runs in its own scope. *@
+<PageTitle>My custom habits · Habit Tracker</PageTitle>
+
+@if (_habits is { } habits)
+{
+    <div class="ht-container">
+        <div class="ht-page-head">
+            <h1>Habit catalog</h1>
+            <span class="ht-spacer"></span>
+            <HtButton Variant="HtButton.ButtonVariant.Secondary" Href="/custom-habits/new">+ Create custom habit</HtButton>
+        </div>
+        <CatalogTabs MyCustomHabits="true" PublicCount="_publicCount" CustomCount="habits.Count" />
+        @if (habits.Count == 0)
+        {
+            <EmptyState Icon="plus" Title="No custom habits yet"
+                        Text="Create a habit of your own when the catalog has nothing that fits. Only you can see it.">
+                <HtButton Href="/custom-habits/new">+ Create custom habit</HtButton>
+            </EmptyState>
+        }
+        else
+        {
+            <div class="ht-grid-cards">
+                @foreach (var habit in habits)
+                {
+                    <HabitCard Icon="@habit.Icon" Name="@habit.Name" Category="@habit.Category.ToString()"
+                               Intent="@habit.Intent.ToString()" Description="@habit.Description"
+                               Variant="HabitCard.HabitCardVariant.CustomHabit" Href="@($"/custom-habits/{habit.Id.Value}")" />
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private IReadOnlyList<CustomHabitView>? _habits;
+    private int _publicCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var actingUser = await ActingUsers.GetAsync();
+        var list = await UseCases.RunAsync<CustomHabitService, CustomHabitListResult>(
+            (service, token) => service.ListAsync(actingUser, token), CancellationToken.None);
+        if (list.Outcome != CustomHabitListOutcome.Found)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        var catalog = await UseCases.RunAsync<CatalogService, CatalogBrowseResult>(
+            (service, token) => service.BrowseAsync(new CatalogFilter(), token), CancellationToken.None);
+        _publicCount = catalog.Count;
+        _habits = list.Habits;
+    }
+}

@@ -1,8 +1,14 @@
 using System.Net;
+using HT.Domain.Accounts;
+using HT.Domain.Habits;
+using static HT.UnitTests.Fakes.HabitSamples;
 
 namespace HT.UiTests.Host;
 
-/// <summary>US3-AS6, US6-AS8, US6-AS11, HP-007, HP-008, HP-014: Profile through the real host.</summary>
+/// <summary>
+/// US3-AS6, US6-AS8, US6-AS11, HP-007, HP-008, HP-014 (slice 1); slice 2's HP-008 and US4-AS14 (the Tabs for
+/// registered users): Profile through the real host.
+/// </summary>
 [Collection(HostCollection.Name)]
 public sealed class ProfilePageTests(HostFixture host)
 {
@@ -37,8 +43,87 @@ public sealed class ProfilePageTests(HostFixture host)
         Assert.Contains("<dt>Email</dt><dd>ana.profile@example.com</dd>", html, StringComparison.Ordinal);
         Assert.Contains("Change password", html, StringComparison.Ordinal);
         Assert.DoesNotContain("member since", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("ht-tabs", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Goal history", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HP_008_a_registered_user_gets_the_Tabs_with_Account_first_and_current()
+    {
+        await host.CreateAccountAsync("tabs.profile@example.com", Password);
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, "tabs.profile@example.com", Password, keepSignedIn: false);
+
+        var (status, html) = await browser.GetPageAsync("/profile");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("<nav class=\"ht-tabs\" aria-label=\"Profile sections\">"
+            + "<a class=\"ht-tab\" href=\"/profile\" aria-current=\"page\">Account</a>"
+            + "<a class=\"ht-tab\" href=\"/profile?tab=custom-habits\">Custom habits</a></nav>", html, StringComparison.Ordinal);
+        Assert.Contains("<dt>Email</dt><dd>tabs.profile@example.com</dd>", html, StringComparison.Ordinal);
+        Assert.Contains("Change password", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Private habits for your own goals.", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task US4_AS14_the_Custom_habits_tab_lists_the_users_habits_with_create_and_edit()
+    {
+        var account = await host.CreateAccountAsync("list.profile@example.com", Password);
+        var shower = await host.ArrangeCustomHabitAsync(account.Id, Definition("Ui-Ch Profile shower", Category.Body, icon: "droplet"));
+        await host.ArrangeCustomHabitAsync(account.Id, Definition("Ui-Ch Profile bed", Category.Home, Intent.Reduce, "smartphone"));
+        var other = await host.CreateAccountAsync("list.profile.other@example.com", Password);
+        await host.ArrangeCustomHabitAsync(other.Id, Definition("Ui-Ch Profile other"));
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, "list.profile@example.com", Password, keepSignedIn: false);
+
+        var (status, html) = await browser.GetPageAsync("/profile?tab=custom-habits");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("<a class=\"ht-tab\" href=\"/profile?tab=custom-habits\" aria-current=\"page\">Custom habits</a>", html, StringComparison.Ordinal);
+        Assert.Contains("<h2 class=\"ht-card__title\">Custom habits</h2>", html, StringComparison.Ordinal);
+        Assert.Contains("Private habits for your own goals. Only you can see them.", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/custom-habits/new\"", html, StringComparison.Ordinal);
+        Assert.Contains("Create custom habit</a>", html, StringComparison.Ordinal);
+        var bed = html.IndexOf("<div class=\"ht-row__name\">Ui-Ch Profile bed</div>", StringComparison.Ordinal);
+        var showerRow = html.IndexOf("<div class=\"ht-row__name\">Ui-Ch Profile shower</div>", StringComparison.Ordinal);
+        Assert.True(bed >= 0 && showerRow > bed, "The rows are in name order.");
+        Assert.Contains("<div class=\"ht-row__meta\">Home · Reduce</div>", html, StringComparison.Ordinal);
+        Assert.Contains($"href=\"/custom-habits/{shower.Value}\" aria-label=\"Edit Ui-Ch Profile shower\">Edit</a>", html, StringComparison.Ordinal);
+        Assert.Contains("<span class=\"ht-chip ht-chip--strong\">Private</span>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ui-Ch Profile other", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Change password", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task US4_AS14_without_custom_habits_the_tab_shows_the_EmptyState()
+    {
+        await host.CreateAccountAsync("empty.profile@example.com", Password);
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, "empty.profile@example.com", Password, keepSignedIn: false);
+
+        var (status, html) = await browser.GetPageAsync("/profile?tab=custom-habits");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("<h3>No custom habits yet</h3>", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/custom-habits/new\"", html, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/profile")]
+    [InlineData("/profile?tab=custom-habits")]
+    public async Task HP_008_an_administrators_Profile_stays_Account_only_without_Tabs(string path)
+    {
+        var email = $"admin.profile.{Guid.NewGuid():N}@example.com";
+        await host.CreateAccountAsync(email, Password, Role.Administrator);
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+
+        var (status, html) = await browser.GetPageAsync(path);
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains($"<h1>{email}</h1>", html, StringComparison.Ordinal);
+        Assert.Contains($"<dt>Email</dt><dd>{email}</dd>", html, StringComparison.Ordinal);
+        Assert.Contains("Change password", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("ht-tabs", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Custom habits", html, StringComparison.Ordinal);
     }
 

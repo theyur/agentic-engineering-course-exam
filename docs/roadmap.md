@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-11-12"
+updated_at: "2026-11-14"
 ---
 
 # Roadmap — Habit Tracker
@@ -28,9 +28,9 @@ in its idea brief, which assumed the catalog also carried the account foundation
 | # | Slice | Outcome (the why) | SPEC | Needs | Better after | Horizon | Status | Spec |
 |---|---|---|---|---|---|---|---|---|
 | 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | — | shipped | [001](../specs/001-accounts-and-access/spec.md) |
-| 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | Next | not started (idea brief confirmed) | — |
+| 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | — | shipped | [002](../specs/002-habit-catalog/spec.md) |
 | 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | Next | not started | — |
-| 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Later | not started | — |
+| 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Next | not started | — |
 | 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Later | not started | — |
 | 6 | `personal-reports` | A user sees how consistent they are: a dashboard of upcoming, due and overdue commitments and Missed results, consistency with its count, strict streaks with their unit, trends. | §6 | 5 | — | Later | not started | — |
 | 7 | `excusals-and-pauses` | Excused commitments and paused expectations are left out of consistency and neither extend nor break the streak. | §5.3 | 5, 6 | — | Later | not started | — |
@@ -70,7 +70,7 @@ Only what the order depends on. Scope is decided in each spec.
    are decided in ADR 0004 and ADR 0005 (see the decision table).
 2. **`habit-catalog`** keeps the confirmed idea brief (Approach C and its three demo scenarios), minus the
    foundation slice 1 now carries. The brief, SPEC §4 and the design disagree on details (see the decision
-   table). Seed content: at least 20 published habits in at least 4 categories.
+   table). Seed content: at least 20 Published habits covering all six categories (FR-030).
 3. **`demo-hosting`** is infrastructure, not a feature: an ADR for hosting and deployment, then the
    deployment itself and hosted demo data. No AC tests. If it comes right after the catalog, every later
    slice can be shown in the hosted app once it is deployed.
@@ -111,6 +111,7 @@ decision R7.
 | Shell: `TopNav` (visitor, signed-in, admin), `MobileNav`, `Footer` | 1 (Today, avatar menu, "Privacy") | each slice adds its links (Catalog and Admin 2, Goals and "+ New goal" 4, Community 9); "Send feedback" 11 |
 | `PageSignIn`, `PageRegister` | 1 | 11 (deactivated notice) |
 | `PagePrivacy` (new, designed in 1) | 1 | — |
+| `PageAdminCatalogHabit` (new, designed in 2) | 2 | — |
 | `PageHomeVisitor` | 1 (hero with "Register free", how it works) | 2 ("Browse the catalog", catalog preview), 6 (GoalStats card from demo data), 9 (BandSummary) |
 | `PageHomeSignedIn` | 1 ("Today" heading; the greeting and date wait for the time-zone decision of slice 4) | 2 (empty state pointing to the catalog), 6 (stat tiles, Today list, GoalSummary, recent notes), 7 ("Excuse" on Pending rows) |
 | `PageProfile` | 1 (Account tab) | 2 (Custom habits), 8 (Goal history), 9 (Community) |
@@ -166,10 +167,10 @@ How this works with the Spec Kit commands:
 | Privacy page: `design/components/Footer` links to it, but no page design exists | new; design | `accounts-and-access` | decided | [spec](../specs/001-accounts-and-access/spec.md#clarifications) |
 | Whether an account has a name, and the time-dependent text of the signed-in Home greeting and the Profile "member since". Slice 1 shows neither ([spec](../specs/001-accounts-and-access/spec.md#clarifications)). | new; design | `goals` | open | — |
 | Whether an administrator account can also track its own goals. `design/components/TopNav` gives administrators no Goals link. | SPEC §3; design | `goals` | open | — |
-| One or several suggested starting goals per catalog habit, and whether the catalog page has search, an Intent filter and sort. The idea brief says "at most one" and "search can wait". SPEC §4 says "suggested starting goals" while SPEC §2 is singular, so SPEC is ambiguous. `design/pages/PageHabitDetail` shows several; `PageCatalogVisitor` and `HabitCard` show one per card, plus search, an Intent filter and sort. If the brief wins, `design/` changes first (constitution IV). | idea brief §7, §8; SPEC §2, §4; design | `habit-catalog` | open | — |
-| Shape of a suggested starting goal, compatible with goals | idea brief §15 | `habit-catalog` | open | — |
-| How goals behave when their catalog habit is edited or unpublished; `goals` cites the answer | idea brief §15 | `habit-catalog` | open | — |
-| Who writes the seed catalog content | idea brief §15 | `habit-catalog` | open | — |
+| One or several suggested starting goals per catalog habit, and whether the catalog page has search, an Intent filter and sort. The idea brief says "at most one" and "search can wait". SPEC §4 says "suggested starting goals" while SPEC §2 is singular, so SPEC is ambiguous. `design/pages/PageHabitDetail` shows several; `PageCatalogVisitor` and `HabitCard` show one per card, plus search, an Intent filter and sort. If the brief wins, `design/` changes first (constitution IV). | idea brief §7, §8; SPEC §2, §4; design | `habit-catalog` | decided: several suggested starting goals, one marked for the card; search, Intent filter and A–Z order as the design shows | [spec](../specs/002-habit-catalog/spec.md#clarifications); [ADR 0011](adr/0011-suggested-starting-goals.md) |
+| Shape of a suggested starting goal, compatible with goals | idea brief §15 | `habit-catalog` | decided: structured fields like the New goal form | [spec](../specs/002-habit-catalog/spec.md#clarifications); [ADR 0011](adr/0011-suggested-starting-goals.md) |
+| How goals behave when their catalog habit is edited or unpublished; `goals` cites the answer | idea brief §15 | `habit-catalog` | decided: goals keep working with the current name; unpublishing a used habit asks for confirmation with the goal count | [spec](../specs/002-habit-catalog/spec.md#clarifications); [ADR 0012](adr/0012-goals-on-changed-catalog-habit.md) |
+| Who writes the seed catalog content | idea brief §15 | `habit-catalog` | decided: Claude drafts it, the owner reviews it in the PR | [spec](../specs/002-habit-catalog/spec.md#clarifications) |
 | Hosting services, deployment, pipelines, monitoring, secrets mechanics (ADR). Scheduled evaluation (slice 5) may need more; changing this then needs a superseding ADR. | ARCH §7, §9 | `demo-hosting` | open | — |
 | Schema migration rollout on each deployment | ARCH §5 | `demo-hosting` | open; locally the host applies migrations at start in Development ([ADR 0007](adr/0007-startup-operator-tasks.md)) | — |
 | When and how hosted demo data is refreshed. Time-relative generation (slice 5) may reopen it with a new or superseding ADR. | ARCH §7 | `demo-hosting` | open | — |
@@ -255,3 +256,4 @@ Every change to this file also sets `updated_at`.
 | Outcome | Slice | Spec | PR |
 |---|---|---|---|
 | People can register, sign in and sign out; the app tells visitors, registered users and administrators apart. | `accounts-and-access` | [001](../specs/001-accounts-and-access/spec.md) | [#21](https://github.com/theyur/agentic-engineering-course-exam/pull/21) |
+| A new user does not start from a blank page: anyone browses curated catalog habits, administrators curate them, users keep private custom habits. | `habit-catalog` | [002](../specs/002-habit-catalog/spec.md) | [#23](https://github.com/theyur/agentic-engineering-course-exam/pull/23) |

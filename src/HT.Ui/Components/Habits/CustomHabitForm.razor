@@ -1,0 +1,50 @@
+@using HT.Ui.Habits
+@* design/pages/PageCustomHabit, slice 2 (US4-AS13): the habit fields, "Save habit" and Cancel, and the privacy
+   card. No "Save and create goal" (slice 4) and no "Suggest for catalog" (slice 10). One refusal at a time sits
+   under its field; the page decides what Save does and may add an action at the right (Delete). Disabled, the
+   whole form can no longer be saved. *@
+<div class="ht-grid-2">
+    <EditForm Model="Model" OnSubmit="OnSave" class="ht-card" FormName="custom-habit">
+        <fieldset class="ht-fieldset" disabled="@Disabled">
+            <HabitFieldsEditor Model="Model" Error="Error" IdPrefix="custom-habit" NameHelp="@NameHelp" />
+            <div class="ht-form-actions">
+                <HtButton Type="submit">Save habit</HtButton>
+                <HtButton Variant="HtButton.ButtonVariant.Ghost" Href="/custom-habits">Cancel</HtButton>
+                @if (EndAction is not null)
+                {
+                    <span class="ht-spacer"></span>
+                    @EndAction
+                }
+            </div>
+        </fieldset>
+    </EditForm>
+    <aside class="ht-card ht-sticky" aria-labelledby="custom-habit-privacy">
+        <h2 class="ht-card__title ht-card__title--accent" id="custom-habit-privacy">Private</h2>
+        <div class="ht-goal">Only you can see custom habits. Admins cannot see them.</div>
+        <div class="ht-goal">They never appear in the catalog or in community statistics.</div>
+    </aside>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public HabitFormModel Model { get; set; } = new();
+
+    /// <summary>The refusal to show under its field.</summary>
+    [Parameter]
+    public FormError? Error { get; set; }
+
+    /// <summary>The help under Name; none when null.</summary>
+    [Parameter]
+    public string? NameHelp { get; set; }
+
+    /// <summary>True when the form can no longer be saved (the habit does not exist any more).</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    /// <summary>An action pushed to the right of Save and Cancel, such as "Delete".</summary>
+    [Parameter]
+    public RenderFragment? EndAction { get; set; }
+}

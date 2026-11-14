@@ -21,6 +21,7 @@ All `.html` files open directly in a browser (they link `../css/*.css`). They ar
 - Build each component once as a Razor component (`HtButton`, `StatusChip`, `HabitCard`, `CommitmentRow`, `HtDialog`, …) that renders the markup from its preview, and reuse it.
 - Match page structure and wording of the page previews. Use the SPEC words exactly: Pending, Met, Failed, Missed, Excused, Paused; consistency as "90% (18 of 20)", "N/A" when there is no data.
 - A status is never shown by color alone: always a word (StatusChip) or a shape (ConsistencyStrip).
+- A catalog habit's marked suggested starting goal is labelled "Suggested starting goal: …" on its HabitCard, never "Suggested start"; the detail page lists all of them under "Examples to adjust, not prescribed targets.".
 - Keep text contrast at least 4.5:1 and the 2px `--accent` focus ring on every focusable element.
 - Dialogs: focus the first field on open, close with Esc and ×, return focus to the opener.
 - Layout breakpoints: 860px (columns stack, nav links collapse) and 480px (phone padding).
@@ -30,6 +31,7 @@ All `.html` files open directly in a browser (they link `../css/*.css`). They ar
 ## Pages
 
 - `PageAdmin` — The admin page: privacy Notice, Tabs for Catalog, Suggestions, Feedback and Accounts, each a DataTable. ([notes](pages/PageAdmin.md), [preview](pages/PageAdmin.html))
+- `PageAdminCatalogHabit` — The administrator's catalog habit form (create and edit): the habit fields and an editor for up to 5 suggested starting goals. New in slice 2. ([notes](pages/PageAdminCatalogHabit.md), [preview](pages/PageAdminCatalogHabit.html))
 - `PageAdminAccounts` — Admin · Accounts tab: search, filter (All · Active · Deactivated) and a table of accounts. ([notes](pages/PageAdminAccounts.md), [preview](pages/PageAdminAccounts.html))
 - `PageAdminFeedback` — Admin · Feedback tab: filter (Open · Resolved · All), search, a table of messages and the opened message below. ([notes](pages/PageAdminFeedback.md), [preview](pages/PageAdminFeedback.html))
 - `PageAdminSuggestions` — Admin · Suggestions tab: a queue on the left, the review form on the right. ([notes](pages/PageAdminSuggestions.md), [preview](pages/PageAdminSuggestions.html))
@@ -42,7 +44,7 @@ All `.html` files open directly in a browser (they link `../css/*.css`). They ar
 - `PageHabitDetail` — The catalog habit page, opened from "See details" / "Details" on a HabitCard. ([notes](pages/PageHabitDetail.md), [preview](pages/PageHabitDetail.html))
 - `PageHomeSignedIn` — The signed-in Home (Today): greeting, four StatTiles, the Today list and active goals. ([notes](pages/PageHomeSignedIn.md), [preview](pages/PageHomeSignedIn.html))
 - `PageHomeVisitor` — The visitor Home in layout A: hero with an example goal, How it works, catalog preview and community bands. ([notes](pages/PageHomeVisitor.md), [preview](pages/PageHomeVisitor.html))
-- `PageNewGoal` — The New goal form, opened from "Use this habit" (pre-filled with the suggested start) or "+ New goal". ([notes](pages/PageNewGoal.md), [preview](pages/PageNewGoal.html))
+- `PageNewGoal` — The New goal form, opened from "Use this habit" (pre-filled with the suggested starting goal) or "+ New goal". ([notes](pages/PageNewGoal.md), [preview](pages/PageNewGoal.html))
 - `PagePrivacy` — Privacy: what stays private, that community comparison is opt-in and off by default, and what administrators cannot see. ([notes](pages/PagePrivacy.md), [preview](pages/PagePrivacy.html))
 - `PageProfile` — The personal profile: header with avatar, name and email, then Tabs for Account, Community, Goal history and Custom habits. ([notes](pages/PageProfile.md), [preview](pages/PageProfile.html))
 - `PageRegister` — Register: same `ht-auth` layout as Sign in. ([notes](pages/PageRegister.md), [preview](pages/PageRegister.html))
@@ -117,7 +119,7 @@ All `.html` files open directly in a browser (they link `../css/*.css`). They ar
 
 ## Icons
 
-`icons/` holds the Lucide SVG files used by the design (Lucide 0.460.0, ISC license in `icons/LICENSE`). See `components/Icons.md` for the meaning of each icon.
+`icons/` holds the Lucide SVG files used by the design (Lucide 0.460.0, ISC license in `icons/LICENSE`). See `components/Icons.md` for the meaning of each icon: the 24 "Habit icons" a habit can have, and the app icons.
 
 ## Not designed yet
 
