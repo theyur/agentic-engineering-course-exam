@@ -33,7 +33,7 @@ public sealed class CustomHabitsPageTests : BunitContext
         return Render<CustomHabits>();
     }
 
-    private static IReadOnlyList<(string Text, string? Href, string? Current)> Tabs(IRenderedComponent<CustomHabits> cut) =>
+    private static List<(string Text, string? Href, string? Current)> Tabs(IRenderedComponent<CustomHabits> cut) =>
         cut.FindAll("nav.ht-tabs a.ht-tab").Select(a => (a.TextContent, a.GetAttribute("href"), a.GetAttribute("aria-current"))).ToList();
 
     [Fact]

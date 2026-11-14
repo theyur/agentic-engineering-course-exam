@@ -69,7 +69,7 @@ public sealed class CatalogHabitFormTests : BunitContext
         Assert.Equal(5, _goals.Count);
         Assert.DoesNotContain(cut.FindAll("button"), b => b.TextContent.Contains("Add suggested", StringComparison.Ordinal));
         Assert.Contains("A habit can have at most 5 suggested starting goals.", cut.Markup, StringComparison.Ordinal);
-        Assert.Equal("Remove suggested starting goal 5", cut.FindAll(".ht-editor-item__head")[4].QuerySelectorAll("button").Last().GetAttribute("aria-label"));
+        Assert.Equal("Remove suggested starting goal 5", cut.FindAll(".ht-editor-item__head")[4].QuerySelectorAll("button")[^1].GetAttribute("aria-label"));
     }
 
     [Fact]

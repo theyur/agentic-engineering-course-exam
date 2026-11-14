@@ -8,6 +8,8 @@ namespace HT.UnitTests.Domain.Habits;
 /// </summary>
 public class HabitNameTests
 {
+    private static readonly string[] UnorderedNames = ["Zest", "b habit", "Ac2 walking", "Éclair", "A habit", "Ac2 Cycling", "Ac2 Breathing"];
+
     private static HabitName Name(string text)
     {
         Assert.True(HabitName.TryCreate(text, out var name, out var problem));
@@ -53,7 +55,7 @@ public class HabitNameTests
     public void Orders_by_key_ignoring_case_and_ordinally()
     {
         using var culture = new CultureScope("tr-TR");
-        var names = new[] { "Zest", "b habit", "Ac2 walking", "Éclair", "A habit", "Ac2 Cycling", "Ac2 Breathing" }
+        var names = UnorderedNames
             .Select(Name)
             .Order(HabitName.Order)
             .Select(n => n.Value)

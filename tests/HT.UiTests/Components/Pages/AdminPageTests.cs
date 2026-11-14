@@ -22,7 +22,7 @@ public sealed class AdminPageTests : BunitContext
         _store.Add(Catalog("Sugar", CatalogHabitState.Unpublished, Category.Health, Intent.Reduce, "candy"));
     }
 
-    private static IReadOnlyList<string> Cells(AngleSharp.Dom.IElement row) => row.QuerySelectorAll("td").Select(td => td.TextContent.Trim()).ToList();
+    private static List<string> Cells(AngleSharp.Dom.IElement row) => row.QuerySelectorAll("td").Select(td => td.TextContent.Trim()).ToList();
 
     [Fact]
     public void US3_AS20_the_Admin_page_follows_the_slice_2_preview()

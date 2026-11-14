@@ -26,7 +26,7 @@ public sealed partial class HomeCatalogHostTests(HostFixture host)
 
         Assert.Equal(HttpStatusCode.OK, status);
         Assert.Contains("<h2>Popular in the catalog</h2>", html, StringComparison.Ordinal);
-        Assert.Equal(4, CardName().Matches(html).Count);
+        Assert.Equal(4, CardName().Count(html));
         var text = WebUtility.HtmlDecode(html);
         Assert.Equal(preview.Habits.Select(h => h.Name), CardName().Matches(text).Select(m => m.Groups[1].Value));
         Assert.Contains($"<a href=\"/catalog\">See all {preview.PublishedCount} →</a>", text, StringComparison.Ordinal);

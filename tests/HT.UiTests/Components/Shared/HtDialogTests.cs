@@ -19,7 +19,7 @@ public sealed class HtDialogTests : BunitContext
         return reference;
     }
 
-    private IReadOnlyList<string?> FocusedReferences(int times) =>
+    private List<string> FocusedReferences(int times) =>
         JSInterop.VerifyFocusAsyncInvoke(times).Select(i => Assert.IsType<ElementReference>(i.Arguments[0]).Id).ToList();
 
     [Fact]

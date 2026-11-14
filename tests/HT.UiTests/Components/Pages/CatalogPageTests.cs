@@ -34,7 +34,7 @@ public sealed class CatalogPageTests : BunitContext
         return Render<Catalog>();
     }
 
-    private static IReadOnlyList<string> Names(IRenderedComponent<Catalog> cut) =>
+    private static List<string> Names(IRenderedComponent<Catalog> cut) =>
         cut.FindAll(".ht-habit__name").Select(n => n.TextContent).ToList();
 
     [Fact]

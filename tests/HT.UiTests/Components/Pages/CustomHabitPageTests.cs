@@ -56,7 +56,7 @@ public sealed class CustomHabitPageTests : BunitContext
         cut.Find($"button[aria-label={icon}]").Click();
     }
 
-    private static IReadOnlyList<string> Errors(IRenderedComponent<CustomHabitPage> cut) =>
+    private static List<string> Errors(IRenderedComponent<CustomHabitPage> cut) =>
         cut.FindAll(".ht-field__error").Select(e => e.TextContent).ToList();
 
     [Fact]
