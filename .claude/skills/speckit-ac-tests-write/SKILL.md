@@ -3,6 +3,7 @@ name: speckit-ac-tests-write
 description: 'AC step 5: export the public API as reference assemblies and have the isolated ac-test-writer write the Reqnroll step definitions for a feature, without seeing the implementation. Started only by the user.'
 compatibility: Requires spec-kit project structure with .specify/ directory
 disable-model-invocation: true
+argument-hint: "[feature: NNN | FNNN | NNN-name] [fresh]"
 metadata:
   author: github-spec-kit
   source: ac:commands/speckit.ac.tests-write.md

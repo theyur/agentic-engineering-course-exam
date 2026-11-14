@@ -3,6 +3,7 @@ name: speckit-ac-init
 description: 'AC setup, once per project: detect the .NET solution and test setup, ask what can''t be detected, write .workflow/config.json, create the Reqnroll acceptance-test project and verify the setup; `smoke` runs the live guard smoke test. Started only by the user.'
 compatibility: Requires spec-kit project structure with .specify/ directory
 disable-model-invocation: true
+argument-hint: "[smoke]"
 metadata:
   author: github-spec-kit
   source: ac:commands/speckit.ac.init.md
