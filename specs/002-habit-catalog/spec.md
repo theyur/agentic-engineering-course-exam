@@ -73,6 +73,22 @@ recorded decisions; the owner confirmed them on 2026-11-12, before `/speckit-ac-
   [critic ac pass 2](critic-ac-pass-2.md) MINOR-1).
 - The administrator's catalog table keeps its search and "Showing N of M" line (FR-012).
 
+### Owner answers 2026-11-14 (plan)
+
+Positions of `plan.md` ("Spec discrepancies" 1 to 5 and "Gates before the next step"), after
+[critic plan pass 1](critic-plan-pass-1.md) and [critic plan pass 2](critic-plan-pass-2.md); the owner
+accepted all six on 2026-11-14. None changes an acceptance criterion.
+
+- Values that do not belong to the chosen measurement or schedule (a duration unit on a count, a count unit on
+  a duration, days with N times) are not refused and not stored (FR-007).
+- A yes/no suggested starting goal whose count unit is empty after trimming has no unit, so it is not refused
+  for it (FR-007).
+- The character limits of FR-004 to FR-007 count UTF-16 code units.
+- "My custom habits" has an address of its own; its access follows US4-AS15, and HP-007 returns to it.
+- An N times schedule with no number gives "Enter a number of times from 1 to 20." (FR-007).
+- Catalog habits and custom habits share one identifier type:
+  [ADR 0014](../../docs/adr/0014-one-habit-identifier.md).
+
 ## Decisions this slice cites
 
 Recorded in earlier slices and not decided again here:
@@ -830,6 +846,8 @@ owner and recorded as a dated line in `## Clarifications` (plus an ADR where it 
   - every habit has exactly one category from the fixed list, "Other" as the catch-all (FR-001, FR-002).
 - The decisions of the critic revision (see `## Clarifications`), confirmed by the owner on 2026-11-12;
   private demo data: [ADR 0013](../../docs/adr/0013-private-demo-data.md).
+- The owner answers of 2026-11-14 on the plan's positions (see `## Clarifications`); one habit identifier:
+  [ADR 0014](../../docs/adr/0014-one-habit-identifier.md).
 - No decision of this slice is open.
 
 ## Assumptions
