@@ -41,7 +41,17 @@ internal sealed class CustomHabitStore : ICustomHabitStore
     {
         ArgumentNullException.ThrowIfNull(definition);
         var id = Guid.NewGuid();
-        var rows = await WriteAsync(() => _db.Database.ExecuteSqlInterpolatedAsync(
+        var rows = await InsertAsync(_db, id, owner, definition, cancellationToken).ConfigureAwait(false);
+        return rows == 1 ? CreateCustomHabitOutcome.Created(new HabitId(id)) : CreateCustomHabitOutcome.NameTaken;
+    }
+
+    /// <summary>
+    /// The conditional insert of research R-14, in the context's current transaction if it has one: one row, or none
+    /// when the owner already has the name key. A database fault names the SQL error number only (HP-015). Shared with
+    /// the demo data store (research R-09).
+    /// </summary>
+    internal static Task<int> InsertAsync(HtDbContext db, Guid id, AccountId owner, HabitDefinition definition, CancellationToken cancellationToken) =>
+        WriteAsync(() => db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO [CustomHabits] ([Id], [OwnerId], [Name], [NameKey], [Description], [Category], [Intent], [Icon])
             SELECT {id}, {owner.Value}, {definition.Name.Value}, {definition.Name.Key}, {definition.Description},
@@ -49,9 +59,7 @@ internal sealed class CustomHabitStore : ICustomHabitStore
             WHERE NOT EXISTS (SELECT 1 FROM [CustomHabits] WITH (UPDLOCK, HOLDLOCK)
                               WHERE [OwnerId] = {owner.Value} AND [NameKey] = {definition.Name.Key})
             """,
-            cancellationToken)).ConfigureAwait(false);
-        return rows == 1 ? CreateCustomHabitOutcome.Created(new HabitId(id)) : CreateCustomHabitOutcome.NameTaken;
-    }
+            cancellationToken));
 
     public async Task<UpdateCustomHabitOutcome> UpdateAsync(AccountId owner, HabitId id, HabitDefinition definition, CancellationToken cancellationToken)
     {

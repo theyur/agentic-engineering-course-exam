@@ -63,6 +63,15 @@ public sealed class UiDependencyTests
     }
 
     [Fact]
+    public void NoUiTypeMayDependOnTheDemoDataStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IDemoDataStore)))
+            .Because("the port writes private demo data without an acting user; the host reaches it only through DemoDataService (ADR 0010, ADR 0013, research R-12)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
     public void OnlyTheHostsOperatorTypesMayDependOnTheOperatorServices()
     {
         Types().That().ResideInAssembly(ArchitectureModel.Ui)

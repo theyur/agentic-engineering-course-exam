@@ -1,5 +1,6 @@
 using HT.Application.Accounts;
 using HT.Application.Habits;
+using HT.Application.Operator;
 using HT.Persistence.Habits;
 using HT.Persistence.Identity;
 using Microsoft.AspNetCore.Identity;
@@ -15,10 +16,10 @@ public static class PersistenceServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the database context on SQL Server, Identity's user services with options no stricter than the
-    /// domain rules (research R-03), the account store and the habit stores. Adds no token providers, roles or
-    /// sign-in manager (research R-02). EF Core never logs a database error text: such a text can carry a custom
-    /// habit's name (HP-015, research R-14); the stores' own exceptions carry no field value. Sensitive-data
-    /// logging stays off.
+    /// domain rules (research R-03), the account store, the habit stores and the demo data store (research R-09).
+    /// Adds no token providers, roles or sign-in manager (research R-02). EF Core never logs a database error text:
+    /// such a text can carry a custom habit's name (HP-015, research R-14); the stores' own exceptions carry no field
+    /// value. Sensitive-data logging stays off.
     /// </summary>
     public static IServiceCollection AddHtPersistence(this IServiceCollection services, string connectionString)
     {
@@ -54,6 +55,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IAccountStore, AccountStore>();
         services.AddScoped<ICatalogHabitStore, CatalogHabitStore>();
         services.AddScoped<ICustomHabitStore, CustomHabitStore>();
+        services.AddScoped<IDemoDataStore, DemoDataStore>();
         return services;
     }
 }
