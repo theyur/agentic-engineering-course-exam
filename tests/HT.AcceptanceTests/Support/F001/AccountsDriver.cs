@@ -54,8 +54,13 @@ public sealed class AccountsDriver : IDisposable
     public Task<AdministratorCreationResult> CreateAdministratorAsync(string? email, string? password) =>
         WithStoreAsync(store => new OperatorService(store).CreateAdministratorAsync(email, password, CancellationToken.None));
 
-    public Task<DemoLoadingResult> LoadDemoDataAsync(string? demoPassword) =>
-        WithStoreAsync(store => new DemoDataService(store).LoadAsync(demoPassword, CancellationToken.None));
+    public async Task<DemoLoadingResult> LoadDemoDataAsync(string? demoPassword)
+    {
+        await using var scope = _services.CreateAsyncScope();
+        var store = scope.ServiceProvider.GetRequiredService<IAccountStore>();
+        var demoData = scope.ServiceProvider.GetRequiredService<IDemoDataStore>();
+        return await new DemoDataService(store, demoData).LoadAsync(demoPassword, CancellationToken.None);
+    }
 
     public static Task ResetDatabaseAsync() =>
         HtDatabase.ResetAsync(F001Database.ConnectionString, CancellationToken.None);
