@@ -151,10 +151,14 @@
 .ht-tab { font:inherit; background:none; border:0; padding:8px 0; margin-bottom:-1px; color:var(--ink-muted); font-weight:600; font-size:14px; cursor:pointer; border-bottom:2px solid transparent; }
 .ht-tab[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--accent); }
 .ht-tab .ht-count { font-weight:600; color:var(--ink-muted); margin-left:4px; }
+/* link tabs (a.ht-tab inside nav.ht-tabs): the current page has aria-current */
+a.ht-tab { display:inline-block; text-decoration:none; }
+.ht-tab[aria-current="page"] { color:var(--ink); border-bottom-color:var(--accent); }
 
 /* ---------- forms ---------- */
 .ht-field { display:flex; flex-direction:column; gap:4px; }
 .ht-field__label { font-weight:600; font-size:14px; line-height:20px; }
+.ht-field__label .ht-muted { font-weight:400; }
 .ht-field__help { font-size:13px; line-height:18px; color:var(--ink-muted); }
 .ht-field__error { font-size:13px; line-height:18px; color:var(--danger); font-weight:600; }
 .ht-input { font:inherit; min-height:var(--control-height); padding:7px 12px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); width:100%; }
@@ -230,6 +234,10 @@
 
 /* ---------- text area ---------- */
 .ht-textarea { min-height:88px; resize:vertical; line-height:22px; }
+/* editor items: one suggested starting goal in the administrator's catalog habit form */
+.ht-editor-item { border:1px solid var(--line); border-radius:var(--radius-sm); padding:var(--space-4); background:var(--surface); }
+.ht-editor-item__head { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); }
+.ht-editor-item__fields { display:grid; gap:var(--space-3); }
 
 /* ---------- segmented control ---------- */
 .ht-seg { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-sm); overflow:hidden; background:var(--surface); }

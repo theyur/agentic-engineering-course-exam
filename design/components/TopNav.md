@@ -24,3 +24,11 @@ The avatar is a button that opens a small floating menu with Profile and Sign ou
 - Closes on Esc, on a click outside (on the click-away layer), and on choosing an item. Focus goes back to the avatar button.
 - Focus: the 2px `accent` ring on the avatar button and on each item.
 - In slice 1 the signed-in bar has only "Today" and the avatar (registered users and administrators alike; no Admin link yet). Other links appear with their slices (ADR 0008).
+
+## Slice 2
+
+The last three bars of the preview are slice 2 (HP-011, ADR 0008):
+- Visitor: the link "Catalog", then "Sign in" and "Register".
+- Registered user: "Today" and "Catalog", then the avatar menu.
+- Administrator: "Today", "Catalog" and "Admin", then the avatar menu.
+- No "Goals", "Community" or "+ New goal" yet (slices 4 and 9). The current page's link has `aria-current="page"`; "Catalog" is current on the catalog pages, and "Admin" on the Admin page and the administrator's catalog habit form.

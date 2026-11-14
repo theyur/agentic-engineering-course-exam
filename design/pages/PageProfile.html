@@ -61,6 +61,28 @@
     <label class="ht-field"><span class="ht-field__label">Repeat new password</span><input class="ht-input" type="password" aria-invalid="true" aria-describedby="cp-rep-error" autocomplete="new-password"><span class="ht-field__error" id="cp-rep-error">The passwords do not match.</span></label>
   </section></div>
 </div>
+<!-- Slice 2 state (HP-008, US4-AS14): registered users get the link Tabs "Account" (/profile) and "Custom habits" (/profile?tab=custom-habits). An administrator's Profile keeps the slice 1 state above: Account only, no Tabs. -->
+<div class="ht-container" aria-label="Slice 2 state">
+<div class="ht-eyebrow" style="padding-top:28px">Slice 2 state · registered user, Account tab</div>
+<div class="ht-page-head" style="align-items:center"><span class="ht-avatar ht-avatar--lg" aria-label="Account of yuri@example.com">Y</span><div><h1 style="font-size:24px;line-height:30px">yuri@example.com</h1><span class="ht-muted">Profile</span></div></div>
+<nav class="ht-tabs" aria-label="Profile sections"><a class="ht-tab" href="/profile" aria-current="page">Account</a><a class="ht-tab" href="/profile?tab=custom-habits">Custom habits</a></nav>
+<div class="ht-grid-2"><section class="ht-card">
+<h2 class="ht-card__title">Account</h2>
+<div class="ht-form-section"><dl class="ht-kv"><dt>Email</dt><dd>yuri@example.com</dd></dl></div>
+<form class="ht-form-section ht-stack"><h3 class="ht-form-section__title">Change password</h3><label class="ht-field"><span class="ht-field__label">Current password</span><input class="ht-input" type="password" autocomplete="current-password"></label><label class="ht-field"><span class="ht-field__label">New password</span><input class="ht-input" type="password" aria-describedby="s2-new-help" autocomplete="new-password"><span class="ht-field__help" id="s2-new-help">At least 8 characters, with a number.</span></label><label class="ht-field"><span class="ht-field__label">Repeat new password</span><input class="ht-input" type="password" autocomplete="new-password"></label><div><button class="ht-btn ht-btn--primary">Change password</button></div></form>
+</section></div>
+<div class="ht-eyebrow" style="margin:24px 0 8px">Slice 2 state · registered user, Custom habits tab</div>
+<div class="ht-page-head" style="align-items:center"><span class="ht-avatar ht-avatar--lg" aria-label="Account of yuri@example.com">Y</span><div><h1 style="font-size:24px;line-height:30px">yuri@example.com</h1><span class="ht-muted">Profile</span></div></div>
+<nav class="ht-tabs" aria-label="Profile sections"><a class="ht-tab" href="/profile">Account</a><a class="ht-tab" href="/profile?tab=custom-habits" aria-current="page">Custom habits</a></nav>
+<section class="ht-card"><div class="ht-section__head" style="margin-bottom:8px"><h2 class="ht-card__title" style="margin:0">Custom habits</h2><span class="ht-spacer"></span><a class="ht-btn ht-btn--secondary ht-btn--sm" href="#">+ Create custom habit</a></div>
+<p class="ht-card__sub">Private habits for your own goals. Only you can see them.</p>
+<div class="ht-row"><span class="ht-habit__glyph" style="margin:0;width:36px;height:36px"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" /></svg></span><div class="ht-row__main"><div class="ht-row__name">Cold shower</div><div class="ht-row__meta">Body · Build</div></div><span class="ht-chip ht-chip--strong">Private</span><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#" aria-label="Edit Cold shower">Edit</a></div>
+<div class="ht-row"><span class="ht-habit__glyph" style="margin:0;width:36px;height:36px"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg></span><div class="ht-row__main"><div class="ht-row__name">No phone in bed</div><div class="ht-row__meta">Home · Reduce</div></div><span class="ht-chip ht-chip--strong">Private</span><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#" aria-label="Edit No phone in bed">Edit</a></div>
+</section>
+<div class="ht-eyebrow" style="margin:24px 0 8px">Slice 2 state · Custom habits tab, none yet</div>
+<nav class="ht-tabs" aria-label="Profile sections"><a class="ht-tab" href="/profile">Account</a><a class="ht-tab" href="/profile?tab=custom-habits" aria-current="page">Custom habits</a></nav>
+<section class="ht-card"><div class="ht-empty"><div class="ht-empty__icon"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /><path d="M12 5v14" /></svg></div><h3>No custom habits yet</h3><p>Create a habit of your own when the catalog has nothing that fits. Only you can see it.</p><div class="ht-inline" style="justify-content:center"><a class="ht-btn ht-btn--primary" href="#">+ Create custom habit</a></div></div></section>
+</div>
 <footer class="ht-footer"><div class="ht-footer__inner"><span>Habit Tracker · Agentic Engineering course project</span><span class="ht-spacer"></span><a href="#">Privacy</a><a href="#">Send feedback</a></div></footer>
 </div>
 </body>

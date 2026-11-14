@@ -1,5 +1,6 @@
 using ArchUnitNET.xUnit;
 using HT.Application.Accounts;
+using HT.Application.Habits;
 using HT.Application.Operator;
 using Xunit;
 
@@ -40,6 +41,15 @@ public sealed class UiDependencyTests
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
             .Should().NotDependOnAny(Types(true).That().Are(typeof(IAccountStore)))
             .Because("the port is persistence plumbing, not a use case; the host reaches accounts only through the use cases (ADR 0010)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
+    public void NoUiTypeMayDependOnTheCatalogHabitStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(ICatalogHabitStore)))
+            .Because("the port is persistence plumbing; pages reach catalog habits only through the use cases (ADR 0010, research R-12)")
             .Check(ArchitectureModel.Architecture);
     }
 

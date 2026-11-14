@@ -28,7 +28,7 @@ in its idea brief, which assumed the catalog also carried the account foundation
 | # | Slice | Outcome (the why) | SPEC | Needs | Better after | Horizon | Status | Spec |
 |---|---|---|---|---|---|---|---|---|
 | 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | — | shipped | [001](../specs/001-accounts-and-access/spec.md) |
-| 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | Now | tasks ready | [002](../specs/002-habit-catalog/spec.md) |
+| 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | Now | implementing | [002](../specs/002-habit-catalog/spec.md) |
 | 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | Next | not started | — |
 | 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Next | not started | — |
 | 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Later | not started | — |
@@ -70,7 +70,7 @@ Only what the order depends on. Scope is decided in each spec.
    are decided in ADR 0004 and ADR 0005 (see the decision table).
 2. **`habit-catalog`** keeps the confirmed idea brief (Approach C and its three demo scenarios), minus the
    foundation slice 1 now carries. The brief, SPEC §4 and the design disagree on details (see the decision
-   table). Seed content: at least 20 published habits in at least 4 categories.
+   table). Seed content: at least 20 Published habits covering all six categories (FR-030).
 3. **`demo-hosting`** is infrastructure, not a feature: an ADR for hosting and deployment, then the
    deployment itself and hosted demo data. No AC tests. If it comes right after the catalog, every later
    slice can be shown in the hosted app once it is deployed.
@@ -111,6 +111,7 @@ decision R7.
 | Shell: `TopNav` (visitor, signed-in, admin), `MobileNav`, `Footer` | 1 (Today, avatar menu, "Privacy") | each slice adds its links (Catalog and Admin 2, Goals and "+ New goal" 4, Community 9); "Send feedback" 11 |
 | `PageSignIn`, `PageRegister` | 1 | 11 (deactivated notice) |
 | `PagePrivacy` (new, designed in 1) | 1 | — |
+| `PageAdminCatalogHabit` (new, designed in 2) | 2 | — |
 | `PageHomeVisitor` | 1 (hero with "Register free", how it works) | 2 ("Browse the catalog", catalog preview), 6 (GoalStats card from demo data), 9 (BandSummary) |
 | `PageHomeSignedIn` | 1 ("Today" heading; the greeting and date wait for the time-zone decision of slice 4) | 2 (empty state pointing to the catalog), 6 (stat tiles, Today list, GoalSummary, recent notes), 7 ("Excuse" on Pending rows) |
 | `PageProfile` | 1 (Account tab) | 2 (Custom habits), 8 (Goal history), 9 (Community) |

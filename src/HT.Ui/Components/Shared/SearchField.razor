@@ -1,0 +1,25 @@
+@* design/components/SearchField: a search input with a leading magnifier. It reports every change at once; the
+   page decides when to search (the debounce belongs to the page). *@
+<div class="ht-search">
+    <HtIcon Name="search" Size="HtIcon.IconSize.Small" />
+    <input class="ht-input" type="search" id="@Id" placeholder="@Label" aria-label="@Label" value="@Value"
+           @oninput="OnInputAsync" />
+</div>
+
+@code {
+    /// <summary>What is searched, as placeholder and accessible name ("Search habits").</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Id { get; set; }
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    /// <summary>Called on every keystroke with the whole text.</summary>
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    private Task OnInputAsync(ChangeEventArgs e) => ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
+}
