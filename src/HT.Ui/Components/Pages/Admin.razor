@@ -42,14 +42,11 @@
                             <td><Tag Text="@habit.State.ToString()" Strong="@(habit.State == CatalogHabitState.Published)" /></td>
                             <td class="ht-actions">
                                 <HtButton Variant="HtButton.ButtonVariant.Ghost" Small="true" Href="@($"/admin/catalog/{habit.Id.Value}")" aria-label="@($"Edit {habit.Name}")">Edit</HtButton>
-                                @if (habit.State == CatalogHabitState.Published)
-                                {
-                                    <HtButton Variant="HtButton.ButtonVariant.Secondary" Small="true" aria-label="@($"Unpublish {habit.Name}")" @onclick="() => UnpublishAsync(habit.Id)">Unpublish</HtButton>
-                                }
-                                else
-                                {
-                                    <HtButton Small="true" aria-label="@($"Publish {habit.Name}")" @onclick="() => PublishAsync(habit.Id)">Publish</HtButton>
-                                }
+                                @* One button that changes its words, not two: the keyboard focus stays on it after the click. *@
+                                @{ var published = habit.State == CatalogHabitState.Published; }
+                                <HtButton Variant="@(published ? HtButton.ButtonVariant.Secondary : HtButton.ButtonVariant.Primary)" Small="true"
+                                          aria-label="@(published ? $"Unpublish {habit.Name}" : $"Publish {habit.Name}")"
+                                          @onclick="() => published ? UnpublishAsync(habit.Id) : PublishAsync(habit.Id)">@(published ? "Unpublish" : "Publish")</HtButton>
                             </td>
                         </tr>
                     }

@@ -496,12 +496,12 @@ custom habits. Commit.
 
 ## Phase 9: Polish and cross-cutting concerns
 
-- [ ] T126 Review the accessibility and wording of every new and changed page and component (SC-008, HP-014, HP-016): a visible focus ring from tokens; text contrast of at least 4.5:1 from the token pairs; labelled icon-only buttons; the Dialog's focus; Draft, Published, Unpublished and Private always as text; brand-book wording. Search `src/HT.Ui` for hard-coded colours or sizes outside `wwwroot/css/` and remove them
-- [ ] T127 [P] Check HP-015 across the code: no log template, exception message or error page in `src/` names a custom-habit field; `StartupTasks`' fault log carries only the store's own exception texts
-- [ ] T128 [P] Update `README.md`'s status line for slice 2. Update `CONTEXT.md` only if implementation sharpened a term (plan, Work order 7)
-- [ ] T129 Run `dotnet build HabitTracker.slnx` and `dotnet test HabitTracker.slnx`. Every project must pass: unit, architecture, integration and UI. Record the counts for the report (constitution V)
-- [ ] T130 Walk through [quickstart.md](quickstart.md) section 3 with `dotnet run --project src/HT.Ui --launch-profile https`. Ask the owner before dropping the local `HT` database (quickstart, Prerequisites); check the startup log lines and each row of the browser table; note anything left unverified
-- [ ] T131 Leave `docs/roadmap.md` at `implementing`; the owner's `/speckit-ac-tests-write` and `/speckit-ac-tests-analyze` move it to `AC tests green`, and opening the PR to `shipped` (roadmap, "Updating this file")
+- [X] T126 Review the accessibility and wording of every new and changed page and component (SC-008, HP-014, HP-016): a visible focus ring from tokens; text contrast of at least 4.5:1 from the token pairs; labelled icon-only buttons; the Dialog's focus; Draft, Published, Unpublished and Private always as text; brand-book wording. Search `src/HT.Ui` for hard-coded colours or sizes outside `wwwroot/css/` and remove them
+- [X] T127 [P] Check HP-015 across the code: no log template, exception message or error page in `src/` names a custom-habit field; `StartupTasks`' fault log carries only the store's own exception texts
+- [X] T128 [P] Update `README.md`'s status line for slice 2. Update `CONTEXT.md` only if implementation sharpened a term (plan, Work order 7)
+- [X] T129 Run `dotnet build HabitTracker.slnx` and `dotnet test HabitTracker.slnx`. Every project must pass: unit, architecture, integration and UI. Record the counts for the report (constitution V)
+- [X] T130 Walk through [quickstart.md](quickstart.md) section 3 with `dotnet run --project src/HT.Ui --launch-profile https`. Ask the owner before dropping the local `HT` database (quickstart, Prerequisites); check the startup log lines and each row of the browser table; note anything left unverified
+- [X] T131 Leave `docs/roadmap.md` at `implementing`; the owner's `/speckit-ac-tests-write` and `/speckit-ac-tests-analyze` move it to `AC tests green`, and opening the PR to `shipped` (roadmap, "Updating this file")
 
 ---
 
