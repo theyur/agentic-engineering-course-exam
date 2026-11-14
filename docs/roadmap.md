@@ -28,7 +28,7 @@ in its idea brief, which assumed the catalog also carried the account foundation
 | # | Slice | Outcome (the why) | SPEC | Needs | Better after | Horizon | Status | Spec |
 |---|---|---|---|---|---|---|---|---|
 | 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | — | shipped | [001](../specs/001-accounts-and-access/spec.md) |
-| 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | Now | implementing | [002](../specs/002-habit-catalog/spec.md) |
+| 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | — | shipped | [002](../specs/002-habit-catalog/spec.md) |
 | 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | Next | not started | — |
 | 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Next | not started | — |
 | 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Later | not started | — |
@@ -256,3 +256,4 @@ Every change to this file also sets `updated_at`.
 | Outcome | Slice | Spec | PR |
 |---|---|---|---|
 | People can register, sign in and sign out; the app tells visitors, registered users and administrators apart. | `accounts-and-access` | [001](../specs/001-accounts-and-access/spec.md) | [#21](https://github.com/theyur/agentic-engineering-course-exam/pull/21) |
+| A new user does not start from a blank page: anyone browses curated catalog habits, administrators curate them, users keep private custom habits. | `habit-catalog` | [002](../specs/002-habit-catalog/spec.md) | [#23](https://github.com/theyur/agentic-engineering-course-exam/pull/23) |
