@@ -36,6 +36,16 @@ public sealed class CatalogService
     }
 
     /// <summary>
+    /// The Home preview (FR-008): the first <see cref="HomePreviewResult.Size"/> habits of browsing with no filters,
+    /// fewer when fewer exist, and the number of all Published habits for "See all N →".
+    /// </summary>
+    public async Task<HomePreviewResult> GetHomePreviewAsync(CancellationToken cancellationToken)
+    {
+        var all = await BrowseAsync(new CatalogFilter(), cancellationToken).ConfigureAwait(false);
+        return HomePreviewResult.Found([.. all.Habits.Take(HomePreviewResult.Size)], all.Count);
+    }
+
+    /// <summary>
     /// A Published catalog habit's details with all its suggested starting goals in order (FR-010). A Draft, an
     /// Unpublished habit, a custom habit's identifier and an unknown identifier are all "not in the catalog".
     /// </summary>

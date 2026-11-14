@@ -432,19 +432,19 @@ links to the catalog and to Admin.
 
 ### Tests for User Story 5
 
-- [ ] T108 [P] [US5] Create `tests/HT.UnitTests/Application/Habits/HomePreviewTests.cs`: with 0, 3, 4 and 5 Published habits (and Drafts and Unpublished ones beside them), `Habits` is the first four of browsing with no filters, fewer when fewer exist, and `PublishedCount` counts every Published habit. Create `tests/HT.IntegrationTests/Habits/HomePreviewTests.cs` (collection `SeedDatabase`, from a reset database): with a custom habit `"A0 Custom"` and five Published habits whose names sort after it, the preview holds four catalog habits and no custom habit, and `PublishedCount` is 5 (FR-024, SC-005). The integration test needs US4's `CustomHabitService` (T096)
+- [X] T108 [P] [US5] Create `tests/HT.UnitTests/Application/Habits/HomePreviewTests.cs`: with 0, 3, 4 and 5 Published habits (and Drafts and Unpublished ones beside them), `Habits` is the first four of browsing with no filters, fewer when fewer exist, and `PublishedCount` counts every Published habit. Create `tests/HT.IntegrationTests/Habits/HomePreviewTests.cs` (collection `SeedDatabase`, from a reset database): with a custom habit `"A0 Custom"` and five Published habits whose names sort after it, the preview holds four catalog habits and no custom habit, and `PublishedCount` is 5 (FR-024, SC-005). The integration test needs US4's `CustomHabitService` (T096)
 
 ### Implementation for User Story 5
 
-- [ ] T109 [US5] Add `GetHomePreviewAsync(CancellationToken)` and its result `HomePreviewResult` (`Found`, `Habits`, `PublishedCount`) to `src/HT.Application/Habits/CatalogService.cs` (research R-07)
-- [ ] T110 [US5] Add "Catalog" (→ `/catalog`) for every audience and "Admin" (→ `/admin`) for administrators to `src/HT.Ui/Components/Layout/SiteNav.razor`, in the order and markup of TopNav and MobileNav after T015 (HP-011). Update `tests/HT.UiTests/Components/Layout/SiteNavTests.cs` (slice 1 HP-010, amended): the links per audience, no "Goals", "Community" or "+ New goal"
-- [ ] T111 [US5] Extend `src/HT.Ui/Components/Pages/Home.razor` (static) per T014:
+- [X] T109 [US5] Add `GetHomePreviewAsync(CancellationToken)` and its result `HomePreviewResult` (`Found`, `Habits`, `PublishedCount`) to `src/HT.Application/Habits/CatalogService.cs` (research R-07)
+- [X] T110 [US5] Add "Catalog" (→ `/catalog`) for every audience and "Admin" (→ `/admin`) for administrators to `src/HT.Ui/Components/Layout/SiteNav.razor`, in the order and markup of TopNav and MobileNav after T015 (HP-011). Update `tests/HT.UiTests/Components/Layout/SiteNavTests.cs` (slice 1 HP-010, amended): the links per audience, no "Goals", "Community" or "+ New goal"
+- [X] T111 [US5] Extend `src/HT.Ui/Components/Pages/Home.razor` (static) per T014:
   - visitor: the hero's secondary button "Browse the catalog" (→ `/catalog`); after "How it works", "Popular in the catalog" with `GetHomePreviewAsync`'s habits as visitor HabitCards and "See all N →" (→ `/catalog`) with N = `PublishedCount`; no section when `Habits` is empty (HP-012);
   - registered user: under "Today", an EmptyState with "Browse the catalog" (HP-013); administrator unchanged.
 
   Depends on T109.
-- [ ] T112 [P] [US5] Update `tests/HT.UiTests/Components/Pages/HomeVisitorTests.cs` (slice 1 HP-011, amended): "Browse the catalog"; with 5 Published habits in T064's fake, four cards and "See all 5 →"; with none, no "Popular in the catalog". Update `tests/HT.UiTests/Components/Pages/HomeSignedInTests.cs` (slice 1 HP-013, amended): the registered user's EmptyState, the administrator's "Today" only (depends on T111)
-- [ ] T113 [P] [US5] Create `tests/HT.UiTests/Host/HomeCatalogHostTests.cs`: with at least four Published habits arranged (prefix `Ui-Ho`), the visitor Home shows four cards and "See all N →" with N equal to `GetHomePreviewAsync`'s `PublishedCount` from the host's services (depends on T111)
+- [X] T112 [P] [US5] Update `tests/HT.UiTests/Components/Pages/HomeVisitorTests.cs` (slice 1 HP-011, amended): "Browse the catalog"; with 5 Published habits in T064's fake, four cards and "See all 5 →"; with none, no "Popular in the catalog". Update `tests/HT.UiTests/Components/Pages/HomeSignedInTests.cs` (slice 1 HP-013, amended): the registered user's EmptyState, the administrator's "Today" only (depends on T111)
+- [X] T113 [P] [US5] Create `tests/HT.UiTests/Host/HomeCatalogHostTests.cs`: with at least four Published habits arranged (prefix `Ui-Ho`), the visitor Home shows four cards and "See all N →" with N equal to `GetHomePreviewAsync`'s `PublishedCount` from the host's services (depends on T111)
 
 **Checkpoint**: full suite green; the catalog is reachable from every page. Commit.
 

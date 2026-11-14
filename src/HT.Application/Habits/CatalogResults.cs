@@ -26,6 +26,41 @@ public sealed class CatalogBrowseResult
     internal static CatalogBrowseResult Found(IReadOnlyList<CatalogHabitSummary> habits) => new(habits);
 }
 
+/// <summary>The outcomes of <see cref="CatalogService.GetHomePreviewAsync"/>.</summary>
+public enum HomePreviewOutcome
+{
+    Found,
+}
+
+/// <summary>
+/// The Home preview (FR-008): the first four habits of browsing with no filters, fewer when fewer exist, and the
+/// number of all Published habits.
+/// </summary>
+public sealed class HomePreviewResult
+{
+    /// <summary>How many habits the preview holds at most (FR-008).</summary>
+    public const int Size = 4;
+
+    private HomePreviewResult(IReadOnlyList<CatalogHabitSummary> habits, int publishedCount)
+    {
+        Habits = habits;
+        PublishedCount = publishedCount;
+    }
+
+    public HomePreviewOutcome Outcome => HomePreviewOutcome.Found;
+
+    /// <summary>Always null: the preview has no refusal and the spec gives its success no text.</summary>
+    public string? Message => null;
+
+    public IReadOnlyList<CatalogHabitSummary> Habits { get; }
+
+    /// <summary>All Published catalog habits, for "See all N →".</summary>
+    public int PublishedCount { get; }
+
+    internal static HomePreviewResult Found(IReadOnlyList<CatalogHabitSummary> habits, int publishedCount) =>
+        new(habits, publishedCount);
+}
+
 /// <summary>The outcomes of <see cref="CatalogService.GetDetailsAsync"/>.</summary>
 public enum CatalogHabitDetailsOutcome
 {
