@@ -1,0 +1,11 @@
+@* design/components/Tag: a small neutral label for categories, intent and states. Always a word, never colour alone. *@
+<span class="@(Strong ? "ht-chip ht-chip--strong" : "ht-chip")">@Text</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+
+    /// <summary>The dark variant: Published, Private.</summary>
+    [Parameter]
+    public bool Strong { get; set; }
+}

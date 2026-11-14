@@ -47,6 +47,49 @@ public static class Sql
         await command.ExecuteNonQueryAsync();
     }
 
+    /// <summary>The rows of a parameterized query, each as column name to value (null for DBNull).</summary>
+    public static async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> QueryAsync(
+        string connectionString, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(sql, connection);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        await using var reader = await command.ExecuteReaderAsync();
+        var rows = new List<IReadOnlyDictionary<string, object?>>();
+        while (await reader.ReadAsync())
+        {
+            var row = new Dictionary<string, object?>(StringComparer.Ordinal);
+            for (var i = 0; i < reader.FieldCount; i++)
+            {
+                row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+            }
+
+            rows.Add(row);
+        }
+
+        return rows;
+    }
+
+    /// <summary>The single value of a parameterized query.</summary>
+    public static async Task<object?> ScalarAsync(string connectionString, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(sql, connection);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        var result = await command.ExecuteScalarAsync();
+        return result is DBNull ? null : result;
+    }
+
     /// <summary>True when a table with this name exists in the database.</summary>
     public static async Task<bool> TableExistsAsync(string connectionString, string table)
     {

@@ -1,17 +1,22 @@
 @page "/profile"
 @attribute [Authorize]
 @using HT.Application.Accounts
+@using HT.Application.Habits
 @using HT.Domain.Accounts
 @using HT.Ui.Account
 @using HT.Ui.Components.Account
 @using Microsoft.AspNetCore.Authorization
 @inject ActingUserAccessor ActingUsers
 @inject AccountService AccountService
+@inject CustomHabitService CustomHabits
 @inject AccountSession AccountSession
 @inject NavigationManager Navigation
-@* design/pages/PageProfile, slice 1 state: the header (avatar letter and email) and one Account card, so no Tabs
-   (HP-014). An anonymous request never gets here: the endpoint's [Authorize] sends it to Sign in (HP-008).
-   After a change the session that made it is re-issued with the new security stamp (HP-007). *@
+@* design/pages/PageProfile. Slice 2 state for registered users (HP-008, US4-AS14): the header, then the link
+   Tabs "Account" and "Custom habits" (?tab=custom-habits). Account keeps the slice 1 content. An
+   administrator, who has no custom habits (the use case refuses, FR-025), keeps the slice 1 state: Account
+   only, without Tabs (HP-014). The page stays static, so the change-password form keeps working. An anonymous
+   request never gets here: the endpoint's [Authorize] sends it to Sign in (HP-008). After a change the session
+   that made it is re-issued with the new security stamp (HP-007). *@
 <PageTitle>Profile · Habit Tracker</PageTitle>
 
 @if (_details is { } details)
@@ -24,21 +29,76 @@
                 <span class="ht-muted">Profile</span>
             </div>
         </div>
-        <div class="ht-grid-2">
-            <section class="ht-card">
-                <h2 class="ht-card__title">Account</h2>
-                <div class="ht-form-section">
-                    <dl class="ht-kv"><dt>Email</dt><dd>@details.Email</dd></dl>
-                </div>
-                <ChangePasswordForm ActingUser="_actingUser" OnSucceeded="RefreshSessionAsync" />
-            </section>
-        </div>
+        @if (_customHabits is not null)
+        {
+            <Tabs Links="true" Label="Profile sections" Items="TabItems" />
+        }
+        @if (_customHabits is { } habits && ShowsCustomHabits)
+        {
+            @if (habits.Count == 0)
+            {
+                <EmptyState Icon="plus" Title="No custom habits yet"
+                            Text="Create a habit of your own when the catalog has nothing that fits. Only you can see it.">
+                    <HtButton Href="/custom-habits/new">+ Create custom habit</HtButton>
+                </EmptyState>
+            }
+            else
+            {
+                <section class="ht-card">
+                    <div class="ht-card__head">
+                        <h2 class="ht-card__title">Custom habits</h2>
+                        <span class="ht-spacer"></span>
+                        <HtButton Variant="HtButton.ButtonVariant.Secondary" Small="true" Href="/custom-habits/new">+ Create custom habit</HtButton>
+                    </div>
+                    <p class="ht-card__sub">Private habits for your own goals. Only you can see them.</p>
+                    @foreach (var habit in habits)
+                    {
+                        <div class="ht-row">
+                            <span class="ht-habit__glyph ht-habit__glyph--row"><HtIcon Name="@habit.Icon" /></span>
+                            <div class="ht-row__main">
+                                <div class="ht-row__name">@habit.Name</div>
+                                <div class="ht-row__meta">@habit.Category · @habit.Intent</div>
+                            </div>
+                            <Tag Text="Private" Strong="true" />
+                            <a class="ht-btn ht-btn--ghost ht-btn--sm" href="@($"/custom-habits/{habit.Id.Value}")" aria-label="@($"Edit {habit.Name}")">Edit</a>
+                        </div>
+                    }
+                </section>
+            }
+        }
+        else
+        {
+            <div class="ht-grid-2">
+                <section class="ht-card">
+                    <h2 class="ht-card__title">Account</h2>
+                    <div class="ht-form-section">
+                        <dl class="ht-kv"><dt>Email</dt><dd>@details.Email</dd></dl>
+                    </div>
+                    <ChangePasswordForm ActingUser="_actingUser" OnSucceeded="RefreshSessionAsync" />
+                </section>
+            </div>
+        }
     </div>
 }
 
 @code {
+    private const string CustomHabitsTab = "custom-habits";
+
     private ActingUser _actingUser = ActingUser.Anonymous;
     private AccountDetails? _details;
+    private IReadOnlyList<CustomHabitView>? _customHabits;
+
+    /// <summary>"custom-habits" opens the Custom habits tab; anything else is Account.</summary>
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string? Tab { get; set; }
+
+    private bool ShowsCustomHabits => string.Equals(Tab, CustomHabitsTab, StringComparison.Ordinal);
+
+    private IReadOnlyList<Tabs.TabItem> TabItems =>
+    [
+        new("Account", "/profile", null, !ShowsCustomHabits),
+        new("Custom habits", "/profile?tab=" + CustomHabitsTab, null, ShowsCustomHabits),
+    ];
 
     protected override async Task OnInitializedAsync()
     {
@@ -51,6 +111,8 @@
         }
 
         _details = result.AccountDetails;
+        var custom = await CustomHabits.ListAsync(_actingUser, CancellationToken.None);
+        _customHabits = custom.Outcome == CustomHabitListOutcome.Found ? custom.Habits : null;
     }
 
     private Task RefreshSessionAsync(PasswordChangeResult result) => AccountSession.RefreshSignInAsync(_actingUser);

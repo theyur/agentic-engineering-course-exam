@@ -1,0 +1,73 @@
+@* design/components/HabitCard, slice 2: the habit's glyph, name, category and intent Tags, the description and
+   "Suggested starting goal: …" when a text is given. Variants: visitor ("See details"), signed in ("Details"),
+   custom habit ("Private" Tag and "Edit"). The card receives plain values and formats nothing (ADR 0011). *@
+<article class="ht-card ht-habit">
+    <div class="ht-habit__glyph"><HtIcon Name="@Icon" Size="HtIcon.IconSize.Large" /></div>
+    <div class="ht-habit__head"><h3 class="ht-habit__name">@Name</h3></div>
+    <div class="ht-habit__tags">
+        <Tag Text="@Category" /><Tag Text="@Intent" />@if (Variant == HabitCardVariant.CustomHabit)
+        {
+            <Tag Text="Private" Strong="true" />
+        }
+    </div>
+    @if (Description is not null)
+    {
+        <p class="ht-habit__desc">@Description</p>
+    }
+    @if (SuggestedStartingGoal is not null)
+    {
+        <div class="ht-habit__start">Suggested starting goal: <b>@SuggestedStartingGoal</b></div>
+    }
+    <div class="ht-habit__actions">
+        @switch (Variant)
+        {
+            case HabitCardVariant.Visitor:
+                <a class="ht-btn ht-btn--ghost ht-btn--sm" href="@Href">See details</a>
+                break;
+            case HabitCardVariant.SignedIn:
+                <a class="ht-btn ht-btn--ghost ht-btn--sm" href="@Href">Details</a>
+                break;
+            default:
+                <a class="ht-btn ht-btn--ghost ht-btn--sm" href="@Href" aria-label="@($"Edit {Name}")">Edit</a>
+                break;
+        }
+    </div>
+</article>
+
+@code {
+    /// <summary>A habit icon name.</summary>
+    [Parameter, EditorRequired]
+    public string Icon { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The category's word.</summary>
+    [Parameter, EditorRequired]
+    public string Category { get; set; } = string.Empty;
+
+    /// <summary>The intent's word.</summary>
+    [Parameter, EditorRequired]
+    public string Intent { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    /// <summary>The marked suggested starting goal's text; no line when null.</summary>
+    [Parameter]
+    public string? SuggestedStartingGoal { get; set; }
+
+    [Parameter]
+    public HabitCardVariant Variant { get; set; } = HabitCardVariant.Visitor;
+
+    /// <summary>Where the action goes: the details page, or the custom habit form.</summary>
+    [Parameter, EditorRequired]
+    public string Href { get; set; } = string.Empty;
+
+    public enum HabitCardVariant
+    {
+        Visitor,
+        SignedIn,
+        CustomHabit,
+    }
+}

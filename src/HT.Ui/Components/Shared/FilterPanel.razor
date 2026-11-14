@@ -1,0 +1,61 @@
+@using HT.Domain.Habits
+@* design/components/FilterPanel: Category as a radio group, Intent as the two checkboxes Build and Reduce, native
+   inputs inside label.ht-check. Every change is reported at once; there is no Apply button. "Only habits I track"
+   is slice 4's and absent. *@
+<aside class="ht-card" aria-label="Filters">
+    <div class="ht-filter__group" role="radiogroup" aria-labelledby="@($"{Id}-category-title")">
+        <div class="ht-filter__title" id="@($"{Id}-category-title")">Category</div>
+        @foreach (var option in Categories)
+        {
+            <label class="ht-check">
+                <input type="radio" name="@($"{Id}-category")" value="@(option.Category?.ToString() ?? string.Empty)"
+                       checked="@(option.Category == Category)"
+                       @onchange="() => CategoryChanged.InvokeAsync(option.Category)" />
+                @option.Label
+            </label>
+        }
+    </div>
+    <div class="ht-filter__group" role="group" aria-labelledby="@($"{Id}-intent-title")">
+        <div class="ht-filter__title" id="@($"{Id}-intent-title")">Intent</div>
+        <label class="ht-check">
+            <input type="checkbox" checked="@Build" @onchange="e => OnIntentAsync(IsChecked(e), Reduce)" /> Build
+        </label>
+        <label class="ht-check">
+            <input type="checkbox" checked="@Reduce" @onchange="e => OnIntentAsync(Build, IsChecked(e))" /> Reduce
+        </label>
+    </div>
+</aside>
+
+@code {
+    /// <summary>A prefix for the radio group's name, unique on the page.</summary>
+    [Parameter]
+    public string Id { get; set; } = "filters";
+
+    /// <summary>The Category options in order: "All" (null) first.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<CategoryOption> Categories { get; set; } = [];
+
+    /// <summary>The chosen category; null is "All".</summary>
+    [Parameter]
+    public Category? Category { get; set; }
+
+    [Parameter]
+    public EventCallback<Category?> CategoryChanged { get; set; }
+
+    [Parameter]
+    public bool Build { get; set; }
+
+    [Parameter]
+    public bool Reduce { get; set; }
+
+    /// <summary>Called with both boxes' new states when either changes.</summary>
+    [Parameter]
+    public EventCallback<(bool Build, bool Reduce)> IntentChanged { get; set; }
+
+    private Task OnIntentAsync(bool build, bool reduce) => IntentChanged.InvokeAsync((build, reduce));
+
+    private static bool IsChecked(ChangeEventArgs e) => e.Value is true || (e.Value is string text && bool.TryParse(text, out var value) && value);
+
+    /// <summary>One Category radio button: its value (null for "All") and its words.</summary>
+    public sealed record CategoryOption(Category? Category, string Label);
+}

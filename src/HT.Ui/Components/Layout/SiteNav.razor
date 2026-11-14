@@ -3,7 +3,9 @@
 @using HT.Ui.Account
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
-@* design/components/TopNav and MobileNav, slice 1 (HP-010, research R-08). The only interactive component: it
+@using HT.Domain.Accounts
+@* design/components/TopNav and MobileNav, slice 2 (HP-011): "Catalog" for every audience and "Admin" for
+   administrators; no links of later slices (ADR 0008). The only interactive component: it
    holds the state of the avatar menu and the narrow-screen menu. Each closes on Esc, on a click outside (the
    click-away layer) and on choosing an item, and focus goes back to its button. Opening one closes the other. *@
 <div @onkeydown="OnKeyDownAsync">
@@ -12,6 +14,9 @@
             <a class="ht-nav__brand" href="/">Habit Tracker</a>
             @if (_email is null)
             {
+                <nav class="ht-nav__links" aria-label="Main">
+                    <a href="/catalog" aria-current="@CatalogCurrent" @onclick="ChooseItemAsync">Catalog</a>
+                </nav>
                 <div class="ht-nav__end">
                     <a class="ht-btn ht-btn--ghost ht-hide-sm" href="/sign-in">Sign in</a>
                     <a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="/register">Register</a>
@@ -22,6 +27,11 @@
             {
                 <nav class="ht-nav__links" aria-label="Main">
                     <a href="/" aria-current="@TodayCurrent" @onclick="ChooseItemAsync">Today</a>
+                    <a href="/catalog" aria-current="@CatalogCurrent" @onclick="ChooseItemAsync">Catalog</a>
+                    @if (_isAdministrator)
+                    {
+                        <a href="/admin" aria-current="@AdminCurrent" @onclick="ChooseItemAsync">Admin</a>
+                    }
                 </nav>
                 <div class="ht-nav__end">
                     <div class="ht-account ht-layer-top">
@@ -47,12 +57,18 @@
         <nav class="ht-mobile-menu ht-layer-top" id="@MobileMenuId" aria-label="Menu">
             @if (_email is null)
             {
+                <a href="/catalog" aria-current="@CatalogCurrent" @onclick="ChooseItemAsync"><HtIcon Name="layout-grid" />Catalog</a>
                 <a href="/sign-in" @onclick="ChooseItemAsync">Sign in</a>
                 <a href="/register" @onclick="ChooseItemAsync">Register</a>
             }
             else
             {
                 <a href="/" aria-current="@TodayCurrent" @onclick="ChooseItemAsync"><HtIcon Name="list-checks" />Today</a>
+                <a href="/catalog" aria-current="@CatalogCurrent" @onclick="ChooseItemAsync"><HtIcon Name="layout-grid" />Catalog</a>
+                @if (_isAdministrator)
+                {
+                    <a href="/admin" aria-current="@AdminCurrent" @onclick="ChooseItemAsync"><HtIcon Name="shield" />Admin</a>
+                }
                 <hr />
                 <a href="/profile" @onclick="ChooseItemAsync"><HtIcon Name="user" />Profile</a>
                 @SignOutForm
@@ -81,6 +97,7 @@
 
     private Menu _open;
     private string? _email;
+    private bool _isAdministrator;
     private ElementReference _accountButton;
     private ElementReference _mobileButton;
 
@@ -96,7 +113,22 @@
     // A form, never a link (HP-006); the browser posts it, so the cookie is ended in an HTTP response.
     private RenderFragment SignOutForm => @<form method="post" action="@SignOutEndpoint.Path"><AntiforgeryToken /><button type="submit"><HtIcon Name="log-out" />Sign out</button></form>;
 
-    private string? TodayCurrent => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Length == 0 ? "page" : null;
+    private string CurrentPath => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+
+    private string? TodayCurrent => CurrentPath.Length == 0 ? "page" : null;
+
+    // The catalog pages: the public catalog, a habit's details, and "My custom habits" with the custom habit form.
+    private string? CatalogCurrent => IsIn("catalog") || IsIn("custom-habits") ? "page" : null;
+
+    // The Admin page and the administrator's catalog habit form.
+    private string? AdminCurrent => IsIn("admin") ? "page" : null;
+
+    private bool IsIn(string section)
+    {
+        var path = CurrentPath;
+        return string.Equals(path, section, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(section + "/", StringComparison.OrdinalIgnoreCase);
+    }
 
     protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
 
@@ -105,6 +137,7 @@
         var wasSignedIn = _email is not null;
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
         _email = user?.Identity?.IsAuthenticated == true ? user.Identity.Name ?? string.Empty : null;
+        _isAdministrator = _email is not null && user!.IsInRole(nameof(Role.Administrator));
 
         // The circuit's revalidation ended the session while the page stays open, for example after a password
         // change in another browser (HP-007). The page body is rendered statically, so reload it: the new request

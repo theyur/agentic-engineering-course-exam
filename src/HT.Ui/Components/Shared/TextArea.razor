@@ -1,0 +1,63 @@
+@* design/components/TextArea: a labelled multi-line input (textarea.ht-input.ht-textarea) with its help or error
+   text under the field, as TextField has it. The error comes from the use case. *@
+<label class="ht-field">
+    <span class="ht-field__label">@Label@(Optional ? " " : null)@if (Optional)
+        {
+            <span class="ht-muted">(optional)</span>
+        }</span>
+    <textarea id="@Id" class="ht-input ht-textarea" placeholder="@Placeholder" aria-describedby="@DescribedBy"
+              aria-invalid="@(Error is null ? null : "true")" @bind="CurrentValue" @bind:event="oninput"></textarea>
+    @if (Error is not null)
+    {
+        <span class="ht-field__error" id="@ErrorId">@Error</span>
+    }
+    else if (Help is not null)
+    {
+        <span class="ht-field__help" id="@HelpId">@Help</span>
+    }
+</label>
+
+@code {
+    /// <summary>The textarea's id; the help and error texts get ids derived from it.</summary>
+    [Parameter, EditorRequired]
+    public string Id { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>Adds "(optional)" after the label.</summary>
+    [Parameter]
+    public bool Optional { get; set; }
+
+    [Parameter]
+    public string? Help { get; set; }
+
+    /// <summary>The error text; shown in place of the help text.</summary>
+    [Parameter]
+    public string? Error { get; set; }
+
+    [Parameter]
+    public string? Placeholder { get; set; }
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    private string? CurrentValue
+    {
+        get => Value;
+        set
+        {
+            Value = value;
+            ValueChanged.InvokeAsync(value);
+        }
+    }
+
+    private string HelpId => Id + "-help";
+
+    private string ErrorId => Id + "-error";
+
+    private string? DescribedBy => Error is not null ? ErrorId : Help is not null ? HelpId : null;
+}

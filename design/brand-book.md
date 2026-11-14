@@ -10,7 +10,7 @@ Habit Tracker is a calm, private consistency tracker. The design is **Ink Blue &
 - Buttons start with a verb: Record, Add time, Excuse, Use this habit, Approve & publish.
 - Use the product words exactly as the spec defines them: catalog habit, custom habit, goal, attempt, Build / Reduce, commitment, Pending, Met, Failed, Missed, Excused, Paused, consistency, streak, Consistency Bands. Never "done", "skipped", "overdue", "rank", "leaderboard", "top", "score".
 - Consistency always comes with its count: **90% (18 of 20)**. No eligible data: **N/A**. Streaks always carry their unit: "6 sessions", "3 weeks".
-- Suggested starting goals are examples, never advice: "Suggested start: 15 min, 5 days a week" and "An example to adjust, not a prescribed target."
+- Suggested starting goals are examples, never advice: "Suggested starting goal: 15 min, 5 days a week" and "Examples to adjust, not prescribed targets."
 - Privacy is stated, not implied: say what others can see and what they never see. Community is "opt-in"; names are "listed alphabetically, never ranked".
 - No emoji, no exclamation marks, no gamified praise ("Great job!"). Neutral facts: "Streak 6 sessions".
 - Dates: "Friday, 30 October", short "Wed 28 Oct". Time left: "22 h left to record".
@@ -52,7 +52,7 @@ Habit Tracker is a calm, private consistency tracker. The design is **Ink Blue &
 - Icons are **Lucide** 0.460.0 (ISC license): 24px line icons, `stroke-width` 1.75, round caps and joins, `currentColor`. The chosen icons and their meanings are in the Icons card; use only those, one meaning each.
 - Sizes: `ht-icon--sm` 16px in inputs and small buttons, `ht-icon` 20px in menus and buttons, `ht-icon--lg` 24px in habit glyph tiles (`accent` on `accent-soft`) and empty states.
 - Icons sit next to a word. Icon-only buttons (menu, close) need an `aria-label`.
-- Every catalog habit has one icon (book-open for Reading, person-standing for Yoga…), picked from the Icons list.
+- Every catalog habit and custom habit has one icon (book-open for Reading, person-standing for Yoga…), picked from the "Habit icons" group of the Icons card (`components/Icons`). The other icons of the card are app icons and are never a habit icon.
 - No emoji as icons.
 
 ## Logo

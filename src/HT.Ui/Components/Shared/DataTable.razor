@@ -1,0 +1,29 @@
+@* design/components/DataTable: a table in ht-table-wrap (card look, scrolls sideways on small screens). The first
+   column is the name in bold; actions are right-aligned in td.ht-actions. Rows are the child content. *@
+<div class="ht-table-wrap">
+    <table class="ht-table" aria-label="@Label">
+        <thead>
+            <tr>
+                @foreach (var column in Columns)
+                {
+                    <th scope="col">@column</th>
+                }
+            </tr>
+        </thead>
+        <tbody>@ChildContent</tbody>
+    </table>
+</div>
+
+@code {
+    /// <summary>The column headings; an empty heading for the actions column.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<string> Columns { get; set; } = [];
+
+    /// <summary>What the table lists, for assistive technology.</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>The rows (tr elements).</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

@@ -15,3 +15,10 @@ The top navigation under 860px: product name, avatar and a menu button that open
 - Sign out is a button inside a form that posts to sign out, styled like the links.
 - Closes on Esc, on a tap outside, and on choosing an item; focus goes back to the menu button. Opening one menu closes the other.
 - The panel is never shown on wide screens, even if it was left open when the window grew.
+
+## Slice 2
+
+- Visitor: the menu lists Catalog, then Sign in and Register.
+- Registered user: Today and Catalog, a divider, Profile and Sign out.
+- Administrator: Today, Catalog and Admin, a divider, Profile and Sign out.
+- Icons: `list-checks` for Today, `layout-grid` for Catalog, `shield` for Admin. No Goals, Community, New goal or Send feedback yet.

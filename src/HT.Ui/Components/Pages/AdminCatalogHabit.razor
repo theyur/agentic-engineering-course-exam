@@ -1,0 +1,138 @@
+@page "/admin/catalog/new"
+@page "/admin/catalog/{Id:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using HT.Application.Habits
+@using HT.Domain.Accounts
+@using HT.Domain.Habits
+@using HT.Ui.Account
+@using HT.Ui.Components.Habits
+@using HT.Ui.Habits
+@using Microsoft.AspNetCore.Authorization
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageAdminCatalogHabit (HP-009, HP-010): create a catalog habit, or edit one in any state. After a
+   save the page goes back to the Admin table. Anyone who is not an administrator, and an unknown habit, get the
+   Not found page; the use cases refuse on their own (FR-014). Every use case runs in its own scope. *@
+<PageTitle>@Title · Habit Tracker</PageTitle>
+
+@if (_ready)
+{
+    <div class="ht-container">
+        <BackLink Href="/admin" Text="Administration" />
+        <div class="ht-page-head ht-detail-head">
+            <div>
+                <h1>@Title</h1>
+                <span class="ht-muted">@_subtitle</span>
+            </div>
+        </div>
+        <CatalogHabitForm Model="_model" Goals="_goals" Error="_error" OnSave="SaveAsync" />
+    </div>
+}
+
+@code {
+    private const string NewSubtitle = "Created as a Draft. Publish it from the catalog table.";
+
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private HabitFormModel _model = new();
+    private List<SuggestedStartingGoalFormModel> _goals = [];
+    private FormError? _error;
+    private string _subtitle = NewSubtitle;
+    private bool _ready;
+    private bool _loaded;
+    private Guid? _loadedId;
+
+    /// <summary>The habit being edited; null on the create address.</summary>
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    private string Title => Id is null ? "New catalog habit" : "Edit catalog habit";
+
+    protected override async Task OnInitializedAsync() => _actingUser = await ActingUsers.GetAsync();
+
+    /// <summary>
+    /// Both addresses share this component, so the router keeps it when only the address changes: each new
+    /// <see cref="Id"/> starts from an empty form and loads that habit.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loaded && Id == _loadedId)
+        {
+            return;
+        }
+
+        _loaded = true;
+        _loadedId = Id;
+        _ready = false;
+        _model = new();
+        _goals = [];
+        _error = null;
+        _subtitle = NewSubtitle;
+        if (Id is not { } id)
+        {
+            if (_actingUser.Role != Role.Administrator)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            _ready = true;
+            return;
+        }
+
+        var result = await UseCases.RunAsync<CatalogAdministrationService, CatalogHabitAdminResult>(
+            (service, token) => service.GetAsync(_actingUser, new HabitId(id), token), CancellationToken.None);
+        if (result.Habit is not { } habit)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        _model = HabitFormModel.From(habit.Name, habit.Description, habit.Category, habit.Intent, habit.Icon);
+        _goals = habit.SuggestedStartingGoals.Select(SuggestedStartingGoalFormModel.From).ToList();
+        _subtitle = $"{habit.Name} · {habit.State}. Saving keeps its state.";
+        _ready = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        var input = new CatalogHabitInput
+        {
+            Name = _model.Name,
+            Description = _model.Description,
+            Category = _model.Category,
+            Intent = _model.Intent,
+            Icon = _model.Icon,
+            SuggestedStartingGoals = _goals.Select(g => g.ToInput()).ToList(),
+        };
+
+        if (Id is not { } id)
+        {
+            var created = await UseCases.RunAsync<CatalogAdministrationService, CatalogHabitCreateResult>(
+                (service, token) => service.CreateAsync(_actingUser, input, token), CancellationToken.None);
+            Finish(created.Outcome == CatalogHabitCreateOutcome.Created, created.Outcome.ToString(), created.Message, created.Position);
+            return;
+        }
+
+        var edited = await UseCases.RunAsync<CatalogAdministrationService, CatalogHabitEditResult>(
+            (service, token) => service.EditAsync(_actingUser, new HabitId(id), input, token), CancellationToken.None);
+        Finish(edited.Outcome == CatalogHabitEditOutcome.Saved, edited.Outcome.ToString(), edited.Message, edited.Position);
+    }
+
+    private void Finish(bool saved, string outcome, string? message, int? position)
+    {
+        if (saved)
+        {
+            Navigation.NavigateTo("/admin");
+            return;
+        }
+
+        _error = FormError.Of(outcome, message, position);
+        if (_error is null)
+        {
+            // Not signed in, not an administrator, or the habit is gone: no field to show it under.
+            Navigation.NotFound();
+        }
+    }
+}

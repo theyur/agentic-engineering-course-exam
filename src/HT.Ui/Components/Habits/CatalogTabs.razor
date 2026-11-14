@@ -1,0 +1,25 @@
+@* design/pages/PageCatalogSignedIn, slice 2 (HP-002, US4-AS12): the link Tabs between the Public catalog
+   (/catalog) and My custom habits (/custom-habits). "Public catalog" counts every Published catalog habit,
+   whatever the search and filters; "My custom habits" counts all of the user's own custom habits. The page
+   passes both counts. *@
+<Tabs Links="true" Label="Catalog views" Items="Items" />
+
+@code {
+    /// <summary>True on My custom habits, false on the Public catalog.</summary>
+    [Parameter]
+    public bool MyCustomHabits { get; set; }
+
+    /// <summary>The number of Published catalog habits.</summary>
+    [Parameter, EditorRequired]
+    public int PublicCount { get; set; }
+
+    /// <summary>The number of the user's own custom habits.</summary>
+    [Parameter, EditorRequired]
+    public int CustomCount { get; set; }
+
+    private IReadOnlyList<Tabs.TabItem> Items =>
+    [
+        new("Public catalog", "/catalog", PublicCount, !MyCustomHabits),
+        new("My custom habits", "/custom-habits", CustomCount, MyCustomHabits),
+    ];
+}

@@ -1,0 +1,168 @@
+@page "/admin"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@using HT.Application.Habits
+@using HT.Domain.Accounts
+@using HT.Domain.Habits
+@using HT.Ui.Account
+@using HT.Ui.Habits
+@using Microsoft.AspNetCore.Authorization
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageAdmin, slice 2 state (US3-AS20, HP-009, HP-010): the catalog only, so no Tabs and no "Updated"
+   column. Publish and Unpublish act from the row and the row shows the new state at once. A registered user gets
+   the Not found page; the use cases refuse on their own (FR-014). Every use case runs in its own scope. *@
+<PageTitle>Administration · Habit Tracker</PageTitle>
+
+@if (_loaded)
+{
+    <div class="ht-container">
+        <div class="ht-page-head">
+            <h1>Administration</h1>
+            <span class="ht-spacer"></span>
+            <HtButton Href="/admin/catalog/new">+ New catalog habit</HtButton>
+        </div>
+        <div class="ht-stack">
+            <Notice Neutral="true"><b>Privacy:</b> admins manage public content and accounts. Private goals, records, notes and personal reports are not available here.</Notice>
+            <div>
+                <div class="ht-results-bar">
+                    <SearchField Id="admin-search" Label="Search catalog" Value="@_search" ValueChanged="OnSearchChangedAsync" />
+                    <span class="ht-spacer"></span>
+                    <span>Showing @_habits.Count of @_total</span>
+                </div>
+                <DataTable Columns="Columns" Label="Catalog habits">
+                    @foreach (var habit in _habits)
+                    {
+                        <tr @key="habit.Id">
+                            <td><b>@habit.Name</b></td>
+                            <td>@habit.Category</td>
+                            <td>@habit.Intent</td>
+                            <td><Tag Text="@habit.State.ToString()" Strong="@(habit.State == CatalogHabitState.Published)" /></td>
+                            <td class="ht-actions">
+                                <HtButton Variant="HtButton.ButtonVariant.Ghost" Small="true" Href="@($"/admin/catalog/{habit.Id.Value}")" aria-label="@($"Edit {habit.Name}")">Edit</HtButton>
+                                @* One button that changes its words, not two: the keyboard focus stays on it after the click. *@
+                                @{ var published = habit.State == CatalogHabitState.Published; }
+                                <HtButton Variant="@(published ? HtButton.ButtonVariant.Secondary : HtButton.ButtonVariant.Primary)" Small="true"
+                                          aria-label="@(published ? $"Unpublish {habit.Name}" : $"Publish {habit.Name}")"
+                                          @onclick="() => published ? UnpublishAsync(habit.Id) : PublishAsync(habit.Id)">@(published ? "Unpublish" : "Publish")</HtButton>
+                            </td>
+                        </tr>
+                    }
+                </DataTable>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private const int SearchDelayMilliseconds = 300;
+    private static readonly IReadOnlyList<string> Columns = ["Habit", "Category", "Intent", "Status", string.Empty];
+
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private IReadOnlyList<CatalogHabitListItem> _habits = [];
+    private int _total;
+    private string _search = string.Empty;
+    private bool _loaded;
+    private int _request;
+    private CancellationTokenSource? _pendingSearch;
+
+    // The search the address last asked for, or that this page last wrote to it; null before the first load.
+    private string? _appliedQuery;
+
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+
+    protected override async Task OnInitializedAsync() => _actingUser = await ActingUsers.GetAsync();
+
+    /// <summary>
+    /// The address is the source of the search: a link or Back that changes "q" while the page stays open loads that
+    /// search. The page's own address update after a search changes nothing, so typing on is not undone.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        var query = Query ?? string.Empty;
+        if (query == _appliedQuery)
+        {
+            return;
+        }
+
+        _appliedQuery = query;
+        CancelPendingSearch();
+        _search = query;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var request = ++_request;
+        var search = _search;
+        var result = await UseCases.RunAsync<CatalogAdministrationService, CatalogHabitListResult>(
+            (service, token) => service.ListAsync(_actingUser, search, token), CancellationToken.None);
+        if (result.Outcome != CatalogHabitListOutcome.Found)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        if (request != _request)
+        {
+            return;
+        }
+
+        _habits = result.Habits;
+        _total = result.Total;
+        _loaded = true;
+    }
+
+    private async Task PublishAsync(HabitId id)
+    {
+        await UseCases.RunAsync<CatalogAdministrationService, CatalogHabitPublishResult>(
+            (service, token) => service.PublishAsync(_actingUser, id, token), CancellationToken.None);
+        await LoadAsync();
+    }
+
+    private async Task UnpublishAsync(HabitId id)
+    {
+        await UseCases.RunAsync<CatalogAdministrationService, CatalogHabitUnpublishResult>(
+            (service, token) => service.UnpublishAsync(_actingUser, id, token), CancellationToken.None);
+        await LoadAsync();
+    }
+
+    private async Task OnSearchChangedAsync(string text)
+    {
+        _search = text;
+        _pendingSearch?.Cancel();
+        _pendingSearch?.Dispose();
+        var pending = _pendingSearch = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(SearchDelayMilliseconds, pending.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(pending, _pendingSearch))
+        {
+            _pendingSearch = null;
+            pending.Dispose();
+        }
+
+        await LoadAsync();
+        var query = string.IsNullOrWhiteSpace(_search) ? null : _search;
+        _appliedQuery = query ?? string.Empty;
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("q", query), replace: true);
+    }
+
+    private void CancelPendingSearch()
+    {
+        _pendingSearch?.Cancel();
+        _pendingSearch?.Dispose();
+        _pendingSearch = null;
+    }
+
+    public void Dispose() => CancelPendingSearch();
+}

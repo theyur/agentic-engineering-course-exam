@@ -3,6 +3,7 @@ using HT.Persistence;
 using HT.Persistence.Identity;
 using HT.Ui.Account;
 using HT.Ui.Components;
+using HT.Ui.Habits;
 using HT.Ui.Operator;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -51,6 +52,8 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 builder.Services.AddScoped<AccountSession>();
 builder.Services.AddScoped<ActingUserAccessor>();
+// Interactive pages call each use case in a scope of its own (research R-15).
+builder.Services.AddSingleton<UseCaseScope>();
 
 var app = builder.Build();
 

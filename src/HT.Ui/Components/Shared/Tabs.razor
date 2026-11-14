@@ -1,0 +1,42 @@
+@* design/components/Tabs. Link tabs change the address: nav.ht-tabs with a.ht-tab, the current one with
+   aria-current="page". Button tabs switch content in the page: div[role=tablist] with button[role=tab]. *@
+@if (Links)
+{
+    <nav class="ht-tabs" aria-label="@Label">
+        @foreach (var item in Items)
+        {
+            <a class="ht-tab" href="@item.Href" aria-current="@(item.IsCurrent ? "page" : null)">@item.Text@if (item.Count is { } count){<span class="ht-count">@count</span>}</a>
+        }
+    </nav>
+}
+else
+{
+    <div class="ht-tabs" role="tablist" aria-label="@Label">
+        @foreach (var item in Items)
+        {
+            <button type="button" class="ht-tab" role="tab" aria-selected="@(item.IsCurrent ? "true" : "false")"
+                    @onclick="() => OnSelect.InvokeAsync(item)">@item.Text@if (item.Count is { } count){<span class="ht-count">@count</span>}</button>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>The tabs in order; exactly one is current.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TabItem> Items { get; set; } = [];
+
+    /// <summary>What the tabs switch between, for assistive technology.</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>True for link tabs (each tab has its own address).</summary>
+    [Parameter]
+    public bool Links { get; set; }
+
+    /// <summary>Called when a button tab is chosen.</summary>
+    [Parameter]
+    public EventCallback<TabItem> OnSelect { get; set; }
+
+    /// <summary>One tab: its words, its address (link tabs), an optional count, and whether it is current.</summary>
+    public sealed record TabItem(string Text, string? Href, int? Count, bool IsCurrent);
+}

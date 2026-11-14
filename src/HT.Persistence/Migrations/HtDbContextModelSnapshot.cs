@@ -22,6 +22,109 @@ namespace HT.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("HT.Persistence.Habits.CatalogHabitRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("Intent")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NameKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatalogHabits_NameKey");
+
+                    b.ToTable("CatalogHabits", (string)null);
+                });
+
+            modelBuilder.Entity("HT.Persistence.Habits.CustomHabitRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("Intent")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "NameKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CustomHabits_OwnerId_NameKey");
+
+                    b.ToTable("CustomHabits", (string)null);
+                });
+
             modelBuilder.Entity("HT.Persistence.Identity.HtUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -165,6 +268,80 @@ namespace HT.Persistence.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("HT.Persistence.Habits.CatalogHabitRow", b =>
+                {
+                    b.OwnsMany("HT.Persistence.Habits.SuggestedStartingGoalRow", "SuggestedStartingGoals", b1 =>
+                        {
+                            b1.Property<Guid>("CatalogHabitId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<int>("Position")
+                                .HasColumnType("int");
+
+                            b1.Property<int?>("Amount")
+                                .HasColumnType("int");
+
+                            b1.Property<string>("BuildOrReduce")
+                                .IsRequired()
+                                .HasMaxLength(16)
+                                .IsUnicode(false)
+                                .HasColumnType("varchar(16)");
+
+                            b1.Property<string>("CountUnit")
+                                .HasMaxLength(20)
+                                .HasColumnType("nvarchar(20)");
+
+                            b1.Property<int?>("Days")
+                                .HasColumnType("int");
+
+                            b1.Property<string>("DurationUnit")
+                                .HasMaxLength(16)
+                                .IsUnicode(false)
+                                .HasColumnType("varchar(16)");
+
+                            b1.Property<bool>("IsMarked")
+                                .HasColumnType("bit");
+
+                            b1.Property<string>("Measurement")
+                                .IsRequired()
+                                .HasMaxLength(16)
+                                .IsUnicode(false)
+                                .HasColumnType("varchar(16)");
+
+                            b1.Property<string>("Period")
+                                .HasMaxLength(16)
+                                .IsUnicode(false)
+                                .HasColumnType("varchar(16)");
+
+                            b1.Property<string>("ScheduleKind")
+                                .IsRequired()
+                                .HasMaxLength(16)
+                                .IsUnicode(false)
+                                .HasColumnType("varchar(16)");
+
+                            b1.Property<int?>("Times")
+                                .HasColumnType("int");
+
+                            b1.HasKey("CatalogHabitId", "Position");
+
+                            b1.ToTable("CatalogHabitSuggestedStartingGoals", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("CatalogHabitId");
+                        });
+
+                    b.Navigation("SuggestedStartingGoals");
+                });
+
+            modelBuilder.Entity("HT.Persistence.Habits.CustomHabitRow", b =>
+                {
+                    b.HasOne("HT.Persistence.Identity.HtUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>

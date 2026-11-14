@@ -9,13 +9,16 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HT.UiTests.Components.Layout;
 
-/// <summary>US5-AS1 to AS5, HP-010, HP-014: the items of each audience and the behaviour of both menus.</summary>
+/// <summary>
+/// Slice 1 US5-AS1 to AS5, HP-010, HP-014, amended by slice 2 HP-011 (US5-AS1): the items of each audience and the
+/// behaviour of both menus.
+/// </summary>
 public sealed class SiteNavTests : BunitContext
 {
     private const string Email = "ana@example.com";
 
-    // Links of later slices (R7, ADR 0008); none of them may appear in slice 1.
-    private static readonly string[] LaterLinks = ["Admin", "Catalog", "Community", "Goals", "New goal", "Send feedback"];
+    // Links of later slices (ADR 0008); none of them may appear in slice 2 ("Catalog" and "Admin" came with it).
+    private static readonly string[] LaterLinks = ["Community", "Goals", "New goal", "Send feedback"];
 
     private readonly BunitAuthorizationContext _authorization;
 
@@ -26,7 +29,7 @@ public sealed class SiteNavTests : BunitContext
     }
 
     [Fact]
-    public void US5_AS1_a_visitor_sees_the_product_name_sign_in_and_register_only()
+    public void US5_AS1_a_visitor_sees_the_product_name_catalog_sign_in_and_register_only()
     {
         var cut = Render<SiteNav>();
 
@@ -36,23 +39,26 @@ public sealed class SiteNavTests : BunitContext
         Assert.Equal(["Sign in", "Register"], Texts(cut.FindAll(".ht-nav__end > a")));
         Assert.Equal("/sign-in", cut.Find(".ht-nav__end > a.ht-btn--ghost").GetAttribute("href"));
         Assert.Equal("/register", cut.Find(".ht-nav__end > a.ht-btn--primary").GetAttribute("href"));
-        Assert.Empty(cut.FindAll(".ht-nav__links"));
+        var catalog = Assert.Single(cut.FindAll(".ht-nav__links a"));
+        Assert.Equal("Catalog", catalog.TextContent);
+        Assert.Equal("/catalog", catalog.GetAttribute("href"));
+        Assert.Equal("Main", cut.Find("nav.ht-nav__links").GetAttribute("aria-label"));
         Assert.Empty(cut.FindAll(".ht-avatar"));
-        AssertAbsent(cut, [.. LaterLinks, "Today", "Profile", "Sign out"]);
+        AssertAbsent(cut, [.. LaterLinks, "Admin", "Today", "Profile", "Sign out"]);
     }
 
     [Theory]
-    [InlineData("RegisteredUser")]
-    [InlineData("Administrator")]
-    public void US5_AS2_AS3_a_signed_in_user_sees_today_and_the_avatar_menu_with_profile_and_sign_out(string role)
+    [InlineData("RegisteredUser", new[] { "Today", "Catalog" }, new[] { "/", "/catalog" })]
+    [InlineData("Administrator", new[] { "Today", "Catalog", "Admin" }, new[] { "/", "/catalog", "/admin" })]
+    public void US5_AS2_AS3_a_signed_in_user_sees_the_links_of_the_role_and_the_avatar_menu_with_profile_and_sign_out(
+        string role, string[] links, string[] hrefs)
     {
         SignIn(role);
         var cut = Render<SiteNav>();
 
         Assert.Equal("Habit Tracker", cut.Find("a.ht-nav__brand").TextContent);
-        var today = Assert.Single(cut.FindAll(".ht-nav__links a"));
-        Assert.Equal("Today", today.TextContent);
-        Assert.Equal("/", today.GetAttribute("href"));
+        Assert.Equal(links, Texts(cut.FindAll(".ht-nav__links a")));
+        Assert.Equal(hrefs, cut.FindAll(".ht-nav__links a").Select(a => a.GetAttribute("href")));
 
         cut.Find(AccountButton).Click();
 
@@ -75,21 +81,23 @@ public sealed class SiteNavTests : BunitContext
     }
 
     [Fact]
-    public void US5_AS4_the_narrow_menu_of_a_visitor_lists_sign_in_and_register()
+    public void US5_AS4_the_narrow_menu_of_a_visitor_lists_catalog_sign_in_and_register()
     {
         var cut = Render<SiteNav>();
-        var wide = Texts(cut.FindAll(".ht-nav__end > a"));
+        var wide = Texts(cut.FindAll(".ht-nav__links a, .ht-nav__end > a"));
 
         cut.Find(MobileButton).Click();
 
+        Assert.Equal(["Catalog", "Sign in", "Register"], wide);
         Assert.Equal(wide, Texts(cut.FindAll(MobileItems)));
-        Assert.Equal(["/sign-in", "/register"], cut.FindAll($"#{SiteNav.MobileMenuId} a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/catalog", "/sign-in", "/register"], cut.FindAll($"#{SiteNav.MobileMenuId} a").Select(a => a.GetAttribute("href")));
+        Assert.Single(cut.FindAll($"#{SiteNav.MobileMenuId} a[href='/catalog'] svg.ht-icon"));
     }
 
     [Theory]
-    [InlineData("RegisteredUser")]
-    [InlineData("Administrator")]
-    public void US5_AS4_the_narrow_menu_of_a_signed_in_user_lists_the_same_items_as_the_wide_navigation(string role)
+    [InlineData("RegisteredUser", new[] { "Today", "Catalog", "Profile", "Sign out" })]
+    [InlineData("Administrator", new[] { "Today", "Catalog", "Admin", "Profile", "Sign out" })]
+    public void US5_AS4_the_narrow_menu_of_a_signed_in_user_lists_the_same_items_as_the_wide_navigation(string role, string[] items)
     {
         SignIn(role);
         var cut = Render<SiteNav>();
@@ -98,9 +106,61 @@ public sealed class SiteNavTests : BunitContext
 
         cut.Find(MobileButton).Click();
 
-        Assert.Equal(["Today", "Profile", "Sign out"], wide);
+        Assert.Equal(items, wide);
         Assert.Equal(wide, Texts(cut.FindAll(MobileItems)));
         AssertAbsent(cut, [.. LaterLinks, "Sign in", "Register"]);
+    }
+
+    [Theory]
+    [InlineData("RegisteredUser")]
+    [InlineData("Administrator")]
+    public void HP_011_the_narrow_menu_puts_the_main_links_with_their_icons_before_the_divider(string role)
+    {
+        SignIn(role);
+        var cut = Render<SiteNav>();
+
+        cut.Find(MobileButton).Click();
+
+        string[] links = role == "Administrator" ? ["Today", "Catalog", "Admin"] : ["Today", "Catalog"];
+        string[] hrefs = role == "Administrator" ? ["/", "/catalog", "/admin"] : ["/", "/catalog"];
+        var children = cut.Find("#" + SiteNav.MobileMenuId).Children.Select(c => c.TagName == "HR" ? "hr" : c.TextContent.Trim()).ToList();
+        Assert.Equal(links, children.TakeWhile(c => c != "hr"));
+        foreach (var href in hrefs)
+        {
+            Assert.Single(cut.FindAll($"#{SiteNav.MobileMenuId} a[href='{href}'] svg.ht-icon"));
+        }
+    }
+
+    [Theory]
+    [InlineData("/catalog", "Catalog")]
+    [InlineData("/catalog?category=mind", "Catalog")]
+    [InlineData("/catalog/2b1f9c3e-0000-4000-8000-000000000001", "Catalog")]
+    [InlineData("/custom-habits", "Catalog")]
+    [InlineData("/custom-habits/new", "Catalog")]
+    [InlineData("/admin", "Admin")]
+    [InlineData("/admin/catalog/new", "Admin")]
+    [InlineData("/", "Today")]
+    [InlineData("/profile", null)]
+    [InlineData("/catalogue", null)]
+    public void HP_011_the_current_page_link_is_marked_in_both_menus(string path, string? current)
+    {
+        SignIn("Administrator");
+        Services.GetRequiredService<NavigationManager>().NavigateTo(path);
+        var cut = Render<SiteNav>();
+        string[] expected = current is null ? [] : [current];
+
+        Assert.Equal(expected, Texts(cut.FindAll(".ht-nav__links a[aria-current=page]")));
+        cut.Find(MobileButton).Click();
+        Assert.Equal(expected, Texts(cut.FindAll($"#{SiteNav.MobileMenuId} a[aria-current=page]")));
+    }
+
+    [Fact]
+    public void HP_011_the_visitor_catalog_link_is_marked_on_the_catalog_pages()
+    {
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/catalog");
+        var cut = Render<SiteNav>();
+
+        Assert.Equal("page", cut.Find(".ht-nav__links a").GetAttribute("aria-current"));
     }
 
     [Theory]

@@ -1,14 +1,26 @@
 @page "/"
+@using HT.Application.Habits
+@using HT.Domain.Accounts
 @using Microsoft.AspNetCore.Components.Authorization
-@* One address for both Homes (HP-009). The visitor Home: the hero and "How it works" with the wording of
-   design/pages/PageHomeVisitor, and nothing else from that preview (HP-011, ADR 0008). *@
+@inject CatalogService Catalog
+@* One address for both Homes (HP-009). Static: the services are injected directly. The visitor Home: the hero,
+   "How it works" and "Popular in the catalog" with the wording of design/pages/PageHomeVisitor, slice 2 state
+   (HP-012, ADR 0008). *@
 <PageTitle>Habit Tracker</PageTitle>
 
 <AuthorizeView>
     <Authorized>
-        @* design/pages/PageHomeSignedIn, slice 1 state: the heading only; no greeting, name or date (HP-013, HP-015). *@
+        @* design/pages/PageHomeSignedIn, slice 2 state: the heading, and for a registered user the EmptyState that
+           points to the catalog; an administrator's Home keeps the heading only (HP-013, HP-015). *@
         <div class="ht-container">
             <div class="ht-page-head"><h1>Today</h1></div>
+            @if (!context.User.IsInRole(nameof(Role.Administrator)))
+            {
+                <EmptyState Icon="layout-grid" Title="No goals yet"
+                            Text="Goals come in a later version. Until then, browse the catalog for ideas or keep custom habits of your own.">
+                    <HtButton Href="/catalog">Browse the catalog</HtButton>
+                </EmptyState>
+            }
         </div>
     </Authorized>
     <NotAuthorized>
@@ -17,7 +29,10 @@
                 <div>
                     <h1>Keep the habits you choose</h1>
                     <p class="ht-hero__text">Set a goal to build or reduce a habit, record what really happened, and see how consistent you are over time.</p>
-                    <div class="ht-hero__cta"><HtButton Href="/register">Register free</HtButton></div>
+                    <div class="ht-hero__cta">
+                        <HtButton Href="/register">Register free</HtButton>
+                        <HtButton Href="/catalog" Variant="HtButton.ButtonVariant.Secondary">Browse the catalog</HtButton>
+                    </div>
                     <p class="ht-hero__fine">Your goals and notes stay private. Community comparison is opt-in.</p>
                 </div>
             </div>
@@ -31,6 +46,38 @@
                     <div class="ht-step"><div class="ht-step__n">3</div><h3>See your consistency</h3><p>Streaks and a clear percentage, like 90% (18 of 20).</p></div>
                 </div>
             </section>
+            @if (_preview is { Habits.Count: > 0 } preview)
+            {
+                @* The Home preview of FR-008; the page only renders it. The compact cards of the design carry no description. *@
+                <section class="ht-section">
+                    <div class="ht-section__head"><h2>Popular in the catalog</h2><a href="/catalog">@($"See all {preview.PublishedCount} →")</a></div>
+                    <div class="ht-grid-4">
+                        @foreach (var habit in preview.Habits)
+                        {
+                            <HabitCard Icon="@habit.Icon" Name="@habit.Name" Category="@habit.Category.ToString()"
+                                       Intent="@habit.Intent.ToString()"
+                                       SuggestedStartingGoal="@habit.MarkedSuggestedStartingGoal?.Text"
+                                       Variant="HabitCard.HabitCardVariant.Visitor" Href="@($"/catalog/{habit.Id.Value}")" />
+                        }
+                    </div>
+                </section>
+            }
         </div>
     </NotAuthorized>
 </AuthorizeView>
+
+@code {
+    private HomePreviewResult? _preview;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        if (user?.Identity?.IsAuthenticated != true)
+        {
+            _preview = await Catalog.GetHomePreviewAsync(CancellationToken.None);
+        }
+    }
+}

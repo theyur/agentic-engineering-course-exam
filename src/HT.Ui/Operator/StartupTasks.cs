@@ -40,7 +40,7 @@ internal static partial class StartupTasks
         await RunStepAsync("Demo loading", logger, () => LoadDemoDataAsync(services, logger));
     }
 
-    // HP-021: at every start, right after administrator creation. The demo password is passed on and never logged.
+    // HP-021, HP-017: at every start, right after administrator creation. The demo password is passed on and never logged.
     private static async Task LoadDemoDataAsync(IServiceProvider services, ILogger logger)
     {
         var configuration = services.GetRequiredService<IConfiguration>();
@@ -55,9 +55,20 @@ internal static partial class StartupTasks
             return;
         }
 
+        // HP-017: an account's custom-habit line right after its account line, then the catalog line once. The results
+        // name the demo email and a result text only, never a custom habit.
         foreach (var account in result.Accounts)
         {
             LogDemoAccount(logger, account.Email, account.Message);
+            if (account.CustomHabits is { } customHabits)
+            {
+                LogDemoCustomHabits(logger, account.Email, customHabits.Message);
+            }
+        }
+
+        if (result.Catalog is { } catalog)
+        {
+            LogDemoCatalog(logger, catalog.Message);
         }
     }
 
@@ -108,6 +119,12 @@ internal static partial class StartupTasks
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Demo account {Email}: {Result}")]
     private static partial void LogDemoAccount(ILogger logger, string email, string result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo custom habits {Email}: {Result}")]
+    private static partial void LogDemoCustomHabits(ILogger logger, string email, string result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo catalog: {Result}")]
+    private static partial void LogDemoCatalog(ILogger logger, string result);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "{Step} failed; the app starts without it")]
     private static partial void LogStepFailed(ILogger logger, Exception exception, string step);

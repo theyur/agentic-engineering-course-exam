@@ -1,9 +1,13 @@
+using HT.Application.Operator;
 using HT.UiTests.Fakes;
 using Microsoft.Extensions.Logging;
 
 namespace HT.UiTests.Operator;
 
-/// <summary>HP-021: demo loading runs at every start, right after administrator creation, and never logs the password.</summary>
+/// <summary>
+/// Slice 1 HP-021: demo loading runs at every start, right after administrator creation, and never logs the password.
+/// Slice 2 HP-017: its custom-habit and catalog results are logged too, never with a custom-habit name.
+/// </summary>
 [Collection(StartupTasksCollection.Name)]
 public sealed class StartupTasksDemoTests
 {
@@ -17,7 +21,17 @@ public sealed class StartupTasksDemoTests
     {
         var log = await StartupTasksHarness.RunAsync("Development", Configured(DemoPassword));
 
-        AssertDemoLines(log, "created");
+        // HP-017: each account line is followed by its custom-habit line; the catalog line comes once, last.
+        AssertDemoLines(
+            log,
+            [
+                .. Emails.SelectMany(email => new[]
+                {
+                    $"Demo account {email}: created",
+                    $"Demo custom habits {email}: demo custom habits added",
+                }),
+                "Demo catalog: seed catalog loaded",
+            ]);
     }
 
     [Fact]
@@ -27,7 +41,21 @@ public sealed class StartupTasksDemoTests
 
         var log = await StartupTasksHarness.RunWithoutDropAsync("Development", Configured(DemoPassword));
 
-        AssertDemoLines(log, "already exists");
+        // HP-017: an existing account has no custom-habit line; the catalog is not empty any more.
+        AssertDemoLines(
+            log,
+            [.. Emails.Select(email => $"Demo account {email}: already exists"), "Demo catalog: catalog not empty"]);
+    }
+
+    [Fact]
+    public async Task No_log_entry_contains_a_demo_custom_habit_name()
+    {
+        var first = await StartupTasksHarness.RunAsync("Development", Configured(DemoPassword));
+        var second = await StartupTasksHarness.RunWithoutDropAsync("Development", Configured(DemoPassword));
+        var names = Emails.SelectMany(DemoCustomHabits.For).Select(h => h.Name.Value).ToList();
+
+        Assert.All(first.Concat(second), e => Assert.DoesNotContain(
+            names, name => (e.Message + e.Exception).Contains(name, StringComparison.OrdinalIgnoreCase)));
     }
 
     [Fact]
@@ -47,6 +75,8 @@ public sealed class StartupTasksDemoTests
 
         Assert.Contains(log, e => e.Message == "Demo loading: demo password does not meet the password rule");
         Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo account ", StringComparison.Ordinal));
+        Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo custom habits ", StringComparison.Ordinal));
+        Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo catalog", StringComparison.Ordinal));
         foreach (var email in Emails)
         {
             Assert.Equal(0, await Host.HostClient.CountUsersAsync(StartupTasksHarness.ConnectionString, email));
@@ -85,14 +115,14 @@ public sealed class StartupTasksDemoTests
         Assert.All(log, e => Assert.DoesNotContain(DemoPassword, e.Message + e.Exception, StringComparison.Ordinal));
     }
 
-    private static void AssertDemoLines(IReadOnlyList<LogEntry> log, string result)
+    private static void AssertDemoLines(IReadOnlyList<LogEntry> log, IReadOnlyList<string> expected)
     {
         var messages = log.Select(e => e.Message).ToList();
         var administrator = messages.FindIndex(m => m.StartsWith(AdministratorLine, StringComparison.Ordinal));
         Assert.True(administrator >= 0, "No administrator creation line.");
 
         var demoLines = log.Skip(administrator + 1).Where(e => e.Message.StartsWith("Demo ", StringComparison.Ordinal)).ToList();
-        Assert.Equal(Emails.Select(email => $"Demo account {email}: {result}"), demoLines.Select(e => e.Message));
+        Assert.Equal(expected, demoLines.Select(e => e.Message));
         Assert.All(demoLines, e => Assert.Equal(LogLevel.Information, e.Level));
         Assert.DoesNotContain(log.Take(administrator), e => e.Message.StartsWith("Demo ", StringComparison.Ordinal));
     }

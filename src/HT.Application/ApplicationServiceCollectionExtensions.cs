@@ -1,4 +1,5 @@
 using HT.Application.Accounts;
+using HT.Application.Habits;
 using HT.Application.Operator;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -18,6 +19,9 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<AccountService>();
         services.AddScoped<OperatorService>();
         services.AddScoped<DemoDataService>();
+        services.AddScoped<CatalogService>();
+        services.AddScoped<CatalogAdministrationService>();
+        services.AddScoped<CustomHabitService>();
         services.TryAddSingleton(TimeProvider.System);
         return services;
     }
