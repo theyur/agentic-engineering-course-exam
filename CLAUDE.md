@@ -62,6 +62,16 @@ Two global CLI tools that complement each other: **Roslynator** (Roslyn analyzer
   - `jb inspectcode HabitTracker.slnx --stdout -f=Text -e=WARNING --caches-home=<scratchpad>/jbcache --no-updates`: about 40 s, and the cache is about 15 MB. Always point `--caches-home` outside the repo. The default severity, `SUGGESTION`, is unusable. `-e=ERROR` isn't a quiet mode here: its only output is the 3 false `xUnit1025` hits below. Scope with `--project=<Name>` or `--include=<glob>`.
 - Baseline 2026-11-14: Roslynator reported 229 diagnostics, 15 of them not from the compiler. `jb -e=WARNING` reported 95. If a run shows far more than that, something changed.
 
+### Rider MCP (`mcp__rider__*`) and worktrees
+
+Rider's MCP tools work on whatever solution Rider has open, not on this session's folder. They need Rider running with its MCP server enabled, and every call takes a `rootFolder` that Rider matches against its open projects.
+
+- Worktrees live inside the main checkout (`.claude/worktrees/...`). If only the main checkout is open in Rider, a call with a worktree path as `rootFolder` is matched to the parent. It "succeeds" but reads, and for refactoring tools edits, the **main checkout** on another branch.
+- In a worktree session, use Rider MCP only after the user has opened that worktree folder (or its `HabitTracker.slnx`) in Rider. Always pass the worktree path as `rootFolder`.
+- Before trusting the result, confirm that the worktree itself is listed among Rider's open projects. A tool error lists them as "Currently open projects".
+- If the worktree isn't open in Rider, use the `roslynator` / `jb inspectcode` CLI instead. They read the files on disk.
+- Never call Rider's editing tools (`rename_refactoring`, `apply_patch`, `reformat_file`, `safe_delete`, …) until that check passes.
+
 ### Known false positives: Roslynator (checked 2026-11-14)
 
 Don't "fix" the code for any of these.
