@@ -300,16 +300,16 @@ unknown habit and get the same result and the same Not found page.
 
 ### Tests for User Story 2
 
-- [ ] T068 [P] [US2] Create `tests/HT.UnitTests/Application/Habits/CatalogDetailsTests.cs`: US2-AS1 (`Ac7 Reading`, three suggested starting goals in order with fields, mark, texts and kinds); US2-AS2 (none); two of US2-AS3's goals through the service (the rest are T033's); US2-AS4 Draft, Unpublished and an unknown identifier give `NotInCatalog` with `CatalogTexts.NotInCatalog`
-- [ ] T069 [P] [US2] Create `tests/HT.IntegrationTests/Habits/CatalogDetailsTests.cs` (prefix `It-De`): US2-AS1 and US2-AS4 against SQL Server
+- [X] T068 [P] [US2] Create `tests/HT.UnitTests/Application/Habits/CatalogDetailsTests.cs`: US2-AS1 (`Ac7 Reading`, three suggested starting goals in order with fields, mark, texts and kinds); US2-AS2 (none); two of US2-AS3's goals through the service (the rest are T033's); US2-AS4 Draft, Unpublished and an unknown identifier give `NotInCatalog` with `CatalogTexts.NotInCatalog`
+- [X] T069 [P] [US2] Create `tests/HT.IntegrationTests/Habits/CatalogDetailsTests.cs` (prefix `It-De`): US2-AS1 and US2-AS4 against SQL Server
 
 ### Implementation for User Story 2
 
-- [ ] T070 [US2] Create the view `CatalogHabitDetails` and the result `CatalogHabitDetailsResult` (`NotInCatalog` with its text, `Found` with the details) in `src/HT.Application/Habits/`, and extend `CatalogViews` (T061)
-- [ ] T071 [US2] Add `GetDetailsAsync(HabitId id, CancellationToken)` to `src/HT.Application/Habits/CatalogService.cs` over `FindPublishedAsync` (depends on T070)
-- [ ] T072 [US2] Create `src/HT.Ui/Components/Pages/CatalogHabitDetail.razor` at `/catalog/{id:guid}`, static server rendering, per `design/pages/PageHabitDetail` after T010: BackLink "← Catalog", glyph, name and tags, description, "Suggested starting goals" with "Examples to adjust, not prescribed targets." and each goal's text and kind in order; the head button "Register to use this habit" (→ `/register`) for anonymous visitors only. `NotInCatalog` calls `NavigationManager.NotFound()` (research R-11) (depends on T071)
-- [ ] T073 [P] [US2] Create `tests/HT.UiTests/Components/Pages/CatalogHabitDetailTests.cs` (bUnit): US2-AS6 for a visitor, US2-AS7 for a signed-in user (no head button), a habit with no suggested starting goal, and no "Your goals", community card or "Start with this" (depends on T072)
-- [ ] T074 [P] [US2] Create `tests/HT.UiTests/Host/CatalogHabitDetailHostTests.cs`: a Published habit answers 200 with its content; a Draft, an Unpublished and an unknown identifier answer 404 with slice 1's Not found page, for an anonymous visitor, a registered user and an administrator (US2-AS8, HP-006); `/catalog/not-a-guid` answers 404. If `NotFound()` does not set 404 during prerendering, apply the fallback of plan.md's Risks and record it in the PR (depends on T072)
+- [X] T070 [US2] Create the view `CatalogHabitDetails` and the result `CatalogHabitDetailsResult` (`NotInCatalog` with its text, `Found` with the details) in `src/HT.Application/Habits/`, and extend `CatalogViews` (T061)
+- [X] T071 [US2] Add `GetDetailsAsync(HabitId id, CancellationToken)` to `src/HT.Application/Habits/CatalogService.cs` over `FindPublishedAsync` (depends on T070)
+- [X] T072 [US2] Create `src/HT.Ui/Components/Pages/CatalogHabitDetail.razor` at `/catalog/{id:guid}`, static server rendering, per `design/pages/PageHabitDetail` after T010: BackLink "← Catalog", glyph, name and tags, description, "Suggested starting goals" with "Examples to adjust, not prescribed targets." and each goal's text and kind in order; the head button "Register to use this habit" (→ `/register`) for anonymous visitors only. `NotInCatalog` calls `NavigationManager.NotFound()` (research R-11) (depends on T071)
+- [X] T073 [P] [US2] Create `tests/HT.UiTests/Components/Pages/CatalogHabitDetailTests.cs` (bUnit): US2-AS6 for a visitor, US2-AS7 for a signed-in user (no head button), a habit with no suggested starting goal, and no "Your goals", community card or "Start with this" (depends on T072)
+- [X] T074 [P] [US2] Create `tests/HT.UiTests/Host/CatalogHabitDetailHostTests.cs`: a Published habit answers 200 with its content; a Draft, an Unpublished and an unknown identifier answer 404 with slice 1's Not found page, for an anonymous visitor, a registered user and an administrator (US2-AS8, HP-006); `/catalog/not-a-guid` answers 404. If `NotFound()` does not set 404 during prerendering, apply the fallback of plan.md's Risks and record it in the PR (depends on T072)
 
 **Checkpoint**: full suite green; catalog cards open their details. Commit.
 

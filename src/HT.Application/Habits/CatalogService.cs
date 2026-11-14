@@ -35,6 +35,16 @@ public sealed class CatalogService
         return CatalogBrowseResult.Found(matching);
     }
 
+    /// <summary>
+    /// A Published catalog habit's details with all its suggested starting goals in order (FR-010). A Draft, an
+    /// Unpublished habit, a custom habit's identifier and an unknown identifier are all "not in the catalog".
+    /// </summary>
+    public async Task<CatalogHabitDetailsResult> GetDetailsAsync(HabitId id, CancellationToken cancellationToken)
+    {
+        var habit = await _store.FindPublishedAsync(id, cancellationToken).ConfigureAwait(false);
+        return habit is null ? CatalogHabitDetailsResult.NotInCatalog : CatalogHabitDetailsResult.Found(CatalogViews.Details(habit));
+    }
+
     /// <summary>"All", then each category that has at least one Published habit, in FR-002 order (FR-009).</summary>
     public async Task<CategoryFilterResult> GetCategoryFilterAsync(CancellationToken cancellationToken)
     {

@@ -1,0 +1,75 @@
+@page "/catalog/{Id:guid}"
+@using HT.Application.Habits
+@using HT.Domain.Habits
+@using HT.Ui.Account
+@inject CatalogService CatalogService
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageHabitDetail, slice 2 state (US2-AS6, US2-AS7, HP-005, HP-006). Static. A Draft, an Unpublished
+   habit, a custom habit's identifier and an unknown identifier all show the Not found page with status 404, for
+   every audience (research R-11). *@
+<PageTitle>@(_details?.Name ?? "Catalog habit") · Habit Tracker</PageTitle>
+
+@if (_details is { } habit)
+{
+    <div class="ht-container">
+        <BackLink Href="/catalog" Text="Catalog" />
+        <div class="ht-page-head ht-detail-head">
+            <div class="ht-glyph-lg"><HtIcon Name="@habit.Icon" Size="HtIcon.IconSize.Large" /></div>
+            <div>
+                <h1>@habit.Name</h1>
+                <div class="ht-inline"><Tag Text="@habit.Category.ToString()" /><Tag Text="@habit.Intent.ToString()" /></div>
+            </div>
+            @if (_isVisitor)
+            {
+                <span class="ht-spacer"></span>
+                <HtButton Href="/register">Register to use this habit</HtButton>
+            }
+        </div>
+        @if (habit.Description is not null)
+        {
+            <p class="ht-lead">@habit.Description</p>
+        }
+        @if (habit.SuggestedStartingGoals.Count > 0)
+        {
+            <div class="ht-grid-2">
+                <div class="ht-stack">
+                    <section class="ht-card">
+                        <h2 class="ht-card__title">Suggested starting goals</h2>
+                        <p class="ht-card__sub">Examples to adjust, not prescribed targets.</p>
+                        @foreach (var goal in habit.SuggestedStartingGoals)
+                        {
+                            <div class="ht-row">
+                                <div class="ht-row__main">
+                                    <div class="ht-row__name">@goal.Text</div>
+                                    <div class="ht-row__meta">@goal.Kind</div>
+                                </div>
+                            </div>
+                        }
+                    </section>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private CatalogHabitDetails? _details;
+    private bool _isVisitor;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await CatalogService.GetDetailsAsync(new HabitId(Id), CancellationToken.None);
+        if (result.Outcome != CatalogHabitDetailsOutcome.Found)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        _details = result.Details;
+        _isVisitor = (await ActingUsers.GetAsync()).IsAnonymous;
+    }
+}

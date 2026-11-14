@@ -26,6 +26,41 @@ public sealed class CatalogBrowseResult
     internal static CatalogBrowseResult Found(IReadOnlyList<CatalogHabitSummary> habits) => new(habits);
 }
 
+/// <summary>The outcomes of <see cref="CatalogService.GetDetailsAsync"/>.</summary>
+public enum CatalogHabitDetailsOutcome
+{
+    NotInCatalog,
+    Found,
+}
+
+/// <summary>
+/// The result of reading a catalog habit's details (FR-010): the details of a Published habit, or "This habit is
+/// not in the catalog." for anything else, the same for every audience.
+/// </summary>
+public sealed class CatalogHabitDetailsResult
+{
+    private CatalogHabitDetailsResult(CatalogHabitDetailsOutcome outcome, string? message, CatalogHabitDetails? details)
+    {
+        Outcome = outcome;
+        Message = message;
+        Details = details;
+    }
+
+    public CatalogHabitDetailsOutcome Outcome { get; }
+
+    /// <summary>The spec's text for <see cref="CatalogHabitDetailsOutcome.NotInCatalog"/>; null for Found.</summary>
+    public string? Message { get; }
+
+    /// <summary>Set only for <see cref="CatalogHabitDetailsOutcome.Found"/>.</summary>
+    public CatalogHabitDetails? Details { get; }
+
+    internal static CatalogHabitDetailsResult NotInCatalog { get; } =
+        new(CatalogHabitDetailsOutcome.NotInCatalog, CatalogTexts.NotInCatalog, null);
+
+    internal static CatalogHabitDetailsResult Found(CatalogHabitDetails details) =>
+        new(CatalogHabitDetailsOutcome.Found, null, details);
+}
+
 /// <summary>The outcomes of <see cref="CatalogService.GetCategoryFilterAsync"/>.</summary>
 public enum CategoryFilterOutcome
 {
