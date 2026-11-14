@@ -1,0 +1,139 @@
+@using HT.Domain.Habits
+@using HT.Ui.Habits
+@* One suggested starting goal in the administrator's form (design/pages/PageAdminCatalogHabit, an ht-editor-item):
+   "Shown on the card", Move up, Move down and Remove, then the New goal form's controls. Only the controls of the
+   chosen measurement and schedule kind are shown. A refusal with this position sits under its field. *@
+<div class="ht-editor-item">
+    <div class="ht-editor-item__head">
+        <h3 class="ht-form-section__title">Suggested starting goal @Position</h3>
+        <span class="ht-spacer"></span>
+        <label class="ht-check">
+            <input type="radio" name="@($"{IdPrefix}-marked")" checked="@Model.IsMarked" @onchange="() => OnMark.InvokeAsync()" />
+            Shown on the card
+        </label>
+        @if (!IsFirst)
+        {
+            <HtButton Variant="HtButton.ButtonVariant.Ghost" Small="true" aria-label="@($"Move suggested starting goal {Position} up")" @onclick="() => OnMoveUp.InvokeAsync()">Move up</HtButton>
+        }
+        @if (!IsLast)
+        {
+            <HtButton Variant="HtButton.ButtonVariant.Ghost" Small="true" aria-label="@($"Move suggested starting goal {Position} down")" @onclick="() => OnMoveDown.InvokeAsync()">Move down</HtButton>
+        }
+        <HtButton Variant="HtButton.ButtonVariant.Ghost" Small="true" aria-label="@($"Remove suggested starting goal {Position}")" @onclick="() => OnRemove.InvokeAsync()">Remove</HtButton>
+    </div>
+    <div class="ht-editor-item__fields">
+        <div class="ht-field">
+            <span class="ht-field__label">Build or reduce</span>
+            <SegmentedControl TValue="BuildOrReduce" Label="@($"Build or reduce, suggested starting goal {Position}")" Options="Sides"
+                              Value="Model.BuildOrReduce" ValueChanged="v => Model.BuildOrReduce = v" DescribedBy="@ErrorId(HabitFormErrors.BuildOrReduce)" />
+            @ErrorText(HabitFormErrors.BuildOrReduce)
+        </div>
+        <div class="ht-field">
+            <span class="ht-field__label">Measured as</span>
+            <SegmentedControl TValue="Measurement" Label="@($"Measured as, suggested starting goal {Position}")" Options="Measurements"
+                              Value="Model.Measurement" ValueChanged="v => Model.Measurement = v" DescribedBy="@ErrorId(HabitFormErrors.Measurement)" />
+            @ErrorText(HabitFormErrors.Measurement)
+        </div>
+        @if (Model.Measurement is Measurement.Count or Measurement.Duration)
+        {
+            <div class="ht-field">
+                <span class="ht-field__label">Amount</span>
+                <span class="ht-inline">
+                    <span>@(Model.BuildOrReduce == BuildOrReduce.Reduce ? "At most" : "At least")</span>
+                    <Stepper Id="@($"{IdPrefix}-amount")" Label="@($"Amount, suggested starting goal {Position}")" Value="Model.Amount"
+                             ValueChanged="v => Model.Amount = v" Min="@(Model.BuildOrReduce == BuildOrReduce.Reduce ? 0 : 1)" Max="999"
+                             Step="@(Model.Measurement == Measurement.Duration && Model.DurationUnit != DurationUnit.Hours ? 5 : 1)"
+                             DescribedBy="@ErrorId(HabitFormErrors.Amount)" Invalid="@(ErrorId(HabitFormErrors.Amount) is not null)" />
+                    @if (Model.Measurement == Measurement.Count)
+                    {
+                        <input class="ht-input ht-unit-input" value="@Model.CountUnit" placeholder="pages"
+                               aria-label="@($"Unit, suggested starting goal {Position}")" @onchange="e => Model.CountUnit = e.Value?.ToString()" />
+                    }
+                    else
+                    {
+                        <SegmentedControl TValue="DurationUnit" Label="@($"Unit, suggested starting goal {Position}")" Options="Units"
+                                          Value="Model.DurationUnit" ValueChanged="v => Model.DurationUnit = v" />
+                    }
+                </span>
+                @ErrorText(HabitFormErrors.Amount)
+            </div>
+        }
+        <div class="ht-field">
+            <span class="ht-field__label">Schedule</span>
+            <SegmentedControl TValue="ScheduleKind" Label="@($"Schedule, suggested starting goal {Position}")" Options="Kinds"
+                              Value="Model.ScheduleKind" ValueChanged="v => Model.ScheduleKind = v" DescribedBy="@ErrorId(HabitFormErrors.Schedule)" />
+            @ErrorText(HabitFormErrors.Schedule)
+        </div>
+        @if (Model.ScheduleKind == ScheduleKind.FixedDays)
+        {
+            <div class="ht-field">
+                <span class="ht-field__label">Days</span>
+                <DayPicker Label="@($"Days, suggested starting goal {Position}")" Days="Model.Days" DaysChanged="d => Model.Days = d"
+                           DescribedBy="@ErrorId(HabitFormErrors.Days)" />
+                @ErrorText(HabitFormErrors.Days)
+            </div>
+        }
+        else if (Model.ScheduleKind == ScheduleKind.Times)
+        {
+            <div class="ht-field">
+                <span class="ht-field__label">How many times</span>
+                <span class="ht-inline">
+                    <Stepper Id="@($"{IdPrefix}-times")" Label="@($"Times, suggested starting goal {Position}")" Value="Model.Times"
+                             ValueChanged="v => Model.Times = v" Min="1" Max="20"
+                             DescribedBy="@ErrorId(HabitFormErrors.Times)" Invalid="@(ErrorId(HabitFormErrors.Times) is not null)" />
+                    <SegmentedControl TValue="SchedulePeriod" Label="@($"Per day or per week, suggested starting goal {Position}")" Options="Periods"
+                                      Value="Model.Period" ValueChanged="v => Model.Period = v" />
+                </span>
+                @ErrorText(HabitFormErrors.Times)
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<(BuildOrReduce, string)> Sides = [(BuildOrReduce.Build, "Build"), (BuildOrReduce.Reduce, "Reduce")];
+    private static readonly IReadOnlyList<(Measurement, string)> Measurements =
+        [(Measurement.YesNo, "Yes/no"), (Measurement.Count, "Count"), (Measurement.Duration, "Duration")];
+    private static readonly IReadOnlyList<(DurationUnit, string)> Units = [(DurationUnit.Minutes, "Minutes"), (DurationUnit.Hours, "Hours")];
+    private static readonly IReadOnlyList<(ScheduleKind, string)> Kinds = [(ScheduleKind.FixedDays, "Fixed days"), (ScheduleKind.Times, "A number of times")];
+    private static readonly IReadOnlyList<(SchedulePeriod, string)> Periods = [(SchedulePeriod.Day, "per day"), (SchedulePeriod.Week, "per week")];
+
+    [Parameter, EditorRequired]
+    public SuggestedStartingGoalFormModel Model { get; set; } = new();
+
+    /// <summary>The position from 1.</summary>
+    [Parameter, EditorRequired]
+    public int Position { get; set; }
+
+    [Parameter]
+    public bool IsFirst { get; set; }
+
+    [Parameter]
+    public bool IsLast { get; set; }
+
+    [Parameter]
+    public FormError? Error { get; set; }
+
+    [Parameter]
+    public string IdPrefix { get; set; } = "goal";
+
+    [Parameter]
+    public EventCallback OnMark { get; set; }
+
+    [Parameter]
+    public EventCallback OnMoveUp { get; set; }
+
+    [Parameter]
+    public EventCallback OnMoveDown { get; set; }
+
+    [Parameter]
+    public EventCallback OnRemove { get; set; }
+
+    private string Prefix => $"{IdPrefix}-{Position}";
+
+    private string? ErrorId(string field) => Error?.For(field, Position) is null ? null : $"{Prefix}-{field}-error";
+
+    private RenderFragment? ErrorText(string field) => Error?.For(field, Position) is { } message
+        ? @<span class="ht-field__error" id="@($"{Prefix}-{field}-error")">@message</span>
+        : null;
+}

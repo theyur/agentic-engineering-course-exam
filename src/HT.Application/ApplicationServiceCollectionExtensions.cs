@@ -20,6 +20,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<OperatorService>();
         services.AddScoped<DemoDataService>();
         services.AddScoped<CatalogService>();
+        services.AddScoped<CatalogAdministrationService>();
         services.TryAddSingleton(TimeProvider.System);
         return services;
     }

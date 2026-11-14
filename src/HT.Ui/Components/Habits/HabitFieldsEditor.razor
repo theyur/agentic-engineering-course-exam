@@ -1,0 +1,75 @@
+@using HT.Domain.Habits
+@using HT.Ui.Habits
+@* The fields every habit form has (design/pages/PageCustomHabit and PageAdminCatalogHabit): Name, Description,
+   Category, "Usually you want to" Build or Reduce, and the icon picker with the 24 "Habit icons". A refusal sits
+   under its field. Used inside an EditForm. *@
+<div class="ht-form-section">
+    <TextField Id="@($"{IdPrefix}-name")" Label="Name" Help="@NameHelp" Error="@Error?.For(HabitFormErrors.Name)"
+               @bind-Value="Model.Name" />
+</div>
+<div class="ht-form-section">
+    <TextArea Id="@($"{IdPrefix}-description")" Label="Description" Optional="true" Placeholder="What counts as doing it?"
+              Error="@Error?.For(HabitFormErrors.Description)" @bind-Value="Model.Description" />
+</div>
+<div class="ht-form-section ht-field-pair">
+    <label class="ht-field">
+        <span class="ht-field__label">Category</span>
+        <select class="ht-input" id="@($"{IdPrefix}-category")" aria-invalid="@Invalid(HabitFormErrors.Category)"
+                aria-describedby="@ErrorId(HabitFormErrors.Category)" @onchange="OnCategoryChanged">
+            <option value="" selected="@(Model.Category is null)">Choose a category</option>
+            @foreach (var category in Enum.GetValues<Category>())
+            {
+                <option value="@category" selected="@(Model.Category == category)">@category</option>
+            }
+        </select>
+        @ErrorText(HabitFormErrors.Category)
+    </label>
+    <div class="ht-field">
+        <span class="ht-field__label">Usually you want to</span>
+        <SegmentedControl TValue="Intent" Label="Usually you want to" Options="Intents" Value="Model.Intent"
+                          ValueChanged="i => Model.Intent = i" DescribedBy="@ErrorId(HabitFormErrors.Intent)" />
+        @ErrorText(HabitFormErrors.Intent)
+    </div>
+</div>
+<div class="ht-form-section">
+    <div class="ht-field">
+        <span class="ht-field__label" id="@($"{IdPrefix}-icon-label")">Icon</span>
+        <div class="ht-inline" role="group" aria-labelledby="@($"{IdPrefix}-icon-label")" aria-describedby="@ErrorId(HabitFormErrors.Icon)">
+            @foreach (var icon in HabitIcon.All)
+            {
+                <button type="button" class="ht-day ht-icon-choice" aria-pressed="@(Model.Icon == icon.Name ? "true" : "false")"
+                        aria-label="@icon.Name" @onclick="() => Model.Icon = icon.Name"><HtIcon Name="@icon.Name" /></button>
+            }
+        </div>
+        @ErrorText(HabitFormErrors.Icon)
+    </div>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<(Intent, string)> Intents = [(Intent.Build, "Build"), (Intent.Reduce, "Reduce")];
+
+    [Parameter, EditorRequired]
+    public HabitFormModel Model { get; set; } = new();
+
+    /// <summary>The refusal to show, if it belongs to one of these fields.</summary>
+    [Parameter]
+    public FormError? Error { get; set; }
+
+    /// <summary>A prefix for the element ids, unique on the page.</summary>
+    [Parameter]
+    public string IdPrefix { get; set; } = "habit";
+
+    [Parameter]
+    public string? NameHelp { get; set; }
+
+    private void OnCategoryChanged(ChangeEventArgs e) =>
+        Model.Category = Enum.TryParse<Category>(e.Value?.ToString(), ignoreCase: false, out var category) && Enum.IsDefined(category) ? category : null;
+
+    private string? ErrorId(string field) => Error?.For(field) is null ? null : $"{IdPrefix}-{field}-error";
+
+    private string? Invalid(string field) => Error?.For(field) is null ? null : "true";
+
+    private RenderFragment? ErrorText(string field) => Error?.For(field) is { } message
+        ? @<span class="ht-field__error" id="@($"{IdPrefix}-{field}-error")">@message</span>
+        : null;
+}

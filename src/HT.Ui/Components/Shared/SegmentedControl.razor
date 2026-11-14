@@ -1,0 +1,31 @@
+@typeparam TValue where TValue : struct
+@* design/components/SegmentedControl: 2-3 mutually exclusive options side by side, div.ht-seg[role=group] with
+   button[aria-pressed]; exactly one pressed, or none until the user chooses. *@
+<div class="ht-seg" role="group" aria-label="@Label" aria-describedby="@DescribedBy">
+    @foreach (var option in Options)
+    {
+        <button type="button" aria-pressed="@(Equals(option.Value, Value) ? "true" : "false")"
+                @onclick="() => ValueChanged.InvokeAsync(option.Value)">@option.Label</button>
+    }
+</div>
+
+@code {
+    /// <summary>The options in order, each with its words.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<(TValue Value, string Label)> Options { get; set; } = [];
+
+    /// <summary>The chosen option; null until the user chooses.</summary>
+    [Parameter]
+    public TValue? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<TValue> ValueChanged { get; set; }
+
+    /// <summary>The group's accessible name.</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>The id of an error text about this control.</summary>
+    [Parameter]
+    public string? DescribedBy { get; set; }
+}

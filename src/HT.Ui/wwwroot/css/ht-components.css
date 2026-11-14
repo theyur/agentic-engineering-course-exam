@@ -242,6 +242,14 @@ a.ht-tab { display:inline-block; text-decoration:none; }
 .ht-editor-item { border:1px solid var(--line); border-radius:var(--radius-sm); padding:var(--space-4); background:var(--surface); }
 .ht-editor-item__head { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); }
 .ht-editor-item__fields { display:grid; gap:var(--space-3); }
+/* two fields side by side in a form (Category and "Usually you want to"); one column on phones */
+.ht-field-pair { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); }
+@media (max-width:480px) { .ht-field-pair { grid-template-columns:1fr; } }
+/* an icon in the habit icon picker, on a DayPicker-style toggle button */
+.ht-icon-choice { display:grid; place-items:center; }
+/* the count unit after a Stepper, and a one-column form card */
+.ht-unit-input { width:140px; }
+.ht-form-card { max-width:760px; }
 
 /* ---------- segmented control ---------- */
 .ht-seg { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-sm); overflow:hidden; background:var(--surface); }

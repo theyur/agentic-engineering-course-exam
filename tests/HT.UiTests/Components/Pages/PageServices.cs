@@ -21,6 +21,7 @@ public static class PageServices
         store ??= new FakeCatalogHabitStore();
         context.Services.AddSingleton<ICatalogHabitStore>(store);
         context.Services.AddScoped<CatalogService>();
+        context.Services.AddScoped<CatalogAdministrationService>();
         context.Services.AddSingleton<UseCaseScope>();
         context.Services.AddScoped<ActingUserAccessor>();
         return store;

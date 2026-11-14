@@ -1,0 +1,58 @@
+@* design/components/Stepper: a native number input between − and + buttons ("Less", "More"), and the unit after
+   it in ht-unit. The bounds come from the caller: a Build target from 1, a Reduce target from 0, up to 999. *@
+<span class="ht-inline">
+    <span class="ht-stepper">
+        <button type="button" aria-label="Less" @onclick="LessAsync">−</button>
+        <input type="number" id="@Id" min="@Min" max="@Max" step="@Step" value="@Value" aria-label="@Label"
+               aria-describedby="@DescribedBy" aria-invalid="@(Invalid ? "true" : null)" @onchange="OnChangeAsync" />
+        <button type="button" aria-label="More" @onclick="MoreAsync">+</button>
+    </span>
+    @if (Unit is not null)
+    {
+        <span class="ht-unit">@Unit</span>
+    }
+</span>
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>The number's accessible name ("Amount", "Times").</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>The value; null when the field is empty.</summary>
+    [Parameter]
+    public int? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<int?> ValueChanged { get; set; }
+
+    [Parameter]
+    public int Min { get; set; }
+
+    [Parameter]
+    public int Max { get; set; } = 999;
+
+    [Parameter]
+    public int Step { get; set; } = 1;
+
+    /// <summary>The unit text after the stepper; none when null.</summary>
+    [Parameter]
+    public string? Unit { get; set; }
+
+    [Parameter]
+    public string? DescribedBy { get; set; }
+
+    [Parameter]
+    public bool Invalid { get; set; }
+
+    private Task LessAsync() => ValueChanged.InvokeAsync(Math.Clamp((Value ?? Min) - Step, Min, Max));
+
+    private Task MoreAsync() => ValueChanged.InvokeAsync(Value is { } value ? Math.Clamp(value + Step, Min, Max) : Min);
+
+    // A typed value is passed on as it is, out of range or not: the use case decides the refusal.
+    private Task OnChangeAsync(ChangeEventArgs e) =>
+        ValueChanged.InvokeAsync(int.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : null);
+}
