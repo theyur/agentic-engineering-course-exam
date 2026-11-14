@@ -3,6 +3,7 @@ name: speckit-ac-translate
 description: 'AC step 2–3: draft a feature''s acceptance.md for review and lock it, then have the isolated ac-feature-translator turn it into Reqnroll .feature files. Started only by the user.'
 compatibility: Requires spec-kit project structure with .specify/ directory
 disable-model-invocation: true
+argument-hint: "[feature: NNN | FNNN | NNN-name]"
 metadata:
   author: github-spec-kit
   source: ac:commands/speckit.ac.translate.md

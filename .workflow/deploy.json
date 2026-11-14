@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "command": "uv run --no-project python -I \"$CLAUDE_PROJECT_DIR/.specify/extensions/ac/hooks/guard.py\"",
-  "installedAt": "2026-11-12T17:20:08+00:00",
+  "installedAt": "2026-11-14T20:20:06+00:00",
   "preexisting": {
     ".claude/settings.json": true,
     ".claude/agents": false,
@@ -36,32 +36,32 @@
     {
       "path": ".claude/skills/speckit-ac-critic/SKILL.md",
       "kind": "skill",
-      "sha256": "a1feff715dd7512c948a326d058d5cbf7c682b39e8aaeb753852f77800fcc82e"
+      "sha256": "cebb89ca8514952af190f82614620d7a4bcefe5788fcee7c9e2d720153098c44"
     },
     {
       "path": ".claude/skills/speckit-ac-init/SKILL.md",
       "kind": "skill",
-      "sha256": "5ef87cea0267aac5013a3a1ef6ead9a7f9923ce960e8818bf45b45553879cdb8"
+      "sha256": "6653e012ec7409f4aa718df8a048c2006e290dd2fbb84037fbd37baa6a0531f9"
     },
     {
       "path": ".claude/skills/speckit-ac-tests-analyze/SKILL.md",
       "kind": "skill",
-      "sha256": "965551dd580405bafc54ef707459cc6e8bf171fa2491cc5ab71e08f4a1ef8ed5"
+      "sha256": "87b9a20776eb600414aadf9ab932a4cc46c52714347519ea2b910366af30a11d"
     },
     {
       "path": ".claude/skills/speckit-ac-tests-write/SKILL.md",
       "kind": "skill",
-      "sha256": "a688f97222ef9bc5ab0de455ee61f201ed38b8a1d7ed11f1e7449cae2c464c08"
+      "sha256": "0af972c26284d001e5d708954688d18483a010c6778c1f06ef3f1b1e01241ccf"
     },
     {
       "path": ".claude/skills/speckit-ac-translate/SKILL.md",
       "kind": "skill",
-      "sha256": "40fc858d8e6052839a752b3bc80abd549c1819b812e57e9b119971802209750c"
+      "sha256": "24a64649bc76ce6b0af7edfa789217e3022a90d6c24e33998be79ee1371deae2"
     },
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-critic/SKILL.md",
       "kind": "extension",
-      "sha256": "62a3b9291c8e3aac8cb5db487cc0c17e2dc934c02483102810a4bfda8c85b48f"
+      "sha256": "b855d0db14e0d9750a07a410de9e91bc40698186c65530c8260668a83468ecdf"
     },
     {
       "path": ".specify/extensions/ac/.specify-dev/agent-commands/claude/speckit-ac-init/SKILL.md",
@@ -106,7 +106,7 @@
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.critic.md",
       "kind": "extension",
-      "sha256": "d520c4b6361ccc1d2a0a7231ef932d96a0c6496684d5c9cb2c84d01a287fb050"
+      "sha256": "3e7e5fe37ce5cc75e0e110a5236aa009d786f5c0fcf1a187157f79a2176d85c7"
     },
     {
       "path": ".specify/extensions/ac/commands/speckit.ac.init.md",
@@ -131,7 +131,7 @@
     {
       "path": ".specify/extensions/ac/extension.yml",
       "kind": "extension",
-      "sha256": "f7236dc09f8c2246a94879139bebcd8a217fb2414d3127ee2009bc197cfbf19d"
+      "sha256": "d5e5ddd20be1f2477e74aefbaddb892279687fdbeda6230e48b8f6fcb1fe2669"
     },
     {
       "path": ".specify/extensions/ac/hooks/guard.py",
@@ -176,7 +176,7 @@
     {
       "path": ".specify/extensions/ac/scripts/export_refs.py",
       "kind": "extension",
-      "sha256": "2e6a333005cc0be62431789e7a527b15702579b07f8ce47e7c5ab07fd91c43b3"
+      "sha256": "a9e7a1abf039c0af314e46daf9102d3661e88e46f9c31806c598c813af5650ab"
     },
     {
       "path": ".specify/extensions/ac/scripts/extract_feedback.py",

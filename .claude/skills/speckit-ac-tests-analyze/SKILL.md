@@ -3,6 +3,7 @@ name: speckit-ac-tests-analyze
 description: 'AC step 6: run every feature''s acceptance tests against the real implementation and, if any fail, have the isolated ac-test-fail-judge decide whether the implementation, the test, the translation or an outdated acceptance criterion is at fault. Started only by the user.'
 compatibility: Requires spec-kit project structure with .specify/ directory
 disable-model-invocation: true
+argument-hint: "[feature: NNN | FNNN | NNN-name] [--current]"
 metadata:
   author: github-spec-kit
   source: ac:commands/speckit.ac.tests-analyze.md
