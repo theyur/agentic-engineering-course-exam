@@ -47,6 +47,54 @@ C# / .NET 10, Blazor Interactive Server, EF Core + SQL Server (only provider —
 
 A feature is not done without tests: unit (domain rules — targets, grace period, corrections, pauses, consistency, streaks), integration (workflows against real SQL Server), architecture (layer deps), selective UI where useful. Use xUnit for all tests and ArchUnitNET for architecture tests.
 
+## C# code analysis
+
+Two global CLI tools that complement each other: **Roslynator** (Roslyn analyzers, symbol listing, LOC) and **`jb inspectcode`** (ReSharper inspections). **Use `jb` for anything involving `.razor` files and for `HT.Ui` / `HT.UiTests`, because Roslynator can't see Razor components. Use Roslynator for fast (~6 s) analyzer runs and public-API listings over `HT.Domain`, `HT.Application` and `HT.Persistence`.** Both give semantic answers that grep can't. Neither says anything about whether behaviour is correct, so a clean run doesn't replace tests or review.
+
+- Versions checked: Roslynator CLI 0.13.0 (Roslyn 4.14), ReSharper CLI 2026.2.1. Both are global dotnet tools, not part of the repo's tool manifest. Both load `HabitTracker.slnx`.
+- **Never** pass `--remove` to `roslynator find-symbol`, which deletes declarations. **Never** run `jb cleanupcode`, which rewrites source files across the solution.
+- **Never point either tool at `tests/HT.AcceptanceTests`.** Its output would expose the off-limits `StepDefinitions/` and `Support/` code (see "Acceptance tests" below). The project isn't in `HabitTracker.slnx`, so solution-level runs skip it. Keep it that way, and exclude it from greps too.
+- **Roslynator needs `dotnet restore HabitTracker.slnx` first.** Fresh worktrees have no `obj/`. Measured 2026-11-14: 4,896 diagnostics unrestored vs 229 restored, and those 229 are almost all Razor phantoms (below). Re-restore after adding a package. `jb` doesn't need a restore because it builds the solution itself. Its cold and warm runs gave identical output here.
+- Commands (these are the ones pre-approved in `.claude/settings.json`):
+  - `roslynator analyze HabitTracker.slnx`: analyzer and compiler diagnostics. Scope it with `--projects <Name>`.
+  - `roslynator list-symbols HabitTracker.slnx --projects HT.Application --visibility public --depth member`: the real public API surface. Pass `--projects`, because a solution-wide run crashes (below).
+  - `roslynator loc HabitTracker.slnx` / `lloc`: size per project. It counts only `.cs`, so `HT.Ui` shows 394 lines while its `.razor` files hold about 3,200 more.
+  - `jb inspectcode HabitTracker.slnx --stdout -f=Text -e=WARNING --caches-home=<scratchpad>/jbcache --no-updates`: about 40 s, and the cache is about 15 MB. Always point `--caches-home` outside the repo. The default severity, `SUGGESTION`, is unusable. `-e=ERROR` isn't a quiet mode here: its only output is the 3 false `xUnit1025` hits below. Scope with `--project=<Name>` or `--include=<glob>`.
+- Baseline 2026-11-14: Roslynator reported 229 diagnostics, 15 of them not from the compiler. `jb -e=WARNING` reported 95. If a run shows far more than that, something changed.
+
+### Rider MCP (`mcp__rider__*`) and worktrees
+
+Rider's MCP tools work on whatever solution Rider has open, not on this session's folder. They need Rider running with its MCP server enabled, and every call takes a `rootFolder` that Rider matches against its open projects.
+
+- Worktrees live inside the main checkout (`.claude/worktrees/...`). If only the main checkout is open in Rider, a call with a worktree path as `rootFolder` is matched to the parent. It "succeeds" but reads, and for refactoring tools edits, the **main checkout** on another branch.
+- In a worktree session, use Rider MCP only after the user has opened that worktree folder (or its `HabitTracker.slnx`) in Rider. Always pass the worktree path as `rootFolder`.
+- Before trusting the result, confirm that the worktree itself is listed among Rider's open projects. A tool error lists them as "Currently open projects".
+- If the worktree isn't open in Rider, use the `roslynator` / `jb inspectcode` CLI instead. They read the files on disk.
+- Never call Rider's editing tools (`rename_refactoring`, `apply_patch`, `reformat_file`, `safe_delete`, …) until that check passes.
+
+### Known false positives: Roslynator (checked 2026-11-14)
+
+Don't "fix" the code for any of these.
+
+- **The Razor source generator doesn't run** under Roslynator's workspace, so `.razor` components don't exist as symbols. That causes about 210 `CS0246`/`CS0103`/`CS1503`/`CS1061`/… errors in `HT.UiTests` (bUnit tests), plus `Program.cs: CS0246 'App' could not be found`. Cascades from the same cause: `xUnit1025` on `SiteNavTests.cs:170-172` (the constants come from `SiteNav.razor`'s `@code`) and `CA1822` on `CatalogHabitDetailTests.RenderHabit`. `find-symbol --unused` is unreliable for anything a component calls. Confirm each hit with grep.
+- The BCL generators (`[GeneratedRegex]`, `[LoggerMessage]`) do run. Their partial methods report nothing.
+- `CA1861` in `src/HT.Persistence/Migrations/*` is in EF-generated migration code. Leave it.
+- `list-symbols` without `--projects` crashes with `InvalidOperationException` in `SymbolDefinitionWriter.WriteAttribute`, triggered by `HT.UnitTests` and `HT.UiTests`. The production projects and the other test projects work.
+- No C# 14 `field` keyword is used yet, so the older bundled Roslyn hasn't misreported a language feature. If one is reported later, cross-check with `jb`.
+
+### Known false positives: `jb inspectcode` (checked 2026-11-14)
+
+Don't "fix" the code for any of these.
+
+- The `RazorSourceGenerator ... TypeLoadException` banner at the top of the output is harmless. `jb` still inspects `.razor` with its own engine.
+- `xUnit1025` "InlineData duplicate(s)" on `SiteNavTests.cs:170-172` is the same Razor-constant blind spot as in Roslynator. The real build passes.
+- "Path '…\wwwroot\catalog' is not found" (16 hits in `SiteNav`, `Footer`, `Home`, `Register`, `SignIn` `.razor`): these `href`s are page routes, not files.
+- "Parameter 'h' is only used for precondition check(s)" (18 hits, all in tests): these are predicate lambdas passed to `Assert.Single` / `Assert.All` and similar.
+
+### Where grep still wins
+
+Neither tool covers `.css`, `.js`, `.json`, `.md`, `.feature` or `.ps1` files. For those, and for confirming an "unused" hit, use grep.
+
 ## Commits
 
 - Subject line: Conventional Commits with one gitmoji right after the colon: `<type>(<scope>): <emoji> <subject>`, e.g. `feat(ac): ✨ add the acceptance-test workflow`. The type stays first so Conventional Commits tooling can still parse it. Use the emoji that matches the type:
