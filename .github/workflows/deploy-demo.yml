@@ -80,7 +80,7 @@ jobs:
 
       - name: "1.2 Sign in to Azure"
         id: s1_2
-        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -194,9 +194,10 @@ jobs:
 
       - name: "4.2 Set up .NET"
         id: s4_2
-        # setup-dotnet@v5 downloads from dotnetorigin.blob.core.windows.net, which answered HTTP 409
-        # (2026-10-25, seen in another repo); v4 uses builds.dotnet.microsoft.com.
-        uses: actions/setup-dotnet@v4
+        # v5 runs on Node 24 (v4 targets the deprecated Node 20). The HTTP 409 from
+        # dotnetorigin.blob.core.windows.net on 2026-10-25 was a .NET release-day outage that hit
+        # v5 and v6 alike and was fixed the same day (actions/setup-dotnet issue 794).
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
