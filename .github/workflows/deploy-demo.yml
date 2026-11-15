@@ -220,9 +220,12 @@ jobs:
         # Only dotnet-ef is installed, at the version the tool manifest pins: `dotnet tool restore` on the .NET 10
         # SDK restores the manifest's tools in parallel and, on an empty cache, failed with "dotnet-ef ... is not
         # contained in the package" (first deploy run, 2026-11-15).
+        # dotnet-ef needs the project's restore output; in refresh mode 4.4 does not run and restore nothing for it
+        # (first refresh run, 2026-11-15: NETSDK1004 project.assets.json not found).
         run: |
           ef_version=$(jq -r '.tools["dotnet-ef"].version' dotnet-tools.json)
           dotnet tool install dotnet-ef --version "$ef_version" --tool-path "$RUNNER_TEMP/ef"
+          dotnet restore src/HT.Persistence
           "$RUNNER_TEMP/ef/dotnet-ef" migrations bundle --project src/HT.Persistence --startup-project src/HT.Persistence \
             --self-contained -r linux-x64 --output efbundle
 
