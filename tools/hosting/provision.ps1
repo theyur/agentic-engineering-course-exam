@@ -145,7 +145,8 @@ if ((Get-AzNames @('appservice', 'plan', 'list', '--resource-group', $ResourceGr
     Write-Info "plan $PlanName created (Linux, B1)"
 }
 else {
-    if ((Invoke-AzValue @('appservice', 'plan', 'show', '--name', $PlanName, '--resource-group', $ResourceGroup, '--query', 'reserved')) -ne 'true') {
+    # `kind` is "linux" for a Linux plan; the `reserved` flag comes back null from current Azure CLI versions.
+    if ((Invoke-AzValue @('appservice', 'plan', 'show', '--name', $PlanName, '--resource-group', $ResourceGroup, '--query', 'kind')) -notmatch '\blinux\b') {
         throw "The plan $PlanName exists but is not a Linux plan. Delete it or choose another name."
     }
     Write-Info "plan $PlanName exists"
@@ -353,11 +354,24 @@ else {
     Write-Info "service principal exists, object ID $principalId"
 }
 
-# Subject: the workflow's job runs in the environment `demo` (contracts/deploy-workflow.md).
+# Subject: the workflow's job runs in the environment `demo` (contracts/deploy-workflow.md). Its prefix is the
+# repository's OIDC subject prefix as GitHub reports it: `repo:<owner>/<name>` by default, or
+# `repo:<owner>@<owner id>/<name>@<repo id>` when the repository uses immutable subject claims. A repository with
+# customized claim keys sends another format, which this script does not build.
+$oidcSub = ((Invoke-Gh @('api', "repos/$Repository/actions/oidc/customization/sub")) -join "`n") | ConvertFrom-Json
+if (-not $oidcSub.use_default) {
+    throw "The repository customizes its OIDC subject claim (use_default is false); set the federated credential subject by hand."
+}
+$subjectPrefix = if ($oidcSub.PSObject.Properties.Name -contains 'sub_claim_prefix' -and $oidcSub.sub_claim_prefix) {
+    [string]$oidcSub.sub_claim_prefix
+}
+else {
+    "repo:$Repository"
+}
 $credential = [ordered]@{
     name        = $FederatedCredentialName
     issuer      = 'https://token.actions.githubusercontent.com'
-    subject     = "repo:${Repository}:environment:$EnvironmentName"
+    subject     = "${subjectPrefix}:environment:$EnvironmentName"
     description = "GitHub Actions, $Repository, environment $EnvironmentName"
     audiences   = @('api://AzureADTokenExchange')
 }

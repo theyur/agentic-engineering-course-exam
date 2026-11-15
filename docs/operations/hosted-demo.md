@@ -87,8 +87,11 @@ Created by step 8 of provisioning; change it by running the script again, not by
   `AZURE_WEBAPP_NAME`, `AZURE_SQL_SERVER`, `AZURE_SQL_DATABASE`, `DEMO_BASE_URL`.
 - No secrets. Never add one: the workflow does not need it.
 
-The workflow signs in to Azure with OpenID Connect through the federated credential, whose subject is
-`repo:<owner>/<name>:environment:demo`.
+The workflow signs in to Azure with OpenID Connect through the federated credential, whose subject is the
+repository's OIDC subject prefix followed by `:environment:demo`. The prefix is `repo:<owner>/<name>` by default and
+`repo:<owner>@<owner id>/<name>@<repo id>` when the repository uses immutable subject claims, as this one does;
+`provision.ps1` reads it from GitHub (`gh api repos/<owner>/<name>/actions/oidc/customization/sub`). A sign-in
+error `AADSTS700213` in step 1.2 means the two differ: run `provision.ps1` again.
 
 ## Run the workflow
 
