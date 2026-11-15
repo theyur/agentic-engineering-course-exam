@@ -217,9 +217,13 @@ jobs:
         id: s4_5
         if: inputs.mode == 'deploy' || inputs.mode == 'refresh'
         # The bundle reads its connection from HT_DESIGN_CONNECTION (HtDbContextFactory), set only in 10.1.
+        # Only dotnet-ef is installed, at the version the tool manifest pins: `dotnet tool restore` on the .NET 10
+        # SDK restores the manifest's tools in parallel and, on an empty cache, failed with "dotnet-ef ... is not
+        # contained in the package" (first deploy run, 2026-11-15).
         run: |
-          dotnet tool restore
-          dotnet ef migrations bundle --project src/HT.Persistence --startup-project src/HT.Persistence \
+          ef_version=$(jq -r '.tools["dotnet-ef"].version' dotnet-tools.json)
+          dotnet tool install dotnet-ef --version "$ef_version" --tool-path "$RUNNER_TEMP/ef"
+          "$RUNNER_TEMP/ef/dotnet-ef" migrations bundle --project src/HT.Persistence --startup-project src/HT.Persistence \
             --self-contained -r linux-x64 --output efbundle
 
       # ---- 5: firewall rule for the runner, then delete the database (deploy, refresh) ----
