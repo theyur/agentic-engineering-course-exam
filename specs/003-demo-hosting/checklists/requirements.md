@@ -13,9 +13,9 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
-- [ ] Success criteria are measurable
+- [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
 - [x] All acceptance scenarios are defined
 - [x] Edge cases are identified
@@ -26,7 +26,7 @@
 
 - [ ] All functional requirements have clear acceptance criteria
 - [x] User scenarios cover primary flows
-- [ ] Feature meets measurable outcomes defined in Success Criteria
+- [x] Feature meets measurable outcomes defined in Success Criteria
 - [x] No implementation details leak into specification
 
 ## Notes
@@ -52,5 +52,8 @@
   covers the operator log not being exposed; "Deployment" added to `CONTEXT.md` and Operator sharpened; HP-015
   keeps the administrator email out of the repository; HP-018 cites slice 1's session rules; the sign-in block
   is named and lasts 5 minutes; roadmap rows for hosting and refresh updated.
+- Iteration 6 (`/speckit-plan`, 2026-11-15): the owner confirmed the critic-revision decisions and decided the
+  four ARCHITECTURE §9 items (ADR 0015); the markers are gone and SC-007 has its number (USD 25 a month). Only
+  "All functional requirements have clear acceptance criteria" stays unchecked, for the reason in iteration 4.
 - Requirements use HP-NNN, not FR-NNN: the slice adds no Application behaviour, so nothing is on the
   acceptance-test surface (ADR 0003, spec "What acceptance tests can reach").

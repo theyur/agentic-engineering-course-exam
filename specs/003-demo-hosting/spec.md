@@ -45,13 +45,25 @@ any slice deployed after it, reachable for reviewers.
 - Q: What if not every slice has shipped by the exam? → A: Hosting starts no later than a fixed date before the
   exam, whatever has shipped by then: 2026-11-20 (the example date of the question; the owner may move it in
   the roadmap's R2 row). The hosted app is then reachable before the exam on 2026-11-23.
+- Q (plan, 2026-11-15): Does the owner confirm the author's decisions under "Critic revision 2026-11-15"? →
+  A: Yes, all of them. They are owner answers from this date.
+- Q (plan, 2026-11-15): Which Azure services and monthly budget? → A: App Service Basic B1 on Linux with Always
+  On, and Azure SQL Database Basic; budget USD 25 a month (SC-007). Recorded in
+  [ADR 0015](../../docs/adr/0015-demo-hosting.md).
+- Q (plan, 2026-11-15): How do a deployment and a demo refresh run, including the schema migrations? → A: A
+  manual GitHub Actions workflow, signed in to Azure with OpenID Connect: it empties the database, applies the
+  deployed commit's migrations with an EF Core migration bundle while the app is stopped, deploys (not on a
+  refresh), starts the app and runs the smoke check, which decides success. [ADR 0015](../../docs/adr/0015-demo-hosting.md).
+- Q (plan, 2026-11-15): How does the hosted app get its passwords and connection, and keep sessions across idle
+  restarts? → A: App Service app settings set once by the Operator, and the session keys on App Service's
+  persistent storage. [ADR 0015](../../docs/adr/0015-demo-hosting.md) adds the setting that puts them there,
+  because App Service on Linux documents no automatic key persistence.
 
 ### Critic revision 2026-11-15
 
 Decisions made by the author while revising after [critic pass 1](critic-spec-pass-1.md) and
-[critic pass 2](critic-spec-pass-2.md). They fill gaps the answers above left open and stay within them. They
-are **not yet owner answers**: the owner confirms them before `/speckit-plan` (first bullet of "Decisions due
-before `/speckit-plan`"), and until then later slices MUST NOT cite them as recorded decisions. The
+[critic pass 2](critic-spec-pass-2.md). They fill gaps the answers above left open and stay within them. The
+owner confirmed all of them on 2026-11-15 (plan session above), so they are recorded decisions. The
 requirements built on them are HP-014, HP-017 and HP-018.
 
 - In the requirements, the person who starts deployments and refreshes, holds the secret configuration and
@@ -89,10 +101,9 @@ the hosted app that the Operator runs.
 
 The decisions above add no application behaviour: the reviewers' administrator is the existing configured
 administrator, and a demo refresh starts the hosted app on an empty database, where the existing
-administrator creation and demo loading run as at every start. The refresh mechanism is one of the decisions
-taken in the hosting ADR before `/speckit-plan` (Decisions due below). If that ADR chooses a mechanism that
-needs a new use case, this section is revised in the same change, before `/speckit-plan`, and that behaviour
-gets FR-NNN requirements and the acceptance-test states.
+administrator creation and demo loading run as at every start. The refresh mechanism of
+[ADR 0015](../../docs/adr/0015-demo-hosting.md) (a workflow that empties the database, applies the migrations
+and restarts the app) needs no new use case, so this stays true.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -352,34 +363,26 @@ a demo refresh, and sign in to that account again with the original demo passwor
 - **SC-006**: The smoke check passes (it reaches the hosted demo and finds what SC-005 checks) on 2026-11-23
   and on each weekly check from the first deployment until 2026-12-31, apart from the minutes of an
   Operator-started deployment or refresh.
-- **SC-007**: The monthly hosting cost stays at or under the budget recorded as a number in the hosting ADR.
+- **SC-007**: The monthly hosting cost stays at or under USD 25, the budget of ADR 0015.
 - **SC-008**: The hosted demo, with every slice shipped by then, is reachable before the exam on 2026-11-23.
 
 ## Decisions due before `/speckit-plan`
 
-The roadmap places these technical decisions in this slice. They are ARCHITECTURE §9 deferred choices, so
-each carries a marker (constitution, Decision Discipline) and the plan's Constitution Check fails while one
-is open. Each is decided with the owner when the slice resumes, written as an ADR where the roadmap row or the
-constitution's test asks for one, and recorded as a dated line in `## Clarifications` that links the ADR.
-`research.md` then cites the answers instead of choosing them.
+The roadmap places these technical decisions in this slice. They are ARCHITECTURE §9 deferred choices
+(constitution, Decision Discipline). All were decided with the owner on 2026-11-15, recorded in
+`## Clarifications` and in [ADR 0015](../../docs/adr/0015-demo-hosting.md); `research.md` cites them instead
+of choosing them.
 
-- Owner confirmation of the author's decisions under "Critic revision 2026-11-15" in `## Clarifications`
-  (Operator as the actor, the secret boundary, the success rule, sessions across restarts, the synthetic
-  administrator email, no extra seed content), and so of HP-014, HP-017 and HP-018. The confirmation is
-  recorded as a dated line in `## Clarifications`; a decision the owner changes is revised before
-  `/speckit-plan`.
-- [NEEDS CLARIFICATION: ARCHITECTURE §9] Azure services and tiers, deployment, pipeline, monitoring and
-  secrets mechanics (ADR), including the budget of SC-007 as a number. That the Operator starts each
-  deployment is decided (HP-016); how is the ADR's. Because the slice resumes after the product slices, the
-  ADR also covers what slices shipped by then need from hosting, such as scheduled evaluation (slice 5).
-- [NEEDS CLARIFICATION: ARCHITECTURE §9] Schema migration rollout on each deployment, before the startup tasks
-  run (HP-004). Locally the host applies migrations at start in Development only (ADR 0007).
-- [NEEDS CLARIFICATION: ARCHITECTURE §9] How the hosted demo is refreshed, and how its success is detected
-  (HP-011, HP-017). When is decided (every deployment and on the Operator's demand). If slices with demo data
-  relative to the current time have shipped, the decision also covers keeping that data current until
-  2026-12-31 (Edge Cases).
-- [NEEDS CLARIFICATION: ARCHITECTURE §9] How the hosted app receives the administrator and demo passwords and
-  how sessions survive a restart (HP-007, HP-018). The reviewers' channel is decided (the exam submission).
+- Owner confirmation of the author's decisions under "Critic revision 2026-11-15": confirmed, all of them.
+- ARCHITECTURE §9, Azure services and tiers, deployment, pipeline, monitoring and secrets mechanics: decided
+  (ADR 0015), budget USD 25 a month (SC-007). Only slices 1 and 2 had shipped when it was decided; what later
+  slices need from hosting, such as scheduled evaluation (slice 5), is decided by those slices, citing ADR 0015.
+- ARCHITECTURE §9, schema migration rollout on each deployment, before the startup tasks run (HP-004): decided
+  (ADR 0015). ADR 0007 is unchanged.
+- ARCHITECTURE §9, how the hosted demo is refreshed and how its success is detected (HP-011, HP-017): decided
+  (ADR 0015). No time-relative demo data had shipped; the slice that adds it keeps it current (Edge Cases).
+- ARCHITECTURE §9, how the hosted app receives the passwords and how sessions survive a restart (HP-007,
+  HP-018): decided (ADR 0015).
 - Roadmap decision R2 (when to host the demo) is decided: at the end, by the latest start date in
   Clarifications.
 
