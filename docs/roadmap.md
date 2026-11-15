@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-11-14"
+updated_at: "2026-11-15"
 ---
 
 # Roadmap — Habit Tracker
@@ -29,9 +29,9 @@ in its idea brief, which assumed the catalog also carried the account foundation
 |---|---|---|---|---|---|---|---|---|
 | 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | — | shipped | [001](../specs/001-accounts-and-access/spec.md) |
 | 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | — | shipped | [002](../specs/002-habit-catalog/spec.md) |
-| 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | Next | not started | — |
+| 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | Later (built last; starts by 2026-11-20, R2) | clarified | [003](../specs/003-demo-hosting/spec.md) |
 | 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Next | not started | — |
-| 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Later | not started | — |
+| 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Next | not started | — |
 | 6 | `personal-reports` | A user sees how consistent they are: a dashboard of upcoming, due and overdue commitments and Missed results, consistency with its count, strict streaks with their unit, trends. | §6 | 5 | — | Later | not started | — |
 | 7 | `excusals-and-pauses` | Excused commitments and paused expectations are left out of consistency and neither extend nor break the streak. | §5.3 | 5, 6 | — | Later | not started | — |
 | 8 | `goal-changes` | A user changes a goal from the next evaluation boundary, ends it with an outcome, and restarts it as a new attempt, with earlier attempts kept in history. | §5.4 | 5, 6 | 7 | Later | not started | — |
@@ -72,8 +72,9 @@ Only what the order depends on. Scope is decided in each spec.
    foundation slice 1 now carries. The brief, SPEC §4 and the design disagree on details (see the decision
    table). Seed content: at least 20 Published habits covering all six categories (FR-030).
 3. **`demo-hosting`** is infrastructure, not a feature: an ADR for hosting and deployment, then the
-   deployment itself and hosted demo data. No AC tests. If it comes right after the catalog, every later
-   slice can be shown in the hosted app once it is deployed.
+   deployment itself and hosted demo data. No AC tests. Its spec is written and clarified, but by decision R2
+   it is built last, after the product slices, and starts no later than 2026-11-20 whatever has shipped by
+   then, so the hosted demo exists before the exam. Its row keeps number 3 and its spec folder `003`.
 4. **`goals`** defines goals and fixes the time model the rest depends on: schedules, evaluation
    boundaries and time zones. Goal settings are stored as rule versions from the start (constitution II),
    even though changing them comes in slice 8. Whether a goal starts as its first attempt is decided here,
@@ -173,8 +174,8 @@ How this works with the Spec Kit commands:
 | Who writes the seed catalog content | idea brief §15 | `habit-catalog` | decided: Claude drafts it, the owner reviews it in the PR | [spec](../specs/002-habit-catalog/spec.md#clarifications) |
 | Hosting services, deployment, pipelines, monitoring, secrets mechanics (ADR). Scheduled evaluation (slice 5) may need more; changing this then needs a superseding ADR. | ARCH §7, §9 | `demo-hosting` | open | — |
 | Schema migration rollout on each deployment | ARCH §5 | `demo-hosting` | open; locally the host applies migrations at start in Development ([ADR 0007](adr/0007-startup-operator-tasks.md)) | — |
-| When and how hosted demo data is refreshed. Time-relative generation (slice 5) may reopen it with a new or superseding ADR. | ARCH §7 | `demo-hosting` | open | — |
-| How reviewers get demo sign-ins, with no secret in source control | ARCH §7; CLAUDE.md | `demo-hosting` | open | — |
+| When and how hosted demo data is refreshed. Time-relative generation (slice 5) may reopen it with a new or superseding ADR. | ARCH §7 | `demo-hosting` | open; when is decided: on every deployment and on the owner's demand. The mechanism needs the ADR. | [spec](../specs/003-demo-hosting/spec.md#clarifications) |
+| How reviewers get demo sign-ins, with no secret in source control | ARCH §7; CLAUDE.md | `demo-hosting` | open; the channel is decided: only with the exam submission, including the configured administrator's sign-in. How the hosted app gets the passwords is part of the secrets ADR. | [spec](../specs/003-demo-hosting/spec.md#clarifications) |
 | Commitment deadlines and time zones (ADR) | SPEC §11.1 (first part); ARCH §9 | `goals` | open | — |
 | Whether a goal is created as its first attempt from the start | SPEC §2, §5.4 | `goals` | open | — |
 | The 48-hour grace period around local clock changes | SPEC §11.1 (second part) | `recording-and-evaluation` | open | — |
@@ -203,7 +204,7 @@ For the owner. *Before* says which slice cannot start until the decision is made
 | # | Decision | Before | Recommended | Alternative | Owner answer |
 |---|---|---|---|---|---|
 | R1 | Accounts as their own first slice | slice 1 | Yes: it isolates the idea brief's top risk, foundation drag, from the catalog. The catalog's 3 person-week estimate and RICE 5.3 included that foundation, so both need re-estimating after the split. README's example folder `001-habit-catalog/` changes too. | Fold minimal sign-in into `habit-catalog`, as the brief's estimate assumed. The catalog then becomes `001`. | Yes (2026-11-11) |
-| R2 | When to host the demo | slice 3 | Right after `habit-catalog` | At the end, which risks a late deployment surprise | — |
+| R2 | When to host the demo | slice 3 | Right after `habit-catalog` | At the end, which risks a late deployment surprise | At the end, starting no later than 2026-11-20 whatever has shipped by then (2026-11-15); [spec](../specs/003-demo-hosting/spec.md#clarifications) |
 | R3 | Reports before excusals and pauses | slice 6 | Yes: the core value is demonstrable sooner. The cost: SPEC §11.2 may rework period evaluation in slice 7 (slice note 7). | After them, with less rework | — |
 | R4 | Splitting goal changes (§5.4) out of `goals` | slice 4 | Yes, as slice 8: its rules can only be verified once evaluations and streaks exist. The cost: between slices 4 and 8 a goal cannot be edited or ended, and SPEC has no delete, so a mistaken demo goal stays. | Keep them in `goals` and name, per rule, the later slice that verifies it | — |
 | R5 | Cutting scope if time runs short | after R8 | No cut now; decide after R8. Any cut needs a SPEC amendment by the owner (constitution, Governance). Stopping after slice 6 would remove §5.3, §5.4 changes, §7, Suggest for catalog (§4) and §8 feedback and deactivation. SPEC §10 requires the demo to show community views, and design pages already show Pause, Excuse, Ended and Community. | Name a cut line now | No cut (2026-11-11): slices ship in roadmap order; what has shipped by 2026-11-23 is what the exam shows. SPEC stays unchanged. |
