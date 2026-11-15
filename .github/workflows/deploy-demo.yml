@@ -278,7 +278,12 @@ jobs:
           # Cleared first, so a refresh after a failed deployment stops at 2.2.
           az webapp config appsettings set --resource-group "$RG" --name "$APP" \
             --settings "Deployment__Commit=" --output none
-          az webapp deploy --resource-group "$RG" --name "$APP" --type zip --src-path publish.zip --output none
+          # --track-status false: the CLI would wait for the new version to start healthily, which it cannot do
+          # here, without a database (5.2); step 8 stops it at once, and the smoke check (12) decides success.
+          # With tracking, a start that missed the warm-up probe failed this step after 10 minutes (recovery
+          # deploy run, 2026-11-15).
+          az webapp deploy --resource-group "$RG" --name "$APP" --type zip --src-path publish.zip \
+            --track-status false --output none
           az webapp config appsettings set --resource-group "$RG" --name "$APP" \
             --settings "Deployment__Commit=$SHA" --output none
 
