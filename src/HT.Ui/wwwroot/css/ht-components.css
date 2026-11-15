@@ -8,6 +8,8 @@
 .ht h1, .ht h2, .ht h3 { font-family:var(--font-head); font-weight:600; margin:0; color:var(--ink); }
 :where(.ht a) { color:var(--accent); }
 .ht :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+/* FocusOnNavigate (Routes.razor) focuses the page h1 so screen readers announce the new page; headings aren't Tab stops, so hide the ring. */
+.ht h1:focus { outline:none; }
 .ht-num { font-family:var(--font-head); font-weight:600; font-variant-numeric:tabular-nums; }
 .ht-muted { color:var(--ink-muted); }
 .ht-eyebrow { font-size:12px; line-height:16px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-muted); }
