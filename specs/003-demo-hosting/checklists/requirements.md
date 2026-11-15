@@ -13,9 +13,9 @@
 
 ## Requirement Completeness
 
-- [x] No [NEEDS CLARIFICATION] markers remain
+- [ ] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
-- [x] Success criteria are measurable
+- [ ] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
 - [x] All acceptance scenarios are defined
 - [x] Edge cases are identified
@@ -24,23 +24,33 @@
 
 ## Feature Readiness
 
-- [x] All functional requirements have clear acceptance criteria
+- [ ] All functional requirements have clear acceptance criteria
 - [x] User scenarios cover primary flows
-- [x] Feature meets measurable outcomes defined in Success Criteria
+- [ ] Feature meets measurable outcomes defined in Success Criteria
 - [x] No implementation details leak into specification
 
 ## Notes
 
-- Iteration 1 (2026-11-15): "EF Core migrations" in US3 and HP-004 replaced with "schema migrations". The
-  remaining technology references are project facts the spec cites, not choices it makes: ADR numbers,
-  `master`, `example.com`, `design/`.
-- Iteration 2 (2026-11-15): the 3 `[NEEDS CLARIFICATION]` markers (demo sign-in channel, reviewer
-  administrator access, demo refresh timing) were answered by the owner and recorded in `## Clarifications`;
-  US2, US4, the edge cases, HP-004/005/007/008/011, Key Entities and Assumptions were updated to match. All
-  items pass.
+- Iteration 1 (`/speckit-specify`, 2026-11-15): "EF Core migrations" in US3 and HP-004 replaced with "schema
+  migrations". Remaining technology references are project facts the spec cites, not choices it makes: Azure
+  (fixed by SPEC §10 and ARCHITECTURE §2), ADR numbers, `master`, `example.com`.
+- Iteration 2 (`/speckit-specify`, 2026-11-15): three markers (demo sign-in channel, reviewer administrator
+  access, demo refresh timing) answered by the owner and recorded in `## Clarifications`.
+- Iteration 3 (`/speckit-clarify`, 2026-11-15): five more answers (Operator-started deployments, reachable
+  until 2026-12-31, slow first page after idling, R2 hosting at the end, latest start date) recorded.
+- Iteration 4 (critic pass 1, 2026-11-15): spec revised; decisions listed under "Critic revision 2026-11-15".
+  Three items are unchecked on purpose:
+  - Markers: four `[NEEDS CLARIFICATION: ARCHITECTURE §9]` markers in "Decisions due before `/speckit-plan`"
+    are required by the constitution (Decision Discipline) for the deferred hosting choices. They are decided
+    in the hosting ADR when the slice resumes; the plan's Constitution Check fails until then.
+  - Measurable, and meets measurable outcomes: SC-007 has no number until the hosting ADR records the budget.
+  - Acceptance criteria: HP-012, HP-013 and HP-014 have no acceptance scenario; they are checked by review of
+    the deployment definitions and configuration and by SC-004 and SC-007, not by a scenario.
+- Iteration 5 (critic pass 2 MINOR notes, 2026-11-15): the author's decisions are marked as pending owner
+  confirmation and listed first under "Decisions due before `/speckit-plan`"; the success rule covers every
+  shipped slice's demo data; failure wording aligned; US4-AS5 and an edge case cover a failed refresh; US3-AS3
+  covers the operator log not being exposed; "Deployment" added to `CONTEXT.md` and Operator sharpened; HP-015
+  keeps the administrator email out of the repository; HP-018 cites slice 1's session rules; the sign-in block
+  is named and lasts 5 minutes; roadmap rows for hosting and refresh updated.
 - Requirements use HP-NNN, not FR-NNN: the slice adds no Application behaviour, so nothing is on the
   acceptance-test surface (ADR 0003, spec "What acceptance tests can reach").
-- Technical decisions (hosting services, migration rollout mechanism, secrets mechanics, deployment trigger,
-  budget) are listed under "Decisions due before `/speckit-plan`", not as markers; they are decided with the
-  owner and recorded as ADRs before planning.
-- SC-007 is measurable only once the owner sets the budget in the hosting ADR.

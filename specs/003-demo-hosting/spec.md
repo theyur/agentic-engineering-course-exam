@@ -9,10 +9,11 @@
 **Input**: User description: "slice 3 from the roadmap"
 
 Roadmap outcome (slice 3, `demo-hosting`): reviewers open the app in a browser, with demonstration data,
-without installing anything (SPEC §10, ARCHITECTURE §7). The roadmap calls this slice infrastructure, not a
-feature: an ADR for hosting and deployment, then the deployment itself and the hosted demo data. By the
-owner's answer to roadmap decision R2 (Clarifications), it is built at the end, after the product slices,
-and starts no later than 2026-11-20, whatever has shipped by then.
+without installing anything (SPEC §10, ARCHITECTURE §7). The app is hosted on Azure (SPEC §10, ARCHITECTURE
+§2); which Azure services and tiers is still open (ARCHITECTURE §9). The roadmap calls this slice
+infrastructure, not a feature: an ADR for hosting and deployment, then the deployment itself and the hosted
+demo data. By the owner's answer to roadmap decision R2 (Clarifications), it is built at the end, after the
+product slices, and starts no later than the latest start date recorded there, whatever has shipped by then.
 
 This slice adds no product behaviour. It makes the behaviour of the slices shipped by its deployment, and of
 any slice deployed after it, reachable for reviewers.
@@ -43,7 +44,38 @@ any slice deployed after it, reachable for reviewers.
   product slices. This spec is kept and parked until then.
 - Q: What if not every slice has shipped by the exam? → A: Hosting starts no later than a fixed date before the
   exam, whatever has shipped by then: 2026-11-20 (the example date of the question; the owner may move it in
-  the roadmap). SPEC §10 is then met before the exam on 2026-11-23.
+  the roadmap's R2 row). The hosted app is then reachable before the exam on 2026-11-23.
+
+### Critic revision 2026-11-15
+
+Decisions made by the author while revising after [critic pass 1](critic-spec-pass-1.md) and
+[critic pass 2](critic-spec-pass-2.md). They fill gaps the answers above left open and stay within them. They
+are **not yet owner answers**: the owner confirms them before `/speckit-plan` (first bullet of "Decisions due
+before `/speckit-plan`"), and until then later slices MUST NOT cite them as recorded decisions. The
+requirements built on them are HP-014, HP-017 and HP-018.
+
+- In the requirements, the person who starts deployments and refreshes, holds the secret configuration and
+  reads the operator log is the **Operator** (`CONTEXT.md`); the clarifications above call that person the
+  owner. "Owner" otherwise means the owner of private data, or the project owner who answers decisions.
+- Secret values are passwords, connection strings, keys and tokens. The administrator email is configuration
+  but not a secret: it stays out of source control, appears in the operator log (ADR 0007) and is given to
+  reviewers with the exam submission. The demo emails and the published address are public and may appear in
+  the repository; of the demo sign-ins, only the demo password is given exclusively with the exam submission.
+- A deployment or demo refresh counts as succeeded only when the hosted app serves requests and its startup
+  tasks created the administrator and every shipped slice's demo data, the seed catalog included. A start
+  whose startup task faulted is a failed deployment or refresh, although the app starts (ADR 0007). After a
+  failure the hosted demo may be unavailable or incomplete until the next successful deployment or refresh;
+  that time counts against SC-006, whose smoke check then fails.
+- A restart of the hosted app that is not a deployment or demo refresh, such as waking up after idling, does
+  not end reviewers' sessions. Sessions still end the ways slice 1 defines (sign-out, closing the browser
+  without "Keep me signed in", another session changing the account's password) and at every deployment or
+  refresh.
+- The configured administrator of the hosted demo has an `example.com` email and no real person's details,
+  like the demo data (constitution VI), because every reviewer shares it.
+- The hosted demo gets no extra seed content: it gets the seed catalog and demo data that every new deployment
+  gets (answers slice 2's handed-over question, slice 2 Assumptions).
+- The SPEC §10 outcome the latest start date secures is browser access before the exam. The demo data covers
+  the slices shipped by then, which may not yet include progress reports or community views (roadmap R5).
 
 ## What acceptance tests can reach
 
@@ -52,25 +84,26 @@ Nothing in this slice. ADR 0003 limits acceptance tests to the Application use c
 it hosts the existing app, configures it, rolls out its schema and makes the existing demo loading (ADR 0007,
 ADR 0013) run against the hosted database. Following the roadmap, the slice skips the acceptance-test states
 (`acceptance locked`, `features locked`, `AC tests green`) and its requirements are host, deployment and
-operation requirements (**HP-NNN**), verified by integration tests, deployment checks and a scripted smoke
-check of the hosted app.
+operation requirements (**HP-NNN**), verified by integration tests, deployment checks and a smoke check of
+the hosted app that the Operator runs.
 
-The clarifications above add no application behaviour: the reviewers' administrator is the existing
-configured administrator, and a demo refresh starts the hosted app on an empty database, where the existing
-administrator creation and demo loading run as at every start. If the plan finds that a refresh needs a new
-use case after all, this section is revisited before `/speckit-plan`, and that behaviour gets FR-NNN
-requirements and the acceptance-test states.
+The decisions above add no application behaviour: the reviewers' administrator is the existing configured
+administrator, and a demo refresh starts the hosted app on an empty database, where the existing
+administrator creation and demo loading run as at every start. The refresh mechanism is one of the decisions
+taken in the hosting ADR before `/speckit-plan` (Decisions due below). If that ADR chooses a mechanism that
+needs a new use case, this section is revised in the same change, before `/speckit-plan`, and that behaviour
+gets FR-NNN requirements and the acceptance-test states.
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Open the hosted app in a browser (Priority: P1)
 
-A reviewer on Windows or macOS opens one public web address in a current browser and uses the app as it is
-on `master`: the visitor Home, the catalog, Register and Sign in. Nothing is installed, and no local database
-is needed.
+A reviewer on Windows or macOS opens one public web address in a current browser and uses the app as it is in
+the deployed commit of `master`: the visitor Home, the catalog, Register and Sign in. Nothing is installed,
+and no local database is needed.
 
 **Why this priority**: SPEC §10 and ARCHITECTURE §7 require it; without it nothing else in this slice has
-value, and later slices cannot be shown to reviewers.
+value.
 
 **Independent Test**: From a machine that has never run the app, open the published address in a browser
 and walk the visitor pages and the catalog; register a new account and sign in with it.
@@ -88,6 +121,9 @@ and walk the visitor pages and the catalog; register a new account and sign in w
    **Then** the signed-in Home is shown, as it is locally.
 5. **Given** the hosted app has been idle for a while, **When** a reviewer opens the address, **Then** the
    first page appears within the time in SC-001, without an error page.
+6. **Given** a reviewer signed in with "Keep me signed in" and nobody has changed that account's password,
+   **When** the hosted app restarts after idling and the reviewer opens a page again, **Then** they are still
+   signed in.
 
 ---
 
@@ -100,22 +136,23 @@ slice 2), without waiting for real activity.
 **Why this priority**: SPEC §10 asks for demo data "sufficient to explore" the app; an empty hosted app does
 not meet it.
 
-**Independent Test**: Using only the sign-in information the reviewer is given (see HP-007), sign in to each
+**Independent Test**: With the demo password from the hosted app's secret configuration, sign in to each
 demo account on the hosted app and check that its demo data is there.
 
 **Acceptance Scenarios**:
 
-1. **Given** the hosted app is freshly deployed on an empty database, **When** it has started, **Then** the
-   demo accounts `demo1@example.com` to `demo3@example.com` exist with their demo data, and the seed catalog
-   is loaded.
-2. **Given** a reviewer has the demo sign-in information, **When** they sign in to a demo account, **Then**
-   they see that account's demo data from every shipped slice (at least its custom habits) and nothing of
-   another account's private data.
-3. **Given** the hosted app restarts, **When** demo loading runs again, **Then** no demo data is duplicated
-   and existing data is left unchanged (ADR 0007).
-4. **Given** a reviewer has the exam submission, **When** they look for the demo sign-ins, **Then** the
-   submission gives the published address, the demo emails and the demo password, and neither the
-   repository nor any page of the hosted app contains the demo password.
+1. **Given** a deployment of the hosted app has succeeded (HP-017), **When** it has started, **Then** the demo
+   accounts (at least `demo1@example.com` to `demo3@example.com`, more if a shipped slice adds them) exist with
+   every shipped slice's demo data, and the seed catalog is loaded.
+2. **Given** a reviewer has the demo password, **When** they sign in to a demo account, **Then** they see that
+   account's demo data from every shipped slice (at least its custom habits) and nothing of another account's
+   private data.
+3. **Given** the hosted app restarts without a deployment, **When** demo loading runs again, **Then** no demo
+   data is duplicated and existing data is left unchanged (ADR 0007).
+4. **Given** the repository and the hosted app, **When** they are searched for the demo password and the
+   administrator password, **Then** neither is found, and the Operator documentation (HP-015) names the items
+   the exam submission gives reviewers (the published address, the demo emails, the administrator email and
+   the two passwords) without the values of the administrator email and the passwords.
 5. **Given** a reviewer has the administrator sign-in from the exam submission, **When** they sign in with
    it, **Then** they reach catalog administration (slice 2) and see no private data of any account
    (SPEC §3).
@@ -124,146 +161,178 @@ demo account on the hosted app and check that its demo data is there.
 
 ### User Story 3 - Deploy a new version (Priority: P2)
 
-The owner puts the current `master` on the hosted app. The schema is brought up to date, the administrator
-and the demo data are created as at every start, and the owner can see whether the deployment and the
-startup tasks succeeded.
+The Operator puts a chosen commit of `master` on the hosted app. The schema is brought up to date, the
+administrator and the demo data are created as at every start, and the Operator can see whether the
+deployment, including its startup tasks, succeeded.
 
-**Why this priority**: the first deployment happens only days before the exam (start no later than
-2026-11-20, exam 2026-11-23), and fixes after it are deployed the same way; a deployment that needs manual
-database work or hides its failures would eat into that margin.
+**Why this priority**: the first deployment happens only days before the exam, and fixes after it are
+deployed the same way; a deployment that needs manual database work or hides its failures would eat into
+that margin.
 
-**Independent Test**: Merge a change that adds a schema migration, deploy it, and check that the hosted app
-serves the new version with the new schema, with no manual database step.
+**Independent Test**: Merge a change that adds a schema migration, deploy that commit, and check that the
+hosted app serves it with the new schema and complete demo data, with no manual database step.
 
 **Acceptance Scenarios**:
 
-1. **Given** a new version on `master` with a pending schema migration, **When** the owner deploys it,
-   **Then** the hosted database gets the migration before the new version serves requests, and no manual
+1. **Given** a commit of `master` whose schema differs from the deployed one, **When** the Operator deploys
+   it, **Then** the hosted database has that commit's schema before the startup tasks run, and no manual
    database step is needed.
-2. **Given** a deployment has finished, **When** the owner checks it, **Then** they can tell which commit of
-   `master` is deployed and whether it succeeded.
-3. **Given** the hosted app has started, **When** the owner reads the operator log, **Then** it shows the
+2. **Given** a deployment has finished, **When** the Operator checks it, **Then** they can tell which commit
+   of `master` is deployed and whether the deployment succeeded (HP-017).
+3. **Given** the hosted app has started, **When** the Operator reads the operator log, **Then** it shows the
    results of administrator creation and demo loading (ADR 0007) with emails and result texts, and no
-   password, secret, note or custom-habit name.
-4. **Given** a deployment fails (build, migration or start), **When** the owner checks it, **Then** the
-   failure and its reason are visible to the owner, and no secret value appears in what they see.
+   password, secret value, note or custom-habit name; no page or public address of the hosted app shows it.
+4. **Given** a deployment fails (build, migration, start or a faulted startup task), **When** the Operator
+   checks it, **Then** it is reported as failed with its reason, and no secret value appears in what they see.
 5. **Given** the hosted configuration lacks the administrator or demo password, **When** the app starts,
-   **Then** it starts and logs "no administrator configured" or "no demo password configured" (ADR 0007).
+   **Then** it starts and logs "no administrator configured" or "no demo password configured" (ADR 0007), and
+   the deployment is reported as failed (HP-017).
+6. **Given** a commit is merged to `master` and the Operator starts no deployment, **When** a reviewer opens
+   the hosted app, **Then** it still runs the previously deployed commit with its data unchanged.
 
 ---
 
 ### User Story 4 - Keep the demo usable (Priority: P3)
 
 Reviewers can change the demo: register accounts, add custom habits, change a demo account's password or
-lock it with failed sign-ins (ADR 0007, Consequences). The owner can bring the hosted demo back to its known
-state so the next reviewer sees the full demo data.
+trigger its sign-in block (ADR 0007, Consequences). The Operator can bring the hosted demo back to its
+known state so the next reviewer sees the full demo data.
 
 **Why this priority**: the demo is public and shared; without a way back to a known state, one reviewer can
 spoil it for the next.
 
-**Independent Test**: Change a demo account's password and unpublish a catalog habit on the hosted app, ask
-for a demo refresh, and sign in to that account again with the original demo sign-in information.
+**Independent Test**: Change a demo account's password and unpublish a catalog habit on the hosted app, start
+a demo refresh, and sign in to that account again with the original demo password.
 
 **Acceptance Scenarios**:
 
-1. **Given** a reviewer has changed a demo account's password or its demo data, **When** the owner asks for a
-   demo refresh, **Then** every demo account signs in with the original demo sign-in information and shows
-   its full demo data.
+1. **Given** a reviewer has changed a demo account's password or its demo data, **When** the Operator starts a
+   demo refresh, **Then** every demo account signs in with the original demo password and shows its full demo
+   data.
 2. **Given** a reviewer has changed the catalog or the administrator's password, **When** the hosted demo is
    refreshed, **Then** the catalog shows its full seed again and the administrator signs in with the
    configured sign-in.
-3. **Given** a new version is deployed, **When** the deployment has finished, **Then** the hosted demo has
+3. **Given** a deployment has succeeded, **When** a reviewer opens the hosted app, **Then** the hosted demo has
    been refreshed: accounts and data that reviewers added are gone, and the demo data is complete.
-4. **Given** the hosted demo is refreshed, **When** it is done, **Then** the seed catalog and the demo data of
-   every shipped slice are present, as on a freshly deployed empty database (ADR 0013).
+4. **Given** a demo refresh has succeeded, **When** a reviewer opens the hosted app, **Then** the seed catalog
+   and the demo data of every shipped slice are present, as on a freshly deployed empty database (ADR 0013).
+5. **Given** a demo refresh fails (for example a startup task faults), **When** the Operator checks it,
+   **Then** it is reported as failed with its reason (HP-009, HP-017), and no secret value appears in what they
+   see.
 
 ---
 
 ### Edge Cases
 
-- A reviewer changes a demo account's password or locks it out with failed sign-ins: other reviewers cannot
-  use that account until the next refresh (User Story 4). The same holds for the administrator's password,
-  which every reviewer shares.
+- A reviewer changes a demo account's password: other reviewers cannot sign in to that account until the next
+  refresh (User Story 4), and other reviewers already signed in to it lose their session (slice 1 HP-007). The
+  same holds for the administrator's password, which every reviewer shares.
+- A reviewer triggers a demo account's sign-in block with failed sign-ins: nobody can sign in to that account
+  for 5 minutes (slice 1 FR-008); then it works again without a refresh.
 - A reviewer uses the administrator sign-in to unpublish or edit seed catalog habits: other reviewers see the
   changed catalog until the next refresh.
 - The hosted database is unreachable at start: the app still starts and logs the fault without secrets
-  (ADR 0007); pages that need the database show the app's error page, which contains no secret, note or
-  custom-habit name.
-- A deployment happens while reviewers are signed in: the database is refreshed, so their next interaction
-  asks them to sign in again, and accounts they registered are gone.
+  (ADR 0007). At a deployment or refresh, that is reported as failed (HP-017); at a restart without one (for
+  example after idling), the fault shows in the operator log and the next smoke check fails. Pages that need
+  the database show the app's error page or its error notice, neither of which contains a secret value, note
+  or custom-habit name.
+- A demo refresh fails: it is reported as failed with its reason (US4-AS5), and the hosted demo may be
+  unavailable or incomplete until the next successful refresh or deployment.
+- A deployment or refresh happens while reviewers are signed in: the database starts empty, so their next
+  interaction asks them to sign in again, and accounts they registered are gone.
 - A deployment's migration fails: the deployment stops, the new version does not serve requests against a
-  partial schema, and the failure is visible to the owner (US3-AS4).
-- The app is restarted or scaled back up after idling, without a deployment: the data is kept, and demo
-  loading reports existing data and duplicates nothing (US2-AS3).
-- A demo email registered by a reviewer before demo loading runs: cannot happen on the hosted demo, because
-  every deployment and refresh starts on an empty database and demo loading runs before the app serves
-  requests. Elsewhere ADR 0013 applies.
+  partial schema, and the failure is visible to the Operator (US3-AS4). The hosted demo may be unavailable
+  until the next successful deployment.
+- The app is restarted or scaled back up after idling, without a deployment: the data and reviewers' sessions
+  are kept (HP-018), and demo loading reports existing data and duplicates nothing (US1-AS6, US2-AS3).
+- A demo email registered by a reviewer before demo loading runs: cannot happen after a successful deployment
+  or refresh, because the database starts empty and demo loading runs before the app serves requests. If
+  demo loading faulted, the deployment or refresh has failed (HP-017), and the incomplete hosted demo it leaves
+  may let a reviewer register a demo email until the next successful one; demo loading then reports that
+  account and writes no private data into it (ADR 0013).
+- Demo data that depends on the current time (slice 5 onward, for example Pending results inside the 48-hour
+  grace period or a rolling 30-day community window) goes stale between refreshes. If such slices have shipped
+  when this slice resumes, the refresh decision covers keeping that data current until 2026-12-31 (Decisions
+  due below).
 - The hosted app is opened from a phone: the pages behave as they do locally at that width; no extra mobile
   work is in scope.
-- The hosting provider's free or lowest-cost tier sleeps after inactivity: the first request is slower
-  (SC-001) but succeeds.
+- The hosting tier sleeps after inactivity: the first request is slower (SC-001) but succeeds.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements (host, deployment and operation; outside the AC surface)
 
-- **HP-001**: The app MUST be reachable at one stable public web address from current desktop browsers on
-  Windows and macOS, with nothing installed by the reviewer.
+- **HP-001**: The app MUST be reachable on Azure at one stable public web address from current desktop
+  browsers on Windows and macOS, with nothing installed by the reviewer.
 - **HP-002**: The hosted app MUST be served only over an encrypted connection; an unencrypted request MUST be
   redirected to the encrypted address. The secure session cookie of slice 1 MUST keep working.
-- **HP-003**: The hosted app MUST run the same code as the deployed commit of `master`, with the same
-  behaviour as locally, apart from configuration values and the environment-specific behaviour ADR 0007
-  names (no migrations at start outside Development).
-- **HP-004**: Each deployment MUST bring the hosted database schema up to date with the deployed version's
-  schema migrations before that version serves requests, with no manual database step. A failed migration
-  MUST stop the deployment, and the new version MUST NOT serve requests against a partial schema.
+- **HP-003**: The hosted app MUST run the code of the deployed commit of `master`, with the same behaviour as
+  locally apart from configuration values and the behaviour the app already has outside the Development
+  environment: the error page, strict-transport headers, and no migrations at start (ADR 0007).
+- **HP-004**: Each deployment MUST bring the hosted database schema up to date with the deployed commit's
+  schema migrations before administrator creation and demo loading run, with no manual database step. A failed
+  migration MUST stop the deployment, and the new version MUST NOT serve requests against a partial schema.
 - **HP-005**: Every deployment MUST start the hosted app on an empty database, so that administrator creation
   and demo loading create the administrator and every shipped slice's demo data (ADR 0013). Accounts and
   data added on the hosted demo do not survive a deployment.
 - **HP-006**: At every start, the hosted app MUST run administrator creation and demo loading as ADR 0007
   describes, with the administrator email and password and the demo password taken from the hosted app's
   secret configuration.
-- **HP-007**: Reviewers MUST be able to sign in to the demo accounts with the published address, the demo
-  emails and the demo password given only with the exam submission. No page of the hosted app shows the demo
-  password. No secret value (passwords, connection strings, keys, tokens) MAY be in source control,
-  deployment definitions, build output, logs or error pages.
-- **HP-008**: Reviewers MUST be able to sign in as the configured administrator with the sign-in given the
-  same way as the demo sign-ins. An administrator still has no access to private goals, activity, notes or
-  custom habits of other accounts (SPEC §3, constitution III).
-- **HP-009**: The owner MUST be able to see, for each deployment, which commit was deployed, whether it
-  succeeded, and the reason when it failed.
-- **HP-010**: The owner MUST be able to read the hosted app's operator log, including the results of
-  administrator creation and demo loading. The log MUST NOT contain passwords, secrets, notes, custom-habit
-  names or recorded amounts (constitution III, slice 1 HP-017).
-- **HP-011**: Besides every deployment (HP-005), the owner MUST be able to refresh the hosted demo at any
+- **HP-007**: Secret values (passwords, connection strings, keys and tokens) MUST NOT be in source control,
+  deployment definitions, build output, logs or error pages, and no page of the hosted app shows the demo
+  password. Reviewers get the demo password only with the exam submission; the demo emails and the published
+  address are public.
+- **HP-008**: Reviewers MUST be able to sign in as the configured administrator with the administrator email
+  and password given with the exam submission. An administrator still has no access to private goals,
+  activity, notes or custom habits of other accounts (SPEC §3, constitution III).
+- **HP-009**: For each deployment and each demo refresh, the Operator MUST be able to see which commit runs,
+  whether it succeeded (HP-017), and the reason when it failed.
+- **HP-010**: The Operator MUST be able to read the hosted app's operator log, including the results of
+  administrator creation and demo loading; no page or public address of the hosted app exposes it. The log
+  MUST NOT contain secret values, notes, custom-habit names or recorded amounts (constitution III, slice 1
+  HP-017); it may contain the administrator email and demo emails (ADR 0007).
+- **HP-011**: Besides every deployment (HP-005), the Operator MUST be able to refresh the hosted demo at any
   time, without a new version and without editing the database by hand. A refresh brings the hosted demo to
-  the state of a freshly deployed empty database, including the catalog seed and the configured
+  the state of a freshly deployed empty database, including the seed catalog and the configured
   administrator's sign-in.
 - **HP-012**: Deploying a new version MUST NOT require changes to source code or committed files beyond the
   version itself; secret and environment values are set once, outside source control, and reused.
-- **HP-016**: A deployment MUST start only when the owner starts it, with one action, for a chosen commit of
+- **HP-013**: The hosted demo MUST use the lowest-cost Azure options that meet the other HP requirements,
+  SC-001 and SC-006; no redundancy, autoscaling, multi-region setup or disaster recovery (SPEC §9,
+  ARCHITECTURE §7). Nothing has to keep running after 2026-12-31.
+- **HP-014**: The hosted demo data and the configured administrator MUST stay visibly synthetic: emails only in
+  `example.com`, no real people (constitution VI).
+- **HP-015**: The repository MUST document, for the Operator, how to deploy, how to refresh the demo, how to run
+  the smoke check, where to read the deployment result and the operator log, and which items the exam
+  submission has to give reviewers. It MUST NOT state any secret value or the administrator email; the
+  published address and the demo emails may appear.
+- **HP-016**: A deployment MUST start only when the Operator starts it, with one action, for a chosen commit of
   `master`. A merge or push alone MUST NOT deploy or reset the hosted demo.
-- **HP-013**: The hosted demo MUST use the lowest-cost options that meet the other HP requirements, SC-001
-  and SC-006; no redundancy, autoscaling, multi-region setup or disaster recovery (SPEC §9, ARCHITECTURE §7).
-  Nothing has to keep running after 2026-12-31.
-- **HP-014**: The hosted demo data MUST stay visibly synthetic: emails only in `example.com`, no real people
-  (constitution VI).
-- **HP-015**: The repository MUST document, for the owner, how to deploy, where to read the deployment result
-  and the operator log, and how to refresh the demo data, without stating any secret value.
+- **HP-017**: A deployment or demo refresh MUST count as succeeded only when the hosted app serves requests and
+  its startup tasks created the administrator and every shipped slice's demo data, the seed catalog included;
+  otherwise it is reported as failed, even though the app starts. A failed deployment or refresh MAY leave the
+  hosted demo unavailable or incomplete until the next successful one.
+- **HP-018**: A restart of the hosted app that is not a deployment or demo refresh, such as waking up after
+  idling, MUST NOT end any session. Sessions still end as slice 1 defines (HP-004 browser close without "Keep
+  me signed in", HP-006 sign-out, HP-007 password change) and at every deployment or refresh.
 
 ### Key Entities
 
-- **Hosted demo**: the one public instance of the app that reviewers use; it has a public address, a
+- **Hosted demo**: the one public instance of the app on Azure that reviewers use; it has a public address, a
   database and secret configuration.
-- **Deployment**: one rollout of a commit of `master` to the hosted demo; it has the commit, a result
-  (succeeded or failed) and, on failure, a reason.
-- **Secret configuration**: the hosted demo's administrator email and password, demo password and database
-  connection; held outside source control, never shown in logs.
-- **Demo sign-in information**: the published address, the demo emails, the demo password and the
-  administrator sign-in; given to reviewers only with the exam submission.
+- **Deployment**: one rollout of a chosen commit of `master` to the hosted demo, started by the Operator; it
+  has the commit, a result (succeeded or failed, HP-017) and, on failure, a reason. The hosted demo itself is
+  the installation it rolls out to (`CONTEXT.md`, Deployment and Hosted demo).
+- **Secret configuration**: the hosted demo's administrator email, administrator password, demo password and
+  database connection; held outside source control. Its secret values (the passwords and the connection) never
+  appear in logs; the administrator email appears in the operator log.
+- **Demo sign-in information**: the published address, the demo emails, the demo password, the administrator
+  email and the administrator password; given to reviewers with the exam submission, where the two passwords
+  are the only secret values.
 - **Demo refresh**: bringing the hosted demo's data back to the state of a freshly deployed empty database;
-  happens on every deployment and whenever the owner asks for it.
-- **Operator log**: the hosted app's log of startup tasks and faults, readable by the owner only.
+  happens as part of every deployment, and on its own, without a new commit, whenever the Operator starts a
+  refresh; it has a result like a deployment (HP-017).
+- **Operator log**: the hosted app's log of startup tasks and faults, readable only by the Operator.
 
 ## Success Criteria *(mandatory)*
 
@@ -273,58 +342,65 @@ for a demo refresh, and sign in to that account again with the original demo sig
   app has been idle, and every later page within 3 seconds, in at least 9 of 10 attempts.
 - **SC-002**: A reviewer who has never seen the app signs in to a demo account and sees its demo data within
   3 minutes of receiving the address and the sign-in information, without installing anything and without
-  contacting the owner.
-- **SC-003**: Deploying a new version of `master`, including a schema migration, takes the owner at most one
+  contacting the Operator.
+- **SC-003**: Deploying a new commit of `master`, including a schema migration, takes the Operator at most one
   action to start and finishes within 15 minutes, with no manual database step.
-- **SC-004**: A search of the repository, the deployment definitions and the hosted app's logs finds no
-  secret value.
-- **SC-005**: After a demo refresh, all three demo accounts sign in with the original sign-in information and
-  show their full demo data, and the catalog shows its full seed, in 100% of checks.
-- **SC-006**: The hosted demo is reachable on every check from its first deployment until 2026-12-31 (the
-  exam is on 2026-11-23), apart from the minutes of an owner-started deployment or refresh.
-- **SC-007**: The monthly hosting cost stays at or under the budget the owner sets in the hosting ADR.
-- **SC-008**: The hosted demo, with every slice shipped by then, is reachable before the exam on 2026-11-23;
-  work on this slice starts no later than 2026-11-20.
+- **SC-004**: A search by the Operator of the repository, the deployment definitions and the operator log for
+  the values in the secret configuration finds none of the passwords or the connection.
+- **SC-005**: After every succeeded deployment and demo refresh, the smoke check signs in to every demo
+  account with the demo password and finds every shipped slice's demo data, and finds the full seed catalog.
+- **SC-006**: The smoke check passes (it reaches the hosted demo and finds what SC-005 checks) on 2026-11-23
+  and on each weekly check from the first deployment until 2026-12-31, apart from the minutes of an
+  Operator-started deployment or refresh.
+- **SC-007**: The monthly hosting cost stays at or under the budget recorded as a number in the hosting ADR.
+- **SC-008**: The hosted demo, with every slice shipped by then, is reachable before the exam on 2026-11-23.
 
 ## Decisions due before `/speckit-plan`
 
-The roadmap places these technical decisions in this slice. This slice has no acceptance-test stage, so each
-is decided with the owner before `/speckit-plan`, written as an ADR where the roadmap row or the
+The roadmap places these technical decisions in this slice. They are ARCHITECTURE §9 deferred choices, so
+each carries a marker (constitution, Decision Discipline) and the plan's Constitution Check fails while one
+is open. Each is decided with the owner when the slice resumes, written as an ADR where the roadmap row or the
 constitution's test asks for one, and recorded as a dated line in `## Clarifications` that links the ADR.
 `research.md` then cites the answers instead of choosing them.
 
-- Hosting services, deployment, pipelines, monitoring and secrets mechanics (ADR), including the budget of
-  SC-007. That the owner starts each deployment is decided (Clarifications, HP-016); how is the ADR's. Scheduled
-  evaluation (slice 5) may need more later; changing this then needs a superseding ADR.
-- Schema migration rollout on each deployment (HP-004). Locally the host applies migrations at start in
-  Development only (ADR 0007).
-- How the hosted demo data is refreshed. When is decided (Clarifications: every deployment and on the
-  owner's demand); the mechanism goes into the ADR. Time-relative demo data (slice 5) may reopen it.
-- How reviewers get demo sign-ins with no secret in source control. The channel is decided (Clarifications:
-  only with the exam submission); how the hosted app receives the demo and administrator passwords is part
-  of the secrets mechanics above.
-- Roadmap decision R2 (when to host the demo) is decided: at the end, starting no later than 2026-11-20
-  (Clarifications). The technical decisions above are taken when the slice resumes, so they can account for
-  the slices shipped by then (for example scheduled evaluation from slice 5).
+- Owner confirmation of the author's decisions under "Critic revision 2026-11-15" in `## Clarifications`
+  (Operator as the actor, the secret boundary, the success rule, sessions across restarts, the synthetic
+  administrator email, no extra seed content), and so of HP-014, HP-017 and HP-018. The confirmation is
+  recorded as a dated line in `## Clarifications`; a decision the owner changes is revised before
+  `/speckit-plan`.
+- [NEEDS CLARIFICATION: ARCHITECTURE §9] Azure services and tiers, deployment, pipeline, monitoring and
+  secrets mechanics (ADR), including the budget of SC-007 as a number. That the Operator starts each
+  deployment is decided (HP-016); how is the ADR's. Because the slice resumes after the product slices, the
+  ADR also covers what slices shipped by then need from hosting, such as scheduled evaluation (slice 5).
+- [NEEDS CLARIFICATION: ARCHITECTURE §9] Schema migration rollout on each deployment, before the startup tasks
+  run (HP-004). Locally the host applies migrations at start in Development only (ADR 0007).
+- [NEEDS CLARIFICATION: ARCHITECTURE §9] How the hosted demo is refreshed, and how its success is detected
+  (HP-011, HP-017). When is decided (every deployment and on the Operator's demand). If slices with demo data
+  relative to the current time have shipped, the decision also covers keeping that data current until
+  2026-12-31 (Edge Cases).
+- [NEEDS CLARIFICATION: ARCHITECTURE §9] How the hosted app receives the administrator and demo passwords and
+  how sessions survive a restart (HP-007, HP-018). The reviewers' channel is decided (the exam submission).
+- Roadmap decision R2 (when to host the demo) is decided: at the end, by the latest start date in
+  Clarifications.
 
 ## Assumptions
 
 - Reviewers use a current desktop browser (Chrome, Edge, Firefox or Safari) on Windows or macOS; phone
   layouts work as they do locally but are not checked for this slice.
-- One hosted instance is enough; there is no separate staging environment. The owner verifies changes
+- One hosted instance is enough; there is no separate staging environment. The Operator verifies changes
   locally and through the tests before deploying.
 - The hosted app may sleep when idle (Clarifications); SC-001 allows for a slow first request.
-- The public address may be the hosting provider's default address; a custom domain is not required.
+- The public address may be Azure's default address for the chosen service; a custom domain is not required.
 - The hosted app keeps open registration as locally: anyone can register an account. Such accounts last
   only until the next deployment or refresh.
-- No new page, banner or design element is added in this slice; the demo sign-in information lives only in
-  the exam submission.
-- The exam submission text is written by the owner outside the repository; this slice does not produce it,
-  but HP-015's documentation lists what it has to contain (address, demo emails, where the passwords come
-  from), without the values.
-- Demo loading and administrator creation keep their slice 1 behaviour; this slice only supplies their
-  configuration and database on the hosted app.
-- Monitoring means the owner can read deployment results and the operator log; alerting, dashboards and
-  uptime monitoring are out of scope.
-- No new domain term is introduced; "hosted demo", "deployment" and "demo refresh" are operational terms and
-  do not go into `CONTEXT.md`.
+- No new page, banner or design element is added in this slice; the demo password reaches reviewers only
+  through the exam submission (it is also in the hosted demo's secret configuration).
+- The exam submission text is written by the owner outside the repository; this slice does not produce it.
+  HP-015's documentation names the items it has to contain, without their secret values or the
+  administrator email.
+- Demo loading and administrator creation keep the behaviour of slices 1 and 2 (demo accounts, their custom
+  habits, the seed catalog); this slice only supplies their configuration and database on the hosted app.
+- Monitoring means the Operator can read deployment and refresh results and the operator log, and runs the
+  smoke check; alerting, dashboards and continuous uptime monitoring are out of scope.
+- "Deployment", "Hosted demo" and "Demo refresh" are added to `CONTEXT.md` in the same change, and the
+  Operator entry is sharpened to separate the installation from its deployments (constitution I).
