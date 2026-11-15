@@ -95,9 +95,10 @@ jobs:
 
       - name: Set up .NET
         if: steps.pre.outputs.run == 'true'
-        # setup-dotnet@v5 downloads from dotnetorigin.blob.core.windows.net, which answered HTTP 409
-        # (2026-10-25, seen in another repo); v4 uses builds.dotnet.microsoft.com.
-        uses: actions/setup-dotnet@v4
+        # v5 runs on Node 24 (v4 targets the deprecated Node 20). The HTTP 409 from
+        # dotnetorigin.blob.core.windows.net on 2026-10-25 was a .NET release-day outage that hit
+        # v5 and v6 alike and was fixed the same day (actions/setup-dotnet issue 794).
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
