@@ -50,6 +50,11 @@ HabitTracker.slnx        solution
 Directory.Build.props    shared build settings (net10.0, nullable, warnings as errors)
 src/                     production projects
 tests/                   test projects
+tools/                   operational tools, outside the four layers
+  HT.SmokeCheck/         smoke check of the hosted demo (.NET console tool, references HT.Application only)
+  hosting/               provisioning and teardown scripts of the hosted demo, with selftest.ps1
+  pr-gates/              PR review gate scripts (see PR review flow)
+  guard-oracle/          tests of the Claude Code commit guard hook
 docs/adr/                architecture decision records (0001-initial-setup.md)
 specs/                   Spec Kit feature folders: spec, plan, tasks (001-accounts-and-access/)
 .specify/                Spec Kit templates, scripts and the project constitution
@@ -93,6 +98,14 @@ the results, never a password. The full walk-through:
 [specs/001-accounts-and-access/quickstart.md](specs/001-accounts-and-access/quickstart.md).
 
 Warnings are treated as errors — the build must stay warning-free.
+
+## Hosted demo
+
+Reviewers use one Azure-hosted instance with demo data until 2026-12-31. The Operator provisions it with
+`tools/hosting/provision.ps1`, then deploys, refreshes and checks it with the manual GitHub Actions workflow
+**Deploy demo** (`.github/workflows/deploy-demo.yml`); a merge never deploys. How to do each, and what the exam
+submission gives reviewers: [docs/operations/hosted-demo.md](docs/operations/hosted-demo.md). Decisions:
+[ADR 0015](docs/adr/0015-demo-hosting.md).
 
 ## Development workflow
 

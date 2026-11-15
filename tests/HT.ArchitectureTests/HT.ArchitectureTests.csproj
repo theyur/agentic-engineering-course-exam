@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/HT.Ui/HT.Ui.csproj" />
     <ProjectReference Include="../../src/HT.Persistence/HT.Persistence.csproj" />
+    <ProjectReference Include="../../tools/HT.SmokeCheck/HT.SmokeCheck.csproj" />
   </ItemGroup>
 
 </Project>

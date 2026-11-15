@@ -6,15 +6,19 @@ using HT.Persistence;
 
 namespace HT.ArchitectureTests;
 
-/// <summary>The one architecture model every rule checks: the four production assemblies.</summary>
+/// <summary>
+/// The one architecture model every rule checks: the four production assemblies and the smoke check tool
+/// (slice 3).
+/// </summary>
 internal static class ArchitectureModel
 {
     public static readonly System.Reflection.Assembly Domain = typeof(AccountId).Assembly;
     public static readonly System.Reflection.Assembly Application = typeof(ApplicationServiceCollectionExtensions).Assembly;
     public static readonly System.Reflection.Assembly Persistence = typeof(PersistenceAssemblyMarker).Assembly;
     public static readonly System.Reflection.Assembly Ui = typeof(HT.Ui.Components.App).Assembly;
+    public static readonly System.Reflection.Assembly SmokeCheck = typeof(HT.SmokeCheck.SmokeCheckCommand).Assembly;
 
     public static readonly Architecture Architecture = new ArchLoader()
-        .LoadAssemblies(Domain, Application, Persistence, Ui)
+        .LoadAssemblies(Domain, Application, Persistence, Ui, SmokeCheck)
         .Build();
 }
