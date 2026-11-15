@@ -19,9 +19,10 @@ C# / .NET 10, Blazor Interactive Server, EF Core + SQL Server (only provider —
 
 - Build: `dotnet build HabitTracker.slnx`
 - Test: `dotnet test HabitTracker.slnx`; single test: `dotnet test HabitTracker.slnx --filter "FullyQualifiedName~<TestName>"`
-  - The integration and UI tests need SQL Server: `.\COLL1` with integrated security, or `HT_IT_CONNECTION` and `HT_UI_CONNECTION` pointing elsewhere (ADR 0006).
+  - The integration and UI tests need SQL Server: `.\COLL1` with integrated security, or `HT_IT_CONNECTION` and `HT_UI_CONNECTION` pointing elsewhere (ADR 0006). Some host tests also use the derived databases `HT-UI-SMOKE` and `HT-UI-KEYS` on the same server.
 - Run UI: `dotnet run --project src/HT.Ui --launch-profile https`, then open `https://localhost:7194` (the session cookie is `Secure`). The operator values are User Secrets of `HT.Ui` (`Operator:AdministratorEmail`, `Operator:AdministratorPassword`, `Operator:DemoPassword`); never read or print their values.
 - Changed `.claude/hooks/architecture-gate.ps1`? Run `pwsh tools/guard-oracle/oracle.ps1` — it must print `PASSED` (see `tools/guard-oracle/README.md`).
+- Changed `tools/hosting/`? Run `pwsh -NoProfile -File tools/hosting/selftest.ps1` — it must print `PASSED`.
 - `TreatWarningsAsErrors` is on — any warning fails the build; fix it, don't suppress it.
 - `TargetFramework`, `Nullable`, `ImplicitUsings` live in root `Directory.Build.props`; don't repeat them in `.csproj` files.
 
@@ -33,6 +34,7 @@ C# / .NET 10, Blazor Interactive Server, EF Core + SQL Server (only provider —
   - `HT.Application` references only `HT.Domain`.
   - `HT.Persistence` implements contracts defined inward; no business rules or workflow decisions.
   - `HT.Ui` is the composition root; components must not touch persistence implementations directly.
+- `tools/HT.SmokeCheck` is a .NET tool outside the four layers (the hosted demo's smoke check); it references `HT.Application` only, enforced by `SmokeCheckDependencyTests`.
 - No business rules in Blazor components; no EF/SQL details in Domain or Application.
 - Layer rules must be enforced by architecture tests, not just prose.
 - Schema changes only via EF Core migrations.

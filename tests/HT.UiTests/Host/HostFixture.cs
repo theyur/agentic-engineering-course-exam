@@ -22,7 +22,7 @@ public sealed class HostFixture : WebApplicationFactory<Program>, IAsyncLifetime
 
     private static readonly string[] ForbiddenDatabases = ["HT", "HT-AC", "HT-IT"];
 
-    private const string LocalDefault =
+    internal const string LocalDefault =
         @"Server=.\COLL1;Database=HT-UI;Integrated Security=True;TrustServerCertificate=True";
 
     public HostFixture()

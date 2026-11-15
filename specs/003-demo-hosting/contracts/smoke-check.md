@@ -21,9 +21,9 @@ dotnet run --project tools/HT.SmokeCheck -- <base-url> [--skip-http-redirect] [-
 
 ## Checks, in order
 
-Each check that signs in uses a new client with an empty cookie container. The checks class takes a client
-factory (`Func<HttpClient>`), not one client: the tool's factory creates an `HttpClient` with its own
-`CookieContainer`; the in-process host test passes the factory's `CreateBrowser`, which returns a new client
+Each check that signs in uses a new client with an empty cookie container. The checks class `SmokeCheckRunner`
+takes a client factory (`Func<HttpClient>`), not one client: the tool's factory creates an `HttpClient` with its
+own `CookieContainer`; the in-process host test passes the factory's `CreateBrowser`, which returns a new client
 with its own cookies on every call.
 
 | # | Name | Passes when |
@@ -44,7 +44,7 @@ with its own cookies on every call.
     succeeded or not; when it did not succeed and a retry was needed, the line says `first <ms> ms (retried)`
     and the sample does not count for SC-001. Meaningful in `check` runs after the app has had no requests;
     after a deployment's start it measures the cold start instead.
-  - `later`: for the first demo account, after its sign-in, the duration of `GET /custom-habits` together with
+  - `later`: for the first demo account that signs in, after its sign-in, the duration of `GET /custom-habits` together with
     every stylesheet and script the page links (`<link rel="stylesheet" href>`, `<script src>`), fetched one
     after another with that account's cookie, as a signed-in browser without a cache does (slice 1 research
     R-09: no-store, one security-stamp lookup per request). It does not include opening the interactive
@@ -71,10 +71,18 @@ yet then.
 
 ## Output
 
-One line per check, `PASS <name> (<found> of <expected>)` or `FAIL <name>: <reason>`, then
-`TIMING first <ms> ms[ (retried)], later <ms> ms (<n> requests)`, then `RESULT PASS` or `RESULT FAIL`. `<name>` contains a demo email
-or the word `administrator`, never the administrator email. No password, habit name, note or page content is
-printed.
+One line per check, in order. Every check runs, also after an earlier one failed (a failed `home` does not stop
+checks 2–5):
+
+- a check with a list of expected names (`catalog`, `demo <email>`): `PASS <name> (<found> of <expected>)` or
+  `FAIL <name>: <reason>`, where `<found>` counts the expected names present on the page, not the cards shown;
+- a check without a list (`home`, `https-redirect`, `administrator`): `PASS <name>` or `FAIL <name>: <reason>`;
+- check 2 with `--skip-http-redirect`: `SKIP https-redirect`.
+
+Then `TIMING first <ms> ms[ (retried)], later <ms> ms (<n> requests)`, or `TIMING first <ms> ms[ (retried)], later n/a`
+when no demo account signed in, then `RESULT PASS` or `RESULT FAIL`. "Every check line" means the lines before
+`TIMING`. `<name>` contains a demo email or the word `administrator`, never the administrator email. No
+password, habit name, note or page content is printed.
 
 ## Exit codes
 
@@ -85,6 +93,22 @@ variable).
 
 `Program.cs` only calls `SmokeCheckCommand.RunAsync(args, environment, output)`, which parses the arguments,
 reads the three variables from the environment dictionary it is given, runs the checks and returns the exit
-code. `SmokeCheckCommand`, `SmokeCheck`, `PageReader` and `SmokeCheckCoverage` are public, so `HT.UiTests` tests
-the invocation, the page reading and the coverage without starting a process. The tool's `Program` stays
-internal.
+code. Its optional fourth parameter `createHandler` (`Func<HttpMessageHandler>?`) gives each new client its
+handler, so tests run without a network; by default each client gets a new `HttpClientHandler` with its own
+cookies that does not follow redirects.
+
+Public types, so `HT.UiTests` tests the invocation, the checks, the page reading and the coverage without
+starting a process:
+
+- `SmokeCheckCommand`: `RunAsync(string[] args, IDictionary environment, TextWriter output,
+  Func<HttpMessageHandler>? createHandler = null)` and `Parse(string[] args, IDictionary environment)`, which
+  returns a `SmokeCheckParseResult` (options or a usage error that names no value);
+- `SmokeCheckOptions`: the base URL, the three values, `SkipHttpRedirect` and `WarmUp`; its text form leaves
+  out the passwords and the administrator email;
+- `SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOptions options, TextWriter output)` with
+  `RunAsync()`, which writes the output lines and returns a `SmokeCheckResult` (the check lines, the `TIMING`
+  line, the timings and `Passed`);
+- `PageReader`;
+- `SmokeCheckCoverage`, whose `Entries` are `CoverageEntry` records (method, parameter, parameter type, check).
+
+The tool's `Program` stays internal.

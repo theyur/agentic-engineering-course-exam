@@ -105,23 +105,29 @@ tools/HT.SmokeCheck/                              # new console project, in Habi
 ├── HT.SmokeCheck.csproj                          # references src/HT.Application only
 ├── Program.cs                                    # internal: calls SmokeCheckCommand.RunAsync
 ├── SmokeCheckCommand.cs                          # public: arguments, environment, exit codes (contract)
-├── SmokeCheck.cs                                 # public: the checks over a client factory (contract)
+├── SmokeCheckOptions.cs                          # public: SmokeCheckOptions, SmokeCheckParseResult
+├── SmokeCheckRunner.cs                           # public: the checks over a client factory (contract)
+├── SmokeCheckResult.cs                           # public: check lines, timings, Passed
 ├── PageReader.cs                                 # public: antiforgery token, handler, names
-└── SmokeCheckCoverage.cs                         # public: IDemoDataStore parameters and their checks (R-06)
+└── SmokeCheckCoverage.cs                         # public: SmokeCheckCoverage, CoverageEntry: IDemoDataStore parameters, checks (R-06)
 tools/hosting/
+├── HostingFunctions.ps1                          # the offline parts: example.com check, secret-file helper, parse check
 ├── provision.ps1                                 # Operator, once, after changes, and for rotation (R-03)
 ├── teardown.ps1                                  # after 2026-12-31
-└── selftest.ps1                                  # example.com check and secret-file helper; prints PASSED
+└── selftest.ps1                                  # tests HostingFunctions.ps1, parses both scripts; prints PASSED
 .github/workflows/deploy-demo.yml                 # workflow_dispatch only, modes deploy/refresh/check (contract)
 .github/workflows/sonar.yml                       # coverage exclusion narrowed to the script folders (R-11)
 docs/operations/hosted-demo.md                    # Operator documentation (HP-015, R-10)
 README.md, CLAUDE.md                              # layout: tools/HT.SmokeCheck; Operator document; selftest command
 tests/HT.UiTests/HT.UiTests.csproj                # + reference to tools/HT.SmokeCheck
+tests/HT.UiTests/Host/DerivedDatabaseHost.cs      # host factory on a derived database (HT-UI-SMOKE, HT-UI-KEYS)
 tests/HT.UiTests/Host/SmokeCheckHostTests.cs      # own factory, database HT-UI-SMOKE
 tests/HT.UiTests/Host/DataProtectionKeysTests.cs  # two factories, database HT-UI-KEYS
-tests/HT.UiTests/SmokeCheck/PageReaderTests.cs
-tests/HT.UiTests/SmokeCheck/InvocationTests.cs
-tests/HT.UiTests/SmokeCheck/CoverageTests.cs
+tests/HT.UiTests/SmokeChecks/PageReaderTests.cs
+tests/HT.UiTests/SmokeChecks/InvocationTests.cs
+tests/HT.UiTests/SmokeChecks/RunnerBehaviourTests.cs   # scripted site, no network
+tests/HT.UiTests/SmokeChecks/ScriptedHandler.cs        # fake HttpMessageHandler for RunnerBehaviourTests
+tests/HT.UiTests/SmokeChecks/CoverageTests.cs
 tests/HT.ArchitectureTests/SmokeCheckDependencyTests.cs   # + HT.SmokeCheck in the architecture model
 ```
 

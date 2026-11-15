@@ -11,4 +11,7 @@
     <Project Path="tests/HT.IntegrationTests/HT.IntegrationTests.csproj" />
     <Project Path="tests/HT.UiTests/HT.UiTests.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/HT.SmokeCheck/HT.SmokeCheck.csproj" />
+  </Folder>
 </Solution>

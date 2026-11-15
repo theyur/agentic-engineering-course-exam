@@ -7,6 +7,7 @@ using HT.Ui.Habits;
 using HT.Ui.Operator;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -54,6 +55,17 @@ builder.Services.AddScoped<AccountSession>();
 builder.Services.AddScoped<ActingUserAccessor>();
 // Interactive pages call each use case in a scope of its own (research R-15).
 builder.Services.AddSingleton<UseCaseScope>();
+
+// HP-018 (slice 3 research R-07): the hosted app keeps its session keys in an explicit directory on persistent
+// storage, so a restart that is not a deployment or refresh keeps users signed in. Unset (local runs, tests):
+// the framework's default key storage, unchanged.
+var keysDirectory = builder.Configuration["DataProtection:KeysDirectory"];
+if (!string.IsNullOrWhiteSpace(keysDirectory))
+{
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(keysDirectory))
+        .SetApplicationName("HabitTracker");
+}
 
 var app = builder.Build();
 
