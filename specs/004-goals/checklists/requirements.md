@@ -51,3 +51,23 @@
   editable in Profile. The markers are replaced (FR-011, FR-017, FR-021); FR-024 to FR-027, US10, HP-015 and
   HP-016 are added; the answers are recorded in `## Clarifications` with ADR 0016 (Proposed). All items pass.
   D-1 to D-5 remain for `/speckit-clarify`.
+- Iteration 3 (2026-11-17, `/speckit-clarify`): D-1 to D-5 are decided (attempt 1 from the start; count the
+  times; the first full week, told with no confirmation; name, greeting and date; a Notice and no new goals on
+  an Unpublished habit). The defaults the iteration 1 notes describe for FR-004, FR-013, FR-016 and HP-010 are
+  replaced by those answers; no decision is open.
+- Iteration 4 (2026-11-17, after [critic spec pass 1](../critic-spec-pass-1.md)): the duplicate FR-030 is
+  resolved (the catalog requirements are now FR-031 to FR-035) and FR-019 is added. Before that fix, "All
+  functional requirements have clear acceptance criteria" did not hold, although it was ticked. The slice 2
+  rules the scenarios depend on are now restated, so the spec stands alone for `/speckit-ac-translate`.
+  `CONTEXT.md` gains this slice's terms. All items pass.
+- Iteration 5 (2026-11-17, after [critic spec pass 2](../critic-spec-pass-2.md)): a time zone change is
+  measured on each goal's own timeline (FR-012, FR-016, FR-026). The demo goals no longer use the custom
+  habits that slice 2's locked AC-066 deletes, and demo loading loads the seed catalog first (FR-040). The
+  items pass, with one condition outside this list: the defaults under "Critic revision 2026-11-17" in
+  `## Clarifications` await the owner's confirmation before `/speckit-ac-translate`. Until then they are open
+  decisions.
+- Iteration 6 (2026-11-17, MINOR notes of [critic spec pass 3](../critic-spec-pass-3.md), which approved): the
+  open defaults now carry one `[NEEDS CLARIFICATION]` marker (constitution, Decision Discipline), so "No
+  [NEEDS CLARIFICATION] markers remain" fails until the owner answers it. All other items pass.
+- Iteration 7 (2026-11-17): the owner confirmed all defaults of "Critic revision 2026-11-17"; the answer is
+  recorded in `## Clarifications` and the marker is removed. All items pass; no decision is open.

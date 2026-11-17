@@ -48,13 +48,45 @@ from the start (constitution II), and decides whether a goal starts as its first
 - Q: When a catalog habit is unpublished, how does that show to the people who have goals on it? → A: The goal
   keeps working; its page shows the Notice "This habit is no longer in the public catalog. Your goal keeps
   working."; the goal list shows nothing extra; no new goal can be created on that habit, by anyone ("This
-  habit is not in the catalog.") (FR-016, FR-033, HP-004).
+  habit is not in the catalog.") (FR-016, FR-034, HP-004).
 - Q: Should accounts get a personal name in this slice, and what does the top of the signed-in Home show? → A:
   Name, greeting and date. Register and Profile gain an optional "Name"; Home shows "Good morning", "Good
   afternoon" or "Good evening", followed by ", <name>" when a name is set, and today's date; Profile shows the
-  name and "member since" (FR-028 to FR-030, HP-010, HP-015, HP-017). The hour boundaries of the greeting and
-  the absence of "member since" for accounts created before this slice are this spec's defaults, stated in
-  FR-029 and FR-030.
+  name and "member since" (FR-028 to FR-030, HP-010, HP-015, HP-017).
+
+### Critic revision 2026-11-17
+
+Defaults chosen while revising after [critic pass 1](critic-spec-pass-1.md) and
+[critic pass 2](critic-spec-pass-2.md). They fill gaps the owner's answers left open and stay within the
+recorded decisions; the owner confirmed all of them on 2026-11-17, before `/speckit-ac-translate`. The
+greeting's hour boundaries and "no member since" for older accounts (FR-029, FR-030) are defaults of the same
+kind, confirmed with them.
+
+- A time zone change is measured on each goal's own timeline: from the goal's current date (the latest date
+  whose day has begun, in the time zone of that day's version), not from the account's date, so a change
+  never moves a day that has begun. Reading a goal gives the version of its current date and the one later
+  version, if any; a goal never has more than one version after its current date, and a further change
+  replaces it (FR-012, FR-016, FR-026).
+- A large move east may create a first new-zone commitment or period that has already begun; it is kept, and
+  the gap or overlap can be up to 26 hours (FR-027).
+- A named time zone is any identifier of the IANA time zone database, zone or link, other than the "Etc/…"
+  ones, plus "UTC"; Windows names, offsets and abbreviations are not. A value that is not one is refused in
+  Profile and replaced by the default at registration (FR-024 to FR-026). Acceptance tests expect the default
+  "UTC" (FR-025).
+- A Reduce yes/no goal on fixed days has the target text "avoided on …" ("avoided on Mon–Fri", "avoided every
+  day"), not slice 2's "at most 5 days a week", which would say the opposite of FR-004 (target text bullet).
+- The demo data shows the new states (constitution VI): demo1 is named "Demo One", demo2's Yoga goal is named
+  "Morning yoga", and demo3 has a goal on the seed's Unpublished "Coffee". No demo goal uses a demo custom habit
+  that slice 2's locked AC-066 deletes; the seed catalog is loaded before the demo accounts (FR-040); the smoke
+  check finds them (HP-018).
+- The use cases of slices 1 and 2 keep their results for the calls they already accept, so that their locked
+  acceptance criteria pass unchanged (FR-019).
+- The administrator's catalog table keeps having no "Updated" column (slice 2 HP-009).
+- The goal's Build or Reduce is never called "intent" (`CONTEXT.md`); the summary sentence uses no
+  habit-specific verb (HP-002).
+
+- Q: Does the owner confirm the defaults of "Critic revision 2026-11-17" above, including the time zone rules
+  that touch SPEC §11.1 and ARCHITECTURE §9? → A: Yes, all of them, as written (owner, 2026-11-17).
 
 No decision of this slice is open; see
 [Decisions due before acceptance criteria](#decisions-due-before-acceptance-criteria).
@@ -87,8 +119,9 @@ Recorded in earlier slices and not decided again here:
   [ADR 0003](../../docs/adr/0003-acceptance-tests.md).
 - Administrators have no custom habits (slice 2 FR-025); slice 2 recorded that slice 4 reopens this only if
   administrators get goals.
-- No time-dependent text until this slice decides time zones (slice 1, Clarifications). This slice is the
-  first to read the current time; it enters as a supplied value (constitution II).
+- No time-dependent text until this slice decides time zones (slice 1, Clarifications; slice 1 HP-015). The
+  current time already enters the Application as a supplied value (`TimeProvider`, ADR 0005 "Time"), as slice
+  1's sign-in block uses it; this slice is the first to turn it into dates in a time zone (constitution II).
 
 ## Slice 1 and slice 2 behaviour these tests use
 
@@ -103,9 +136,49 @@ Restated here, unchanged, so that this spec alone gives the rules and texts its 
 - **Custom habits** (slice 2 FR-020 to FR-025): a registered user creates, lists, reads, edits and deletes
   their own custom habits; an identifier that is not one of the acting user's custom habits gives "This custom
   habit does not exist."; an administrator gets "Custom habits are for registered users.".
-- **Suggested starting goal fields and text** (slice 2 FR-007, FR-017): as cited above. FR-017's text is
-  what this spec calls the *target text*, for example "15 min, 5 days a week", "at most 1 sweet a day" or
-  "3 times a week".
+- **Names** (slice 2 FR-004): names are trimmed; name order compares names ordinally, ignoring case
+  (culture-invariant), never by the current culture. Character limits count UTF-16 code units (slice 2, owner
+  answer 2026-11-14).
+- **Target fields and their checks** (slice 2 FR-007 and its owner answers of 2026-11-14), which goals use as
+  they are:
+  - Build or Reduce; a Build target means at least the amount, a Reduce target at most the amount.
+  - The measurement: yes/no, count or duration. Yes/no carries no amount and no unit.
+  - For count and duration, the amount: a whole number from 1 to 999 for Build, from 0 to 999 for Reduce. For
+    count, a unit of 1 to 20 characters after trimming, stored trimmed with its spelling and case unchanged
+    (`"  pages  "` is stored as "pages"); for duration, the unit minutes or hours.
+  - The schedule: either fixed days (one or more days of the week), or N times (1 to 20) per day or per week.
+  - The checks, one result, in this order: no Build or Reduce "Choose Build or Reduce."; no measurement
+    "Choose how it is measured."; a yes/no with an amount or a unit "A yes/no suggested starting goal has no
+    amount or unit." (for goals: "A yes/no goal has no amount or unit.", FR-006); for count and duration an
+    amount missing or out of range "Enter a whole number from 1 to 999." (Build) or "Enter a whole number from
+    0 to 999." (Reduce); a count with an empty unit "Enter a unit, for example pages."; a unit longer than 20
+    characters "The unit can have at most 20 characters."; a duration with no unit "Choose minutes or
+    hours."; no schedule "Choose fixed days or how many times."; fixed days with no day "Choose at least one
+    day."; times missing or out of range "Enter a number of times from 1 to 20."; times with no period "Choose
+    per day or per week.".
+  - Values that do not belong to the chosen measurement or schedule (a duration unit on a count, a count unit
+    on a duration, days with N times) are not refused and not stored. A yes/no whose count unit is empty after
+    trimming has no unit, so it is not refused for it.
+- **Target text and kind** (slice 2 FR-017). The *target text* of this spec is FR-017's text, produced from the
+  fields above:
+  - Amount part: count "N unit" with the unit as stored ("20 pages", "1 sweet"); duration "N min" for minutes
+    and "N h" for hours; yes/no has none.
+  - Schedule part: fixed days on all seven days "daily", on one day "once a week", otherwise "N days a week";
+    1 time per day "a day" ("once a day" for yes/no); N times per day "N times a day"; 1 time per week "once a
+    week"; N times per week "N times a week".
+  - Text: the amount part and the schedule part, joined by a space when the schedule part is "daily" or "a
+    day" and by ", " otherwise; yes/no is the schedule part alone. A Reduce text starts with "at most ".
+    Examples: "15 min, 5 days a week", "at most 1 sweet a day", "3 times a week", "daily", "at most 2 cups a
+    day".
+  - One exception, for goals only (a suggested starting goal keeps slice 2's text): a Reduce yes/no goal on
+    fixed days is met on a scheduled day when it is not done (FR-004), so its target text is "avoided on " and
+    the days as the kind writes them ("avoided on Mon–Fri", "avoided on Sat, Sun"), or "avoided every day" for
+    all seven days, never "at most 5 days a week".
+  - Kind: "Yes/no", "Count" or "Duration", then " · ", then "flexible" for N times, or "fixed days " and the
+    days: "every day" for all seven; otherwise the chosen days in week order (Monday first, not wrapping from
+    Sunday to Monday), each run of three or more consecutive days written as its first and last day joined by
+    "–" and every other day on its own, all comma-separated ("Mon–Fri", "Mon, Wed, Fri", "Mon–Wed, Sat").
+    Day names are Mon, Tue, Wed, Thu, Fri, Sat, Sun.
 - **Demo loading** (slice 1 FR-016, slice 2 FR-030, FR-031): creates `demo1@example.com` to
   `demo3@example.com` with the demo password (account result "created" or "already exists"), the seed
   catalog into an empty catalog, and each created account's demo custom habits. This slice adds demo goals
@@ -121,7 +194,9 @@ Domain types they use. As in slices 1 and 2:
 - **HP-NNN** are host, page and integration requirements, verified by unit, integration and selective UI
   tests, not by acceptance tests.
 - Scenarios marked *(page)* describe page or browser behaviour and are expected to be listed as "Not testable
-  through the API" in `acceptance.md`.
+  through the API" in `acceptance.md`; so is any part of a scenario that says it is not testable through the
+  API (US11-AS6).
+- FR numbers are grouped by topic; FR-036 to FR-039 are not used, and demo loading keeps FR-040 as in slice 2.
 - The current time is supplied to the use cases that depend on it (constitution II), so acceptance tests fix
   "now" and the time zone instead of waiting for real time.
 
@@ -200,14 +275,16 @@ demonstrable before recording exists.
 2. **Given** a goal on fixed days Monday, Wednesday and Friday that started earlier, **When** the user lists
    goals on a Wednesday, **Then** its next commitment is that Wednesday (today); on a Thursday, it is the next
    Friday.
-3. **Given** a goal whose start date is after today, **When** the user lists goals, **Then** the goal says it
-   starts on its start date and gives no next commitment.
+3. **Given** a per-day goal whose start date is after today, **When** the user lists goals, **Then** the goal
+   gives its start date and no next commitment; **given** a goal on fixed days Monday, Wednesday and Friday
+   whose start date is a later Tuesday, it gives that start date and, as its next commitment, the Wednesday
+   after it.
 4. **Given** a goal, **When** its owner reads it, **Then** the result has its name, the habit's current name,
    kind and category, Build or Reduce, measurement, amount and unit, schedule, schedule kind, start date, the
    date from which its settings apply, its time zone, and its attempt (FR-016).
 5. **Given** a user with no goals, **When** they list their goals, **Then** the list is empty.
 6. *(page)* **Given** the Goals page, **When** the user has goals, **Then** each GoalListItem shows the name
-   (linking to the goal page), the intent Tag and the meta line ("Mon · Wed · Fri · next today",
+   (linking to the goal page), the Build or Reduce Tag and the meta line ("Mon · Wed · Fri · next today",
    "Flexible · 3 times a week", "starts Mon 23 Nov"); with none, the EmptyState "No goals yet" (HP-003).
 7. *(page)* **Given** a goal page, **Then** it shows "← Goals", the name, the tags (category, Build or Reduce,
    Commitment-based or Period-based), the attempt line and the Settings card (HP-004).
@@ -238,7 +315,7 @@ it, list it and read its evaluation calendar.
    "This custom habit does not exist." and no goal is created.
 6. **Given** user A's goals on catalog habit "Reading", **When** user B browses the catalog or reads the
    details of "Reading", **Then** B's own goal count for "Reading" is 0 and nothing about A's goals is
-   returned (FR-031).
+   returned (FR-032).
 
 ---
 
@@ -265,18 +342,20 @@ schedule kind over two weeks, including a day on which the clocks change.
 3. **Given** a goal of N times per week, **When** its owner reads the calendar over three weeks, **Then** it
    lists one evaluation period per week, Monday to Sunday; for a goal that starts on a Wednesday, the first one
    is the following Monday to Sunday, and the Wednesday to Sunday before it belong to no period.
-8. **Given** a per-week goal whose start date is a Wednesday, **When** its owner lists or reads it before that
-   week's end, **Then** it gives the date its first week starts (the following Monday); **given** a start date
-   on a Monday, the first week starts on the start date.
-4. **Given** a goal and a range that includes the day on which the goal's time zone changes its clocks,
+4. **Given** a per-week goal whose start date is a Wednesday, **When** its owner lists or reads it while its
+   first week has not begun, **Then** it gives the date its first week starts (the following Monday); **given**
+   a start date on a Monday, the first week starts on the start date.
+5. **Given** a goal and a range that includes the day on which the goal's time zone changes its clocks,
    **When** the calendar is read, **Then** that day's commitment or period still starts and ends at local
    midnight, so it lasts 23 or 25 hours.
-5. **Given** a range that ends before the goal's start date, **When** the calendar is read, **Then** it is
+6. **Given** a range that ends before the goal's start date, **When** the calendar is read, **Then** it is
    empty.
-6. **Given** a range whose last date is before its first date, or longer than 366 days, **When** the calendar
+7. **Given** a range whose last date is before its first date, or longer than 366 days, **When** the calendar
    is read, **Then** the result is "Choose a range of 1 to 366 days.".
-7. **Given** the supplied current time is 23:30 on a Monday in the user's time zone, **When** the user creates
-   a goal starting "today", **Then** its start date is that Monday; at 00:30 the next day it is Tuesday.
+8. **Given** the supplied current time is 23:30 on a Monday in the user's time zone, **When** the user starts a
+   new goal, **Then** the starting values' start date is that Monday, and creating the goal with that Monday as
+   its start date succeeds; **given** 00:30 the next day, the starting values' start date is Tuesday, and
+   creating with the Monday gives "The start date cannot be in the past.".
 
 ---
 
@@ -363,10 +442,11 @@ and then with confirmation.
    returned with the habit's current name and settings unchanged, and reading it says the habit is no longer
    in the catalog; **when** the owner or anyone else starts or creates a new goal on that habit, **then** the
    result is "This habit is not in the catalog.".
-8. *(page)* **Given** that goal's page, **Then** it shows the Notice "This habit is no longer in the public
-   catalog. Your goal keeps working."; the goal list shows nothing extra (HP-004).
 7. **Given** a goal on a catalog habit, **When** an administrator renames the habit, **Then** the goal's owner
    sees the new name in the goal (and in its derived name, FR-010).
+8. *(page)* **Given** the page of a goal on an Unpublished catalog habit, **Then** it shows the Notice "This
+   habit is no longer in the public catalog. Your goal keeps working."; the goal list shows nothing extra
+   (HP-004).
 
 ---
 
@@ -408,10 +488,17 @@ account and list goals.
    demo account has the goals of FR-040, and the goal result for each is "demo goals added".
 2. **Given** demo accounts that already exist, **When** demo loading runs again, **Then** no goal result is
    given for them and their goals are unchanged.
-3. **Given** a catalog in which a catalog habit named in FR-040 is not Published when the account is created,
-   **When** demo loading runs, **Then** that one demo goal is left out and the others are created.
+3. **Given** a reset database with a catalog created by the administrator before demo loading, so that no
+   seed catalog is loaded, holding Published "Yoga", "Meditation" and "Sugar", a Draft "Reading" and a Draft
+   "Coffee", **When** demo loading runs, **Then** demo1 gets only its goal on "No phone in bed", demo2 both its
+   goals, and demo3 its goals on "Sugar" and "Late snacks" but not on "Coffee" (FR-040).
 4. **Given** demo loading's results and log, **Then** they name the demo email but never a goal name, habit
-   name or setting.
+   name, account name or setting.
+5. **Given** the seed catalog loaded in the same run, **When** each demo account reads its goals and profile,
+   **Then** demo3's goal on "Coffee" exists and reading it says the habit is no longer in the catalog; demo2's
+   goal on "Yoga" is named "Morning yoga"; demo1's account name is "Demo One", and demo2 and demo3 have none.
+
+---
 
 ### User Story 10 - My time zone (Priority: P2)
 
@@ -429,21 +516,28 @@ they had.
 1. **Given** registration with the browser time zone "Europe/Kyiv", **When** the user reads their time zone,
    **Then** it is "Europe/Kyiv".
 2. **Given** registration with no browser time zone, or with "Mars/Olympus", **When** the user reads their time
-   zone, **Then** it is the installation's default.
+   zone, **Then** it is the installation's default ("UTC" in acceptance tests, FR-025).
 3. **Given** a user in "Europe/Kyiv", **When** they create a goal, **Then** its days run from midnight to
    midnight in "Europe/Kyiv".
-4. **Given** that user changes their time zone to "America/New_York" on Wednesday 18 November (today in
-   Kyiv), **When** the calendar of their Mon/Wed/Fri goal is read, **Then** Wednesday 18 November and earlier
+4. **Given** that user changes their time zone to "America/New_York" at 12:00 Kyiv time on Wednesday 18
+   November (05:00 in New York, also Wednesday), **When** the calendar of their Mon/Wed/Fri goal is read, **Then** Wednesday 18 November and earlier
    commitments keep Kyiv midnights and Friday 20 November onwards uses New York midnights.
 5. **Given** the same change, **Then** their per-day goal uses New York from Thursday 19 November, their
    per-week goal from Monday 23 November, and a goal starting on 1 December from its start date.
-6. **Given** the same change, **When** the user reads a goal, **Then** all its settings except the time zone are
-   unchanged.
+6. **Given** the same change, **When** the user reads their Mon/Wed/Fri goal on Wednesday 18 November, **Then**
+   it gives the time zone in effect "Europe/Kyiv", and "America/New_York" from Thursday 19 November; read on
+   Friday 20 November, it gives "America/New_York" in effect from Thursday 19 November and no later version;
+   all its other settings are unchanged.
 7. **Given** a value that is not a named time zone, **When** the user changes their time zone to it, **Then**
    the result is "Choose a time zone from the list." and nothing changes.
 8. **Given** an administrator, **When** they read or change their own time zone, **Then** it works as for a
    registered user; **given** an anonymous visitor, the result is "You are not signed in.".
 9. **Given** user A's time zone, **Then** no use case gives it to user B or to an administrator.
+10. **Given** the change of AS4 and a second change to "Asia/Tokyo" at 12:00 New York time on Thursday 19
+    November, **Then** the per-week goal's version from Monday 23 November gets "Asia/Tokyo" and it has no
+    other version from that date; the per-day goal, whose New York version is in effect since Thursday 19
+    November, gets a version with "Asia/Tokyo" from Friday 20 November; the goal starting on 1 December has
+    one version, from its start date, with "Asia/Tokyo".
 
 ---
 
@@ -473,7 +567,8 @@ sides of each greeting boundary.
    Kyiv falls between 18:00 and 04:59).
 6. **Given** an account registered on 17 November 2026 in "Europe/Kyiv", **When** its owner reads the
    profile, **Then** it gives "member since November 2026"; **given** an account created before this slice,
-   no "member since".
+   no "member since". The second half is not testable through the API: such accounts exist only through the
+   migration of existing rows, so an integration test covers it (HP-019).
 7. **Given** user A's name, **Then** no use case gives it to user B or to an administrator; an administrator
    can set and read their own name.
 8. **Given** an anonymous visitor, **When** they read the Home heading or change a name, **Then** the result is
@@ -486,13 +581,14 @@ sides of each greeting boundary.
 - A time zone change on a day the user already started a goal: the goal's first version keeps the old zone
   until the change applies (FR-026).
 - Two time zone changes before the first one applies (for example on Tuesday and again on Wednesday of the
-  same week for a per-week goal): the later change replaces the earlier pending one; only one version starts on
-  that date.
+  same week for a per-week goal): the later change replaces the earlier pending version; only one version
+  starts on that date (FR-026). The same second change may already find another goal's version in effect
+  (a per-day goal switched on Wednesday); that goal gets a new version instead.
 - A goal on fixed days whose start date is not a scheduled day: its first commitment is the first scheduled
   day after the start date.
 - A goal created at 23:59 local time: "today" is decided in the user's time zone at the supplied time, never by
   the server's clock or zone (constitution II).
-- A day on which the clocks change: that day's commitment or period lasts 23 or 25 hours (US4-AS4).
+- A day on which the clocks change: that day's commitment or period lasts 23 or 25 hours (US4-AS5).
   How the 48-hour grace period behaves around it is slice 5's decision (SPEC §11.1, second part).
 - A weekly goal starting mid-week: its first evaluation period is the next full Monday-to-Sunday week; the days
   between the start date and that Monday are not evaluated, and the user is told before creating (HP-002).
@@ -520,11 +616,12 @@ sides of each greeting boundary.
 - **FR-001**: A registered user MUST be able to create a personal goal based on exactly one habit: a Published
   catalog habit or one of their own custom habits (SPEC §5.1). The goal records which habit and which kind
   (ADR 0014). One habit may support any number of independent goals.
-- **FR-002**: A goal's settings MUST be: Build or Reduce; the measurement (yes/no, count or duration); for
-  count and duration the amount and the unit; the schedule (fixed days of the week, or N times per day or per
-  week); the start date; an optional name; and the goal's time zone (FR-011). The fields, ranges and units are
-  those of slice 2 FR-007. A Build target means at least the amount, a Reduce target at most the amount (SPEC
-  §5.2).
+- **FR-002**: A goal MUST have its habit, a start date, an optional name of its own, and its settings. The
+  settings, kept in settings versions (FR-005), are: Build or Reduce; the measurement (yes/no, count or
+  duration); for count and duration the amount and the unit; the schedule (fixed days of the week, or N times
+  per day or per week); and the time zone (FR-011). The habit, the start date and the name belong to the goal,
+  not to a version. The fields, ranges and units are those of "Target fields and their checks" above (slice 2
+  FR-007). A Build target means at least the amount, a Reduce target at most the amount (SPEC §5.2).
 - **FR-003**: A goal on fixed days MUST be *commitment-based*: each scheduled day on or after the start date
   is one commitment. A goal of N times per day or per week MUST be *period-based*: each day or each week is one
   evaluation period. Each goal uses one approach at a time (SPEC §5.1).
@@ -543,14 +640,14 @@ sides of each greeting boundary.
   the only later version is the one a change of the owner's time zone adds (FR-026); it changes nothing but
   the time zone.
 - **FR-006**: Creating a goal MUST give one result, checking in this order: no habit "Choose a habit."; then
-  the habit lookup (FR-008); then the fields with the messages of slice 2 FR-007, in its order, with "goal" in
-  place of "suggested starting goal" ("A yes/no goal has no amount or unit."); then a Reduce count or duration
-  goal with N times other than 1 "A Reduce goal with an amount has 1 time per period." (FR-004); then no start date "Choose a start date."; a start date before today (FR-012) "The
-  start date cannot be in the past."; a start date more than 365 days after today "Choose a
-  start date within a year from today."; then a name longer than 60 characters after trimming "The name can
-  have at most 60 characters.". Values that do not belong to the chosen measurement or schedule are not
-  refused and not stored (slice 2, owner answer 2026-11-14). A refusal carries its message and the field it
-  is about.
+  the habit lookup (FR-008); then the target fields with the checks and messages of "Target fields and their
+  checks" (slice 2 FR-007), in that order, with "A yes/no goal has no amount or unit." for the yes/no check;
+  then a Reduce count or duration goal with N times other than 1 "A Reduce goal with an amount has 1 time per
+  period." (FR-004); then no start date "Choose a start date."; a start date before today (FR-012) "The start
+  date cannot be in the past."; a start date more than 365 days after today "Choose a start date within a
+  year from today."; then a name longer than 60 characters after trimming "The name can have at most 60
+  characters.". Values that do not belong to the chosen measurement or schedule are not refused and not
+  stored. A refusal carries its message and the field it is about.
 - **FR-007**: Starting a new goal MUST return starting values for the New goal form without creating
   anything:
   - from a catalog habit and a suggested starting goal position (counted from 1): that suggestion's fields;
@@ -559,8 +656,10 @@ sides of each greeting boundary.
   - from a custom habit: only Build or Reduce from the habit's intent;
   - without a habit: nothing but the start date.
 
-  In every case the start date is today (FR-012), there is no name, and, when a suggestion was
-  used, the catalog suggestion text is its target text (slice 2 FR-017). A position that the habit does not
+  In every case the start date is today (FR-012), there is no name, and, when a suggestion was used, the
+  catalog suggestion text is the target text of the starting values under the goal rules ("Target text and
+  kind", with its exception), so the New goal summary card never shows two opposite texts; the catalog pages
+  keep slice 2's text for the suggestion (slice 2 FR-017). A position that the habit does not
   have gives "This suggested starting goal does not exist.". Every suggested starting goal of the seed catalog
   gives starting values that can be created unchanged.
 - **FR-008**: A goal's habit MUST be looked up only among its kind (ADR 0014): as a catalog habit only among
@@ -582,7 +681,11 @@ sides of each greeting boundary.
 - **FR-012**: A day MUST run from midnight to the next midnight in the time zone of the settings version in
   effect for that day, so a day on which the clocks change lasts 23 or 25 hours. A week MUST run from Monday to
   Sunday. "Today" is the date in the acting user's current time zone at the supplied current time; Domain and
-  Application never read the clock or the machine's time zone (constitution II).
+  Application never read the clock or the machine's time zone (constitution II). Every date on or after the
+  start date has a day of the goal, scheduled or not. A goal's *current date* at an instant is the latest date
+  whose day of the goal has begun at that instant, each day in the time zone of its own settings version; a
+  goal whose start date's day has not begun has no current date. The current date can differ from "today"
+  while a time zone change is on its way (FR-026).
 - **FR-013**: Reading a goal's evaluation calendar for a range of dates (first and last date included, 1 to
   366 days, otherwise "Choose a range of 1 to 366 days.") MUST return, in date order:
   - for a commitment-based goal, one commitment per scheduled day in the range on or after the start date,
@@ -594,10 +697,16 @@ sides of each greeting boundary.
 
   each with the instant at which it starts and the instant at which it ends (FR-012). It returns no status:
   Pending, Met, Failed and Missed are slice 5's.
-- **FR-014**: Listing goals MUST give each goal, besides FR-016's summary fields: when its start date is after
-  today, that it starts on that date; otherwise, for a commitment-based goal, the date of its next commitment
-  on or after today (today included). A per-week goal whose first week (FR-013) has not begun also gives the
-  date on which its first week starts.
+- **FR-014**: Listing goals MUST give each goal, besides FR-015's summary fields:
+  - when the goal has no current date (FR-012: its start date's day has not begun), its start date;
+  - for a commitment-based goal, the date of its next commitment: the first commitment that has not ended at
+    the supplied current time, by its own instants (FR-013); for a goal that has not started, its first
+    commitment, which is the first scheduled day on or after the start date;
+  - for a per-week goal whose first week (FR-013) has not begun at the supplied current time, the date on
+    which its first week starts.
+
+  These follow the goal's own timeline, not the account's "today", so that just after a time zone change a
+  commitment already over is not shown as next and one in progress is not skipped (FR-026).
 
 **Listing and reading (owner only)**
 
@@ -606,16 +715,31 @@ sides of each greeting boundary.
   measurement, target text, schedule kind and FR-014 information. All goals are active in this slice (pauses:
   slice 7; ending: slice 8).
 - **FR-016**: Reading a goal MUST return its identifier, name, whether the name is its own, the habit's current
-  name, kind and category, whether the habit is still in the catalog (catalog habits only, FR-033), Build
-  or Reduce, measurement, amount and unit, schedule, schedule kind, target text, start date, the date from
-  which its settings apply, its time zone, for a per-week goal the date its first week starts (FR-013), and
-  its attempt (FR-018).
+  name, kind and category, whether the habit is still in the catalog (catalog habits only, FR-034), Build
+  or Reduce, measurement, amount and unit, schedule, schedule kind, target text, start date, for a per-week
+  goal the date its first week starts (FR-013), and its attempt (FR-018). It also returns, at the supplied
+  current time, the time zone of the settings version of the goal's current date (FR-012) and the date from
+  which that version applies (for a goal with no current date: its first version, from its start date); and,
+  when the goal has a version that takes effect after its current date (at most one, FR-026), that version's
+  time zone and the date from which it applies.
 - **FR-017**: Goals MUST NOT be edited, paused, ended, restarted or deleted in this slice (roadmap decision R4,
   Clarifications 2026-11-17). Pausing comes in slice 7; editing settings, ending and restarting in slice 8.
 - **FR-018**: Creating a goal MUST also start its first attempt: attempt number 1, beginning on the goal's start
   date, not ended (Clarifications 2026-11-17). Every goal of this slice has exactly this one attempt; reading
   a goal returns its number and start date. Commitments and evaluation periods belong to the attempt in which
   they fall, so slice 8's restart adds attempts without moving existing ones.
+
+**Earlier use cases**
+
+- **FR-019**: The use cases of slices 1 and 2 MUST keep giving their slice 1 and slice 2 results for every call
+  those slices accept, so that their locked acceptance criteria (F001, F002) pass unchanged:
+  - browsing the catalog and reading a habit's details as slice 2 does, without an acting user, give the
+    slice 2 result to every audience (slice 2 FR-008, FR-010); the goal information of FR-031 is given only
+    when the acting user is passed, and then only to a registered user;
+  - registering with an email and a password only works as in slice 1; the time zone (FR-025) and the name
+    (FR-028) are optional additions;
+  - unpublishing a habit that no goal uses acts at once, with or without confirmation (FR-033);
+  - deleting a custom habit that no goal uses deletes it (FR-035).
 
 **Privacy**
 
@@ -633,24 +757,46 @@ sides of each greeting boundary.
 
 **Account time zone (Clarifications 2026-11-17)**
 
-- **FR-024**: Every account MUST have a time zone, one of the standard named time zones (for example
-  "Europe/Kyiv", "America/New_York"). It is account data, readable and changeable only by the account itself
-  (constitution III); no use case shows it to anyone else, administrators included.
+- **FR-024**: Every account MUST have a time zone, one of the named time zones (for example "Europe/Kyiv",
+  "America/New_York"). It is account data, readable and changeable only by the account itself
+  (constitution III); no use case shows it to anyone else, administrators included. A *named time zone* is
+  exactly "UTC", or an identifier of the IANA time zone database, zone or link, that contains "/" and does not
+  start with "Etc/": "Europe/Kyiv", "America/Argentina/Buenos_Aires", and the links "Europe/Kiev",
+  "Asia/Calcutta" and "US/Eastern" are named time zones; a link is kept as given. These are not: Windows names
+  ("FLE Standard Time"), the "Etc/…" identifiers ("Etc/GMT+3", "Etc/UTC"), identifiers without "/" other than
+  "UTC" ("EST", "CET", "GMT"), offsets ("+02:00") and names the database does not have ("Mars/Olympus").
+  Identifiers compare exactly, with their case. Scenarios use only identifiers that every current version of
+  the database has.
 - **FR-025**: Registration (slice 1 FR-001) MUST accept the browser's time zone as an optional value. A named
-  time zone becomes the account's time zone; an absent or unknown value is not refused, and the account gets
-  the installation's default time zone. Accounts created before this slice, the configured administrator and
-  the demo accounts have the installation's default time zone. The default is an operator setting; when it is
-  absent or not a named time zone, it is UTC.
+  time zone becomes the account's time zone; an absent value, or one that is not a named time zone (FR-024,
+  "FLE Standard Time" included), is not refused, and the account gets the installation's default time zone. Accounts created before this slice, the configured administrator and
+  the demo accounts have the installation's default time zone. The default is an operator setting, supplied
+  to the use cases as configuration; when it is absent or not a named time zone, it is UTC. Acceptance tests
+  supply no default, so the default they expect is "UTC".
 - **FR-026**: A signed-in account MUST be able to read its time zone and change it. A value that is not a named
   time zone gives "Choose a time zone from the list." and changes nothing; the same time zone is a success that
-  changes nothing. A change made on date C (today in the old time zone) applies to each of the account's goals
-  from the start of its next commitment or evaluation period: for a commitment-based goal and a per-day goal
-  from the day after C, for a per-week goal from the Monday after C's week, and for a goal whose start date is
-  after C from its start date. It adds a settings version effective from that date with the new time zone and
-  all other settings unchanged. Commitments and periods before that date keep the old time zone.
+  changes nothing. The account's time zone changes at once; "today" (FR-012) is then decided in the new one.
+  Each of the account's goals follows on its own timeline, from its current date D at the instant of the change
+  (FR-012), never from the account's date:
+  - a goal with no current date (its start date's day has not begun): its first version gets the new time
+    zone; it has no other version;
+  - otherwise the change applies from the date E of the goal's next commitment or evaluation period: D + 1 day
+    for a commitment-based goal and a per-day goal, the Monday after D's week for a per-week goal. When the goal
+    already has a version taking effect after D (an earlier change not yet in effect; there is at most one),
+    that version gets the new time zone and the date E; otherwise a new settings version is added, effective
+    from E, with the new time zone and all other settings unchanged.
+
+  So a goal never has more than one version taking effect after its current date, never two on the same date,
+  and no day that has begun at the change changes its version (FR-011). Commitments and periods before E keep
+  the time zone of the version in effect for them. A second change replaces the version the first one added
+  only while that version's first day has not begun; once it has begun (after a large move east, possibly at
+  once, FR-027), that version is in effect and the second change adds a version from the next day instead.
 - **FR-027**: Where the old day ends and the new day begins at different instants (a gap after moving west, an
   overlap after moving east), the evaluation calendar MUST give each commitment or period the instants of its
-  own version's time zone; no commitment or period is merged, split or dropped.
+  own version's time zone; no commitment or period is merged, split or dropped. The gap or overlap is as long
+  as the difference between the two time zones' offsets, up to 26 hours. After a large move east, the first
+  commitment or period of the new version may already have begun, or even ended, when the change is made; it
+  is kept as it is, and how it is evaluated is slice 5's.
 
 **Account name, Home greeting and "member since" (Clarifications 2026-11-17)**
 
@@ -672,44 +818,58 @@ sides of each greeting boundary.
 
 **Catalog and custom habits with goals**
 
-- **FR-030**: Browsing the catalog MUST accept "Only habits I track" for a registered user, returning only the
+- **FR-031**: Browsing the catalog MUST accept "Only habits I track" for a registered user, returning only the
   Published catalog habits with at least one of the acting user's goals, together with the other filters
   (slice 2 FR-009). For a registered user, browsing MUST give each habit the acting user's own goal count and
   the number of returned habits the user tracks; details MUST give the user's goal count and their goals on
   that habit (identifier and name, in name order).
-- **FR-031**: Goal counts and goals in catalog results MUST be the acting user's own only. For an anonymous
+- **FR-032**: Goal counts and goals in catalog results MUST be the acting user's own only. For an anonymous
   visitor and an administrator, browsing and details give the slice 2 result with no goal information; "Only
   habits I track" is refused with "You are not signed in." or the FR-021 refusal.
-- **FR-032**: Unpublishing a Published catalog habit that at least one goal uses MUST, without confirmation,
+- **FR-033**: Unpublishing a Published catalog habit that at least one goal uses MUST, without confirmation,
   give "confirmation needed" with the number of goals and the text "1 goal uses this habit." or "N goals use
   this habit.", and leave the habit Published; with confirmation it unpublishes. The result carries only the
   number and the text (ADR 0012). A habit that no goal uses is unpublished at once, with or without
   confirmation.
-- **FR-033**: A goal on an Unpublished catalog habit MUST keep working for its owner, with the habit's current
+- **FR-034**: A goal on an Unpublished catalog habit MUST keep working for its owner, with the habit's current
   name and unchanged settings; reading it says the habit is no longer in the catalog (FR-016). No new goal can
   be based on that habit, by its existing goals' owners or anyone else (FR-008). If an administrator publishes
   it again, it is in the catalog again for new goals (FR-008).
-- **FR-034**: Deleting a custom habit that at least one goal uses MUST give "Goals use this custom habit, so it
-  cannot be deleted." and change nothing. Editing a custom habit never changes a goal's settings; the goal shows
-  the habit's current name (FR-010).
+- **FR-035**: Deleting a custom habit that at least one goal uses MUST give "Goals use this custom habit, so it
+  cannot be deleted." and change nothing. Reading one's own custom habit also gives the number of the user's
+  goals that use it, so the page can leave out "Delete" (HP-007). Editing a custom habit never changes a
+  goal's settings; the goal shows the habit's current name (FR-010).
 
 **Demonstration data**
 
 - **FR-040**: Demo loading MUST give each demo account that it creates in a run its demo goals, in the same run
-  and as a whole with the account (ADR 0013), after the seed catalog and the demo custom habits:
-  - `demo1@example.com`: on catalog habit "Reading", Build, Duration 15 minutes, fixed days Monday to Friday;
-    on custom habit "Cold shower", Build, Yes/no, fixed days on all seven days;
-  - `demo2@example.com`: on catalog habit "Yoga", Build, Yes/no, 3 times per week; on custom habit "Evening
-    stretch", Build, Duration 10 minutes, fixed days Monday, Wednesday and Friday, starting 7 days after the
-    day of the run;
+  and as a whole with the account and its demo custom habits (ADR 0013). Demo loading therefore loads the seed
+  catalog first and then the demo accounts, the reverse of slice 2's order (slice 2 FR-030), so that the
+  catalog habits the goals name exist on an empty database. The seed catalog step keeps slice 2's conditions:
+  it runs only with a valid demo password and loads only into an empty catalog. A demo goal finds its
+  catalog habit by name, compared as slice 2 FR-004 compares names (ordinally, ignoring case). The goals:
+  - `demo1@example.com`, with the account name "Demo One" (FR-028): on catalog habit "Reading", Build,
+    Duration 15 minutes, fixed days Monday to Friday; on custom habit "No phone in bed", Reduce, Yes/no, fixed
+    days on all seven days ("No phone in bed, avoided every day");
+  - `demo2@example.com`: on catalog habit "Yoga", Build, Yes/no, 3 times per week, with the name of its own
+    "Morning yoga"; on catalog habit "Meditation", Build, Duration 10 minutes, fixed days Monday, Wednesday and
+    Friday, starting 7 days after the day of the run;
   - `demo3@example.com`: on catalog habit "Sugar", Reduce, Count at most 1 "sweet", 1 time per day; on custom
-    habit "Late snacks", Reduce, Yes/no, 1 time per day.
+    habit "Late snacks", Reduce, Yes/no, 1 time per day; on catalog habit "Coffee", which the seed catalog
+    loads Unpublished, Reduce, Count at most 2 "cups", 1 time per day, so that a goal on an Unpublished habit
+    (FR-034) can be seen.
 
   Unless stated, a demo goal starts on the day of the run, has no name of its own and uses the demo account's
-  time zone, the installation's default (FR-025). A demo goal on a catalog habit that is not Published at that point is left out. For each created
-  account the goal result is "demo goals added". An account that already exists gets no goal result and none
-  of its private data is read or changed. Results name the demo email but never a goal or habit name.
-  Time-relative demo results (Pending, Met, Missed) are slice 5's.
+  time zone, the installation's default (FR-025); demo2 and demo3 have no account name. Demo loading writes
+  the goals itself (ADR 0013), not through goal creation, so the lookup of FR-008 does not apply; instead, a
+  demo goal on "Reading", "Yoga", "Meditation" or "Sugar" is left out when that habit is not Published at that
+  point, and the goal on "Coffee" when "Coffee" does not exist or is a Draft. No demo goal uses "Cold shower",
+  "Evening stretch" or "Plan tomorrow", which slice 2's locked AC-066 deletes after demo loading (FR-019,
+  FR-035). For each created account the goal result is
+  "demo goals added". An account that already exists gets no goal result and none of its private data is read
+  or changed. Results name the demo email but never a goal, habit or account name. Whether a demo per-week
+  goal shows "first week starts" depends on the weekday of the run; that state is shown by tests, not
+  promised by the demo. Time-relative demo results (Pending, Met, Missed) are slice 5's.
 
 ### Host, page and integration requirements (outside the AC surface)
 
@@ -720,24 +880,29 @@ sides of each greeting boundary.
   it?", "How do you measure it?", Target ("At least" / "At most", Stepper, unit), "When?" (fixed days with
   DayPicker, or a number of times per day or per week), Start date, "Name (optional)", "Create goal" and
   Cancel. Refusals sit under their field, one at a time. "Create goal" opens the new goal's page.
-- **HP-002**: The summary card MUST rewrite the goal as one sentence and list Evaluated ("Each scheduled day",
-  "Each day", "Each week"), "Met when", "Streak counted in" (commitments, days or weeks) and "Late records"
+- **HP-002**: The summary card MUST rewrite the goal as one sentence: the habit's name, ": ", "at least " for a
+  Build count or duration goal, the target text, ", starting " and the start date, then "." ("Reading: at
+  least 15 min, 5 days a week, starting Tue 17 Nov.", "Sugar: at most 1 sweet a day, starting Tue 17 Nov.",
+  "Cold shower: daily, starting Tue 17 Nov."); no habit-specific verb is used. It lists Evaluated ("Each
+  scheduled day", "Each day", "Each week"; the goal page's Settings card uses the same values), "Met when", "Streak counted in" (commitments, days or weeks) and "Late records"
   ("Up to 48 h after each day" or "… after each week"), and, when a suggestion was used, "Catalog suggestion:
   … An example to adjust, not a prescribed target." For a per-week goal whose start date is not a Monday, it
   adds "Your first week starts on Mon 23 Nov. Days before it are not evaluated."; "Create goal" asks for no
   confirmation. Its texts come from one shared formatter (constitution IV).
 - **HP-003**: The Goals page (`/goals`) MUST follow `design/pages/PageGoals` with only the parts this slice
   ships: "Goals", no Tabs (Paused and Ended come in slices 7 and 8), one `ht-list` of GoalListItems with name
-  link, intent Tag and meta line (schedule, then "next today", "next Wed 18 Nov", "starts Mon 23 Nov" or
-  "first week starts Mon 23 Nov"); no
-  consistency, streak, strip or action (slices 5 and 6). With no goals, the EmptyState "No goals yet" with
+  link, Build or Reduce Tag and meta line: the schedule, then exactly one of, in this order of precedence,
+  "first week starts Mon 23 Nov" (a per-week goal whose first week has not begun, whatever its start date),
+  "starts Mon 23 Nov" (any other goal whose start date is after today, with that date), "next today" or
+  "next Wed 18 Nov" (a commitment-based goal that has started), or nothing (a per-day goal that has started,
+  or a per-week goal in its weeks); no consistency, streak, strip or action (slices 5 and 6). With no goals, the EmptyState "No goals yet" with
   "Browse the catalog" and "Create custom habit".
 - **HP-004**: The goal page (`/goals/{id}`) MUST follow `design/pages/PageGoalDetail` with only the parts this
   slice ships: "← Goals", the name, the tags, the attempt line ("Attempt 1 · started 14 Jul", or "Attempt 1 ·
-  starts 23 Nov"), and the Settings card (Habit with "catalog" or "custom", Intent, Measure, Target, Schedule,
-  Evaluated, Started) with its sentence "Changes apply from the next commitment. Past results keep their
+  starts 23 Nov"), and the Settings card (Habit with "catalog" or "custom", "Build or reduce", Measure,
+  Target, Schedule, Evaluated, Started) with its sentence "Changes apply from the next commitment. Past results keep their
   rules." (ADR 0008). For a goal on an Unpublished catalog habit, the Notice "This habit is no longer in the
-  public catalog. Your goal keeps working." under the page head (FR-033). No actions, GoalStats, trend,
+  public catalog. Your goal keeps working." under the page head (FR-034). No actions, GoalStats, trend,
   history, pauses, notes or earlier attempts. Another account's or an unknown goal shows the Not found page.
 - **HP-005**: The signed-in catalog (`design/pages/PageCatalogSignedIn`) MUST add, for registered users: the
   "N goals" tag and "Add another goal" on tracked habits' cards, "Use this habit" on the others, "Show: Only
@@ -761,43 +926,87 @@ sides of each greeting boundary.
   status never by color alone, the habit chooser Dialog managing focus, sentence-case text per
   `design/brand-book.md`.
 - **HP-013**: The host MUST log demo loading's goal results as "Demo goals …" lines with the demo email and the
-  result text only.
-- **HP-014**: `CONTEXT.md` MUST gain, in the change that settles the open decisions: Personal goal, Attempt,
-  Commitment, Evaluation period, Commitment-based and Period-based goal, Goal settings (version), the goal's
-  time zone, the account's time zone, the account name, and the evaluation calendar; each with a NOT-boundary (constitution I).
-- **HP-015**: The Profile Account tab (`design/pages/PageProfile`) MUST add a "Time zone" field with the named
-  time zones and Save, for every account. After a change it shows the Notice "Your time zone is changed. Your
+  result text only. The lines follow the order of the work (FR-040): the "Demo catalog" line first, then for
+  each demo email its account line, its custom-habit line and its goal line.
+- **HP-014**: `CONTEXT.md` has the terms of this slice, each with a NOT-boundary (constitution I), added in the
+  change that revised this spec after its critic review: Account name, Account time zone, Attempt,
+  Commitment, Commitment-based goal, Evaluation calendar, Evaluation period, Goal settings version, Named time
+  zone, Period-based goal, Personal goal and Target text; the Demo account entry names the demo account name.
+  A later change that sharpens one of them updates its entry in the same change.
+- **HP-015**: The Profile Account tab (`design/pages/PageProfile`) MUST add a "Time zone" field and Save, for
+  every account. Its list holds "UTC" first, then the named time zones of FR-024 that the installation's
+  time zone data has as zones (not links), plus the account's current value when it is not among them
+  ("Europe/Kiev"), so the current value is always shown. The data, and so the list, may differ between
+  installations and versions of that data; UI tests check only that the list has "UTC", "Europe/Kyiv",
+  "America/New_York" and the current value. After a change it shows the Notice "Your time zone is changed. Your
   goals use it from their next day or week; earlier days keep their time zone."
 - **HP-016**: The Register page MUST send the browser's time zone with the registration, with no visible field;
   a browser that gives none registers with the default (FR-025).
 - **HP-017**: The Register page MUST add an optional "Name" field, and the Profile Account tab a "Name" field
   with Save and the Notice "Your name is changed."; the Profile header shows the name (when set), the email and
-  "member since …" (when known), as `design/pages/PageProfile` shows. The avatar letter is the first letter of
-  the name, or of the email without a name.
+  "member since …" (when known), as `design/pages/PageProfile` shows. The avatar letter, everywhere slice 1
+  HP-014 shows it (TopNav, MobileNav and the Profile header), is the first letter of the name in upper case,
+  or of the email without a name.
+- **HP-018**: The hosted demo's smoke check (`tools/HT.SmokeCheck`, slice 3 `contracts/smoke-check.md`) MUST
+  also find, for each demo account, the name of every demo goal of FR-040 on its Goals page ("Reading, 15 min,
+  5 days a week", "Morning yoga", "Coffee, at most 2 cups a day", …), and demo1's name "Demo One" on its
+  Profile page (slice 3 SC-005). Every new data parameter of the demo data port gets its `SmokeCheckCoverage`
+  entry (slice 3 "Coverage rule", `CoverageTests`). The port's reads widen from "is the catalog empty" to the
+  state of the catalog habits that demo goals name, which is public catalog data; it still reads no private
+  data (ADR 0013).
+- **HP-019**: The migration of this slice MUST give every existing account the installation's default time
+  zone (FR-025), no name and no recorded creation time, so that it gives no "member since" (FR-030); an
+  integration test checks it on an account created before the migration.
 
 ### Slice 1 and slice 2 requirements and tests this slice changes
 
 Constitution IV and ADR 0008: these slice-2 states end when this slice ships, and their tests change in the
 same change.
 
-- Slice 2 FR-015 (unpublishing with goals): built by FR-032 and FR-033. Tests: catalog administration
+- Slice 2 FR-015 (unpublishing with goals): built by FR-033 and FR-034. Tests: catalog administration
   integration tests and `tests/HT.UiTests/Components/Pages/AdminPageTests.cs`.
-- Slice 2 FR-020/FR-022 (deleting a custom habit): extended by FR-034.
+- Slice 2 FR-020/FR-022 (deleting a custom habit): extended by FR-035.
 - Slice 2 HP-002 (signed-in catalog without goal tags or goal actions), HP-005 (no head button for signed-in
   users), HP-007 (custom habit page without "Save and create goal"): amended by HP-005 to HP-007. Tests:
   `CatalogPageTests.cs`, `CatalogHabitDetailTests.cs`, `CustomHabitPageTests.cs`.
 - Slice 2 HP-011 (navigation without Goals): amended by HP-009. Test: `SiteNavTests.cs`.
 - Slice 2 HP-013 (Home EmptyState "Goals come in a later version."): amended by HP-010. Test:
   `HomeSignedInTests.cs`.
-- Slice 2 FR-030/FR-031 and HP-017 (demo loading): extended by FR-040 and HP-013. Test:
-  `tests/HT.UiTests/Operator/StartupTasksDemoTests.cs` gains the "Demo goals" lines.
+- Slice 2 FR-030/FR-031 and HP-017 (demo loading): extended by FR-040 and HP-013. Slice 2 FR-030's order
+  ("after its account step … it creates the seed catalog") is reversed: the seed catalog comes first
+  (`DemoDataService.LoadAsync`). Its results stay as they are: account results, custom-habit results and the
+  catalog result, now with goal results. Tests that change with the order:
+  `tests/HT.UnitTests/Application/Operator/DemoLoadingTests.cs`
+  (`The_work_runs_in_order_each_account_with_its_custom_habits_then_the_seed_catalog`,
+  `An_existing_account_is_skipped_and_the_seed_catalog_still_comes_last`) and
+  `tests/HT.UiTests/Operator/StartupTasksDemoTests.cs`, whose "Demo catalog" line moves first and which gains
+  the "Demo goals" lines (HP-013). `tests/HT.IntegrationTests/Operator/SeedCatalogLoadingTests.cs` keeps
+  passing, since no demo goal uses the custom habits its US6_AS7 test and F002 AC-066 delete; no locked F001
+  or F002 scenario asserts the order of the work.
 - Slice 1 FR-001 (registration): extended by FR-025, and the Register page by HP-016. Slice 1 HP-014 and slice
   2 HP-008 (the Profile Account tab: email and Change password): extended by HP-015. Accounts that exist when
   this slice ships get the default time zone through a migration.
 - Slice 1 FR-001 and the Register page: extended by FR-028 and HP-017 (optional name). Slice 1 HP-013 and
   slice 2 HP-013 (signed-in Home heading "Today"): amended by HP-010 (greeting and date). Slice 1 HP-014
-  (Profile header with the avatar letter and the email): extended by HP-017. Tests:
-  `tests/HT.UiTests/Components/Pages/HomeSignedInTests.cs`, the Register and Profile page tests.
+  (the avatar letter in TopNav, MobileNav and the Profile header, and the Profile header's email): extended
+  by HP-017. Tests: `tests/HT.UiTests/Components/Pages/HomeSignedInTests.cs`, `SiteNavTests.cs`, the Register
+  and Profile page tests.
+- Slice 1 HP-015 (no date or time of day that depends on the user's time zone): ends with this slice; HP-002
+  to HP-004, HP-010 and HP-017 show such dates, always in the account's time zone (FR-012).
+- Slice 2 FR-008 and FR-010 ("the same result is given to every audience"): amended by FR-031 and FR-032. The
+  slice 2 content stays the same for every audience; only a registered user's own goal information is added,
+  and only when the acting user is passed (FR-019). `CatalogService`'s "the use cases take no acting user"
+  (slice 2 research R-07) no longer holds for that addition.
+- Slice 2 HP-009 (no "Updated" column in the administrator's catalog table until time zones are decided): the
+  column stays out. It is not needed by any page of this slice, and an administrator's "updated" time would
+  need a stored edit time that slice 2 does not keep.
+- The locked acceptance criteria of slices 1 and 2 (`tests/HT.AcceptanceTests/Features/F001`, `F002`) and their
+  step definitions are not changed and must keep passing (FR-019). They register with an email and a password
+  only, browse and read details without an acting user, and unpublish habits that no goal uses.
+- Slice 3 SC-005 ("the smoke check finds every shipped slice's demo data"), its `contracts/smoke-check.md`
+  "Coverage rule" and `tests/HT.UiTests/SmokeChecks/CoverageTests.cs`: extended by HP-018 for the demo goals
+  and demo1's name. The demo data port `IDemoDataStore` gains the goals and the account name, and its
+  documented "only read is whether the catalog is empty" widens to the state of the named catalog habits.
 
 ### Design changes before build
 
@@ -806,10 +1015,10 @@ Constitution IV and ADR 0008 require `design/` to change first:
 - `design/pages/PageNewGoal`: the custom-habit and no-habit states of the head line and Habit section, the habit
   chooser (a Dialog with a SearchField over Published catalog habits and the user's custom habits), the
   refusal states of FR-006, a future start date, and the summary card texts of HP-002 for each schedule kind.
-- `design/pages/PageGoals`: the slice-4 state (no Tabs; GoalListItem with name, intent Tag and meta line only)
+- `design/pages/PageGoals`: the slice-4 state (no Tabs; GoalListItem with name, Build or Reduce Tag and meta line only)
   and the EmptyState. `design/components/GoalListItem`: that reduced state.
 - `design/pages/PageGoalDetail`: the slice-4 state of HP-004, with a Target row in Settings and the "no longer
-  in the catalog" Notice of FR-033.
+  in the catalog" Notice of FR-034.
 - `design/pages/PageCatalogSignedIn`, `PageHabitDetail`, `PageCustomHabit`: the slice-4 states of HP-005 to
   HP-007.
 - `design/pages/PageAdmin`: the unpublish confirmation Dialog of HP-008.
@@ -823,14 +1032,23 @@ Constitution IV and ADR 0008 require `design/` to change first:
   Mon/Wed/Fri (FR-010 gives "Yoga, 3 days a week") and "Coffee, at most 2 cups" ("Coffee, at most 2 cups a
   day"), and "Streak counted in Days" / "Streak, sessions" for commitment-based goals (HP-002 says
   "commitments", the SPEC §2 term; constitution I).
+- Texts that disagree with `CONTEXT.md` or with this spec: the previews' "intent" Tag of GoalListItem and the
+  "Intent" row of the goal page's Settings card show the goal's own Build or Reduce, which `CONTEXT.md`'s
+  Intent entry rules out (they become the "Build or Reduce" Tag and the "Build or reduce" row); the Settings
+  card's "Evaluated: Each commitment" becomes "Each scheduled day" (HP-002); the New goal summary sentence
+  "Read at least 15 minutes on Mon, Tue, Wed, Thu and Fri" becomes the habit-independent sentence of HP-002.
+- `design/components/TopNav`, `MobileNav` and `design/pages/PageProfile`: the avatar letter from the account
+  name (HP-017).
 - `design/pages.md` and `design/README.md`: the slice-4 structure of these pages.
 
 ### Key Entities
 
 - **Personal goal**: one registered user's measurable commitment based on one catalog or custom habit; owned
-  by that user and visible only to them. Has a name of its own or a derived one, and its settings versions.
+  by that user and visible only to them. Has its habit, a start date, a name of its own or a derived one, its
+  attempt, and its settings versions.
 - **Goal settings (version)**: Build or Reduce, measurement, amount and unit, schedule, time zone and the date
-  from which the version applies. This slice creates the first version only.
+  from which the version applies. This slice creates the first version, and further versions only for a
+  change of the owner's time zone (FR-026).
 - **Attempt**: a continuous pursuit of a goal from its beginning until it is ended (SPEC §2): number and start
   date; attempt 1 starts with the goal (FR-018). Ending and restarting are slice 8's.
 - **Commitment**: one scheduled day of a commitment-based goal, from midnight to midnight in the goal's time
@@ -859,7 +1077,9 @@ Constitution IV and ADR 0008 require `design/` to change first:
 - **SC-005**: The unpublish confirmation carries the number of goals and nothing else, in 100% of cases
   (US7-AS5).
 - **SC-006**: After a fresh deployment, each demo account shows at least two goals; together they cover both
-  schedule kinds, Build and Reduce, catalog and custom habits, and one goal that starts in the future.
+  schedule kinds, Build and Reduce, catalog and custom habits, one goal that starts in the future, one goal
+  with a name of its own and one goal on an Unpublished catalog habit; Home greets demo1 by its name and the
+  others without one. The smoke check confirms the goals and the name after every deployment (HP-018).
 - **SC-007**: Every page of this slice passes the accessibility rules of constitution IV (HP-012).
 
 ## Decisions due before acceptance criteria
@@ -882,8 +1102,9 @@ and recorded as a dated line in `## Clarifications`, plus an ADR where it spans 
     the first full week, with the user told and no confirmation (see `## Clarifications`).
   - **D-4** (FR-028 to FR-030): whether an account has a name, and the Home greeting and Profile "member
     since". Decided 2026-11-17: name, greeting and date (see `## Clarifications`).
-  - **D-5** (FR-016, FR-033): how a goal on an Unpublished catalog habit looks to its owner. Decided
+  - **D-5** (FR-016, FR-034): how a goal on an Unpublished catalog habit looks to its owner. Decided
     2026-11-17: a Notice on the goal page and no new goals on that habit (see `## Clarifications`).
+- Confirmed 2026-11-17: the defaults in "Critic revision 2026-11-17" (see `## Clarifications`).
 - No decision of this slice is open.
 
 ## Assumptions
@@ -903,7 +1124,7 @@ and recorded as a dated line in `## Clarifications`, plus an ADR where it spans 
   day or per week only) are kept for goals; periods longer than a week ("or other defined interval", SPEC §2)
   stay out of version 1.
 - Goal names follow the 60-character limit of habit names.
-- "Delete only when no goals use it" for custom habits comes from the roadmap's page tracker (FR-034); it keeps
+- "Delete only when no goals use it" for custom habits comes from the roadmap's page tracker (FR-035); it keeps
   a goal from losing its habit.
 - No account is deactivated yet (slice 11), so this slice has no rule for a deactivated owner's goals.
 - The 48-hour grace period is described on the summary card only; its behaviour, including around clock
