@@ -151,11 +151,21 @@ Restated here, unchanged, so that this spec alone gives the rules and texts its 
   least 8 characters with a digit; a new account is a registered user; signing in makes the account, with its
   role, the acting user. Administrator creation (slice 1 FR-014) creates an administrator account.
 - **Catalog habits** (slice 2 FR-001, FR-008 to FR-012): an administrator creates a catalog habit (Draft),
-  publishes and unpublishes it; only Published habits are in the catalog; reading the details of anything else
-  gives "This habit is not in the catalog.".
+  edits it, publishes and unpublishes it, and can publish an Unpublished habit again; only Published habits
+  are in the catalog; reading the details of anything else gives "This habit is not in the catalog.".
+- **Habit fields** (slice 2 FR-001 to FR-003): a catalog habit and a custom habit each have a name, an optional
+  description, exactly one category, an intent (Build or Reduce) and one icon; a catalog habit also has its
+  suggested starting goals, one of them marked for the card. The categories are the fixed list Body, Mind,
+  Health, Money, Home, Other. The icon is one of slice 2's 24 habit icons, among them `book-open`,
+  `person-standing`, `droplet`, `smartphone`, `candy`, `brain` and `coffee`.
+- **Browsing filters** (slice 2 FR-009): browsing takes an optional category (one of the list above, or all),
+  an optional intent (Build, Reduce or both) and an optional search text. The search matches the catalog
+  habits whose name contains the trimmed text, ignoring case ordinally; an empty search matches all. All given
+  filters apply together.
 - **Custom habits** (slice 2 FR-020 to FR-025): a registered user creates, lists, reads, edits and deletes
   their own custom habits; an identifier that is not one of the acting user's custom habits gives "This custom
-  habit does not exist."; an administrator gets "Custom habits are for registered users.".
+  habit does not exist."; an administrator gets "Custom habits are for registered users.". Editing changes
+  any field, the name and the intent included.
 - **Names** (slice 2 FR-004): names are trimmed; name order compares names ordinally, ignoring case
   (culture-invariant), never by the current culture. Character limits count UTF-16 code units (slice 2, owner
   answer 2026-11-14).
@@ -202,7 +212,20 @@ Restated here, unchanged, so that this spec alone gives the rules and texts its 
 - **Demo loading** (slice 1 FR-016, slice 2 FR-030, FR-031): creates `demo1@example.com` to
   `demo3@example.com` with the demo password (account result "created" or "already exists"), the seed
   catalog into an empty catalog, and each created account's demo custom habits. This slice adds demo goals
-  (FR-040).
+  (FR-040). Its results:
+  - the demo password: absent, empty or only spaces gives "no demo password configured", and one that fails
+    the password rule of "Accounts" gives "demo password does not meet the password rule"; in both cases no
+    account is created. Any other value is a valid demo password (`example2026`, for example);
+  - the catalog result: "seed catalog loaded" when no catalog habit existed, otherwise "catalog not empty",
+    and nothing is added;
+  - the custom-habit result of each created account: "demo custom habits added"; an account that already
+    exists gets no custom-habit result.
+
+  The demo custom habits: `demo1@example.com` "Cold shower" (Body, Build) and "No phone in bed" (Home,
+  Reduce); `demo2@example.com` "Evening stretch" (Body, Build) and "Plan tomorrow" (Mind, Build);
+  `demo3@example.com` "Late snacks" (Health, Reduce) and "Water the plants" (Home, Build). The seed catalog has,
+  among others, the Published habits "Reading" (Mind, Build), "Yoga" (Body, Build), "Meditation" (Mind, Build)
+  and "Sugar" (Health, Reduce), and the Unpublished "Coffee" (Health, Reduce).
 
 ## What acceptance tests can reach
 

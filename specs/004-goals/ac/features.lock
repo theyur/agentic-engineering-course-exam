@@ -1,0 +1,7 @@
+{
+  "group": "features",
+  "feature": "specs/004-goals",
+  "files": {
+    "tests/HT.AcceptanceTests/Features/F004/goals.feature": "3bd74b5c43fc2e70af0d2c21f65ecd548d40eb68b823f170674c3df7cb5f0117"
+  }
+}

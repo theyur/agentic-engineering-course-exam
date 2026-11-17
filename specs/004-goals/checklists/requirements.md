@@ -71,3 +71,7 @@
   [NEEDS CLARIFICATION] markers remain" fails until the owner answers it. All other items pass.
 - Iteration 7 (2026-11-17): the owner confirmed all defaults of "Critic revision 2026-11-17"; the answer is
   recorded in `## Clarifications` and the marker is removed. All items pass; no decision is open.
+- Iteration 8 (2026-11-17, while drafting `acceptance.md`): "Slice 1 and slice 2 behaviour these tests use"
+  now also restates the habit fields (categories, icons), the browsing filters, editing habits, and demo
+  loading's results, demo custom habits and the seed habits that demo goals use, so the acceptance criteria
+  depend on nothing outside this spec. No requirement changed. All items pass.
