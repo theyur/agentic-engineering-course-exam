@@ -88,6 +88,26 @@ kind, confirmed with them.
 - Q: Does the owner confirm the defaults of "Critic revision 2026-11-17" above, including the time zone rules
   that touch SPEC §11.1 and ARCHITECTURE §9? → A: Yes, all of them, as written (owner, 2026-11-17).
 
+### Owner answers 2026-11-18 (plan)
+
+The plan's gates ([plan.md](plan.md), "Gates before the next step") and its "Spec discrepancies", answered by the
+owner on 2026-11-18. None of them changes a requirement or an acceptance criterion.
+
+- Q: Is ADR 0016 accepted? → A: Yes. Its Consequences now describe the migration as below.
+- Q: Does the domain use NodaTime's embedded time-zone data (ADR 0017)? → A: Yes, inside `HT.Domain` only. No
+  NodaTime type is on the public surface.
+- Q: How do accounts created before this slice get the default time zone (HP-019)? → A: As the plan proposes. The
+  migration adds the time zone as a nullable column, because it cannot read the operator's default. Such an
+  account reads as the installation's default until its first goal writes that zone into its row.
+- Q: What is "the installation's time zone data" (FR-024, HP-015)? → A: NodaTime's embedded tzdb, the same on
+  every machine. Both the check and the Profile list use it.
+- Q: How does a refusal give "the field it is about" (FR-006)? → A: As a `GoalField` value: Habit,
+  BuildOrReduce, Measurement, Amount, Unit, Schedule, Days, Times, Period, StartDate or Name.
+- Q: What is "creation order" (FR-015)? → A: The order in which the goals were stored, not the supplied creation
+  time.
+- Q: When does the Goals page show "starts …" (HP-003)? → A: Exactly when the list entry gives a start date
+  (FR-014). It can differ from "start date after today" only during the hours of a time-zone switch.
+
 No decision of this slice is open; see
 [Decisions due before acceptance criteria](#decisions-due-before-acceptance-criteria).
 

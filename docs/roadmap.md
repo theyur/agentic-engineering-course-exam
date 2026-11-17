@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-11-17"
+updated_at: "2026-11-18"
 ---
 
 # Roadmap — Habit Tracker
@@ -30,7 +30,7 @@ in its idea brief, which assumed the catalog also carried the account foundation
 | 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | — | shipped | [001](../specs/001-accounts-and-access/spec.md) |
 | 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | — | shipped | [002](../specs/002-habit-catalog/spec.md) |
 | 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | — | shipped | [003](../specs/003-demo-hosting/spec.md) |
-| 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Now | clarified | [004](../specs/004-goals/spec.md) |
+| 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Now | planned | [004](../specs/004-goals/spec.md) |
 | 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Next | not started | — |
 | 6 | `personal-reports` | A user sees how consistent they are: a dashboard of upcoming, due and overdue commitments and Missed results, consistency with its count, strict streaks with their unit, trends. | §6 | 5 | — | Next | not started | — |
 | 7 | `excusals-and-pauses` | Excused commitments and paused expectations are left out of consistency and neither extend nor break the streak. | §5.3 | 5, 6 | — | Later | not started | — |
@@ -179,7 +179,7 @@ How this works with the Spec Kit commands:
 | Schema migration rollout on each deployment | ARCH §5 | `demo-hosting` | decided: the deployment workflow applies the commit's migrations with an EF Core migration bundle to the emptied database while the app is stopped; ADR 0007 unchanged | [ADR 0015](adr/0015-demo-hosting.md) |
 | When and how hosted demo data is refreshed. If time-relative demo data (slice 5 onward) has shipped when hosting starts, the decision also keeps it current until 2026-12-31. | ARCH §7 | `demo-hosting` | decided: on every deployment and whenever the Operator starts a refresh, by the same workflow in refresh mode (empty database, migrations, restart, smoke check). No time-relative demo data had shipped; the slice that adds it keeps it current. | [spec](../specs/003-demo-hosting/spec.md#clarifications); [ADR 0015](adr/0015-demo-hosting.md) |
 | How reviewers get demo sign-ins, with no secret in source control | ARCH §7; CLAUDE.md | `demo-hosting` | decided: only with the exam submission, including the configured administrator's sign-in; the hosted app reads the passwords from App Service app settings | [spec](../specs/003-demo-hosting/spec.md#clarifications); [ADR 0015](adr/0015-demo-hosting.md) |
-| Commitment deadlines and time zones (ADR) | SPEC §11.1 (first part); ARCH §9 | `goals` | decided: the account's own time zone, from the browser at registration and editable in Profile; each goal settings version keeps the zone in effect, and a change applies from the goal's next commitment or period; the detailed rules (named time zones, repeated and large changes) are critic-revision defaults the owner confirmed (2026-11-17) | [spec](../specs/004-goals/spec.md#clarifications); [ADR 0016](adr/0016-time-zones.md) |
+| Commitment deadlines and time zones (ADR) | SPEC §11.1 (first part); ARCH §9 | `goals` | decided: the account's own time zone, from the browser at registration and editable in Profile; each goal settings version keeps the zone in effect, and a change applies from the goal's next commitment or period; the detailed rules (named time zones, repeated and large changes) are critic-revision defaults the owner confirmed (2026-11-17) | [spec](../specs/004-goals/spec.md#clarifications); [ADR 0016](adr/0016-time-zones.md); [ADR 0017](adr/0017-embedded-time-zone-data.md) |
 | Whether a goal is created as its first attempt from the start | SPEC §2, §5.4 | `goals` | decided: yes, attempt 1 starts with the goal | [spec](../specs/004-goals/spec.md#clarifications) |
 | The 48-hour grace period around local clock changes | SPEC §11.1 (second part) | `recording-and-evaluation` | open | — |
 | When a recorded result becomes final: on recording, or when the grace period ends. SPEC §5.2 only says a missing record is Pending; `CONTEXT.md` (Pending) says Pending applies "whether or not any activity has been recorded so far". Confirm and record it, or change the glossary. | SPEC §5.2; CONTEXT.md | `recording-and-evaluation` | open | — |

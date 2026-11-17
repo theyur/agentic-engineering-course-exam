@@ -1,8 +1,8 @@
 # 0016 — Time zones: the account's own, kept with each goal's settings version
 
-**Status:** Proposed, 2026-11-17. Owner answer in slice 4, `specs/004-goals` (Clarifications, FR-011, FR-024 to
+**Status:** Accepted, 2026-11-18, with the plan of slice 4 (`specs/004-goals/plan.md`). Proposed 2026-11-17. Owner answer in slice 4, `specs/004-goals` (Clarifications, FR-011, FR-024 to
 FR-027). Settles the roadmap row "Commitment deadlines and time zones" (SPEC §11.1, first part; ARCHITECTURE
-§9). Becomes Accepted when the slice's plan is approved. The owner chose the account's own time zone and
+§9). The owner chose the account's own time zone and
 that each goal settings version keeps it (Options 2a). The detailed rules in the Decision (the goal's current
 date, the replacement of a pending version, the set of named time zones, the 26-hour gap) are the spec's
 critic-revision defaults, which the owner confirmed on 2026-11-17 (spec, `## Clarifications`, "Critic
@@ -68,8 +68,11 @@ Where the history lives, for option 2:
   (constitution II).
 - Slice 4 already adds settings versions (for time-zone changes only), so slice 8's settings changes reuse the
   mechanism instead of introducing it.
-- Registration, Profile and the account model change in slice 4: a migration gives existing accounts the
-  default time zone, and the Register page sends the browser's zone.
+- Registration, Profile and the account model change in slice 4, and the Register page sends the browser's zone.
+  A migration cannot read the operator's default, so it adds the account's time zone as a nullable column. An
+  account that existed before slice 4 reads as the installation's default time zone until its first goal writes
+  that zone into its row (owner, 2026-11-18; slice 4 research R-04).
+- The time-zone data is NodaTime's embedded tzdb, the same on every machine ([ADR 0017](0017-embedded-time-zone-data.md)).
 - A gap or overlap at a switch can make one deadline up to 26 hours earlier or later than the old zone would
   have put it (usually a few hours); this is accepted, since records belong to a date (slice 5), not to an
   instant.
