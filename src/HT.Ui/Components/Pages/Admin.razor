@@ -11,9 +11,12 @@
 @inject UseCaseScope UseCases
 @inject ActingUserAccessor ActingUsers
 @inject NavigationManager Navigation
-@* design/pages/PageAdmin, slice 2 state (US3-AS20, HP-009, HP-010): the catalog only, so no Tabs and no "Updated"
-   column. Publish and Unpublish act from the row and the row shows the new state at once. A registered user gets
-   the Not found page; the use cases refuse on their own (FR-014). Every use case runs in its own scope. *@
+@* design/pages/PageAdmin, slice 4 state (US3-AS20, HP-009, HP-010, HP-008): the catalog only, so no Tabs and no
+   "Updated" column. Publish and Unpublish act from the row and the row shows the new state at once. Unpublish of a
+   habit that goals use gets "confirmation needed" from the use case and opens a Dialog with the use case's text (the
+   number of goals only, ADR 0012); its "Unpublish" confirms, and Cancel, × and Esc change nothing and give the focus
+   back to the row's button. A registered user gets the Not found page; the use cases refuse on their own (FR-014).
+   Every use case runs in its own scope. *@
 <PageTitle>Administration · Habit Tracker</PageTitle>
 
 @if (_loaded)
@@ -44,15 +47,29 @@
                                 <HtButton Variant="HtButton.ButtonVariant.Ghost" Small="true" Href="@($"/admin/catalog/{habit.Id.Value}")" aria-label="@($"Edit {habit.Name}")">Edit</HtButton>
                                 @* One button that changes its words, not two: the keyboard focus stays on it after the click. *@
                                 @{ var published = habit.State == CatalogHabitState.Published; }
-                                <HtButton Variant="@(published ? HtButton.ButtonVariant.Secondary : HtButton.ButtonVariant.Primary)" Small="true"
-                                          aria-label="@(published ? $"Unpublish {habit.Name}" : $"Publish {habit.Name}")"
-                                          @onclick="() => published ? UnpublishAsync(habit.Id) : PublishAsync(habit.Id)">@(published ? "Unpublish" : "Publish")</HtButton>
+                                @* A plain button, not HtButton, so the Dialog can give the focus back to it. *@
+                                <button type="button" class="@(published ? "ht-btn ht-btn--secondary ht-btn--sm" : "ht-btn ht-btn--primary ht-btn--sm")"
+                                        @ref="_stateButtons[habit.Id]"
+                                        aria-label="@(published ? $"Unpublish {habit.Name}" : $"Publish {habit.Name}")"
+                                        @onclick="() => published ? UnpublishAsync(habit) : PublishAsync(habit.Id)">@(published ? "Unpublish" : "Publish")</button>
                             </td>
                         </tr>
                     }
                 </DataTable>
             </div>
         </div>
+        <HtDialog Open="@(_confirmation is not null)" OnClose="CancelUnpublish" ReturnFocus="ReturnFocus">
+            <Title>Unpublish this habit?</Title>
+            <Subtitle>@_confirmation?.Name · Published</Subtitle>
+            <ChildContent>
+                <p>@_confirmation?.Message</p>
+                <p>The goals keep working for their owners. No new goal can be based on this habit until you publish it again.</p>
+            </ChildContent>
+            <Footer>
+                <HtButton @onclick="ConfirmUnpublishAsync">Unpublish</HtButton>
+                <HtButton Variant="HtButton.ButtonVariant.Secondary" @onclick="CancelUnpublish">Cancel</HtButton>
+            </Footer>
+        </HtDialog>
     </div>
 }
 
@@ -67,6 +84,16 @@
     private bool _loaded;
     private int _request;
     private CancellationTokenSource? _pendingSearch;
+
+    // Each row's Publish/Unpublish button, for the focus after the Dialog; the habit whose Dialog was opened last.
+    private readonly Dictionary<HabitId, ElementReference> _stateButtons = [];
+    private HabitId? _focusAfterDialog;
+
+    // The open unpublish confirmation: the habit and the use case's text; null when the Dialog is closed.
+    private Confirmation? _confirmation;
+
+    private ElementReference? ReturnFocus =>
+        _focusAfterDialog is { } id && _stateButtons.TryGetValue(id, out var button) ? button : null;
 
     // The search the address last asked for, or that this page last wrote to it; null before the first load.
     private string? _appliedQuery;
@@ -123,12 +150,37 @@
         await LoadAsync();
     }
 
-    private async Task UnpublishAsync(HabitId id)
+    /// <summary>Unpublishes at once, or opens the Dialog when the use case needs confirmation (FR-033, HP-008).</summary>
+    private async Task UnpublishAsync(CatalogHabitListItem habit)
     {
-        await UseCases.RunAsync<CatalogAdministrationService, CatalogHabitUnpublishResult>(
-            (service, token) => service.UnpublishAsync(_actingUser, id, token), CancellationToken.None);
+        var result = await UnpublishAsync(habit.Id, confirmed: false);
+        if (result.Outcome == CatalogHabitUnpublishOutcome.ConfirmationNeeded)
+        {
+            _focusAfterDialog = habit.Id;
+            _confirmation = new Confirmation(habit.Id, habit.Name, result.Message ?? string.Empty);
+            return;
+        }
+
         await LoadAsync();
     }
+
+    private async Task ConfirmUnpublishAsync()
+    {
+        if (_confirmation is not { } confirmation)
+        {
+            return;
+        }
+
+        await UnpublishAsync(confirmation.Id, confirmed: true);
+        _confirmation = null;
+        await LoadAsync();
+    }
+
+    private void CancelUnpublish() => _confirmation = null;
+
+    private Task<CatalogHabitUnpublishResult> UnpublishAsync(HabitId id, bool confirmed) =>
+        UseCases.RunAsync<CatalogAdministrationService, CatalogHabitUnpublishResult>(
+            (service, token) => service.UnpublishAsync(_actingUser, id, confirmed, token), CancellationToken.None);
 
     private async Task OnSearchChangedAsync(string text)
     {
@@ -165,4 +217,6 @@
     }
 
     public void Dispose() => CancelPendingSearch();
+
+    private sealed record Confirmation(HabitId Id, string Name, string Message);
 }

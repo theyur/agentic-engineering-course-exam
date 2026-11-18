@@ -796,7 +796,7 @@ confirmation (US7-AS1, AS2).
 
 ### Tests for User Story 7
 
-- [ ] T094 [P] [US7] Create `tests/HT.UnitTests/Application/Habits/CatalogUnpublishWithGoalsTests.cs` (depends on T097):
+- [X] T094 [P] [US7] Create `tests/HT.UnitTests/Application/Habits/CatalogUnpublishWithGoalsTests.cs` (depends on T097):
   - US7-AS1: 2 goals give `ConfirmationNeeded` with `GoalCount` 2 and "2 goals use this habit.", and the habit stays Published;
   - US7-AS2: with confirmation, the habit is Unpublished;
   - US7-AS3: one goal gives "1 goal uses this habit.";
@@ -804,7 +804,7 @@ confirmation (US7-AS1, AS2).
   - US7-AS5: a reflection check that the result's public members are only `Outcome`, `Message` and `GoalCount` (SC-005);
   - the old overload means "not confirmed";
   - FR-023's order.
-- [ ] T095 [P] [US7] Create `tests/HT.IntegrationTests/Goals/GoalsOnChangedCatalogHabitTests.cs` on `HT-IT` (depends on T097):
+- [X] T095 [P] [US7] Create `tests/HT.IntegrationTests/Goals/GoalsOnChangedCatalogHabitTests.cs` on `HT-IT` (depends on T097):
   - US7-AS6: after a confirmed unpublish, the owner lists and reads the goal with `IsInCatalog` false and the settings unchanged, and a new goal on the habit gives "This habit is not in the catalog." to the owner and to another user;
   - US7-AS7: a rename by the administrator shows in the goal and its derived name;
   - FR-034: publishing again makes new goals possible again;
@@ -812,8 +812,8 @@ confirmation (US7-AS1, AS2).
 
 ### Implementation for User Story 7
 
-- [ ] T096 [US7] Add `CountUsingCatalogHabitAsync(HabitId, …) → int`, the one member without an owner, to `IGoalStore`, `GoalStore` and `FakeGoalStore`. Its XML doc names ADR 0012. Confirm that T050's rule accepts it under exactly this name
-- [ ] T097 [US7] Extend `src/HT.Application/Habits/CatalogAdministrationService.cs` (FR-033; depends on T096):
+- [X] T096 [US7] Add `CountUsingCatalogHabitAsync(HabitId, …) → int`, the one member without an owner, to `IGoalStore`, `GoalStore` and `FakeGoalStore`. Its XML doc names ADR 0012. Confirm that T050's rule accepts it under exactly this name
+- [X] T097 [US7] Extend `src/HT.Application/Habits/CatalogAdministrationService.cs` (FR-033; depends on T096):
   - its constructor gains `IGoalStore`;
   - the new overload `UnpublishAsync(ActingUser, HabitId, bool confirmed, …)` counts first without confirmation, then runs slice 2's compare-and-swap;
   - `ConfirmationNeeded` is appended to `CatalogHabitUnpublishOutcome`;
@@ -821,8 +821,8 @@ confirmation (US7-AS1, AS2).
   - the old overload means `confirmed: false`.
 
   Update the hand-built instances: the target-typed `Service => new(_store)` in `tests/HT.UnitTests/Application/Habits/CatalogHabitStateTests.cs`, `CatalogHabitFieldTests.cs` and `CatalogAdministrationAccessTests.cs`, plus whatever the grep convention finds.
-- [ ] T098 [US7] In `src/HT.Ui/Components/Pages/Admin.razor`, `ConfirmationNeeded` opens an `HtDialog` with the text, the sentence that the goals keep working for their owners, and the confirm button. Confirming calls `UnpublishAsync(…, confirmed: true)` (HP-008; depends on T097)
-- [ ] T099 [P] [US7] Update `tests/HT.UiTests/Components/Pages/AdminPageTests.cs`: the Dialog's text and sentence, confirm and cancel, an immediate unpublish with no goals, and no "Updated" column (depends on T098)
+- [X] T098 [US7] In `src/HT.Ui/Components/Pages/Admin.razor`, `ConfirmationNeeded` opens an `HtDialog` with the text, the sentence that the goals keep working for their owners, and the confirm button. Confirming calls `UnpublishAsync(…, confirmed: true)` (HP-008; depends on T097)
+- [X] T099 [P] [US7] Update `tests/HT.UiTests/Components/Pages/AdminPageTests.cs`: the Dialog's text and sentence, confirm and cancel, an immediate unpublish with no goals, and no "Updated" column (depends on T098)
 
 **Checkpoint**: full suite green. Commit.
 

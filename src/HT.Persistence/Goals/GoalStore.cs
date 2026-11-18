@@ -10,7 +10,8 @@ using Microsoft.EntityFrameworkCore;
 namespace HT.Persistence.Goals;
 
 /// <summary>
-/// The goal store (research R-08). Every statement is scoped by owner (constitution III). Reads are no-tracking and
+/// The goal store (research R-08). Every statement is scoped by owner (constitution III), except the count across
+/// owners for the unpublish confirmation, which returns only a number (ADR 0012). Reads are no-tracking and
 /// read each goal with its versions, its attempts and its habit's current name, category and state in one query.
 /// Creation is one transaction that locks the account row first, then the habit row, with key-range locks (UPDLOCK,
 /// HOLDLOCK), so it serializes against time-zone changes (through <c>GoalsRevision</c>), unpublishing and custom-habit
@@ -74,6 +75,14 @@ internal sealed class GoalStore : IGoalStore
         var rows = await Read(owner).Where(r => r.Goal.CatalogHabitId == habit.Value).ToListAsync(cancellationToken).ConfigureAwait(false);
         return rows.Select(GoalMapping.ToStoredGoal).ToList();
     }
+
+    /// <summary>
+    /// The one statement not scoped by owner (ADR 0012): a count only. It holds no lock past its own read under read
+    /// committed, so it never blocks a goal creation for longer than the read, and the confirmed unpublish's
+    /// compare-and-swap does not depend on it.
+    /// </summary>
+    public Task<int> CountUsingCatalogHabitAsync(HabitId habit, CancellationToken cancellationToken) =>
+        _db.Goals.AsNoTracking().CountAsync(g => g.CatalogHabitId == habit.Value, cancellationToken);
 
     /// <summary>Research R-08 steps 2 to 6, in one transaction; nothing is written unless every check passes.</summary>
     private async Task<GoalWriteOutcome> CreateInTransactionAsync(

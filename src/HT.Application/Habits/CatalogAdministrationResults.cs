@@ -219,7 +219,10 @@ public sealed class CatalogHabitPublishResult
     internal static CatalogHabitPublishResult Published { get; } = new(CatalogHabitPublishOutcome.Published, null);
 }
 
-/// <summary>The outcomes of <see cref="CatalogAdministrationService.UnpublishAsync"/>, in FR-016's check order.</summary>
+/// <summary>
+/// The outcomes of <see cref="CatalogAdministrationService.UnpublishAsync(HT.Domain.Accounts.ActingUser, HabitId, bool, CancellationToken)"/>,
+/// in FR-016's check order; <see cref="ConfirmationNeeded"/> is appended (slice 4), so the slice 2 values keep their numbers.
+/// </summary>
 public enum CatalogHabitUnpublishOutcome
 {
     NotSignedIn,
@@ -227,9 +230,16 @@ public enum CatalogHabitUnpublishOutcome
     NotFound,
     NotPublished,
     Unpublished,
+
+    /// <summary>The Published habit is used by goals and the call was not confirmed, so it stays Published (FR-033).</summary>
+    ConfirmationNeeded,
 }
 
-/// <summary>The result of unpublishing; an Unpublished habit stays Unpublished with this success, a Draft is refused (FR-011).</summary>
+/// <summary>
+/// The result of unpublishing; an Unpublished habit stays Unpublished with this success, a Draft is refused (FR-011).
+/// Its only public members are <see cref="Outcome"/>, <see cref="Message"/> and <see cref="GoalCount"/>: the
+/// confirmation carries the number of goals and its text, and nothing about any goal or account (ADR 0012, SC-005).
+/// </summary>
 public sealed class CatalogHabitUnpublishResult
 {
     private CatalogHabitUnpublishResult(CatalogHabitUnpublishOutcome outcome, string? message)
@@ -242,7 +252,13 @@ public sealed class CatalogHabitUnpublishResult
 
     public string? Message { get; }
 
+    /// <summary>How many goals use the habit, with <see cref="CatalogHabitUnpublishOutcome.ConfirmationNeeded"/>; null otherwise.</summary>
+    public int? GoalCount { get; private init; }
+
     internal static CatalogHabitUnpublishResult Refused(CatalogHabitUnpublishOutcome outcome, string message) => new(outcome, message);
+
+    internal static CatalogHabitUnpublishResult ConfirmationNeeded(int goalCount) =>
+        new(CatalogHabitUnpublishOutcome.ConfirmationNeeded, CatalogTexts.GoalsUseThisHabit(goalCount)) { GoalCount = goalCount };
 
     internal static CatalogHabitUnpublishResult Unpublished { get; } = new(CatalogHabitUnpublishOutcome.Unpublished, null);
 }

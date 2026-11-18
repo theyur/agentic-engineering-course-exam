@@ -10,8 +10,13 @@ namespace HT.UnitTests.Application.Habits;
 public sealed class CatalogHabitFieldTests
 {
     private readonly FakeCatalogHabitStore _store = new();
-    private CatalogAdministrationService Service => new(_store);
-    private CatalogService Browse => new(_store, FakeGoalStore.Over(_store));
+    private readonly FakeGoalStore _goals;
+
+    /// <summary>One goal store per test, with no goal, shared by both services.</summary>
+    public CatalogHabitFieldTests() => _goals = FakeGoalStore.Over(_store);
+
+    private CatalogAdministrationService Service => new(_store, _goals);
+    private CatalogService Browse => new(_store, _goals);
 
     private static readonly SuggestedStartingGoalFields Valid = Count(20, "pages", 3, SchedulePeriod.Week);
 

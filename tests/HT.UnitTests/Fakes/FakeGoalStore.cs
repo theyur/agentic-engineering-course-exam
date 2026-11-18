@@ -204,6 +204,16 @@ public sealed class FakeGoalStore : IGoalStore
         }
     }
 
+    /// <summary>The one count across owners (ADR 0012): every owner's goals on the catalog habit, whatever its state.</summary>
+    public Task<int> CountUsingCatalogHabitAsync(HabitId habit, CancellationToken cancellationToken)
+    {
+        var onHabit = new GoalHabit(habit, HabitKind.Catalog);
+        lock (_gate)
+        {
+            return Task.FromResult(_goals.Count(g => g.Goal.Habit == onHabit));
+        }
+    }
+
     /// <summary>
     /// Runs <paramref name="action"/> under this store's lock with whether any goal is based on the custom habit
     /// <paramref name="habit"/>, so no goal can be created on it in between. For <see cref="FakeCustomHabitStore"/>'s

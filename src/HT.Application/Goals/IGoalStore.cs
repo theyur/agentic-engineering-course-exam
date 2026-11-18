@@ -12,8 +12,8 @@ namespace HT.Application.Goals;
 /// <para>
 /// Goals are private (constitution III). Every member takes the owner first and acts only on that owner's goals, in
 /// the same statement, so another owner's goal and no goal look the same; there is no lookup by goal identifier alone.
-/// The single exception, added with US7, is <c>CountUsingCatalogHabitAsync(HabitId)</c>: a count across owners for the
-/// unpublish confirmation, which returns only a number (ADR 0012, FR-033).
+/// The single exception is <see cref="CountUsingCatalogHabitAsync"/>: a count across owners for the unpublish
+/// confirmation, which returns only a number (ADR 0012, FR-033).
 /// </para>
 /// </summary>
 public interface IGoalStore
@@ -55,4 +55,12 @@ public interface IGoalStore
     /// a custom habit or an unknown identifier.
     /// </summary>
     Task<IReadOnlyList<StoredGoal>> ListOnCatalogHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// How many goals of all owners are based on the catalog habit <paramref name="habit"/>, whatever its state; 0 for a
+    /// custom habit or an unknown identifier. The one member without an owner (ADR 0012, FR-033): a count across owners
+    /// for the administrator's unpublish confirmation, so it returns only a number and never a goal, an owner or a name.
+    /// It takes no lock: the count is informative, and a goal created after it never stops a confirmed unpublish.
+    /// </summary>
+    Task<int> CountUsingCatalogHabitAsync(HabitId habit, CancellationToken cancellationToken);
 }
