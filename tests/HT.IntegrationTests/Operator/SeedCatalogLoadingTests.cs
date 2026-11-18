@@ -3,6 +3,7 @@ using HT.Application.Habits;
 using HT.Application.Operator;
 using HT.Domain.Accounts;
 using HT.Domain.Habits;
+using HT.Domain.Time;
 using HT.IntegrationTests.Habits;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -238,7 +239,13 @@ public sealed class SeedCatalogLoadingTests(SeedDatabaseFixture database)
         await using (var scope = services.CreateAsyncScope())
         {
             exception = await Assert.ThrowsAsync<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<IDemoDataStore>()
-                .CreateDemoAccountAsync(parsed, HabitAccounts.Password, [habit, habit], CancellationToken.None));
+                .CreateDemoAccountAsync(
+                    parsed,
+                    HabitAccounts.Password,
+                    [habit, habit],
+                    new DemoAccountProfile(null, NamedTimeZone.Utc, database.Clock.GetUtcNow()),
+                    [],
+                    CancellationToken.None));
         }
 
         Assert.Equal(0, await Sql.CountUsersAsync(database.ConnectionString, email));

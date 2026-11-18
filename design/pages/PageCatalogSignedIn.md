@@ -15,3 +15,13 @@ The second part of the preview shows the page as slice 2 builds it (HP-002, ADR 
 - Registered user, My custom habits (`/custom-habits`): the same page head (without the SearchField) and Tabs, then the user's custom habits as HabitCards with the "Private" Tag and "Edit", in name order. With none, an EmptyState "No custom habits yet" with "+ Create custom habit".
 - No match on the Public catalog: the EmptyState "No habits match" with "Clear filters", as on the visitor page.
 - Administrator: the Public catalog without Tabs, without "+ Create custom habit" and without the register Notice; cards with "Details". An administrator has no custom habits, and `/custom-habits` is Not found for them.
+
+## Slice 4 state
+
+The last part of the preview shows the registered user's Public catalog as slice 4 builds it (HP-005, ADR 0008). Visitors and administrators keep their slice 2 state, and so does My custom habits.
+
+- Cards: a habit with at least one of the user's goals has the strong Tag "1 goal" or "N goals" after its name, secondary "Add another goal" and ghost "Details"; every other card has primary "Use this habit" and ghost "Details". Both goal actions open the New goal page with the habit (`/goals/new?habit={id}&kind=catalog`).
+- FilterPanel: Category, Intent, and "Show" with the checkbox "Only habits I track", kept in the address (`tracked=true`) with the other filters.
+- The count: "22 habits · you track 2", where the second number counts the returned habits the user tracks.
+- With "Only habits I track", only the tracked Published habits are listed, with the other filters still applied; with none, the EmptyState "No habits match" as in slice 2.
+- Goal counts are the user's own only (FR-032).

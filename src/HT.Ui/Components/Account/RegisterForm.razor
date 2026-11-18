@@ -2,8 +2,19 @@
 @inject AccountService AccountService
 @* design/pages/PageRegister: the form card. A static SSR form (research R-08): it calls the use case, shows each
    refusal next to its field with the email kept and the passwords emptied, and on success raises OnSucceeded.
-   The page signs the new account in. *@
+   The page signs the new account in. Slice 4 (HP-016, research R-12): the browser's time zone goes with the form in
+   a hidden input marked data-ht-browser-time-zone, which js/time-zone.js (loaded once by App.razor) fills when the
+   form is sent; without script it stays empty and the account gets the installation's default (FR-025). HP-017: the
+   optional "Name" field comes first; a refusal keeps the name and the email. *@
 <EditForm Model="Input" method="post" FormName="register" OnSubmit="SubmitAsync" class="ht-card ht-stack" novalidate>
+    <input type="hidden" name="TimeZone" data-ht-browser-time-zone />
+    <TextField Id="register-name"
+               Label="Name"
+               Optional="true"
+               AutoComplete="name"
+               Help="@NameForm.Help"
+               Error="@_nameError"
+               @bind-Value="Input.Name" />
     <TextField Id="register-email"
                Label="Email"
                Type="email"
@@ -36,10 +47,15 @@
     [SupplyParameterFromForm(FormName = "register")]
     private RegisterInput Input { get; set; } = default!;
 
+    /// <summary>The browser's time zone, posted by the hidden input; null or anything else gives the default (FR-025).</summary>
+    [SupplyParameterFromForm(FormName = "register", Name = "TimeZone")]
+    private string? BrowserTimeZone { get; set; }
+
     /// <summary>Raised once with the <see cref="RegistrationOutcome.Registered"/> result.</summary>
     [Parameter]
     public EventCallback<RegistrationResult> OnSucceeded { get; set; }
 
+    private string? _nameError;
     private string? _emailError;
     private bool _emailTaken;
     private string? _passwordError;
@@ -58,6 +74,7 @@
 
     private async Task SubmitAsync()
     {
+        _nameError = null;
         _emailError = null;
         _emailTaken = false;
         _passwordError = null;
@@ -70,7 +87,7 @@
             return;
         }
 
-        var result = await AccountService.RegisterAsync(Input.Email, Input.Password, CancellationToken.None);
+        var result = await AccountService.RegisterAsync(Input.Email, Input.Password, BrowserTimeZone, Input.Name, CancellationToken.None);
         switch (result.Outcome)
         {
             case RegistrationOutcome.Registered:
@@ -86,6 +103,9 @@
             case RegistrationOutcome.PasswordRuleNotMet:
                 _passwordError = result.Message;
                 break;
+            case RegistrationOutcome.NameTooLong:
+                _nameError = result.Message;
+                break;
         }
 
         ClearPasswords();
@@ -99,6 +119,8 @@
 
     private sealed class RegisterInput
     {
+        public string? Name { get; set; }
+
         public string? Email { get; set; }
 
         public string? Password { get; set; }

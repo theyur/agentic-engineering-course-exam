@@ -33,6 +33,17 @@ public sealed class FakeAccountStore : IAccountStore
     /// <summary>Calls of <see cref="CreateAsync"/>.</summary>
     public int CreateCount { get; private set; }
 
+    /// <summary>Calls of <see cref="TrySetNameAsync"/>.</summary>
+    public int NameWriteCount { get; private set; }
+
+    /// <summary>
+    /// Off by default. When on, <see cref="FindByIdAsync"/> of an identifier no account has answers a registered user
+    /// with no stored time zone, no name and no creation time, and keeps it, so a later write (a goal's first time
+    /// zone) sticks. The bUnit page tests sign in with fresh identifiers that no store holds; unit tests keep it off,
+    /// so the rule for a missing account stays tested.
+    /// </summary>
+    public bool KnowsEverySignedInUser { get; set; }
+
     public IReadOnlyList<Account> Accounts
     {
         get
@@ -89,8 +100,19 @@ public sealed class FakeAccountStore : IAccountStore
         }
     }
 
-    /// <summary>Adds an account directly, for arranging a test.</summary>
-    public Account Add(string email, string password, Role role = Role.RegisteredUser, SignInBlock? block = null)
+    /// <summary>
+    /// Adds an account directly, for arranging a test. <paramref name="timeZone"/> is its stored time zone; null is an
+    /// account created before slice 4, which has the installation's default. <paramref name="name"/> and
+    /// <paramref name="createdAt"/> are its stored name and creation time (null for none).
+    /// </summary>
+    public Account Add(
+        string email,
+        string password,
+        Role role = Role.RegisteredUser,
+        SignInBlock? block = null,
+        string? timeZone = null,
+        string? name = null,
+        DateTimeOffset? createdAt = null)
     {
         if (!Email.TryParse(email, out var parsed))
         {
@@ -99,8 +121,52 @@ public sealed class FakeAccountStore : IAccountStore
 
         lock (_gate)
         {
-            var account = new Account(new AccountId(Guid.NewGuid()), parsed, role, block ?? SignInBlock.None);
+            var account = new Account(new AccountId(Guid.NewGuid()), parsed, role, block ?? SignInBlock.None)
+            {
+                StoredTimeZone = timeZone,
+                Name = name,
+                CreatedAt = createdAt,
+            };
             _byEmail.Add(parsed, new Entry(account, password));
+            return account;
+        }
+    }
+
+    /// <summary>Sets the stored time zone (null for none), for arranging a test and for the goal fake's first goal.</summary>
+    public void SetStoredTimeZone(AccountId id, string? timeZone)
+    {
+        lock (_gate)
+        {
+            var entry = FindEntry(id) ?? throw new InvalidOperationException("No such account.");
+            entry.Account = entry.Account with { StoredTimeZone = timeZone };
+        }
+    }
+
+    /// <summary>
+    /// The stored account with this identifier, or null; with <see cref="KnowsEverySignedInUser"/>, an unknown
+    /// identifier gives a new registered user that is kept from then on.
+    /// </summary>
+    public Account? FindById(AccountId id)
+    {
+        lock (_gate)
+        {
+            if (FindEntry(id) is { } entry)
+            {
+                return entry.Account;
+            }
+
+            if (!KnowsEverySignedInUser)
+            {
+                return null;
+            }
+
+            if (!Email.TryParse($"signed-in-{id.Value:N}@example.com", out var email))
+            {
+                throw new InvalidOperationException("The synthetic email is not valid.");
+            }
+
+            var account = new Account(id, email, Role.RegisteredUser, SignInBlock.None);
+            _byEmail.Add(email, new Entry(account, Guid.NewGuid().ToString("N")));
             return account;
         }
     }
@@ -146,16 +212,12 @@ public sealed class FakeAccountStore : IAccountStore
         }
     }
 
-    public Task<Account?> FindByIdAsync(AccountId id, CancellationToken cancellationToken)
-    {
-        lock (_gate)
-        {
-            return Task.FromResult(FindEntry(id)?.Account);
-        }
-    }
+    public Task<Account?> FindByIdAsync(AccountId id, CancellationToken cancellationToken) => Task.FromResult(FindById(id));
 
-    public Task<CreateAccountOutcome> CreateAsync(Email email, Role role, string password, CancellationToken cancellationToken)
+    public Task<CreateAccountOutcome> CreateAsync(
+        Email email, Role role, string password, NewAccountProfile profile, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(profile);
         lock (_gate)
         {
             CreateCount++;
@@ -164,7 +226,12 @@ public sealed class FakeAccountStore : IAccountStore
                 return Task.FromResult(CreateAccountOutcome.EmailTaken);
             }
 
-            var account = new Account(new AccountId(Guid.NewGuid()), email, role, SignInBlock.None);
+            var account = new Account(new AccountId(Guid.NewGuid()), email, role, SignInBlock.None)
+            {
+                StoredTimeZone = profile.TimeZone.Id,
+                Name = profile.Name?.Value,
+                CreatedAt = profile.CreatedAt,
+            };
             _byEmail.Add(email, new Entry(account, password));
 
             if (_takeEmailOnNextCreate)
@@ -249,6 +316,22 @@ public sealed class FakeAccountStore : IAccountStore
 
             entry.Account = entry.Account with { SignInBlock = next };
             SuccessfulSaveCount++;
+            return Task.FromResult(true);
+        }
+    }
+
+    public Task<bool> TrySetNameAsync(AccountId id, AccountName? name, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            NameWriteCount++;
+            var entry = FindEntry(id);
+            if (entry is null)
+            {
+                return Task.FromResult(false);
+            }
+
+            entry.Account = entry.Account with { Name = name?.Value };
             return Task.FromResult(true);
         }
     }

@@ -41,8 +41,10 @@ internal sealed class AccountStore : IAccountStore
         return user is null ? null : ToAccount(user);
     }
 
-    public async Task<CreateAccountOutcome> CreateAsync(Email email, Role role, string password, CancellationToken cancellationToken)
+    public async Task<CreateAccountOutcome> CreateAsync(
+        Email email, Role role, string password, NewAccountProfile profile, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(profile);
         _db.ChangeTracker.Clear();
         try
         {
@@ -52,6 +54,11 @@ internal sealed class AccountStore : IAccountStore
                 UserName = email.Value,
                 Email = email.Value,
                 Role = role,
+
+                // Written at insert only; afterwards only the stores' conditional statements write them (research R-04).
+                Name = profile.Name?.Value,
+                TimeZone = profile.TimeZone.Id,
+                CreatedAt = profile.CreatedAt,
             };
 
             IdentityResult result;
@@ -158,6 +165,17 @@ internal sealed class AccountStore : IAccountStore
         return rows == 1;
     }
 
+    // One statement scoped by account: Identity's full-row update never writes Name (research R-04), so a password
+    // change with a user loaded before this keeps the new name.
+    public async Task<bool> TrySetNameAsync(AccountId id, AccountName? name, CancellationToken cancellationToken)
+    {
+        var value = name?.Value;
+        var rows = await _db.Users.Where(u => u.Id == id.Value)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(u => u.Name, value), cancellationToken)
+            .ConfigureAwait(false);
+        return rows == 1;
+    }
+
     private static Account ToAccount(HtUser user)
     {
         if (!Email.TryParse(user.UserName, out var email))
@@ -169,7 +187,12 @@ internal sealed class AccountStore : IAccountStore
             new AccountId(user.Id),
             email,
             user.Role,
-            new SignInBlock(user.FailedSignInCount, user.SignInBlockedSince));
+            new SignInBlock(user.FailedSignInCount, user.SignInBlockedSince))
+        {
+            StoredTimeZone = user.TimeZone,
+            Name = user.Name,
+            CreatedAt = user.CreatedAt,
+        };
     }
 
     private static bool IsUniqueIndexViolation(DbUpdateException exception) =>

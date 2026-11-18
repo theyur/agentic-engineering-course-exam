@@ -102,11 +102,11 @@ internal static class HabitMapping
         Period = row.Period,
     };
 
-    /// <summary>Monday 1, Tuesday 2 … Sunday 64.</summary>
-    private static int DayBit(DayOfWeek day) => 1 << (((int)day + 6) % 7);
+    /// <summary>Monday 1, Tuesday 2 … Sunday 64; shared with the goal mapping.</summary>
+    internal static int DayBit(DayOfWeek day) => 1 << (((int)day + 6) % 7);
 
-    private static int DayMask(IEnumerable<DayOfWeek> days) => days.Aggregate(0, (mask, day) => mask | DayBit(day));
+    internal static int DayMask(IEnumerable<DayOfWeek> days) => days.Aggregate(0, (mask, day) => mask | DayBit(day));
 
-    private static HashSet<DayOfWeek> DaysOf(int mask) =>
+    internal static HashSet<DayOfWeek> DaysOf(int mask) =>
         Enum.GetValues<DayOfWeek>().Where(day => (mask & DayBit(day)) != 0).ToHashSet();
 }

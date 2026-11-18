@@ -18,6 +18,12 @@ public sealed class FakeCustomHabitStore : ICustomHabitStore
     /// <summary>Writes that changed the store: creates, updates and deletes.</summary>
     public int WriteCount { get; private set; }
 
+    /// <summary>
+    /// The goal store that reads this store; set by <see cref="FakeGoalStore"/>'s constructor, so there is one
+    /// construction order and no cycle. The delete rule for habits that goals use reads it (FR-035).
+    /// </summary>
+    public FakeGoalStore? Goals { get; set; }
+
     /// <summary>Every stored habit of every owner, for assertions.</summary>
     public IReadOnlyList<CustomHabit> Habits
     {
@@ -112,18 +118,35 @@ public sealed class FakeCustomHabitStore : ICustomHabitStore
         }
     }
 
-    public Task<DeleteCustomHabitOutcome> DeleteAsync(AccountId owner, HabitId id, CancellationToken cancellationToken)
+    /// <summary>
+    /// The conditional delete of research R-08: <see cref="DeleteCustomHabitOutcome.NotFound"/> when the owner has no
+    /// such habit, <see cref="DeleteCustomHabitOutcome.UsedByGoals"/> when a goal of <see cref="Goals"/> is based on it,
+    /// and otherwise a delete. The goal store's lock is taken first and this store's lock inside it, never the other way
+    /// round, so no goal is created on the habit between the check and the delete.
+    /// </summary>
+    public Task<DeleteCustomHabitOutcome> DeleteAsync(AccountId owner, HabitId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Goals is { } goals
+            ? goals.WithGoalsOnCustomHabit(id, used => Delete(owner, id, used))
+            : Delete(owner, id, used: false));
+
+    private DeleteCustomHabitOutcome Delete(AccountId owner, HabitId id, bool used)
     {
         lock (_gate)
         {
-            var removed = _habits.RemoveAll(h => h.Owner == owner && h.Id == id);
-            if (removed == 0)
+            var index = _habits.FindIndex(h => h.Owner == owner && h.Id == id);
+            if (index < 0)
             {
-                return Task.FromResult(DeleteCustomHabitOutcome.NotFound);
+                return DeleteCustomHabitOutcome.NotFound;
             }
 
+            if (used)
+            {
+                return DeleteCustomHabitOutcome.UsedByGoals;
+            }
+
+            _habits.RemoveAt(index);
             WriteCount++;
-            return Task.FromResult(DeleteCustomHabitOutcome.Deleted);
+            return DeleteCustomHabitOutcome.Deleted;
         }
     }
 

@@ -73,3 +73,14 @@ internal sealed class CustomHabitRow
 
     public string Icon { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// What demo loading reads of a named catalog habit (slice 4 research R-10): its identifier and its stored state, as an
+/// unmapped result of a raw locking query, so it never tracks or writes the row. Public catalog data only.
+/// </summary>
+internal sealed class CatalogHabitStateRow
+{
+    public Guid Id { get; set; }
+
+    public string State { get; set; } = string.Empty;
+}

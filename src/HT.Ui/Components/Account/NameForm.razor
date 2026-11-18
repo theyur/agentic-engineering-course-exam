@@ -1,0 +1,84 @@
+@using HT.Application.Accounts
+@using HT.Domain.Accounts
+@inject ProfileService Profiles
+@* design/pages/PageProfile, slice 4 (HP-017): the "Name" form of the Account card, for every account, before the
+   "Time zone" form. A static SSR form: Save calls the use case; a change shows the Notice above the field and raises
+   OnChanged, so the page reads the header again and refreshes the session cookie for the avatar letter; a refusal
+   shows its text under the field with the entered value kept. An empty name removes the name. *@
+<EditForm Model="Input" method="post" FormName="@FormName" OnSubmit="SubmitAsync" class="ht-form-section ht-stack" novalidate>
+    @if (_changed)
+    {
+        <Notice Role="status">@NameChanged</Notice>
+    }
+    <TextField Id="profile-name"
+               Label="Name"
+               Optional="true"
+               AutoComplete="name"
+               Help="@Help"
+               Error="@_error"
+               @bind-Value="Input.Name" />
+    <div><HtButton Type="submit" Variant="HtButton.ButtonVariant.Secondary">Save</HtButton></div>
+</EditForm>
+
+@code {
+    /// <summary>The form's name, distinct from the other forms of the page.</summary>
+    public const string FormName = "name";
+
+    /// <summary>The help under the field, on Profile and on Register (HP-017).</summary>
+    public const string Help = "Only you can see it. Home uses it to greet you.";
+
+    /// <summary>The Notice after a change (HP-017).</summary>
+    public const string NameChanged = "Your name is changed.";
+
+    [SupplyParameterFromForm(FormName = FormName)]
+    private NameInput Input { get; set; } = default!;
+
+    /// <summary>The signed-in account whose name the form shows and changes.</summary>
+    [Parameter, EditorRequired]
+    public ActingUser ActingUser { get; set; } = ActingUser.Anonymous;
+
+    /// <summary>The account's current name, shown in the field before a post; null when it has none.</summary>
+    [Parameter]
+    public string? CurrentName { get; set; }
+
+    /// <summary>Raised once after a change.</summary>
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private bool _changed;
+    private string? _error;
+
+    // Before a post, and after a change, the field shows the stored name as the page read it; after a refusal it keeps
+    // the posted value.
+    protected override void OnParametersSet()
+    {
+        Input ??= new NameInput { Name = CurrentName };
+        if (_changed)
+        {
+            Input.Name = CurrentName;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _changed = false;
+        _error = null;
+
+        var result = await Profiles.ChangeNameAsync(ActingUser, Input.Name, CancellationToken.None);
+        if (result.Outcome == NameChangeOutcome.Changed)
+        {
+            _changed = true;
+            await OnChanged.InvokeAsync();
+            Input.Name = CurrentName;
+            return;
+        }
+
+        // NameTooLong, and NotSignedIn for a session whose account is gone.
+        _error = result.Message;
+    }
+
+    private sealed class NameInput
+    {
+        public string? Name { get; set; }
+    }
+}

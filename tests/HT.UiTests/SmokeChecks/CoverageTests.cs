@@ -58,6 +58,19 @@ public sealed class CoverageTests
             SmokeCheckCoverage.Entries.Select(e => (e.Method, e.Parameter)).Distinct().Count());
     }
 
+    [Fact]
+    public void Slice_4_adds_the_profile_and_the_goals_of_a_demo_account_with_check_5()
+    {
+        // Slice 4 HP-018, contracts/host.md "Smoke check": the two new data parameters of CreateDemoAccountAsync.
+        Assert.Contains(
+            new CoverageEntry(nameof(IDemoDataStore.CreateDemoAccountAsync), "profile", typeof(DemoAccountProfile), "5 demo <email>: the account name on Profile"),
+            SmokeCheckCoverage.Entries);
+        Assert.Contains(
+            new CoverageEntry(nameof(IDemoDataStore.CreateDemoAccountAsync), "goals", typeof(IReadOnlyList<DemoGoal>), "5 demo <email>: the goal names on Goals"),
+            SmokeCheckCoverage.Entries);
+        Assert.Equal(6, SmokeCheckCoverage.Entries.Count);
+    }
+
     /// <summary>Every parameter of every method of the port, except the <see cref="CancellationToken"/>.</summary>
     private static IEnumerable<(MethodInfo Method, ParameterInfo Parameter)> DataParameters() =>
         typeof(IDemoDataStore).GetMethods()

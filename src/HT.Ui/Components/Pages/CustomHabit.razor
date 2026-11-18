@@ -12,11 +12,14 @@
 @inject UseCaseScope UseCases
 @inject ActingUserAccessor ActingUsers
 @inject NavigationManager Navigation
-@* design/pages/PageCustomHabit, slice 2 (HP-007, US4-AS13, US4-AS15): create a custom habit, or edit one with
-   "Delete", which asks first in a Dialog. After Save or Delete the page goes to My custom habits. A habit that
-   is gone by then shows a Notice and the form can no longer be saved. Another user's, a deleted or an unknown
-   habit, and an administrator on either address, get the Not found page; the use cases refuse on their own
-   (FR-022, FR-025). Every use case runs in its own scope. *@
+@* design/pages/PageCustomHabit, slice 4 state (HP-007, US4-AS13, US4-AS15, US5-AS6): create a custom habit, or edit
+   one. "Save habit" goes to My custom habits after saving; "Save and create goal" opens the New goal page with the
+   saved habit (/goals/new?habit={id}&kind=custom). "Delete", which asks first in a Dialog, is shown only while no
+   goal uses the habit (the use case's GoalCount); after it the page goes to My custom habits. A delete refused
+   because a goal was created in the meantime shows the use case's text in a Notice and leaves out "Delete" from
+   then on. A habit that is gone by then shows a Notice and the form can no longer be saved. Another user's, a
+   deleted or an unknown habit, and an administrator on either address, get the Not found page; the use cases
+   refuse on their own (FR-022, FR-025, FR-035). Every use case runs in its own scope. *@
 <PageTitle>@Title · Habit Tracker</PageTitle>
 
 @if (_ready)
@@ -37,9 +40,16 @@
                     <Action><HtButton Variant="HtButton.ButtonVariant.Secondary" Small="true" Href="/custom-habits">My custom habits</HtButton></Action>
                 </Notice>
             }
-            <CustomHabitForm Model="_model" Error="_error" NameHelp="@NameHelp" Disabled="@(_gone is not null)" OnSave="SaveAsync">
+            @if (_deleteRefused is { } refused)
+            {
+                <div tabindex="-1" @ref="_deleteRefusedNotice">
+                    <Notice Role="alert">@refused</Notice>
+                </div>
+            }
+            <CustomHabitForm Model="_model" Error="_error" NameHelp="@NameHelp" Disabled="@(_gone is not null)"
+                             OnSave="() => SaveAsync(createGoal: false)" OnSaveAndCreateGoal="() => SaveAsync(createGoal: true)">
                 <EndAction>
-                    @if (Id is not null)
+                    @if (CanDelete)
                     {
                         <button type="button" class="ht-btn ht-btn--danger" @ref="_deleteButton" @onclick="OpenDelete">Delete</button>
                     }
@@ -48,7 +58,8 @@
         </div>
         @if (Id is not null)
         {
-            <HtDialog Open="_confirmDelete" OnClose="CloseDelete" ReturnFocus="_deleteButton">
+            <HtDialog Open="_confirmDelete" OnClose="CloseDelete" ReturnFocus="_deleteButton"
+                      FocusOnClose="@(_deleteRefused is null ? null : FocusDeleteRefusedAsync)">
                 <Title>Delete this custom habit?</Title>
                 <Subtitle>@_savedName · Private</Subtitle>
                 <ChildContent><p>The habit is deleted for good. This cannot be undone.</p></ChildContent>
@@ -68,12 +79,15 @@
     private HabitFormModel _model = new();
     private FormError? _error;
     private string? _gone;
+    private string? _deleteRefused;
     private string _savedName = string.Empty;
+    private int _goalCount;
     private bool _confirmDelete;
     private bool _ready;
     private bool _loaded;
     private Guid? _loadedId;
     private ElementReference _deleteButton;
+    private ElementReference _deleteRefusedNotice;
 
     /// <summary>The habit being edited; null on the create address.</summary>
     [Parameter]
@@ -82,6 +96,9 @@
     private string Title => Id is null ? "New custom habit" : "Edit custom habit";
 
     private string? NameHelp => Id is null ? "Short and clear, for example \"Cold shower\" or \"No phone in bed\"." : null;
+
+    /// <summary>"Delete" only on an edited habit that no goal uses (HP-007, FR-035).</summary>
+    private bool CanDelete => Id is not null && _goalCount == 0;
 
     protected override async Task OnInitializedAsync() => _actingUser = await ActingUsers.GetAsync();
 
@@ -102,7 +119,9 @@
         _model = new();
         _error = null;
         _gone = null;
+        _deleteRefused = null;
         _savedName = string.Empty;
+        _goalCount = 0;
         _confirmDelete = false;
         if (Id is not { } id)
         {
@@ -129,10 +148,15 @@
 
         _model = HabitFormModel.From(habit.Name, habit.Description, habit.Category, habit.Intent, habit.Icon);
         _savedName = habit.Name;
+        _goalCount = habit.GoalCount;
         _ready = true;
     }
 
-    private async Task SaveAsync()
+    /// <summary>
+    /// Saves the habit; then "Save habit" goes to My custom habits and "Save and create goal" to the New goal page
+    /// with the saved habit (HP-007, US5-AS6).
+    /// </summary>
+    private async Task SaveAsync(bool createGoal)
     {
         if (_gone is not null)
         {
@@ -144,18 +168,26 @@
         {
             var created = await UseCases.RunAsync<CustomHabitService, CustomHabitCreateResult>(
                 (service, token) => service.CreateAsync(_actingUser, input, token), CancellationToken.None);
-            Finish(created.Outcome == CustomHabitCreateOutcome.Created, notFound: false, created.Outcome.ToString(), created.Message);
+            var next = created.HabitId is { } newId ? AfterSave(newId, createGoal) : null;
+            Finish(next, notFound: false, created.Outcome.ToString(), created.Message);
             return;
         }
 
         var edited = await UseCases.RunAsync<CustomHabitService, CustomHabitEditResult>(
             (service, token) => service.EditAsync(_actingUser, new HabitId(id), input, token), CancellationToken.None);
-        Finish(edited.Outcome == CustomHabitEditOutcome.Saved, edited.Outcome == CustomHabitEditOutcome.NotFound, edited.Outcome.ToString(), edited.Message);
+        Finish(
+            edited.Outcome == CustomHabitEditOutcome.Saved ? AfterSave(new HabitId(id), createGoal) : null,
+            edited.Outcome == CustomHabitEditOutcome.NotFound,
+            edited.Outcome.ToString(),
+            edited.Message);
     }
+
+    private static string AfterSave(HabitId habit, bool createGoal) =>
+        createGoal ? $"/goals/new?habit={habit.Value:D}&kind=custom" : CustomHabitsAddress;
 
     private void OpenDelete()
     {
-        if (_gone is null)
+        if (_gone is null && CanDelete)
         {
             _confirmDelete = true;
         }
@@ -180,14 +212,26 @@
         }
 
         _confirmDelete = false;
-        Finish(saved: false, deleted.Outcome == CustomHabitDeleteOutcome.NotFound, deleted.Outcome.ToString(), deleted.Message);
+        if (deleted.Outcome == CustomHabitDeleteOutcome.UsedByGoals)
+        {
+            // A goal on the habit was created after the page was read (FR-035): "Delete" goes, and the Dialog gives
+            // the focus to the use case's text, since the control that opened it is gone.
+            _deleteRefused = deleted.Message;
+            _goalCount = Math.Max(_goalCount, 1);
+            return;
+        }
+
+        Finish(next: null, deleted.Outcome == CustomHabitDeleteOutcome.NotFound, deleted.Outcome.ToString(), deleted.Message);
     }
 
-    private void Finish(bool saved, bool notFound, string outcome, string? message)
+    private ValueTask FocusDeleteRefusedAsync() => _deleteRefusedNotice.FocusAsync();
+
+    /// <summary>Goes to <paramref name="next"/> after a save; otherwise shows the refusal.</summary>
+    private void Finish(string? next, bool notFound, string outcome, string? message)
     {
-        if (saved)
+        if (next is not null)
         {
-            Navigation.NavigateTo(CustomHabitsAddress);
+            Navigation.NavigateTo(next);
             return;
         }
 
@@ -195,6 +239,7 @@
         {
             // Deleted in another browser: no field to show it under (HP-007).
             _error = null;
+            _deleteRefused = null;
             _gone = message;
             return;
         }

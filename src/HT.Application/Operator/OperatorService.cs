@@ -10,17 +10,24 @@ namespace HT.Application.Operator;
 public sealed class OperatorService
 {
     private readonly IAccountStore _store;
+    private readonly TimeProvider _timeProvider;
+    private readonly InstallationTimeZone _defaultTimeZone;
 
-    public OperatorService(IAccountStore store)
+    public OperatorService(IAccountStore store, TimeProvider timeProvider, InstallationTimeZone defaultTimeZone)
     {
         ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        ArgumentNullException.ThrowIfNull(defaultTimeZone);
         _store = store;
+        _timeProvider = timeProvider;
+        _defaultTimeZone = defaultTimeZone;
     }
 
     /// <summary>
     /// Creates an administrator with the configured email and password (FR-014), checking in order: both values
     /// configured, a valid email, no administrator with that email, no registered user with that email, the
-    /// password rule. An existing account is never changed.
+    /// password rule. An existing account is never changed. A created administrator has the installation's default
+    /// time zone, no name and the supplied current time as its creation time (FR-025, FR-030).
     /// </summary>
     public async Task<AdministratorCreationResult> CreateAdministratorAsync(
         string? email, string? password, CancellationToken cancellationToken)
@@ -45,7 +52,8 @@ public sealed class OperatorService
             return AdministratorCreationResult.PasswordRuleNotMet;
         }
 
-        var created = await _store.CreateAsync(parsed, Role.Administrator, password, cancellationToken);
+        var profile = new NewAccountProfile(null, _defaultTimeZone.Value, _timeProvider.GetUtcNow());
+        var created = await _store.CreateAsync(parsed, Role.Administrator, password, profile, cancellationToken);
         if (!created.IsEmailTaken)
         {
             return AdministratorCreationResult.Created;

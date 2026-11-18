@@ -1,29 +1,54 @@
 namespace HT.Application.Habits;
 
-/// <summary>The outcomes of <see cref="CatalogService.BrowseAsync"/>.</summary>
+/// <summary>The outcomes of both <c>BrowseAsync</c> overloads of <see cref="CatalogService"/>.</summary>
 public enum CatalogBrowseOutcome
 {
     Found,
+
+    /// <summary>"Only habits I track" asked by an anonymous visitor (FR-032); only the acting-user overload gives it.</summary>
+    NotSignedIn,
+
+    /// <summary>"Only habits I track" asked by an administrator (FR-021, FR-032); only the acting-user overload gives it.</summary>
+    NotForAdministrators,
 }
 
-/// <summary>The result of browsing (FR-008, FR-009): the Published habits in name order, and their count.</summary>
+/// <summary>
+/// The result of browsing (FR-008, FR-009): the Published habits in name order, and their count. With the acting user
+/// passed, a registered user also gets <see cref="TrackedCount"/> and each habit's goal count (FR-031); "Only habits I
+/// track" is refused for the other audiences with no habit (FR-032).
+/// </summary>
 public sealed class CatalogBrowseResult
 {
-    private CatalogBrowseResult(IReadOnlyList<CatalogHabitSummary> habits)
+    private CatalogBrowseResult(CatalogBrowseOutcome outcome, string? message, IReadOnlyList<CatalogHabitSummary> habits)
     {
+        Outcome = outcome;
+        Message = message;
         Habits = habits;
     }
 
-    public CatalogBrowseOutcome Outcome => CatalogBrowseOutcome.Found;
+    public CatalogBrowseOutcome Outcome { get; }
 
-    /// <summary>Always null: browsing has no refusal and the spec gives its success no text.</summary>
-    public string? Message => null;
+    /// <summary>The spec's text of a refusal; null for <see cref="CatalogBrowseOutcome.Found"/>.</summary>
+    public string? Message { get; }
 
+    /// <summary>The habits; empty for a refusal.</summary>
     public IReadOnlyList<CatalogHabitSummary> Habits { get; }
 
     public int Count => Habits.Count;
 
-    internal static CatalogBrowseResult Found(IReadOnlyList<CatalogHabitSummary> habits) => new(habits);
+    /// <summary>
+    /// How many of the returned habits the acting user tracks (a goal count of at least 1). Set only for a registered
+    /// user with the acting user passed; null otherwise (FR-019, FR-032).
+    /// </summary>
+    public int? TrackedCount { get; private init; }
+
+    internal static CatalogBrowseResult Found(IReadOnlyList<CatalogHabitSummary> habits) =>
+        new(CatalogBrowseOutcome.Found, null, habits);
+
+    internal static CatalogBrowseResult FoundWithGoals(IReadOnlyList<CatalogHabitSummary> habits) =>
+        new(CatalogBrowseOutcome.Found, null, habits) { TrackedCount = habits.Count(h => h.GoalCount >= 1) };
+
+    internal static CatalogBrowseResult Refused(CatalogBrowseOutcome outcome, string message) => new(outcome, message, []);
 }
 
 /// <summary>The outcomes of <see cref="CatalogService.GetHomePreviewAsync"/>.</summary>
@@ -61,7 +86,7 @@ public sealed class HomePreviewResult
         new(habits, publishedCount);
 }
 
-/// <summary>The outcomes of <see cref="CatalogService.GetDetailsAsync"/>.</summary>
+/// <summary>The outcomes of both <c>GetDetailsAsync</c> overloads of <see cref="CatalogService"/>.</summary>
 public enum CatalogHabitDetailsOutcome
 {
     NotInCatalog,

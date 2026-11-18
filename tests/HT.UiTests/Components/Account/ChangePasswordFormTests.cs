@@ -19,7 +19,7 @@ public sealed class ChangePasswordFormTests : BunitContext
 
     public ChangePasswordFormTests()
     {
-        Services.AddSingleton(new AccountService(_store, TimeProvider.System));
+        Services.AddSingleton(new AccountService(_store, TimeProvider.System, InstallationTimeZone.From(null)));
     }
 
     [Fact]

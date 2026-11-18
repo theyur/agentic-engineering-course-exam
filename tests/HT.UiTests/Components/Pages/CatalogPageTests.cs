@@ -1,6 +1,10 @@
 using Bunit;
 using Bunit.TestDoubles;
+using HT.Application.Goals;
+using HT.Domain.Accounts;
+using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Time;
 using HT.Ui.Components.Pages;
 using HT.UnitTests.Fakes;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,12 +12,16 @@ using static HT.UnitTests.Fakes.HabitSamples;
 
 namespace HT.UiTests.Components.Pages;
 
-/// <summary>US1-AS10, US1-AS11, HP-001 to HP-004: the Catalog page over the real CatalogService and the fake store.</summary>
+/// <summary>
+/// US1-AS10, US1-AS11, HP-001 to HP-004, and slice 4 US6-AS2, US6-AS5, HP-005: the Catalog page over the real
+/// CatalogService and the fake stores.
+/// </summary>
 public sealed class CatalogPageTests : BunitContext
 {
     private readonly BunitAuthorizationContext _authorization;
     private readonly FakeCatalogHabitStore _store;
     private readonly FakeCustomHabitStore _customHabits;
+    private readonly FakeGoalStore _goals;
 
     public CatalogPageTests()
     {
@@ -24,6 +32,7 @@ public sealed class CatalogPageTests : BunitContext
         _store.Add(Catalog("Sugar", category: Category.Health, intent: Intent.Reduce, icon: "candy"));
         _store.Add(Catalog("Old habit", CatalogHabitState.Unpublished, category: Category.Other));
         _customHabits = this.AddCustomHabits();
+        _goals = this.AddGoals();
     }
 
     private BunitNavigationManager Navigation => Services.GetRequiredService<BunitNavigationManager>();
@@ -151,17 +160,140 @@ public sealed class CatalogPageTests : BunitContext
         Assert.EndsWith("/catalog", Navigation.Uri, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData("RegisteredUser")]
-    [InlineData("Administrator")]
-    public void HP_002_signed_in_audiences_get_Details_and_no_register_Notice(string role)
+    [Fact]
+    public void HP_002_an_administrator_gets_Details_only_and_no_register_Notice()
     {
-        _authorization.SignIn(role);
+        _authorization.SignIn("Administrator", "admin@example.com");
 
         var cut = RenderAt("/catalog");
 
         Assert.Empty(cut.FindAll(".ht-notice"));
         Assert.All(cut.FindAll(".ht-habit__actions a"), a => Assert.Equal("Details", a.TextContent));
+        Assert.Empty(cut.FindAll(".ht-habit__head .ht-chip"));
+        Assert.Equal("3 habits", cut.Find(".ht-results-bar span").TextContent);
+    }
+
+    /// <summary>Stores goals of <paramref name="owner"/> on <paramref name="habit"/> directly, starting today.</summary>
+    private void StoreGoals(AccountId owner, string habit, int count)
+    {
+        var catalog = _store.Habits.Single(h => h.Definition.Name.Value == habit);
+        var start = new DateOnly(2026, 11, 18);
+        Assert.True(GoalTarget.TryCreate(new GoalTargetFields
+        {
+            BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.YesNo, ScheduleKind = ScheduleKind.Times, Times = 3, Period = SchedulePeriod.Week,
+        }, out var target, out _));
+        for (var i = 0; i < count; i++)
+        {
+            _goals.Add(owner,
+                new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(catalog.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                    [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+                new GoalHabitView(catalog.Id, HabitKind.Catalog, habit, catalog.Definition.Category, true));
+        }
+    }
+
+    private void SignInRegisteredUserWithGoals()
+    {
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        StoreGoals(owner, "Reading", 2);
+        StoreGoals(new AccountId(Guid.NewGuid()), "Sugar", 1);
+    }
+
+    private static List<(string Name, string? Tag, string Actions)> Cards(IRenderedComponent<Catalog> cut) =>
+        cut.FindAll(".ht-habit").Select(card => (
+            card.QuerySelector(".ht-habit__name")!.TextContent,
+            card.QuerySelector(".ht-habit__head .ht-chip")?.TextContent,
+            string.Join(" | ", card.QuerySelectorAll(".ht-habit__actions a").Select(a => a.TextContent)))).ToList();
+
+    [Fact]
+    public void US6_AS5_a_registered_user_sees_their_goal_counts_goal_actions_the_Show_option_and_the_tracked_count()
+    {
+        SignInRegisteredUserWithGoals();
+        var reading = _store.Habits.Single(h => h.Definition.Name.Value == "Reading");
+
+        var cut = RenderAt("/catalog");
+
+        Assert.Equal(
+            [("Reading", (string?)"2 goals", "Add another goal | Details"), ("Saving money", null, "Use this habit | Details"), ("Sugar", null, "Use this habit | Details")],
+            Cards(cut));
+        Assert.Contains("ht-chip--strong", cut.Find(".ht-habit__head .ht-chip").ClassList);
+        Assert.All(cut.FindAll(".ht-habit__actions a.ht-btn--primary, .ht-habit__actions a.ht-btn--secondary"),
+            a => Assert.StartsWith("/goals/new?habit=", a.GetAttribute("href"), StringComparison.Ordinal));
+        Assert.Equal($"/goals/new?habit={reading.Id.Value:D}&kind=catalog", cut.Find(".ht-habit__actions a.ht-btn--secondary").GetAttribute("href"));
+        Assert.Equal("3 habits · you track 1", cut.Find(".ht-results-bar span").TextContent);
+        Assert.Equal(["Category", "Intent", "Show"], cut.FindAll(".ht-filter__title").Select(t => t.TextContent));
+        Assert.Contains("Only habits I track", cut.Find("aside").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void US6_AS5_one_goal_is_1_goal()
+    {
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        StoreGoals(owner, "Sugar", 1);
+
+        var cut = RenderAt("/catalog");
+
+        Assert.Equal(("Sugar", (string?)"1 goal", "Add another goal | Details"), Cards(cut)[2]);
+    }
+
+    [Fact]
+    public void US6_AS2_Only_habits_I_track_lists_the_tracked_habits_and_is_kept_in_the_address()
+    {
+        SignInRegisteredUserWithGoals();
+        var cut = RenderAt("/catalog");
+
+        cut.FindAll("input[type=checkbox]")[2].Change(true);
+
+        Assert.Equal(["Reading"], Names(cut));
+        Assert.Equal("1 habit · you track 1", cut.Find(".ht-results-bar span").TextContent);
+        Assert.EndsWith("/catalog?tracked=true", Navigation.Uri, StringComparison.Ordinal);
+        Assert.True(Navigation.History.First().Options.ReplaceHistoryEntry);
+
+        cut.FindAll("input[type=checkbox]")[2].Change(false);
+
+        Assert.Equal(["Reading", "Saving money", "Sugar"], Names(cut));
+        Assert.EndsWith("/catalog", Navigation.Uri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void US6_AS2_tracked_true_in_the_address_checks_the_box_with_the_other_filters()
+    {
+        SignInRegisteredUserWithGoals();
+
+        var cut = RenderAt("/catalog?tracked=true&category=mind");
+
+        Assert.Equal(["Reading"], Names(cut));
+        Assert.True(cut.FindAll("input[type=checkbox]")[2].HasAttribute("checked"));
+
+        var empty = RenderAt("/catalog?tracked=true&category=money");
+        Assert.Empty(Names(empty));
+        Assert.Equal("No habits match", empty.Find(".ht-empty h3").TextContent);
+
+        empty.Find(".ht-empty button").Click();
+
+        Assert.Equal(["Reading", "Saving money", "Sugar"], Names(empty));
+        Assert.False(empty.FindAll("input[type=checkbox]")[2].HasAttribute("checked"));
+        Assert.EndsWith("/catalog", Navigation.Uri, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Administrator")]
+    public void HP_005_visitors_and_administrators_ignore_tracked_true_and_have_no_Show_option(string? role)
+    {
+        if (role is not null)
+        {
+            _authorization.SignIn(role, "admin@example.com");
+        }
+
+        StoreGoals(new AccountId(Guid.NewGuid()), "Reading", 2);
+
+        var cut = RenderAt("/catalog?tracked=true");
+
+        Assert.Equal(["Reading", "Saving money", "Sugar"], Names(cut));
+        Assert.Equal(["Category", "Intent"], cut.FindAll(".ht-filter__title").Select(t => t.TextContent));
+        Assert.Equal("3 habits", cut.Find(".ht-results-bar span").TextContent);
+        Assert.DoesNotContain("Only habits I track", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("goal", string.Join(" ", cut.FindAll(".ht-habit__actions, .ht-habit__head").Select(e => e.TextContent)), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -184,7 +316,7 @@ public sealed class CatalogPageTests : BunitContext
         Assert.Equal(["page", null], links.Select(a => a.GetAttribute("aria-current")));
         // "Public catalog" counts every Published habit, whatever the filters; "My custom habits" the user's own.
         Assert.Equal(["Public catalog3", "My custom habits1"], links.Select(a => a.TextContent));
-        Assert.Equal("1 habit", cut.Find(".ht-results-bar span").TextContent);
+        Assert.Equal("1 habit · you track 0", cut.Find(".ht-results-bar span").TextContent);
         Assert.DoesNotContain("Cold shower", cut.Markup, StringComparison.Ordinal);
     }
 

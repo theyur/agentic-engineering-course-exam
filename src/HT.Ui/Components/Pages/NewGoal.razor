@@ -1,0 +1,195 @@
+@page "/goals/new"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.Globalization
+@using HT.Application.Goals
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Domain.Habits
+@using HT.Ui.Account
+@using HT.Ui.Components.Goals
+@using HT.Ui.Goals
+@using HT.Ui.Habits
+@using Microsoft.AspNetCore.Authorization
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageNewGoal, slice 4 state (HP-001, HP-002, contracts/host.md): the New goal page. The address may
+   name a habit (habit, kind=catalog|custom) and a suggested starting goal (suggestion, from 1); the form starts from
+   the use case's starting values. A value the use case refuses shows its text in the Habit section, and the form
+   opens with no habit chosen. "Create goal" goes to the new goal's page; each refusal sits under its field. The
+   BackLink and Cancel go back to the habit the address names, or to Goals. An administrator gets the Not found page;
+   the use case refuses on its own (FR-021). Every use case runs in its own scope. *@
+<PageTitle>New goal · Habit Tracker</PageTitle>
+
+@if (_model is { } model)
+{
+    <div class="ht-container">
+        <BackLink Href="@_backHref" Text="@_backText" />
+        <div class="ht-page-head ht-detail-head">
+            <div>
+                <h1>New goal</h1>
+                <span class="ht-muted">@HeadLine(model.Habit)</span>
+            </div>
+        </div>
+        <NewGoalForm Model="model" Error="_error" ActingUser="_actingUser" CancelHref="@_backHref"
+                     OnSubmit="CreateAsync" OnHabitChosen="StartFromHabitAsync" />
+    </div>
+}
+
+@code {
+    private const string GoalsAddress = "/goals";
+
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private GoalFormModel? _model;
+    private GoalFormError? _error;
+    private string _backHref = GoalsAddress;
+    private string _backText = "Goals";
+    private string? _loadedAddress;
+
+    /// <summary>The habit's identifier from the address.</summary>
+    [SupplyParameterFromQuery(Name = "habit")]
+    public string? HabitValue { get; set; }
+
+    /// <summary><c>catalog</c> (also when absent) or <c>custom</c>.</summary>
+    [SupplyParameterFromQuery(Name = "kind")]
+    public string? KindValue { get; set; }
+
+    /// <summary>The suggested starting goal's position, counted from 1.</summary>
+    [SupplyParameterFromQuery(Name = "suggestion")]
+    public string? SuggestionValue { get; set; }
+
+    protected override async Task OnInitializedAsync() => _actingUser = await ActingUsers.GetAsync();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var address = $"{HabitValue}|{KindValue}|{SuggestionValue}";
+        if (string.Equals(address, _loadedAddress, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _loadedAddress = address;
+        _model = null;
+        _error = null;
+        _backHref = GoalsAddress;
+        _backText = "Goals";
+        var started = await StartAsync(AddressHabit(), AddressPosition());
+        if (started.StartingValues is { } values)
+        {
+            _model = GoalFormModel.From(values);
+            if (values.Habit is { } habit)
+            {
+                _backHref = habit.Kind == HabitKind.Catalog ? $"/catalog/{habit.Id.Value}" : $"/custom-habits/{habit.Id.Value}";
+                _backText = habit.Name;
+            }
+
+            return;
+        }
+
+        if (!IsHabitRefusal(started.Outcome))
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        // The address named a habit or a suggestion the user cannot start from: say so, and open with no habit.
+        var plain = await StartAsync(null, null);
+        if (plain.StartingValues is not { } empty)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        _model = GoalFormModel.From(empty);
+        _error = new GoalFormError(GoalField.Habit, started.Message!);
+    }
+
+    private Task<GoalStartResult> StartAsync(GoalHabit? habit, int? position) =>
+        UseCases.RunAsync<GoalService, GoalStartResult>(
+            (service, token) => service.StartNewGoalAsync(_actingUser, habit, position, token), CancellationToken.None);
+
+    /// <summary>
+    /// The habit the address names. An identifier that is not a GUID belongs to nothing, so the use case refuses it with
+    /// its own text, as it refuses an unknown one.
+    /// </summary>
+    private GoalHabit? AddressHabit()
+    {
+        if (HabitValue is null)
+        {
+            return null;
+        }
+
+        var id = Guid.TryParse(HabitValue, CultureInfo.InvariantCulture, out var parsed) ? parsed : Guid.Empty;
+        var kind = string.Equals(KindValue, "custom", StringComparison.Ordinal) ? HabitKind.Custom : HabitKind.Catalog;
+        return new GoalHabit(new HabitId(id), kind);
+    }
+
+    /// <summary>The address's position; one that is not a whole number is position 0, which no habit has.</summary>
+    private int? AddressPosition()
+    {
+        if (SuggestionValue is null)
+        {
+            return null;
+        }
+
+        return int.TryParse(SuggestionValue, NumberStyles.None, CultureInfo.InvariantCulture, out var position) ? position : 0;
+    }
+
+    private static bool IsHabitRefusal(GoalStartOutcome outcome) =>
+        outcome is GoalStartOutcome.NotInCatalog or GoalStartOutcome.CustomHabitNotFound or GoalStartOutcome.SuggestionNotFound;
+
+    private static string HeadLine(GoalHabitView? habit) => habit switch
+    {
+        null => "Start from a catalog habit or one of your custom habits.",
+        { Kind: HabitKind.Custom } => $"Based on your custom habit {habit.Name}. Change anything you like.",
+        _ => $"Based on the catalog habit {habit.Name}. Change anything you like.",
+    };
+
+    /// <summary>The habit chooser's choice: the form starts again from that habit's starting values (FR-007).</summary>
+    private async Task StartFromHabitAsync(GoalHabit habit)
+    {
+        var started = await StartAsync(habit, null);
+        if (started.StartingValues is { } values)
+        {
+            _model = GoalFormModel.From(values);
+            _error = null;
+            return;
+        }
+
+        if (!IsHabitRefusal(started.Outcome))
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        // Unpublished or deleted since the chooser listed it: the form stays as it was.
+        _error = new GoalFormError(GoalField.Habit, started.Message!);
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_model is not { } model)
+        {
+            return;
+        }
+
+        var input = model.ToInput();
+        var result = await UseCases.RunAsync<GoalService, GoalCreateResult>(
+            (service, token) => service.CreateAsync(_actingUser, input, token), CancellationToken.None);
+        if (result.GoalId is { } id)
+        {
+            Navigation.NavigateTo($"/goals/{id.Value}");
+            return;
+        }
+
+        if (result.Field is { } field)
+        {
+            _error = new GoalFormError(field, result.Message!);
+            return;
+        }
+
+        // Not signed in any more, or an administrator: the use case refused before anything else.
+        Navigation.NotFound();
+    }
+}

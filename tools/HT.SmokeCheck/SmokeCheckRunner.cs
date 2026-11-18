@@ -25,6 +25,8 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     private const string CatalogPath = "/catalog";
     private const string AdminPath = "/admin";
     private const string CustomHabitsPath = "/custom-habits";
+    private const string GoalsPath = "/goals";
+    private const string ProfilePath = "/profile";
 
     /// <summary>The pause between two tries of check 1, shortened to the warm-up time that is left.</summary>
     private static readonly TimeSpan RetryPause = TimeSpan.FromSeconds(5);
@@ -245,16 +247,21 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     }
 
     /// <summary>
-    /// Check 5 <c>demo &lt;email&gt;</c>: the demo account signs in on a new client with the demo password and
-    /// <c>GET /custom-habits</c> shows the name of every habit of <see cref="DemoCustomHabits.For"/>. With
-    /// <paramref name="measureLater"/>, also measures the <c>later</c> timing (contracts/smoke-check.md "Timings"):
-    /// that request together with every stylesheet and script the page links, fetched one after another with the
-    /// account's cookie.
+    /// Check 5 <c>demo &lt;email&gt;</c>: the demo account signs in on a new client with the demo password, then
+    /// <c>GET /custom-habits</c> shows the name of every habit of <see cref="DemoCustomHabits.For"/>, <c>GET /goals</c>
+    /// the name of every goal of <see cref="DemoGoals.DisplayNames"/>, and, for an account with a name
+    /// (<see cref="DemoAccounts.NameFor"/>, demo1), <c>GET /profile</c> that name as its first heading (slice 4
+    /// HP-018). Every page is read; the line counts the expected names of all of them, and a <c>FAIL</c> names the first
+    /// part that misses, in that order. With <paramref name="measureLater"/>, also measures the <c>later</c> timing
+    /// (contracts/smoke-check.md "Timings"): <c>GET /custom-habits</c> together with every stylesheet and script the
+    /// page links, fetched one after another with the account's cookie.
     /// </summary>
     private async Task<(string Line, LaterTiming? Later)> CheckDemoAccountAsync(string email, bool measureLater)
     {
         var name = $"demo {email}";
-        var expected = DemoCustomHabits.For(email).Select(habit => habit.Name.Value).ToList();
+        var expectedHabits = DemoCustomHabits.For(email).Select(habit => habit.Name.Value).ToList();
+        var expectedGoals = DemoGoals.DisplayNames(email);
+        var expectedAccountName = DemoAccounts.NameFor(email);
         LaterTiming? later = null;
 
         var line = await GuardAsync(name, async () =>
@@ -266,20 +273,54 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
             }
 
             var clock = Stopwatch.StartNew();
-            using var response = await client.GetAsync(new Uri(CustomHabitsPath, UriKind.Relative)).ConfigureAwait(false);
-            var html = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            var (habitsStatus, habitsHtml) = await GetPageAsync(client, CustomHabitsPath).ConfigureAwait(false);
             if (measureLater)
             {
-                var assets = await FetchAssetsAsync(client, html).ConfigureAwait(false);
+                var assets = await FetchAssetsAsync(client, habitsHtml).ConfigureAwait(false);
                 later = new LaterTiming((long)clock.Elapsed.TotalMilliseconds, 1 + assets);
             }
 
-            return response.StatusCode == HttpStatusCode.OK
-                ? NamesLine(name, PageReader.ReadHabitNames(html), expected, "custom habits")
-                : $"{FailPrefix}{name}: GET {CustomHabitsPath} gave {StatusText(response.StatusCode)}";
+            List<NamesPart> parts =
+            [
+                NamesPart.Of(CustomHabitsPath, habitsStatus, PageReader.ReadHabitNames(habitsHtml), expectedHabits, "custom habits"),
+            ];
+
+            var (goalsStatus, goalsHtml) = await GetPageAsync(client, GoalsPath).ConfigureAwait(false);
+            parts.Add(NamesPart.Of(GoalsPath, goalsStatus, PageReader.ReadGoalNames(goalsHtml), expectedGoals, "goals"));
+
+            if (expectedAccountName is not null)
+            {
+                var (profileStatus, profileHtml) = await GetPageAsync(client, ProfilePath).ConfigureAwait(false);
+                parts.Add(NamesPart.OfAccountName(profileStatus, PageReader.ReadFirstHeading(profileHtml), expectedAccountName));
+            }
+
+            return PartsLine(name, parts);
         }).ConfigureAwait(false);
 
         return (line, later);
+    }
+
+    /// <summary>A page's status and its HTML; the HTML of a status other than 200 is not read for names.</summary>
+    private static async Task<(HttpStatusCode Status, string Html)> GetPageAsync(HttpClient client, string path)
+    {
+        using var response = await client.GetAsync(new Uri(path, UriKind.Relative)).ConfigureAwait(false);
+        return (response.StatusCode, await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// <c>PASS &lt;name&gt; (&lt;found&gt; of &lt;expected&gt;)</c>, counting the expected names of every part together, when
+    /// no part misses; otherwise a <c>FAIL</c> with the first part's reason. No name is printed.
+    /// </summary>
+    private static string PartsLine(string name, IReadOnlyList<NamesPart> parts)
+    {
+        if (parts.FirstOrDefault(part => part.Problem is not null) is { Problem: { } problem })
+        {
+            return $"{FailPrefix}{name}: {problem}";
+        }
+
+        var found = parts.Sum(part => part.Found);
+        var expected = parts.Sum(part => part.Expected);
+        return string.Create(CultureInfo.InvariantCulture, $"PASS {name} ({found} of {expected})");
     }
 
     /// <summary>
@@ -398,4 +439,38 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
 
     /// <summary>The <c>later</c> timing: its duration and how many requests it covers.</summary>
     private readonly record struct LaterTiming(long Milliseconds, int Requests);
+
+    /// <summary>
+    /// One page of check 5: how many of its expected names it shows, how many it should, and the reason it misses, or
+    /// null. The reason holds counts and a path only, never a name.
+    /// </summary>
+    private sealed record NamesPart(int Found, int Expected, string? Problem)
+    {
+        public static NamesPart Of(
+            string path, HttpStatusCode status, IReadOnlyList<string> found, IReadOnlyList<string> expected, string what)
+        {
+            if (status != HttpStatusCode.OK)
+            {
+                return new NamesPart(0, expected.Count, $"GET {path} gave {StatusText(status)}");
+            }
+
+            var present = found.ToHashSet(StringComparer.Ordinal);
+            var count = expected.Count(present.Contains);
+            return count == expected.Count
+                ? new NamesPart(count, expected.Count, null)
+                : new NamesPart(count, expected.Count, string.Create(CultureInfo.InvariantCulture, $"{count} of {expected.Count} {what} shown"));
+        }
+
+        public static NamesPart OfAccountName(HttpStatusCode status, string? heading, string expected)
+        {
+            if (status != HttpStatusCode.OK)
+            {
+                return new NamesPart(0, 1, $"GET {ProfilePath} gave {StatusText(status)}");
+            }
+
+            return string.Equals(heading, expected, StringComparison.Ordinal)
+                ? new NamesPart(1, 1, null)
+                : new NamesPart(0, 1, "account name not shown");
+        }
+    }
 }

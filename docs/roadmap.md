@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-11-15"
+updated_at: "2026-11-18"
 ---
 
 # Roadmap — Habit Tracker
@@ -30,9 +30,9 @@ in its idea brief, which assumed the catalog also carried the account foundation
 | 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | — | shipped | [001](../specs/001-accounts-and-access/spec.md) |
 | 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | — | shipped | [002](../specs/002-habit-catalog/spec.md) |
 | 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | — | shipped | [003](../specs/003-demo-hosting/spec.md) |
-| 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Next | not started | — |
+| 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | — | shipped | [004](../specs/004-goals/spec.md) |
 | 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Next | not started | — |
-| 6 | `personal-reports` | A user sees how consistent they are: a dashboard of upcoming, due and overdue commitments and Missed results, consistency with its count, strict streaks with their unit, trends. | §6 | 5 | — | Later | not started | — |
+| 6 | `personal-reports` | A user sees how consistent they are: a dashboard of upcoming, due and overdue commitments and Missed results, consistency with its count, strict streaks with their unit, trends. | §6 | 5 | — | Next | not started | — |
 | 7 | `excusals-and-pauses` | Excused commitments and paused expectations are left out of consistency and neither extend nor break the streak. | §5.3 | 5, 6 | — | Later | not started | — |
 | 8 | `goal-changes` | A user changes a goal from the next evaluation boundary, ends it with an outcome, and restarts it as a new attempt, with earlier attempts kept in history. | §5.4 | 5, 6 | 7 | Later | not started | — |
 | 9 | `community` | People who opt in appear in Consistency Bands under a public display name, and catalog habits show aggregate performance. Anyone, including anonymous visitors, sees these views; no private data is exposed. | §7 | 2, 6 | 7 | Later | not started | — |
@@ -112,20 +112,20 @@ decision R7.
 
 | Page or shell (`design/`) | Created in | Extended in |
 |---|---|---|
-| Shell: `TopNav` (visitor, signed-in, admin), `MobileNav`, `Footer` | 1 (Today, avatar menu, "Privacy") | each slice adds its links (Catalog and Admin 2, Goals and "+ New goal" 4, Community 9); "Send feedback" 11 |
-| `PageSignIn`, `PageRegister` | 1 | 11 (deactivated notice) |
+| Shell: `TopNav` (visitor, signed-in, admin), `MobileNav`, `Footer` | 1 (Today, avatar menu, "Privacy") | each slice adds its links (Catalog and Admin 2, Goals and "+ New goal" 4, Community 9); 4 (the avatar letter from the account name); "Send feedback" 11 |
+| `PageSignIn`, `PageRegister` | 1 | 4 (Register: optional "Name", the browser's time zone with no visible field), 11 (deactivated notice) |
 | `PagePrivacy` (new, designed in 1) | 1 | — |
 | `PageAdminCatalogHabit` (new, designed in 2) | 2 | — |
 | `PageHomeVisitor` | 1 (hero with "Register free", how it works) | 2 ("Browse the catalog", catalog preview), 6 (GoalStats card from demo data), 9 (BandSummary) |
-| `PageHomeSignedIn` | 1 ("Today" heading; the greeting and date wait for the time-zone decision of slice 4) | 2 (empty state pointing to the catalog), 6 (stat tiles, Today list, GoalSummary, recent notes), 7 ("Excuse" on Pending rows) |
-| `PageProfile` | 1 (Account tab) | 2 (Custom habits), 8 (Goal history), 9 (Community) |
+| `PageHomeSignedIn` | 1 ("Today" heading; the greeting and date wait for the time-zone decision of slice 4) | 2 (empty state pointing to the catalog), 4 (greeting and date; the empty state points to the catalog and custom habits), 6 (stat tiles, Today list, GoalSummary, recent notes), 7 ("Excuse" on Pending rows) |
+| `PageProfile` | 1 (Account tab) | 2 (Custom habits), 4 (name and "member since" in the header; "Name" and "Time zone" on the Account tab), 8 (Goal history), 9 (Community) |
 | `PageCatalogVisitor` | 2 | — |
 | `PageCatalogSignedIn` | 2 | 4 ("Use this habit", "N goals", "Add another goal", "Only habits I track"), 10 ("Suggest for catalog" on custom-habit cards) |
 | `PageCustomHabit` | 2 (including "Delete") | 4 ("Save and create goal"; "Delete" only when no goals use it), 10 ("Suggest for catalog") |
 | `PageHabitDetail` | 2 | 4 ("Use this habit", "You track this · N goals", "Start with this", your goals), 9 (community performance) |
-| `PageNewGoal`, `PageGoals`, `PageGoalDetail` | 4 | 5 (Record, history, notes), 6 (GoalStats, trend), 7 (Pause, Excuse, Paused tab), 8 (Edit settings, End goal, Ended tab, earlier attempts) |
+| `PageNewGoal`, `PageGoals`, `PageGoalDetail` | 4 (New goal with the habit chooser and summary card; Goals without Tabs; the goal page's head and Settings card) | 5 (Record, history, notes), 6 (GoalStats, trend), 7 (Pause, Excuse, Paused tab), 8 (Edit settings, End goal, Ended tab, earlier attempts) |
 | `PageCommunity` | 9 | — |
-| `PageAdmin` | 2 (Catalog tab) | 10 (Suggestions), 11 (Feedback, Accounts) |
+| `PageAdmin` | 2 (Catalog tab) | 4 (unpublish confirmation Dialog), 10 (Suggestions), 11 (Feedback, Accounts) |
 | `PageAdminSuggestions` | 10 | — |
 | `PageAdminFeedback` | 11 | — |
 | `PageAdminAccounts` | 11 | 9 (public display name and community state, if 9 lands after 11) |
@@ -169,8 +169,8 @@ How this works with the Spec Kit commands:
 | Test-project layout | ARCH §9 | `accounts-and-access` | decided | [ADR 0006](adr/0006-integration-tests.md) |
 | Re-runnable demo-data seeding | ARCH §7 | `accounts-and-access` | decided | [ADR 0007](adr/0007-startup-operator-tasks.md) |
 | Privacy page: `design/components/Footer` links to it, but no page design exists | new; design | `accounts-and-access` | decided | [spec](../specs/001-accounts-and-access/spec.md#clarifications) |
-| Whether an account has a name, and the time-dependent text of the signed-in Home greeting and the Profile "member since". Slice 1 shows neither ([spec](../specs/001-accounts-and-access/spec.md#clarifications)). | new; design | `goals` | open | — |
-| Whether an administrator account can also track its own goals. `design/components/TopNav` gives administrators no Goals link. | SPEC §3; design | `goals` | open | — |
+| Whether an account has a name, and the time-dependent text of the signed-in Home greeting and the Profile "member since". Slice 1 shows neither ([spec](../specs/001-accounts-and-access/spec.md#clarifications)). | new; design | `goals` | decided: an optional private name; Home greets by time of day in the account's time zone, with the name when set, and shows today's date; Profile shows "member since" for accounts created from slice 4 on | [spec](../specs/004-goals/spec.md#clarifications) |
+| Whether an administrator account can also track its own goals. `design/components/TopNav` gives administrators no Goals link. | SPEC §3; design | `goals` | decided: no; goals are for registered users | [spec](../specs/004-goals/spec.md#clarifications) |
 | One or several suggested starting goals per catalog habit, and whether the catalog page has search, an Intent filter and sort. The idea brief says "at most one" and "search can wait". SPEC §4 says "suggested starting goals" while SPEC §2 is singular, so SPEC is ambiguous. `design/pages/PageHabitDetail` shows several; `PageCatalogVisitor` and `HabitCard` show one per card, plus search, an Intent filter and sort. If the brief wins, `design/` changes first (constitution IV). | idea brief §7, §8; SPEC §2, §4; design | `habit-catalog` | decided: several suggested starting goals, one marked for the card; search, Intent filter and A–Z order as the design shows | [spec](../specs/002-habit-catalog/spec.md#clarifications); [ADR 0011](adr/0011-suggested-starting-goals.md) |
 | Shape of a suggested starting goal, compatible with goals | idea brief §15 | `habit-catalog` | decided: structured fields like the New goal form | [spec](../specs/002-habit-catalog/spec.md#clarifications); [ADR 0011](adr/0011-suggested-starting-goals.md) |
 | How goals behave when their catalog habit is edited or unpublished; `goals` cites the answer | idea brief §15 | `habit-catalog` | decided: goals keep working with the current name; unpublishing a used habit asks for confirmation with the goal count | [spec](../specs/002-habit-catalog/spec.md#clarifications); [ADR 0012](adr/0012-goals-on-changed-catalog-habit.md) |
@@ -179,8 +179,8 @@ How this works with the Spec Kit commands:
 | Schema migration rollout on each deployment | ARCH §5 | `demo-hosting` | decided: the deployment workflow applies the commit's migrations with an EF Core migration bundle to the emptied database while the app is stopped; ADR 0007 unchanged | [ADR 0015](adr/0015-demo-hosting.md) |
 | When and how hosted demo data is refreshed. If time-relative demo data (slice 5 onward) has shipped when hosting starts, the decision also keeps it current until 2026-12-31. | ARCH §7 | `demo-hosting` | decided: on every deployment and whenever the Operator starts a refresh, by the same workflow in refresh mode (empty database, migrations, restart, smoke check). No time-relative demo data had shipped; the slice that adds it keeps it current. | [spec](../specs/003-demo-hosting/spec.md#clarifications); [ADR 0015](adr/0015-demo-hosting.md) |
 | How reviewers get demo sign-ins, with no secret in source control | ARCH §7; CLAUDE.md | `demo-hosting` | decided: only with the exam submission, including the configured administrator's sign-in; the hosted app reads the passwords from App Service app settings | [spec](../specs/003-demo-hosting/spec.md#clarifications); [ADR 0015](adr/0015-demo-hosting.md) |
-| Commitment deadlines and time zones (ADR) | SPEC §11.1 (first part); ARCH §9 | `goals` | open | — |
-| Whether a goal is created as its first attempt from the start | SPEC §2, §5.4 | `goals` | open | — |
+| Commitment deadlines and time zones (ADR) | SPEC §11.1 (first part); ARCH §9 | `goals` | decided: the account's own time zone, from the browser at registration and editable in Profile; each goal settings version keeps the zone in effect, and a change applies from the goal's next commitment or period; the detailed rules (named time zones, repeated and large changes) are critic-revision defaults the owner confirmed (2026-11-17) | [spec](../specs/004-goals/spec.md#clarifications); [ADR 0016](adr/0016-time-zones.md); [ADR 0017](adr/0017-embedded-time-zone-data.md) |
+| Whether a goal is created as its first attempt from the start | SPEC §2, §5.4 | `goals` | decided: yes, attempt 1 starts with the goal | [spec](../specs/004-goals/spec.md#clarifications) |
 | The 48-hour grace period around local clock changes | SPEC §11.1 (second part) | `recording-and-evaluation` | open | — |
 | When a recorded result becomes final: on recording, or when the grace period ends. SPEC §5.2 only says a missing record is Pending; `CONTEXT.md` (Pending) says Pending applies "whether or not any activity has been recorded so far". Confirm and record it, or change the glossary. | SPEC §5.2; CONTEXT.md | `recording-and-evaluation` | open | — |
 | An unrecorded Reduce period | SPEC §11.4 | `recording-and-evaluation` | open; `CONTEXT.md` (Missed) already treats any unrecorded period as Missed. Confirm and record it, or change the glossary. | — |
@@ -209,7 +209,7 @@ For the owner. *Before* says which slice cannot start until the decision is made
 | R1 | Accounts as their own first slice | slice 1 | Yes: it isolates the idea brief's top risk, foundation drag, from the catalog. The catalog's 3 person-week estimate and RICE 5.3 included that foundation, so both need re-estimating after the split. README's example folder `001-habit-catalog/` changes too. | Fold minimal sign-in into `habit-catalog`, as the brief's estimate assumed. The catalog then becomes `001`. | Yes (2026-11-11) |
 | R2 | When to host the demo | slice 3 | Right after `habit-catalog` | At the end, which risks a late deployment surprise | At the end, starting no later than 2026-11-20 whatever has shipped by then (2026-11-15); [spec](../specs/003-demo-hosting/spec.md#clarifications) |
 | R3 | Reports before excusals and pauses | slice 6 | Yes: the core value is demonstrable sooner. The cost: SPEC §11.2 may rework period evaluation in slice 7 (slice note 7). | After them, with less rework | — |
-| R4 | Splitting goal changes (§5.4) out of `goals` | slice 4 | Yes, as slice 8: its rules can only be verified once evaluations and streaks exist. The cost: between slices 4 and 8 a goal cannot be edited or ended, and SPEC has no delete, so a mistaken demo goal stays. | Keep them in `goals` and name, per rule, the later slice that verifies it | — |
+| R4 | Splitting goal changes (§5.4) out of `goals` | slice 4 | Yes, as slice 8: its rules can only be verified once evaluations and streaks exist. The cost: between slices 4 and 8 a goal cannot be edited or ended, and SPEC has no delete, so a mistaken demo goal stays. | Keep them in `goals` and name, per rule, the later slice that verifies it | Yes (2026-11-17); [spec](../specs/004-goals/spec.md#clarifications) |
 | R5 | Cutting scope if time runs short | after R8 | No cut now; decide after R8. Any cut needs a SPEC amendment by the owner (constitution, Governance). Stopping after slice 6 would remove §5.3, §5.4 changes, §7, Suggest for catalog (§4) and §8 feedback and deactivation. SPEC §10 requires the demo to show community views, and design pages already show Pause, Excuse, Ended and Community. | Name a cut line now | No cut (2026-11-11): slices ship in roadmap order; what has shipped by 2026-11-23 is what the exam shows. SPEC stays unchanged. |
 | R6 | Idea briefs for other slices | slice 1 | Optional. Idea brief §14 asks for one for Suggest for catalog. | Required for every slice | Optional (2026-11-11) |
 | R7 | Partly built pages and navigation (see [Pages across slices](#pages-across-slices)) | slice 1 | A page or the navigation shows only the sections and links whose slice has shipped, with no placeholder content. The full preview is reached when the last extending slice ships. | Build each page in full in one slice, which moves work earlier | As recommended: only shipped sections and links (2026-11-11); [ADR 0008](adr/0008-partly-built-pages.md) |
@@ -262,3 +262,4 @@ Every change to this file also sets `updated_at`.
 | People can register, sign in and sign out; the app tells visitors, registered users and administrators apart. | `accounts-and-access` | [001](../specs/001-accounts-and-access/spec.md) | [#21](https://github.com/theyur/agentic-engineering-course-exam/pull/21) |
 | A new user does not start from a blank page: anyone browses curated catalog habits, administrators curate them, users keep private custom habits. | `habit-catalog` | [002](../specs/002-habit-catalog/spec.md) | [#23](https://github.com/theyur/agentic-engineering-course-exam/pull/23) |
 | Reviewers open the app in a browser, with demonstration data, without installing anything. | `demo-hosting` | [003](../specs/003-demo-hosting/spec.md) | [#26](https://github.com/theyur/agentic-engineering-course-exam/pull/26), fixes [#27](https://github.com/theyur/agentic-engineering-course-exam/pull/27), [#28](https://github.com/theyur/agentic-engineering-course-exam/pull/28), [#29](https://github.com/theyur/agentic-engineering-course-exam/pull/29), results [#30](https://github.com/theyur/agentic-engineering-course-exam/pull/30) |
+| A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | `goals` | [004](../specs/004-goals/spec.md) | [#35](https://github.com/theyur/agentic-engineering-course-exam/pull/35) |

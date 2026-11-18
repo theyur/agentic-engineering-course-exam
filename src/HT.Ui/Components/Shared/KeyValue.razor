@@ -1,0 +1,17 @@
+@* design/components/KeyValue: a two-column list of read-only settings, a muted label and a semibold value per row. *@
+<dl class="ht-kv">
+    @foreach (var row in Rows)
+    {
+        <dt>@row.Label</dt>
+        <dd>@row.Value</dd>
+    }
+</dl>
+
+@code {
+    /// <summary>The rows in order. Labels are nouns ("Schedule"), values are short ("Mon · Wed · Fri").</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Row> Rows { get; set; } = [];
+
+    /// <summary>One row: its label and its value.</summary>
+    public sealed record Row(string Label, string Value);
+}

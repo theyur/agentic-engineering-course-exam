@@ -2,7 +2,7 @@
    page decides when to search (the debounce belongs to the page). *@
 <div class="ht-search">
     <HtIcon Name="search" Size="HtIcon.IconSize.Small" />
-    <input class="ht-input" type="search" id="@Id" placeholder="@Label" aria-label="@Label" value="@Value"
+    <input class="ht-input" type="search" id="@Id" placeholder="@Label" aria-label="@Label" value="@Value" @ref="_input"
            @oninput="OnInputAsync" />
 </div>
 
@@ -20,6 +20,11 @@
     /// <summary>Called on every keystroke with the whole text.</summary>
     [Parameter]
     public EventCallback<string> ValueChanged { get; set; }
+
+    private ElementReference _input;
+
+    /// <summary>Moves the focus to the search input (a Dialog's first field).</summary>
+    public ValueTask FocusAsync() => _input.FocusAsync();
 
     private Task OnInputAsync(ChangeEventArgs e) => ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
 }

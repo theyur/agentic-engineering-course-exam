@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace HT.Application.Habits;
 
 /// <summary>The texts of the catalog use cases (FR-006, FR-007, FR-010 to FR-014), worded as in the spec.</summary>
@@ -22,4 +24,8 @@ public static class CatalogTexts
     public const string TimesOutOfRange = "Enter a number of times from 1 to 20.";
     public const string PeriodMissing = "Choose per day or per week.";
     public const string AllCategories = "All";
+
+    /// <summary>The unpublish confirmation (FR-033): "1 goal uses this habit." or "{N} goals use this habit.".</summary>
+    public static string GoalsUseThisHabit(int count) =>
+        count == 1 ? "1 goal uses this habit." : count.ToString(CultureInfo.InvariantCulture) + " goals use this habit.";
 }

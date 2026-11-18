@@ -5,7 +5,8 @@ namespace HT.SmokeCheck;
 
 /// <summary>
 /// Reads what the smoke check needs from a server-rendered page (contracts/smoke-check.md): the antiforgery token
-/// and handler names of a form, the first heading, the names on habit cards and the linked stylesheets and scripts.
+/// and handler names of a form, the first heading, the names on habit cards and goal items, and the linked stylesheets
+/// and scripts.
 /// Every value is HTML-decoded. Names are compared in memory and never printed.
 /// </summary>
 public static partial class PageReader
@@ -47,6 +48,16 @@ public static partial class PageReader
     {
         ArgumentNullException.ThrowIfNull(html);
         return [.. HabitNamePattern().Matches(html).Select(m => Text(m.Groups["inner"].Value))];
+    }
+
+    /// <summary>
+    /// The visible name of every goal on the Goals page, in document order: <c>GoalItem</c> renders it as
+    /// <c>&lt;a class="ht-goalitem__name" href="/goals/…"&gt;</c>.
+    /// </summary>
+    public static IReadOnlyList<string> ReadGoalNames(string html)
+    {
+        ArgumentNullException.ThrowIfNull(html);
+        return [.. GoalNamePattern().Matches(html).Select(m => Text(m.Groups["inner"].Value))];
     }
 
     /// <summary>
@@ -117,6 +128,9 @@ public static partial class PageReader
 
     [GeneratedRegex("""<h3\b[^>]*\bclass="(?:[^"]*\s)?ht-habit__name(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</h3\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex HabitNamePattern();
+
+    [GeneratedRegex("""<a\b[^>]*\bclass="(?:[^"]*\s)?ht-goalitem__name(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</a\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex GoalNamePattern();
 
     [GeneratedRegex("""<(?<name>link|script)\b(?<attributes>[^>]*)>""", RegexOptions.IgnoreCase)]
     private static partial Regex AssetTagPattern();

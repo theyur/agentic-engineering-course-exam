@@ -1,3 +1,4 @@
+using HT.Domain.Goals;
 using HT.Domain.Habits;
 
 namespace HT.Application.Habits;
@@ -29,7 +30,14 @@ public sealed record CatalogHabitSummary(
     Intent Intent,
     string Icon,
     string? Description,
-    SuggestedStartingGoalView? MarkedSuggestedStartingGoal);
+    SuggestedStartingGoalView? MarkedSuggestedStartingGoal)
+{
+    /// <summary>
+    /// The acting user's own goals on this habit, 0 when none (FR-031, FR-032). Set only when a registered user browses
+    /// with the acting user passed; null for every other audience and for browsing without an acting user (FR-019).
+    /// </summary>
+    public int? GoalCount { get; init; }
+}
 
 /// <summary>A Published catalog habit's details (FR-010): the summary's members and all its suggested starting goals in order.</summary>
 public sealed record CatalogHabitDetails(
@@ -40,7 +48,26 @@ public sealed record CatalogHabitDetails(
     string Icon,
     string? Description,
     SuggestedStartingGoalView? MarkedSuggestedStartingGoal,
-    IReadOnlyList<SuggestedStartingGoalView> SuggestedStartingGoals);
+    IReadOnlyList<SuggestedStartingGoalView> SuggestedStartingGoals)
+{
+    /// <summary>
+    /// The acting user's own goals on this habit, 0 when none (FR-031, FR-032). Set only for a registered user with the
+    /// acting user passed; null otherwise (FR-019).
+    /// </summary>
+    public int? GoalCount { get; init; }
+
+    /// <summary>
+    /// The acting user's own goals on this habit, in name order (the keys of <see cref="HabitName.KeyOf"/> compared
+    /// ordinally), then creation order (FR-031). Set exactly when <see cref="GoalCount"/> is; null otherwise.
+    /// </summary>
+    public IReadOnlyList<GoalOnHabit>? Goals { get; init; }
+}
+
+/// <summary>
+/// One of the acting user's goals on a catalog habit, as the habit's details list it (FR-031): its identifier and its
+/// name, derived as everywhere else (FR-010).
+/// </summary>
+public sealed record GoalOnHabit(GoalId Id, string Name);
 
 /// <summary>One option of the category filter: null with "All", or a category with its name (FR-009).</summary>
 public sealed record CategoryFilterOption(Category? Category, string Label);

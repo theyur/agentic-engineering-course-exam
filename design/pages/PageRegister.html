@@ -35,6 +35,28 @@
     <div class="ht-notice ht-notice--neutral"><span>Community comparison is <b>off</b>. You can opt in later in your profile.</span></div>
     <button class="ht-btn ht-btn--primary ht-btn--block">Create account</button>
   </form>
+</section><!-- Slice 4 state (HP-016, HP-017): the optional "Name" field first; a hidden input marked data-ht-browser-time-zone that the page script fills with the browser's time zone when the form is sent. No visible time zone field; without script the account gets the default time zone. -->
+<section class="ht-auth" aria-label="Slice 4 state">
+  <div class="ht-eyebrow" style="margin-bottom:8px">Slice 4 state · with the optional Name</div>
+  <form class="ht-card ht-stack">
+    <input type="hidden" name="TimeZone" value="" data-ht-browser-time-zone>
+    <label class="ht-field"><span class="ht-field__label">Name <span class="ht-muted">(optional)</span></span><input class="ht-input" value="" autocomplete="name" aria-describedby="reg4-name-help"><span class="ht-field__help" id="reg4-name-help">Only you can see it. Home uses it to greet you.</span></label>
+    <label class="ht-field"><span class="ht-field__label">Email</span><input class="ht-input" type="email" placeholder="you@example.com" value="" autocomplete="email"></label>
+    <label class="ht-field"><span class="ht-field__label">Password</span><input class="ht-input" type="password" aria-describedby="reg4-pw-help" autocomplete="new-password"><span class="ht-field__help" id="reg4-pw-help">At least 8 characters, with a number.</span></label>
+    <label class="ht-field"><span class="ht-field__label">Repeat password</span><input class="ht-input" type="password" autocomplete="new-password"></label>
+    <div class="ht-notice ht-notice--neutral"><span>Community comparison is <b>off</b>. You can opt in later in your profile.</span></div>
+    <button type="submit" class="ht-btn ht-btn--primary ht-btn--block">Create account</button>
+  </form>
+  <div class="ht-eyebrow" style="margin:24px 0 8px">State · name too long (the name and the email are kept, the password fields are emptied)</div>
+  <form class="ht-card ht-stack">
+    <input type="hidden" name="TimeZone" value="" data-ht-browser-time-zone>
+    <label class="ht-field"><span class="ht-field__label">Name <span class="ht-muted">(optional)</span></span><input class="ht-input" value="Reading before work on every weekday, fifteen minutes at least" autocomplete="name" aria-invalid="true" aria-describedby="reg4b-name-error"><span class="ht-field__error" id="reg4b-name-error">The name can have at most 60 characters.</span></label>
+    <label class="ht-field"><span class="ht-field__label">Email</span><input class="ht-input" type="email" placeholder="you@example.com" value="ana@example.com" autocomplete="email"></label>
+    <label class="ht-field"><span class="ht-field__label">Password</span><input class="ht-input" type="password" aria-describedby="reg4b-pw-help" autocomplete="new-password"><span class="ht-field__help" id="reg4b-pw-help">At least 8 characters, with a number.</span></label>
+    <label class="ht-field"><span class="ht-field__label">Repeat password</span><input class="ht-input" type="password" autocomplete="new-password"></label>
+    <div class="ht-notice ht-notice--neutral"><span>Community comparison is <b>off</b>. You can opt in later in your profile.</span></div>
+    <button type="submit" class="ht-btn ht-btn--primary ht-btn--block">Create account</button>
+  </form>
 </section><footer class="ht-footer"><div class="ht-footer__inner"><span>Habit Tracker · Agentic Engineering course project</span><span class="ht-spacer"></span><a href="#">Privacy</a><a href="#">Send feedback</a></div></footer>
 </div>
 </body>

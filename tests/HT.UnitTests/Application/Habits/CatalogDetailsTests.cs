@@ -9,13 +9,13 @@ namespace HT.UnitTests.Application.Habits;
 public sealed class CatalogDetailsTests
 {
     private readonly FakeCatalogHabitStore _store = new();
-    private CatalogService Service => new(_store);
+    private CatalogService Service => new(_store, FakeGoalStore.Over(_store));
 
     [Fact]
     public async Task US2_AS1_all_suggested_starting_goals_in_order_with_fields_mark_texts_and_kinds()
     {
         var reading = _store.Add(Catalog("Ac7 Reading", category: Category.Mind, icon: "book-open", description: "Books and articles.",
-            goals: Goals(1, DurationDays(15, DurationUnit.Minutes, Weekdays), Count(20, "pages", 3, SchedulePeriod.Week), YesNo(1, SchedulePeriod.Day))));
+            goals: HabitSamples.Goals(1, DurationDays(15, DurationUnit.Minutes, Weekdays), Count(20, "pages", 3, SchedulePeriod.Week), YesNo(1, SchedulePeriod.Day))));
 
         var result = await Service.GetDetailsAsync(reading.Id, CancellationToken.None);
 
@@ -54,7 +54,7 @@ public sealed class CatalogDetailsTests
     [Fact]
     public async Task US2_AS3_texts_through_the_service()
     {
-        var habit = _store.Add(Catalog("Ac7c Mixed", goals: Goals(0,
+        var habit = _store.Add(Catalog("Ac7c Mixed", goals: HabitSamples.Goals(0,
             DurationTimes(2, DurationUnit.Hours, 1, SchedulePeriod.Day, BuildOrReduce.Reduce),
             Count(1, "sweet", 1, SchedulePeriod.Day, BuildOrReduce.Reduce))));
 

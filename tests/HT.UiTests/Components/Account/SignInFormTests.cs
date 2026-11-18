@@ -13,7 +13,7 @@ public sealed class SignInFormTests : BunitContext
 
     public SignInFormTests()
     {
-        Services.AddSingleton(new AccountService(_store, TimeProvider.System));
+        Services.AddSingleton(new AccountService(_store, TimeProvider.System, InstallationTimeZone.From(null)));
     }
 
     [Fact]

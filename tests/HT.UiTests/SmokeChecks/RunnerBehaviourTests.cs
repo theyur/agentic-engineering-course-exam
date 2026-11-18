@@ -10,8 +10,8 @@ namespace HT.UiTests.SmokeChecks;
 /// <summary>
 /// T008, T024, T025: the smoke check against a scripted site (<see cref="ScriptedHandler"/>), through
 /// <see cref="SmokeCheckCommand.RunAsync"/> with no network: check 1 <c>home</c>, check 2 <c>https-redirect</c>,
-/// check 3 <c>catalog</c>, check 4 <c>administrator</c>, check 5 <c>demo &lt;email&gt;</c>, the <c>TIMING</c> line
-/// and the result.
+/// check 3 <c>catalog</c>, check 4 <c>administrator</c>, check 5 <c>demo &lt;email&gt;</c> (with slice 4's goal names and
+/// account name, HP-018), the <c>TIMING</c> line and the result.
 /// </summary>
 public sealed class RunnerBehaviourTests
 {
@@ -58,10 +58,15 @@ public sealed class RunnerBehaviourTests
     private static readonly IReadOnlyList<string> DemoHabitNames =
         [.. DemoDataService.DemoEmails.SelectMany(DemoCustomHabits.For).Select(h => h.Name.Value)];
 
+    /// <summary>The demo goal names of every demo account: what check 5 expects on Goals, in all (slice 4 HP-018).</summary>
+    private static readonly IReadOnlyList<string> DemoGoalNames =
+        [.. DemoDataService.DemoEmails.SelectMany(DemoGoals.DisplayNames)];
+
     /// <summary>
     /// The good site: the visitor Home, the redirect, the catalog with every Published seed habit, the sign-in form
-    /// (every sign-in is accepted), the admin page, and a custom-habits page with every demo custom habit that links
-    /// one stylesheet and one script.
+    /// (every sign-in is accepted), the admin page, a custom-habits page with every demo custom habit that links one
+    /// stylesheet and one script, a Goals page with every demo goal and a reviewer's goal, and a Profile page whose
+    /// first heading is "Demo One".
     /// </summary>
     private static ScriptedHandler GoodSite() => new ScriptedHandler()
         .On(HttpMethod.Get, Https, ScriptedHandler.Html(VisitorHome))
@@ -71,6 +76,8 @@ public sealed class RunnerBehaviourTests
         .On(HttpMethod.Post, Https + "sign-in", ScriptedHandler.Redirect(HttpStatusCode.Found, "/"))
         .On(HttpMethod.Get, Https + "admin", ScriptedHandler.Html("<!DOCTYPE html><html><body><h1>Admin</h1></body></html>"))
         .On(HttpMethod.Get, Https + "custom-habits", ScriptedHandler.Html(CardsPage(DemoHabitNames)))
+        .On(HttpMethod.Get, Https + "goals", ScriptedHandler.Html(GoalsPage([.. DemoGoalNames, "A reviewer's goal"])))
+        .On(HttpMethod.Get, Https + "profile", ScriptedHandler.Html(ProfilePage("Demo One")))
         .On(HttpMethod.Get, Stylesheet, ScriptedHandler.Html("body {}"))
         .On(HttpMethod.Get, Script, ScriptedHandler.Html("// script"));
 
@@ -88,9 +95,11 @@ public sealed class RunnerBehaviourTests
                 "PASS https-redirect",
                 $"PASS catalog ({PublishedNames.Count} of {PublishedNames.Count})",
                 "PASS administrator",
-                "PASS demo demo1@example.com (2 of 2)",
-                "PASS demo demo2@example.com (2 of 2)",
-                "PASS demo demo3@example.com (2 of 2)",
+
+                // Slice 4 HP-018: 2 custom habits, 2 goals and the account name; 2 and 2; 2 and 3.
+                "PASS demo demo1@example.com (5 of 5)",
+                "PASS demo demo2@example.com (4 of 4)",
+                "PASS demo demo3@example.com (5 of 5)",
             ],
             lines.Take(7));
         Assert.Matches(FirstTiming, lines[7]);
@@ -98,7 +107,66 @@ public sealed class RunnerBehaviourTests
         Assert.Equal(9, lines.Count);
         Assert.Single(site.Requests, r => r == "GET " + Stylesheet);
         Assert.Single(site.Requests, r => r == "GET " + Script);
-        Assert.All(DemoHabitNames.Concat(PublishedNames), name => Assert.DoesNotContain(name, string.Join('\n', lines), StringComparison.Ordinal));
+        Assert.Equal(3, site.Requests.Count(r => r == "GET " + Https + "goals"));
+        Assert.Equal(1, site.Requests.Count(r => r == "GET " + Https + "profile"));
+        Assert.All(
+            DemoHabitNames.Concat(PublishedNames).Concat(DemoGoalNames).Append("Demo One"),
+            name => Assert.DoesNotContain(name, string.Join('\n', lines), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_demo_account_fails_when_its_goals_page_misses_a_goal_name()
+    {
+        var site = GoodSite().On(HttpMethod.Get, Https + "goals", ScriptedHandler.Html(GoalsPage(DemoGoalNames.Skip(1))));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("FAIL demo demo1@example.com: 1 of 2 goals shown", lines[4]);
+        Assert.Equal("PASS demo demo2@example.com (4 of 4)", lines[5]);
+        Assert.Equal("PASS demo demo3@example.com (5 of 5)", lines[6]);
+        Assert.DoesNotContain(DemoGoalNames[0], string.Join('\n', lines), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Demo1_fails_when_its_profile_does_not_show_the_account_name_and_the_others_pass()
+    {
+        var site = GoodSite().On(HttpMethod.Get, Https + "profile", ScriptedHandler.Html(ProfilePage("demo1@example.com")));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("FAIL demo demo1@example.com: account name not shown", lines[4]);
+        Assert.Equal("PASS demo demo2@example.com (4 of 4)", lines[5]);
+        Assert.Equal("PASS demo demo3@example.com (5 of 5)", lines[6]);
+    }
+
+    [Fact]
+    public async Task The_first_part_that_misses_is_named_and_every_page_is_still_read()
+    {
+        var site = GoodSite()
+            .On(HttpMethod.Get, Https + "custom-habits", ScriptedHandler.Html(CardsPage([])))
+            .On(HttpMethod.Get, Https + "goals", ScriptedHandler.Html(GoalsPage([])))
+            .On(HttpMethod.Get, Https + "profile", ScriptedHandler.Html(ProfilePage("Someone else")));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("FAIL demo demo1@example.com: 0 of 2 custom habits shown", lines[4]);
+        Assert.Equal("FAIL demo demo2@example.com: 0 of 2 custom habits shown", lines[5]);
+        Assert.Equal(3, site.Requests.Count(r => r == "GET " + Https + "goals"));
+        Assert.Equal(1, site.Requests.Count(r => r == "GET " + Https + "profile"));
+    }
+
+    [Fact]
+    public async Task A_goals_page_that_is_not_shown_fails_with_its_status()
+    {
+        var site = GoodSite().On(HttpMethod.Get, Https + "goals", ScriptedHandler.Status(HttpStatusCode.NotFound));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("FAIL demo demo1@example.com: GET /goals gave status 404", lines[4]);
     }
 
     [Fact]
@@ -155,7 +223,7 @@ public sealed class RunnerBehaviourTests
 
         Assert.Equal(1, exitCode);
         Assert.Equal("FAIL demo demo1@example.com: 1 of 2 custom habits shown", lines[4]);
-        Assert.Equal("PASS demo demo2@example.com (2 of 2)", lines[5]);
+        Assert.Equal("PASS demo demo2@example.com (4 of 4)", lines[5]);
     }
 
     [Fact]
@@ -257,6 +325,18 @@ public sealed class RunnerBehaviourTests
          <script src="_framework/blazor.web.js"></script><script>/* inline */</script>
          </body></html>
          """;
+
+    /// <summary>A Goals page with one goal item per name, as <c>GoalItem</c> renders it.</summary>
+    private static string GoalsPage(IEnumerable<string> names) =>
+        $"""
+         <!DOCTYPE html><html><body><h1>Goals</h1>
+         {string.Concat(names.Select((n, i) => $"<div class=\"ht-goalitem ht-goalitem--reduced\"><div><a class=\"ht-goalitem__name\" href=\"/goals/{i}\">{WebUtility.HtmlEncode(n)}</a><div class=\"ht-goalitem__meta\"><span>Every day</span></div></div></div>"))}
+         </body></html>
+         """;
+
+    /// <summary>A Profile page whose header's <c>h1</c> is <paramref name="heading"/>, as <c>Profile</c> renders it.</summary>
+    private static string ProfilePage(string heading) =>
+        $"""<!DOCTYPE html><html><body><div class="ht-profile__head"><h1>{WebUtility.HtmlEncode(heading)}</h1><span class="ht-muted">member since November 2026</span></div></body></html>""";
 
     private static async Task<(int ExitCode, IReadOnlyList<string> Lines)> RunAsync(ScriptedHandler site, params string[] options)
     {

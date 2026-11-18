@@ -11,14 +11,16 @@ namespace HT.UnitTests.Application.Habits;
 public sealed class CatalogAdministrationAccessTests
 {
     private readonly FakeCatalogHabitStore _store = new();
+    private readonly FakeGoalStore _goals;
     private readonly CatalogHabit _habit;
 
     public CatalogAdministrationAccessTests()
     {
+        _goals = FakeGoalStore.Over(_store);
         _habit = _store.Add(Catalog("Ac11 Stretching", CatalogHabitState.Draft));
     }
 
-    private CatalogAdministrationService Service => new(_store);
+    private CatalogAdministrationService Service => new(_store, _goals);
 
     /// <summary>Each of the six use cases as the given user: (outcome name, message).</summary>
     private async Task<IReadOnlyList<(string Outcome, string? Message)>> AllAsync(ActingUser user, HabitId id)

@@ -85,13 +85,38 @@ internal sealed class CustomHabitStore : ICustomHabitStore
         return exists ? UpdateCustomHabitOutcome.NameTaken : UpdateCustomHabitOutcome.NotFound;
     }
 
-    public async Task<DeleteCustomHabitOutcome> DeleteAsync(AccountId owner, HabitId id, CancellationToken cancellationToken)
-    {
-        var rows = await WriteAsync(() => _db.CustomHabits
-            .Where(h => h.OwnerId == owner.Value && h.Id == id.Value)
-            .ExecuteDeleteAsync(cancellationToken)).ConfigureAwait(false);
-        return rows == 1 ? DeleteCustomHabitOutcome.Deleted : DeleteCustomHabitOutcome.NotFound;
-    }
+    /// <summary>
+    /// The conditional delete of research R-08, in one transaction. The habit row is locked first (UPDLOCK, HOLDLOCK),
+    /// in the order goal creation locks it, so the two never deadlock. No such row of the owner is
+    /// <see cref="DeleteCustomHabitOutcome.NotFound"/>. Then the delete runs only when no goal is on the habit, read
+    /// under key-range locks, so a goal is either committed before and refuses the delete, or created after and finds
+    /// no habit. With the habit row still locked, zero deleted rows can only mean that a goal uses it. The foreign key
+    /// from the goals stays as a backstop and is never reached.
+    /// </summary>
+    public Task<DeleteCustomHabitOutcome> DeleteAsync(AccountId owner, HabitId id, CancellationToken cancellationToken) =>
+        WriteAsync(async () =>
+        {
+            await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+            var exists = (await _db.Database.SqlQuery<int>(
+                    $"SELECT 1 AS [Value] FROM [CustomHabits] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {id.Value} AND [OwnerId] = {owner.Value}")
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false)).Count == 1;
+            if (!exists)
+            {
+                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                return DeleteCustomHabitOutcome.NotFound;
+            }
+
+            var rows = await _db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                DELETE FROM [CustomHabits]
+                WHERE [Id] = {id.Value} AND [OwnerId] = {owner.Value}
+                  AND NOT EXISTS (SELECT 1 FROM [Goals] WITH (UPDLOCK, HOLDLOCK) WHERE [CustomHabitId] = {id.Value})
+                """,
+                cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return rows == 1 ? DeleteCustomHabitOutcome.Deleted : DeleteCustomHabitOutcome.UsedByGoals;
+        });
 
     public Task<bool> NameKeyExistsAsync(AccountId owner, string key, HabitId? except, CancellationToken cancellationToken)
     {
@@ -106,7 +131,7 @@ internal sealed class CustomHabitStore : ICustomHabitStore
     }
 
     /// <summary>Runs a write; a database fault becomes an exception with the SQL error number only (HP-015).</summary>
-    private static async Task<int> WriteAsync(Func<Task<int>> write)
+    private static async Task<T> WriteAsync<T>(Func<Task<T>> write)
     {
         int number;
         try

@@ -1,7 +1,8 @@
 @using Microsoft.AspNetCore.Components.Web
 @* design/components/Dialog: a modal for a short task of the current page. The title's id is generated per
-   instance, so two dialogs on one page never share it. Focus moves into the dialog when it opens; Esc and ×
-   ask the page to close it; when it closes, for any reason, focus returns to the control that opened it. *@
+   instance, so two dialogs on one page never share it. Focus moves into the dialog when it opens (or to the
+   field the page names); Esc and × ask the page to close it; when it closes, for any reason, focus returns to
+   the control that opened it. *@
 @if (Open)
 {
     <div class="ht-backdrop">
@@ -47,6 +48,20 @@
     [Parameter]
     public ElementReference? ReturnFocus { get; set; }
 
+    /// <summary>
+    /// Moves the focus to the first field when the dialog opens, in place of the dialog itself
+    /// (design/components/Dialog). Called after the dialog's content has rendered.
+    /// </summary>
+    [Parameter]
+    public Func<ValueTask>? FocusOnOpen { get; set; }
+
+    /// <summary>
+    /// Gives the focus back when the dialog closes, in place of <see cref="ReturnFocus"/>. Called after the closing
+    /// render, so it reaches a control that the same render replaced (the habit chooser's "Change").
+    /// </summary>
+    [Parameter]
+    public Func<ValueTask>? FocusOnClose { get; set; }
+
     /// <summary>The action and its object: "Delete this custom habit?".</summary>
     [Parameter, EditorRequired]
     public RenderFragment? Title { get; set; }
@@ -81,13 +96,24 @@
         if (_focusDialog)
         {
             _focusDialog = false;
-            await _dialog.FocusAsync();
+            if (FocusOnOpen is { } focusField)
+            {
+                await focusField();
+            }
+            else
+            {
+                await _dialog.FocusAsync();
+            }
         }
 
         if (_returnFocus)
         {
             _returnFocus = false;
-            if (ReturnFocus is { } control)
+            if (FocusOnClose is { } giveBack)
+            {
+                await giveBack();
+            }
+            else if (ReturnFocus is { } control)
             {
                 await control.FocusAsync();
             }

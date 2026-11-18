@@ -1,0 +1,42 @@
+@using HT.Application.Goals
+@using HT.Ui.Goals
+@* design/pages/PageNewGoal, "Summary card" (HP-002): the sticky ht-summary card, rewritten on every change. Every
+   text comes from GoalSummaryText, the one formatter. While the form is not complete it shows only "Your goal" and
+   one line. It is a polite live region, so the new sentence is read out after a change. *@
+<aside class="ht-card ht-sticky ht-summary" aria-label="@Summary.Title" aria-live="polite">
+    <div class="ht-eyebrow">@Summary.Title</div>
+    @if (!Summary.IsComplete)
+    {
+        <p class="ht-card__text ht-muted">@Summary.IncompleteText</p>
+    }
+    else
+    {
+        <h2 class="ht-card__title">@Summary.Sentence</h2>
+        <KeyValue Rows="Rows" />
+        @if (Summary.FirstWeekLine is { } firstWeek)
+        {
+            <Notice>@firstWeek</Notice>
+        }
+        @if (Summary.SuggestionLine is { } suggestion)
+        {
+            <Notice Neutral="true">@suggestion</Notice>
+        }
+    }
+</aside>
+
+@code {
+    [Parameter, EditorRequired]
+    public GoalFormModel Model { get; set; } = new();
+
+    private GoalSummary Summary { get; set; } = GoalSummaryText.For(null, new(), null, null);
+
+    private IReadOnlyList<KeyValue.Row> Rows { get; set; } = [];
+
+    // The model is changed in place, and a reference parameter is set again on every render of the form.
+    protected override void OnParametersSet()
+    {
+        Summary =
+            GoalSummaryText.For(Model.Habit?.Name, Model.ToTargetFields(), Model.StartDate, Model.CatalogSuggestionText);
+        Rows = Summary.Rows.Select(r => new KeyValue.Row(r.Label, r.Value)).ToList();
+    }
+}

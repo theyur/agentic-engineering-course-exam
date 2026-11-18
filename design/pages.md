@@ -44,7 +44,7 @@ Every page follows layout A: TopNav, a page head, content centered at `container
 4. Right column: Settings (KeyValue, "changes apply from the next commitment") · Pauses · Recent notes · Earlier attempts with outcome.
 
 ## New goal (`PageNewGoal`)
-1. BackLink to where the user came from, `heading-1` "New goal", one line naming the catalog habit.
+1. BackLink to where the user came from, `heading-1` "New goal", one line naming the habit.
 2. Form card in sections: Habit · Build / Reduce · Measure (Yes/no, Count, Duration) · Target ("At least" / "At most" + Stepper + unit) · When (fixed days with DayPicker, or N times per day / week) · Start date and optional name · Create goal / Cancel.
 3. Sticky summary card: the goal as one plain sentence, how it is evaluated, the catalog suggestion note.
 
@@ -121,3 +121,20 @@ What slice 2 builds of the pages above, on top of slice 1. A page shows only the
 - Profile (`PageProfile`): registered users get the link Tabs "Account" (`/profile`) and "Custom habits" (`/profile?tab=custom-habits`); Account keeps its slice 1 content. An administrator's Profile stays Account only, without Tabs.
 - Home, visitor (`PageHomeVisitor`): the hero gains "Browse the catalog"; after "How it works", "Popular in the catalog" with four HabitCards and "See all N →"; the section is absent with no Published habit.
 - Home, signed in (`PageHomeSignedIn`): a registered user gets an EmptyState under "Today" with "Browse the catalog"; an administrator's Home is unchanged.
+
+## Slice 4 (goals)
+
+What slice 4 builds of the pages above, on top of slices 1 and 2. A page shows only the sections and links whose slice has shipped (ADR 0008); the full previews stay as they are, and each page's "Slice 4 state" block shows the built state. Texts that disagreed with the spec were replaced in the full previews too: "Yoga, 3 days a week" for fixed days Mon, Wed and Fri, "Coffee, at most 2 cups a day", the streak unit "commitments" for commitment-based goals, "Each scheduled day", the "Build or reduce" row, and the summary sentence of HP-002.
+
+- Shell: TopNav and MobileNav add "Goals" and "+ New goal" for registered users only (MobileNav: Goals among the main links, "New goal" after the divider, before Profile). The avatar letter is the first letter of the account name, or of the email without one.
+- New goal (`PageNewGoal`, `/goals/new`, interactive): the head line for a catalog habit, a custom habit or no habit; Habit with Change and the habit chooser (a Dialog with a SearchField over the Published catalog habits and the user's custom habits); Build or Reduce, measure and "When?" as SegmentedControl and ChoiceCards; Target with Stepper and unit; Start date and "Name (optional)"; "Create goal" with no confirmation. The summary card: the HP-002 sentence, Evaluated, "Met when", "Streak counted in", "Late records", the first-week Notice and the catalog suggestion Notice, or "Complete the form to see your goal here." while the form is not complete. Refusals under their field, one at a time.
+- Goals (`PageGoals`, `/goals`): "Goals", no Tabs, one `ht-list` of reduced GoalListItems (name link, Build or Reduce Tag, meta line with the schedule and "first week starts …", "starts …" or "next …"); the EmptyState "No goals yet" with "Browse the catalog" and "Create custom habit".
+- Goal page (`PageGoalDetail`, `/goals/{id}`): "← Goals", the name, the tags, the attempt line, the Notice for a habit no longer in the catalog, and the Settings card (Habit, Build or reduce, Measure, Target, Schedule, Evaluated, First week for per-week goals, Started) with "Changes apply from the next commitment. Past results keep their rules.". No actions, stats, trend, history, pauses, notes or earlier attempts.
+- Catalog, registered user (`PageCatalogSignedIn`): "N goals" and "Add another goal" on tracked habits' cards, "Use this habit" on the others, "Show: Only habits I track" (`tracked=true`), and "· you track N" after the count. Visitors and administrators: unchanged.
+- Catalog habit details (`PageHabitDetail`), registered user: the head button "Use this habit", "You track this · N goals", "Start with this" on each suggested starting goal, and "Your goals on this habit" with links to the goal pages. No community card.
+- Custom habit (`PageCustomHabit`): primary "Save and create goal" beside "Save habit"; "Delete" only when no goal uses the habit.
+- Admin (`PageAdmin`): Unpublish of a habit that goals use opens a Dialog with "N goals use this habit." and a sentence that the goals keep working for their owners, then "Unpublish" and "Cancel". Still no "Updated" column.
+- Home, signed in (`PageHomeSignedIn`): the greeting ("Good evening, Yuri", or "Good evening" without a name) as `heading-1` and the date ("Tuesday, 17 November") for registered users and administrators, replacing "Today"; a registered user with no goals sees the EmptyState "No goals yet" with "Browse the catalog" and "Create custom habit".
+- Home, visitor (`PageHomeVisitor`): unchanged.
+- Profile (`PageProfile`): the header with the name, the email and "member since November 2026" (each only when known); the Account tab adds the "Name" form ("Your name is changed.") and the "Time zone" form ("Your time zone is changed. Your goals use it from their next day or week; earlier days keep their time zone.").
+- Register (`PageRegister`): the optional "Name" field, and the browser's time zone sent in a hidden input, with no visible field.

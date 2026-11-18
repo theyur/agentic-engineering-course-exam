@@ -41,7 +41,7 @@ public sealed class CatalogBrowseTests(DatabaseFixture database)
     public async Task US1_AS1_only_Published_habits_with_their_marked_suggested_starting_goal()
     {
         await ArrangeAsync(Definition("It-Br1 Reading", Category.Mind, Intent.Build, "book-open", "Books."), CatalogHabitState.Published,
-            Goals(0, Count(20, "pages", 3, SchedulePeriod.Week), YesNo(1, SchedulePeriod.Day)));
+            HabitSamples.Goals(0, Count(20, "pages", 3, SchedulePeriod.Week), YesNo(1, SchedulePeriod.Day)));
         await ArrangeAsync(Definition("It-Br1 Yoga", Category.Body, Intent.Build, "person-standing"), CatalogHabitState.Published);
         await ArrangeAsync(Definition("It-Br1 Journaling"), CatalogHabitState.Draft);
         await ArrangeAsync(Definition("It-Br1 Stretching"), CatalogHabitState.Unpublished);

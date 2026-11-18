@@ -1,0 +1,8 @@
+@* The EmptyState of a registered user with no goals, shared by the Goals page (HP-003, design/pages/PageGoals) and
+   the signed-in Home (HP-010, design/pages/PageHomeSignedIn, slice 4 state): the list-checks icon, "No goals yet",
+   primary "Browse the catalog" and secondary "Create custom habit". *@
+<EmptyState Icon="list-checks" Title="No goals yet"
+            Text="Pick a habit from the catalog or create your own, then set a target and a schedule for it.">
+    <HtButton Href="/catalog">Browse the catalog</HtButton>
+    <HtButton Variant="HtButton.ButtonVariant.Secondary" Href="/custom-habits/new">Create custom habit</HtButton>
+</EmptyState>

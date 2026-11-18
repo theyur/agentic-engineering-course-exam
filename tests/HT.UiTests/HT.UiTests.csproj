@@ -24,6 +24,7 @@
     <Compile Include="..\HT.UnitTests\Fakes\FakeCatalogHabitStore.cs" Link="Fakes\FakeCatalogHabitStore.cs" />
     <Compile Include="..\HT.UnitTests\Fakes\HabitSamples.cs" Link="Fakes\HabitSamples.cs" />
     <Compile Include="..\HT.UnitTests\Fakes\FakeCustomHabitStore.cs" Link="Fakes\FakeCustomHabitStore.cs" />
+    <Compile Include="..\HT.UnitTests\Fakes\FakeGoalStore.cs" Link="Fakes\FakeGoalStore.cs" />
   </ItemGroup>
 
   <ItemGroup>

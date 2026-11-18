@@ -16,4 +16,5 @@ public static class OperatorTexts
     public const string SeedCatalogLoaded = "seed catalog loaded";
     public const string CatalogNotEmpty = "catalog not empty";
     public const string DemoCustomHabitsAdded = "demo custom habits added";
+    public const string DemoGoalsAdded = "demo goals added";
 }

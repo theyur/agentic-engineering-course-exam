@@ -37,7 +37,7 @@ public sealed class CatalogDetailsTests(DatabaseFixture database)
     public async Task US2_AS1_the_details_of_a_Published_habit()
     {
         var id = await ArrangeAsync("It-De Reading", CatalogHabitState.Published,
-            Goals(1, Duration(15, DurationUnit.Minutes, Weekdays), Count(20, "pages", 3, SchedulePeriod.Week), YesNo(1, SchedulePeriod.Day)));
+            HabitSamples.Goals(1, Duration(15, DurationUnit.Minutes, Weekdays), Count(20, "pages", 3, SchedulePeriod.Week), YesNo(1, SchedulePeriod.Day)));
 
         var result = await DetailsAsync(id);
 

@@ -22,6 +22,126 @@ namespace HT.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("HT.Persistence.Goals.GoalAttemptRow", b =>
+                {
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("GoalId", "Number");
+
+                    b.ToTable("GoalAttempts", (string)null);
+                });
+
+            modelBuilder.Entity("HT.Persistence.Goals.GoalRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CatalogHabitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("CreationSequence")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("CreationSequence"));
+
+                    b.Property<Guid?>("CustomHabitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CatalogHabitId")
+                        .HasDatabaseName("IX_Goals_CatalogHabitId");
+
+                    b.HasIndex("CreationSequence")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Goals_CreationSequence");
+
+                    b.HasIndex("CustomHabitId")
+                        .HasDatabaseName("IX_Goals_CustomHabitId");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("IX_Goals_OwnerId");
+
+                    b.ToTable("Goals", (string)null);
+                });
+
+            modelBuilder.Entity("HT.Persistence.Goals.GoalSettingsVersionRow", b =>
+                {
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("AppliesFrom")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("Amount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("BuildOrReduce")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("CountUnit")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("Days")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DurationUnit")
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("Measurement")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("Period")
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("ScheduleKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int?>("Times")
+                        .HasColumnType("int");
+
+                    b.HasKey("GoalId", "AppliesFrom");
+
+                    b.ToTable("GoalSettingsVersions", (string)null);
+                });
+
             modelBuilder.Entity("HT.Persistence.Habits.CatalogHabitRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -138,6 +258,9 @@ namespace HT.Persistence.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTimeOffset?>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -150,11 +273,20 @@ namespace HT.Persistence.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(0);
 
+                    b.Property<int>("GoalsRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
@@ -185,6 +317,10 @@ namespace HT.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("SignInBlockedSince")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("TimeZone")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
@@ -268,6 +404,47 @@ namespace HT.Persistence.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("HT.Persistence.Goals.GoalAttemptRow", b =>
+                {
+                    b.HasOne("HT.Persistence.Goals.GoalRow", null)
+                        .WithMany("Attempts")
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HT.Persistence.Goals.GoalRow", b =>
+                {
+                    b.HasOne("HT.Persistence.Habits.CatalogHabitRow", "CatalogHabit")
+                        .WithMany()
+                        .HasForeignKey("CatalogHabitId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("HT.Persistence.Habits.CustomHabitRow", "CustomHabit")
+                        .WithMany()
+                        .HasForeignKey("CustomHabitId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("HT.Persistence.Identity.HtUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CatalogHabit");
+
+                    b.Navigation("CustomHabit");
+                });
+
+            modelBuilder.Entity("HT.Persistence.Goals.GoalSettingsVersionRow", b =>
+                {
+                    b.HasOne("HT.Persistence.Goals.GoalRow", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("HT.Persistence.Habits.CatalogHabitRow", b =>
@@ -369,6 +546,13 @@ namespace HT.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("HT.Persistence.Goals.GoalRow", b =>
+                {
+                    b.Navigation("Attempts");
+
+                    b.Navigation("Versions");
                 });
 #pragma warning restore 612, 618
         }

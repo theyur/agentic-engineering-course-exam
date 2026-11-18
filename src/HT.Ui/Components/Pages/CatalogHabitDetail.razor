@@ -2,12 +2,17 @@
 @using HT.Application.Habits
 @using HT.Domain.Habits
 @using HT.Ui.Account
+@using HT.Ui.Habits
 @inject CatalogService CatalogService
 @inject ActingUserAccessor ActingUsers
 @inject NavigationManager Navigation
 @* design/pages/PageHabitDetail, slice 2 state (US2-AS6, US2-AS7, HP-005, HP-006). Static. A Draft, an Unpublished
    habit, a custom habit's identifier and an unknown identifier all show the Not found page with status 404, for
-   every audience (research R-11). *@
+   every audience (research R-11).
+   Slice 4 state (HP-006): the details are read as the acting user. When they carry goal information (a registered
+   user), the head adds "Use this habit", the Tag "You track this · N goals" when N is at least 1, each suggested
+   starting goal "Start with this", and "Your goals on this habit" lists the user's goals when there are any, each
+   name linking to its goal page. Visitors and administrators keep the slice 2 state. *@
 <PageTitle>@(_details?.Name ?? "Catalog habit") · Habit Tracker</PageTitle>
 
 @if (_details is { } habit)
@@ -18,35 +23,63 @@
             <div class="ht-glyph-lg"><HtIcon Name="@habit.Icon" Size="HtIcon.IconSize.Large" /></div>
             <div>
                 <h1>@habit.Name</h1>
-                <div class="ht-inline"><Tag Text="@habit.Category.ToString()" /><Tag Text="@habit.Intent.ToString()" /></div>
+                <div class="@(habit.GoalCount is null ? "ht-inline" : "ht-inline ht-head-tags")">
+                    <Tag Text="@habit.Category.ToString()" /><Tag Text="@habit.Intent.ToString()" />@if (habit.GoalCount is { } count && count >= 1)
+                    {
+                        <Tag Text="@($"You track this · {CatalogGoalLinks.GoalsText(count)}")" Strong="true" />
+                    }
+                </div>
             </div>
             @if (_isVisitor)
             {
                 <span class="ht-spacer"></span>
                 <HtButton Href="/register">Register to use this habit</HtButton>
             }
+            else if (habit.GoalCount is not null)
+            {
+                <span class="ht-spacer"></span>
+                <HtButton Href="@CatalogGoalLinks.NewGoal(habit.Id)">Use this habit</HtButton>
+            }
         </div>
         @if (habit.Description is not null)
         {
             <p class="ht-lead">@habit.Description</p>
         }
-        @if (habit.SuggestedStartingGoals.Count > 0)
+        @if (habit.SuggestedStartingGoals.Count > 0 || habit.Goals is { Count: > 0 })
         {
             <div class="ht-grid-2">
                 <div class="ht-stack">
-                    <section class="ht-card">
-                        <h2 class="ht-card__title">Suggested starting goals</h2>
-                        <p class="ht-card__sub">Examples to adjust, not prescribed targets.</p>
-                        @foreach (var goal in habit.SuggestedStartingGoals)
-                        {
-                            <div class="ht-row">
-                                <div class="ht-row__main">
-                                    <div class="ht-row__name">@goal.Text</div>
-                                    <div class="ht-row__meta">@goal.Kind</div>
+                    @if (habit.SuggestedStartingGoals.Count > 0)
+                    {
+                        <section class="ht-card">
+                            <h2 class="ht-card__title">Suggested starting goals</h2>
+                            <p class="ht-card__sub">Examples to adjust, not prescribed targets.</p>
+                            @foreach (var goal in habit.SuggestedStartingGoals)
+                            {
+                                <div class="ht-row">
+                                    <div class="ht-row__main">
+                                        <div class="ht-row__name">@goal.Text</div>
+                                        <div class="ht-row__meta">@goal.Kind</div>
+                                    </div>
+                                    @if (habit.GoalCount is not null)
+                                    {
+                                        <HtButton Variant="HtButton.ButtonVariant.Secondary" Small="true"
+                                                  Href="@CatalogGoalLinks.NewGoal(habit.Id, goal.Position)">Start with this</HtButton>
+                                    }
                                 </div>
-                            </div>
-                        }
-                    </section>
+                            }
+                        </section>
+                    }
+                    @if (habit.Goals is { Count: > 0 } goals)
+                    {
+                        <section class="ht-card">
+                            <h2 class="ht-card__title">Your goals on this habit</h2>
+                            @foreach (var goal in goals)
+                            {
+                                <div class="ht-goal"><a class="ht-goal__name" href="@($"/goals/{goal.Id.Value:D}")">@goal.Name</a></div>
+                            }
+                        </section>
+                    }
                 </div>
             </div>
         }
@@ -62,7 +95,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var result = await CatalogService.GetDetailsAsync(new HabitId(Id), CancellationToken.None);
+        var actingUser = await ActingUsers.GetAsync();
+        var result = await CatalogService.GetDetailsAsync(actingUser, new HabitId(Id), CancellationToken.None);
         if (result.Outcome != CatalogHabitDetailsOutcome.Found)
         {
             Navigation.NotFound();
@@ -70,6 +104,6 @@
         }
 
         _details = result.Details;
-        _isVisitor = (await ActingUsers.GetAsync()).IsAnonymous;
+        _isVisitor = actingUser.IsAnonymous;
     }
 }

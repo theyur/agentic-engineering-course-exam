@@ -26,6 +26,8 @@ public static class SmokeCheckCoverage
         new(nameof(IDemoDataStore.CreateDemoAccountAsync), "email", typeof(Email), "5 demo <email>: the sign-in"),
         new(nameof(IDemoDataStore.CreateDemoAccountAsync), "password", typeof(string), "5 demo <email>: the sign-in"),
         new(nameof(IDemoDataStore.CreateDemoAccountAsync), "customHabits", typeof(IReadOnlyList<HabitDefinition>), "5 demo <email>: the custom habit names"),
+        new(nameof(IDemoDataStore.CreateDemoAccountAsync), "profile", typeof(DemoAccountProfile), "5 demo <email>: the account name on Profile"),
+        new(nameof(IDemoDataStore.CreateDemoAccountAsync), "goals", typeof(IReadOnlyList<DemoGoal>), "5 demo <email>: the goal names on Goals"),
         new(nameof(IDemoDataStore.TryCreateSeedCatalogAsync), "habits", typeof(IReadOnlyList<SeedCatalogHabit>), "3 catalog"),
     ];
 }

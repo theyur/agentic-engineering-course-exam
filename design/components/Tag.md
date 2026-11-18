@@ -6,3 +6,4 @@ A tag is a small neutral label for categories, Build / Reduce intent and admin s
 - `ht-chip ht-chip--strong`: dark (`ink` fill): Published, "You track this · 2 goals".
 - Tags are not buttons. For filters use `FilterPanel` checkboxes.
 - Keep words short (one or two words), sentence case.
+- A goal's own Build or Reduce is a Tag with the same words, but it is never called "intent": intent is the habit's usual direction (`CONTEXT.md`).

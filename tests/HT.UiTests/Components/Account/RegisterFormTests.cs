@@ -13,7 +13,7 @@ public sealed class RegisterFormTests : BunitContext
 
     public RegisterFormTests()
     {
-        Services.AddSingleton(new AccountService(_store, TimeProvider.System));
+        Services.AddSingleton(new AccountService(_store, TimeProvider.System, InstallationTimeZone.From(null)));
     }
 
     [Fact]
@@ -94,6 +94,91 @@ public sealed class RegisterFormTests : BunitContext
         var result = Assert.Single(_succeeded);
         Assert.Equal(RegistrationOutcome.Registered, result.Outcome);
         Assert.Equal(_store.Find("new.user@example.com")!.Id, result.AccountId);
+    }
+
+    [Fact]
+    public void HP_016_the_form_has_the_hidden_browser_time_zone_input_and_no_visible_time_zone_field()
+    {
+        var cut = RenderForm();
+
+        var marked = Assert.Single(cut.FindAll("input[data-ht-browser-time-zone]"));
+        Assert.Equal("hidden", marked.GetAttribute("type"));
+        Assert.Equal("TimeZone", marked.GetAttribute("name"));
+        Assert.True(string.IsNullOrEmpty(marked.GetAttribute("value")));
+        Assert.Empty(cut.FindAll("select"));
+        Assert.Equal(
+            ["register-name", "register-email", "register-password", "register-repeat-password"],
+            cut.FindAll("input:not([type=hidden])").Select(input => input.Id));
+        Assert.DoesNotContain("time zone", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void HP_016_a_registration_without_a_browser_time_zone_stores_the_installations_default()
+    {
+        var cut = RenderForm();
+
+        Submit(cut, "no.zone@example.com", "walking42", "walking42");
+
+        Assert.Single(_succeeded);
+        Assert.Equal("UTC", _store.Find("no.zone@example.com")!.StoredTimeZone);
+    }
+
+    [Fact]
+    public void HP_017_the_optional_name_field_comes_first_with_its_help()
+    {
+        var cut = RenderForm();
+
+        var fields = cut.FindAll(".ht-field");
+        Assert.Equal("register-name", fields[0].QuerySelector("input")!.Id);
+        Assert.Equal("Name (optional)", fields[0].QuerySelector(".ht-field__label")!.TextContent.Trim());
+        Assert.Equal("(optional)", fields[0].QuerySelector(".ht-field__label .ht-muted")!.TextContent);
+        Assert.Equal("name", cut.Find("#register-name").GetAttribute("autocomplete"));
+        Assert.Equal("Only you can see it. Home uses it to greet you.", cut.Find("#register-name-help").TextContent);
+        Assert.Equal("register-name-help", cut.Find("#register-name").GetAttribute("aria-describedby"));
+    }
+
+    [Fact]
+    public void US11_AS1_the_name_is_stored_trimmed()
+    {
+        var cut = RenderForm();
+
+        cut.Find("#register-name").Change("  Yuri  ");
+        Submit(cut, "named@example.com", "walking42", "walking42");
+
+        Assert.Single(_succeeded);
+        Assert.Equal("Yuri", _store.Find("named@example.com")!.Name);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void US11_AS1_no_name_or_only_spaces_gives_no_name(string name)
+    {
+        var cut = RenderForm();
+
+        cut.Find("#register-name").Change(name);
+        Submit(cut, "unnamed@example.com", "walking42", "walking42");
+
+        Assert.Single(_succeeded);
+        Assert.Null(_store.Find("unnamed@example.com")!.Name);
+    }
+
+    [Fact]
+    public void US11_AS2_a_name_of_61_characters_is_refused_under_the_field_and_keeps_the_name_and_the_email()
+    {
+        var name = new string('n', 61);
+        var cut = RenderForm();
+
+        cut.Find("#register-name").Change(name);
+        Submit(cut, "long.name@example.com", "walking42", "walking42");
+
+        Assert.Equal("The name can have at most 60 characters.", cut.Find("#register-name-error").TextContent);
+        Assert.Equal("true", cut.Find("#register-name").GetAttribute("aria-invalid"));
+        Assert.Equal(name, cut.Find("#register-name").GetAttribute("value"));
+        Assert.Equal("long.name@example.com", cut.Find("#register-email").GetAttribute("value"));
+        Assert.True(string.IsNullOrEmpty(cut.Find("#register-password").GetAttribute("value")));
+        Assert.Empty(_store.Accounts);
+        Assert.Empty(_succeeded);
     }
 
     private IRenderedComponent<RegisterForm> RenderForm() =>

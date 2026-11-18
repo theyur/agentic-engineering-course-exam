@@ -1,4 +1,5 @@
 using HT.Application.Accounts;
+using HT.Application.Goals;
 using HT.Domain.Accounts;
 using HT.Domain.Habits;
 
@@ -7,7 +8,8 @@ namespace HT.Application.Habits;
 /// <summary>
 /// Catalog administration for administrators (FR-011 to FR-016). Every use case takes the acting user first and
 /// checks in FR-016's order: signed in, administrator, the identifier, the fields or the state rule, then name
-/// uniqueness. Every refusal changes nothing (ADR 0005).
+/// uniqueness. Every refusal changes nothing (ADR 0005). Slice 4 adds the unpublish confirmation (FR-033): the only
+/// goal information an administrator gets is the number of goals that use a habit (ADR 0012).
 /// </summary>
 public sealed class CatalogAdministrationService
 {
@@ -15,11 +17,16 @@ public sealed class CatalogAdministrationService
     private const int MaxStateSwaps = 10;
 
     private readonly ICatalogHabitStore _store;
+    private readonly IGoalStore _goals;
 
-    public CatalogAdministrationService(ICatalogHabitStore store)
+    /// <param name="store">The catalog habit store.</param>
+    /// <param name="goals">The goal store, used only for the count across owners of the unpublish confirmation (ADR 0012).</param>
+    public CatalogAdministrationService(ICatalogHabitStore store, IGoalStore goals)
     {
         ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(goals);
         _store = store;
+        _goals = goals;
     }
 
     /// <summary>Every catalog habit in any state that matches the search, in name order, with the total (FR-012).</summary>
@@ -136,13 +143,32 @@ public sealed class CatalogAdministrationService
         };
     }
 
-    /// <summary>Unpublishes a Published habit; an Unpublished one stays with success; a Draft is not published (FR-011).</summary>
-    public async Task<CatalogHabitUnpublishResult> UnpublishAsync(ActingUser actingUser, HabitId id, CancellationToken cancellationToken)
+    /// <summary>
+    /// Unpublishes without confirmation, the slice 2 call (FR-019): a habit that no goal uses gives slice 2's results,
+    /// and a Published habit that goals use gives <see cref="CatalogHabitUnpublishOutcome.ConfirmationNeeded"/> (FR-033).
+    /// </summary>
+    public Task<CatalogHabitUnpublishResult> UnpublishAsync(ActingUser actingUser, HabitId id, CancellationToken cancellationToken) =>
+        UnpublishAsync(actingUser, id, confirmed: false, cancellationToken);
+
+    /// <summary>
+    /// Unpublishes a Published habit; an Unpublished one stays with success; a Draft is not published (FR-011). Without
+    /// <paramref name="confirmed"/>, a Published habit that goals use stays Published and the result is
+    /// <see cref="CatalogHabitUnpublishOutcome.ConfirmationNeeded"/> with the number of goals and its text only (FR-033,
+    /// ADR 0012). The count is informative, not a lock: a confirmed call runs slice 2's compare-and-swap whatever goals
+    /// were created since the confirmation was shown (spec Edge Cases).
+    /// </summary>
+    public async Task<CatalogHabitUnpublishResult> UnpublishAsync(
+        ActingUser actingUser, HabitId id, bool confirmed, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actingUser);
         if (Refusal(actingUser) is { } refusal)
         {
             return CatalogHabitUnpublishResult.Refused(refusal.As<CatalogHabitUnpublishOutcome>(), refusal.Message);
+        }
+
+        if (!confirmed && await GoalsToConfirmAsync(id, cancellationToken).ConfigureAwait(false) is { } goalCount)
+        {
+            return CatalogHabitUnpublishResult.ConfirmationNeeded(goalCount);
         }
 
         var outcome = await ChangeStateAsync(id, CatalogHabitStates.Unpublish, cancellationToken).ConfigureAwait(false);
@@ -181,6 +207,24 @@ public sealed class CatalogAdministrationService
         }
 
         throw new InvalidOperationException("Changing a catalog habit's state lost too many races in a row.");
+    }
+
+    /// <summary>
+    /// The number of goals an unconfirmed unpublish must be confirmed for: set only when the habit exists, the
+    /// unpublish would move it out of Published, and at least one goal uses it. Otherwise null, and the state change
+    /// gives slice 2's result, so FR-023's order holds: the identifier, then the state rule, then the count.
+    /// </summary>
+    private async Task<int?> GoalsToConfirmAsync(HabitId id, CancellationToken cancellationToken)
+    {
+        if (await _store.FindAsync(id, cancellationToken).ConfigureAwait(false) is not { } habit
+            || CatalogHabitStates.Unpublish(habit.State).Next is not { } next
+            || next == habit.State)
+        {
+            return null;
+        }
+
+        var count = await _goals.CountUsingCatalogHabitAsync(id, cancellationToken).ConfigureAwait(false);
+        return count > 0 ? count : null;
     }
 
     /// <summary>FR-016 steps 1 and 2: signed in, then an administrator; null when both hold.</summary>

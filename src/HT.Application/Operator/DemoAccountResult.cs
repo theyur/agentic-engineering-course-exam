@@ -31,8 +31,17 @@ public sealed class DemoAccountResult
     /// </summary>
     public DemoCustomHabitsResult? CustomHabits { get; }
 
+    /// <summary>
+    /// The goal result (FR-040): set for <see cref="DemoAccountOutcome.Created"/>, whose demo goals are created with the
+    /// account; null for <see cref="DemoAccountOutcome.AlreadyExists"/>, whose data is neither read nor changed.
+    /// </summary>
+    public DemoGoalsResult? Goals { get; init; }
+
     internal static DemoAccountResult Created(string email) =>
-        new(email, DemoAccountOutcome.Created, OperatorTexts.DemoAccountCreated, DemoCustomHabitsResult.Added);
+        new(email, DemoAccountOutcome.Created, OperatorTexts.DemoAccountCreated, DemoCustomHabitsResult.Added)
+        {
+            Goals = DemoGoalsResult.Added,
+        };
 
     internal static DemoAccountResult AlreadyExists(string email) =>
         new(email, DemoAccountOutcome.AlreadyExists, OperatorTexts.DemoAccountAlreadyExists, null);

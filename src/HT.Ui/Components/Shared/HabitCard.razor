@@ -1,9 +1,17 @@
-@* design/components/HabitCard, slice 2: the habit's glyph, name, category and intent Tags, the description and
+@* design/components/HabitCard: the habit's glyph, name, category and intent Tags, the description and
    "Suggested starting goal: …" when a text is given. Variants: visitor ("See details"), signed in ("Details"),
-   custom habit ("Private" Tag and "Edit"). The card receives plain values and formats nothing (ADR 0011). *@
+   custom habit ("Private" Tag and "Edit"). Slice 4 (HP-005): a signed-in card with a NewGoalHref is a registered
+   user's; with a GoalsText the habit is tracked (the strong Tag after the name and secondary "Add another goal"),
+   without one it has primary "Use this habit"; both keep ghost "Details". The card receives plain values and formats
+   nothing (ADR 0011). *@
 <article class="ht-card ht-habit">
     <div class="ht-habit__glyph"><HtIcon Name="@Icon" Size="HtIcon.IconSize.Large" /></div>
-    <div class="ht-habit__head"><h3 class="ht-habit__name">@Name</h3></div>
+    <div class="ht-habit__head">
+        <h3 class="ht-habit__name">@Name</h3>@if (HasGoalActions && GoalsText is not null)
+        {
+            <span class="ht-spacer"></span><Tag Text="@GoalsText" Strong="true" />
+        }
+    </div>
     <div class="ht-habit__tags">
         <Tag Text="@Category" /><Tag Text="@Intent" />@if (Variant == HabitCardVariant.CustomHabit)
         {
@@ -25,6 +33,17 @@
                 <a class="ht-btn ht-btn--ghost ht-btn--sm" href="@Href">See details</a>
                 break;
             case HabitCardVariant.SignedIn:
+                if (HasGoalActions)
+                {
+                    if (GoalsText is not null)
+                    {
+                        <a class="ht-btn ht-btn--secondary ht-btn--sm" href="@NewGoalHref">Add another goal</a>
+                    }
+                    else
+                    {
+                        <a class="ht-btn ht-btn--primary ht-btn--sm" href="@NewGoalHref">Use this habit</a>
+                    }
+                }
                 <a class="ht-btn ht-btn--ghost ht-btn--sm" href="@Href">Details</a>
                 break;
             default:
@@ -63,6 +82,19 @@
     /// <summary>Where the action goes: the details page, or the custom habit form.</summary>
     [Parameter, EditorRequired]
     public string Href { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The New goal page with this habit, for a registered user's signed-in card (HP-005); null keeps slice 2's card,
+    /// with "Details" only.
+    /// </summary>
+    [Parameter]
+    public string? NewGoalHref { get; set; }
+
+    /// <summary>The words of the user's goal count ("1 goal", "2 goals") for a tracked habit; null when the user tracks it not.</summary>
+    [Parameter]
+    public string? GoalsText { get; set; }
+
+    private bool HasGoalActions => Variant == HabitCardVariant.SignedIn && NewGoalHref is not null;
 
     public enum HabitCardVariant
     {

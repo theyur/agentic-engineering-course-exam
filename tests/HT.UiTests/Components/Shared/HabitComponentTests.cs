@@ -1,11 +1,13 @@
 using Bunit;
+using HT.Application.Goals;
+using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Ui.Components.Shared;
 using static HT.Ui.Components.Shared.HabitCard;
 
 namespace HT.UiTests.Components.Shared;
 
-/// <summary>The slice-2 shared components against their design files (constitution IV).</summary>
+/// <summary>The slice-2 shared components, with their slice-4 states, against their design files (constitution IV).</summary>
 public sealed class HabitComponentTests : BunitContext
 {
     private IRenderedComponent<HabitCard> Card(HabitCardVariant variant, string? start = "20 pages, 3 times a week", string? description = "Books.") =>
@@ -37,13 +39,76 @@ public sealed class HabitComponentTests : BunitContext
     }
 
     [Fact]
-    public void The_signed_in_card_has_Details_only()
+    public void The_signed_in_card_without_goal_information_has_Details_only()
     {
+        // An administrator's card keeps slice 2's state (HP-005).
         var cut = Card(HabitCardVariant.SignedIn);
 
         Assert.Equal(["Details"], cut.FindAll(".ht-habit__actions a").Select(a => a.TextContent));
         Assert.DoesNotContain("Use this habit", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("goal", cut.Find(".ht-habit__actions").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll(".ht-habit__head .ht-chip"));
+    }
+
+    private const string NewGoalHref = "/goals/new?habit=1&kind=catalog";
+
+    private IRenderedComponent<HabitCard> RegisteredCard(string? goalsText) =>
+        Render<HabitCard>(p => p
+            .Add(x => x.Icon, "book-open")
+            .Add(x => x.Name, "Reading")
+            .Add(x => x.Category, "Mind")
+            .Add(x => x.Intent, "Build")
+            .Add(x => x.Variant, HabitCardVariant.SignedIn)
+            .Add(x => x.Href, "/catalog/1")
+            .Add(x => x.NewGoalHref, NewGoalHref)
+            .Add(x => x.GoalsText, goalsText));
+
+    [Fact]
+    public void US6_AS5_a_tracked_card_has_the_strong_goal_Tag_Add_another_goal_and_Details()
+    {
+        var cut = RegisteredCard("2 goals");
+
+        var tag = cut.Find(".ht-habit__head .ht-chip");
+        Assert.Equal("2 goals", tag.TextContent);
+        Assert.Contains("ht-chip--strong", tag.ClassList);
+        Assert.Equal(["Mind", "Build"], cut.FindAll(".ht-habit__tags .ht-chip").Select(c => c.TextContent));
+        var actions = cut.FindAll(".ht-habit__actions a");
+        Assert.Equal(["Add another goal", "Details"], actions.Select(a => a.TextContent));
+        Assert.Equal([NewGoalHref, "/catalog/1"], actions.Select(a => a.GetAttribute("href")));
+        Assert.Contains("ht-btn--secondary", actions[0].ClassList);
+        Assert.Contains("ht-btn--ghost", actions[1].ClassList);
+    }
+
+    [Fact]
+    public void US6_AS5_an_untracked_card_has_Use_this_habit_and_Details_and_no_goal_Tag()
+    {
+        var cut = RegisteredCard(null);
+
+        Assert.Empty(cut.FindAll(".ht-habit__head .ht-chip"));
+        var actions = cut.FindAll(".ht-habit__actions a");
+        Assert.Equal(["Use this habit", "Details"], actions.Select(a => a.TextContent));
+        Assert.Equal(NewGoalHref, actions[0].GetAttribute("href"));
+        Assert.Contains("ht-btn--primary", actions[0].ClassList);
+    }
+
+    [Fact]
+    public void The_visitor_and_custom_habit_cards_ignore_goal_parameters()
+    {
+        foreach (var variant in new[] { HabitCardVariant.Visitor, HabitCardVariant.CustomHabit })
+        {
+            var cut = Render<HabitCard>(p => p
+                .Add(x => x.Icon, "book-open")
+                .Add(x => x.Name, "Reading")
+                .Add(x => x.Category, "Mind")
+                .Add(x => x.Intent, "Build")
+                .Add(x => x.Variant, variant)
+                .Add(x => x.Href, "/catalog/1")
+                .Add(x => x.NewGoalHref, NewGoalHref)
+                .Add(x => x.GoalsText, "2 goals"));
+
+            Assert.Single(cut.FindAll(".ht-habit__actions a"));
+            Assert.DoesNotContain("goal", cut.Markup, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -154,6 +219,96 @@ public sealed class HabitComponentTests : BunitContext
         Assert.Null(category);
         cut.FindAll("input[type=checkbox]")[1].Change(true);
         Assert.Equal((true, true), intent);
+    }
+
+    [Fact]
+    public void US6_AS5_FilterPanel_with_ShowTracked_adds_Show_with_Only_habits_I_track()
+    {
+        bool? tracked = null;
+        var cut = Render<FilterPanel>(p => p
+            .Add(x => x.Id, "f")
+            .Add(x => x.Categories, [new FilterPanel.CategoryOption(null, "All")])
+            .Add(x => x.ShowTracked, true)
+            .Add(x => x.Tracked, true)
+            .Add(x => x.TrackedChanged, (bool t) => tracked = t));
+
+        Assert.Equal(["Category", "Intent", "Show"], cut.FindAll(".ht-filter__title").Select(t => t.TextContent));
+        var show = cut.FindAll("[role=group]")[1];
+        Assert.Equal("f-show-title", show.GetAttribute("aria-labelledby"));
+        Assert.Equal("Only habits I track", show.QuerySelector("label")!.TextContent.Trim());
+        var box = show.QuerySelector("input[type=checkbox]")!;
+        Assert.True(box.HasAttribute("checked"));
+
+        cut.FindAll("input[type=checkbox]")[2].Change(false);
+        Assert.False(tracked);
+    }
+
+    /// <summary>Wednesday 18 November 2026, the list's today in the GoalItem tests.</summary>
+    private static readonly DateOnly GoalToday = new(2026, 11, 18);
+
+    private IRenderedComponent<GoalItem> RenderGoal(GoalListItem item) =>
+        Render<GoalItem>(p => p.Add(x => x.Item, item).Add(x => x.Today, GoalToday));
+
+    private static GoalListItem GoalAt(
+        string schedule, GoalScheduleKind kind, DateOnly? start = null, DateOnly? next = null, DateOnly? firstWeek = null,
+        BuildOrReduce side = BuildOrReduce.Build) => new()
+    {
+        Id = new GoalId(Guid.Parse("4b1d0c9e-0000-4000-8000-000000000001")),
+        Name = "Reading, 15 min, 5 days a week",
+        HabitName = "Reading",
+        HabitKind = HabitKind.Catalog,
+        BuildOrReduce = side,
+        Measurement = Measurement.Duration,
+        TargetText = "15 min, 5 days a week",
+        ScheduleText = schedule,
+        ScheduleKind = kind,
+        StartDate = start,
+        NextCommitment = next,
+        FirstWeekStarts = firstWeek,
+    };
+
+    /// <summary>Every meta-line variant of HP-003, in its order of precedence, and the schedule alone.</summary>
+    public static TheoryData<GoalListItem, string> GoalMetaLines => new()
+    {
+        {
+            GoalAt("Flexible · 2 times a week", GoalScheduleKind.PeriodBased, start: new(2026, 11, 20), firstWeek: new(2026, 11, 23)),
+            "Flexible · 2 times a week · first week starts Mon 23 Nov"
+        },
+        { GoalAt("Flexible · 2 times a week", GoalScheduleKind.PeriodBased, firstWeek: new(2026, 11, 23)), "Flexible · 2 times a week · first week starts Mon 23 Nov" },
+        { GoalAt("Mon · Wed · Fri", GoalScheduleKind.CommitmentBased, start: new(2026, 11, 24), next: new(2026, 11, 25)), "Mon · Wed · Fri · starts Tue 24 Nov" },
+        { GoalAt("Every day", GoalScheduleKind.PeriodBased, start: new(2026, 11, 18)), "Every day · starts Wed 18 Nov" },
+        { GoalAt("Mon–Fri", GoalScheduleKind.CommitmentBased, next: GoalToday), "Mon–Fri · next today" },
+        { GoalAt("Mon · Wed · Fri", GoalScheduleKind.CommitmentBased, next: new(2026, 11, 20)), "Mon · Wed · Fri · next Fri 20 Nov" },
+        { GoalAt("2 times a day", GoalScheduleKind.PeriodBased), "2 times a day" },
+        { GoalAt("Flexible · 3 times a week", GoalScheduleKind.PeriodBased), "Flexible · 3 times a week" },
+    };
+
+    [Theory]
+    [MemberData(nameof(GoalMetaLines))]
+    public void GoalItem_shows_the_name_link_the_tag_and_the_meta_line(GoalListItem item, string meta)
+    {
+        var cut = RenderGoal(item);
+
+        var root = cut.Find("div.ht-goalitem");
+        Assert.Contains("ht-goalitem--reduced", root.ClassList);
+        var link = cut.Find("a.ht-goalitem__name");
+        Assert.Equal("Reading, 15 min, 5 days a week", link.TextContent);
+        Assert.Equal("/goals/4b1d0c9e-0000-4000-8000-000000000001", link.GetAttribute("href"));
+        Assert.Equal("Build", cut.Find(".ht-goalitem__meta .ht-chip").TextContent);
+        Assert.Equal(meta, cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
+        foreach (var absent in new[] { "ht-strip", "ht-goalitem__actions", "Record", "%" })
+        {
+            Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void GoalItem_shows_Reduce_as_its_tag()
+    {
+        var cut = RenderGoal(GoalAt("Every day", GoalScheduleKind.PeriodBased, side: BuildOrReduce.Reduce));
+
+        Assert.Equal("Reduce", cut.Find(".ht-goalitem__meta .ht-chip").TextContent);
+        Assert.Equal("Every day", cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
     }
 
     [Fact]

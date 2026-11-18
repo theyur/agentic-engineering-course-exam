@@ -22,3 +22,17 @@ The third part of the preview shows Profile as slice 2 builds it for registered 
 - The same header, then the link Tabs "Account" (`/profile`) and "Custom habits" (`/profile?tab=custom-habits`). They are links, so the page stays a normal page and the change-password form keeps working.
 - Account: the slice 1 content unchanged (the email and the "Change password" form with its states).
 - Custom habits: a Card "Custom habits" with secondary "+ Create custom habit" (→ the custom habit form), the line "Private habits for your own goals. Only you can see them.", then one row per custom habit in name order: glyph, name, category and intent, the strong "Private" Tag and "Edit" (→ the custom habit form). With none, an EmptyState "No custom habits yet" with "+ Create custom habit".
+
+## Slice 4 state
+
+The last part of the preview shows Profile as slice 4 builds it (HP-015, HP-017, ADR 0008). An administrator's Profile has the same header and Account content, without Tabs.
+
+- Header: the large avatar with the first letter of the account name in upper case ("Y" for Yuri), or of the email without a name; then
+  - with a name: the name as the `h1` and the muted line "yuri@example.com · member since November 2026";
+  - without a name: the email as the `h1` and "member since November 2026";
+  - an account created before slice 4 has no "member since": with a name the muted line is the email alone; without a name the header is the slice 1 one (the email and "Profile").
+  "member since" gives the month and year of creation in the account's time zone.
+- The Account tab, in one Card "Account": the email (KeyValue), then the "Name" form, the "Time zone" form and "Change password", each with its own button. The Name and Time zone forms use secondary "Save"; "Change password" stays the primary button.
+  - "Name (optional)" with the help "Only you can see it. Home uses it to greet you.". After Save: the Notice "Your name is changed." (`role="status"`) above the field, and the avatar letter follows the new name. A name of more than 60 characters: "The name can have at most 60 characters." under the field. An empty name removes the name.
+  - "Time zone": a select with "UTC" first, then the named time zones of the installation's time zone data in ordinal order ("America/New_York", "Asia/Tokyo", "Europe/Kyiv", …), plus the current value when it is not among them ("Europe/Kiev"), so the current value is always selected. The help: "Your goals' days and weeks start at midnight in this time zone.". After Save: the Notice "Your time zone is changed. Your goals use it from their next day or week; earlier days keep their time zone." (`role="status"`). A value that is not a named time zone: "Choose a time zone from the list." under the field.
+- The full preview's avatar shows one letter ("Y"), not initials.

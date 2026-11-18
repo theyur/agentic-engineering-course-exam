@@ -1,3 +1,4 @@
+using HT.Application.Accounts;
 using HT.Application.Operator;
 using HT.Persistence;
 
@@ -21,11 +22,20 @@ internal static partial class StartupTasks
     /// <summary>The configuration key of the demo password (research R-11), kept out of source control.</summary>
     public const string DemoPasswordKey = "Operator:DemoPassword";
 
+    /// <summary>The configuration key of the installation's default time zone (slice 4 research R-03); not a secret.</summary>
+    public const string DefaultTimeZoneKey = "Operator:DefaultTimeZone";
+
     public static async Task RunAsync(IServiceProvider services, IHostEnvironment environment, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(environment);
         ArgumentNullException.ThrowIfNull(logger);
+
+        // Slice 4 contracts/host.md: only a configured value that is not a named time zone is reported, never the value.
+        if (services.GetRequiredService<InstallationTimeZone>().IsConfiguredValueIgnored)
+        {
+            LogDefaultTimeZoneIgnored(logger);
+        }
 
         if (environment.IsDevelopment())
         {
@@ -55,8 +65,14 @@ internal static partial class StartupTasks
             return;
         }
 
-        // HP-017: an account's custom-habit line right after its account line, then the catalog line once. The results
-        // name the demo email and a result text only, never a custom habit.
+        // Slice 4 HP-013, in the order of the work (FR-040): the catalog line once, first; then per demo email its account
+        // line, its custom-habit line and its goal line. The results name the demo email and a result text only, never
+        // a goal, habit or account name, setting, unit or amount.
+        if (result.Catalog is { } catalog)
+        {
+            LogDemoCatalog(logger, catalog.Message);
+        }
+
         foreach (var account in result.Accounts)
         {
             LogDemoAccount(logger, account.Email, account.Message);
@@ -64,11 +80,11 @@ internal static partial class StartupTasks
             {
                 LogDemoCustomHabits(logger, account.Email, customHabits.Message);
             }
-        }
 
-        if (result.Catalog is { } catalog)
-        {
-            LogDemoCatalog(logger, catalog.Message);
+            if (account.Goals is { } goals)
+            {
+                LogDemoGoals(logger, account.Email, goals.Message);
+            }
         }
     }
 
@@ -105,6 +121,9 @@ internal static partial class StartupTasks
         }
     }
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Default time zone: not a named time zone, using UTC")]
+    private static partial void LogDefaultTimeZoneIgnored(ILogger logger);
+
     [LoggerMessage(Level = LogLevel.Information, Message = "Schema migrations applied: {Count}")]
     private static partial void LogMigrationsApplied(ILogger logger, int count);
 
@@ -122,6 +141,9 @@ internal static partial class StartupTasks
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Demo custom habits {Email}: {Result}")]
     private static partial void LogDemoCustomHabits(ILogger logger, string email, string result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo goals {Email}: {Result}")]
+    private static partial void LogDemoGoals(ILogger logger, string email, string result);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Demo catalog: {Result}")]
     private static partial void LogDemoCatalog(ILogger logger, string result);

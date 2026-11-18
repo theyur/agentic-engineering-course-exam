@@ -1,0 +1,134 @@
+@using HT.Application.Habits
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Domain.Habits
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@* design/pages/PageNewGoal, "Habit chooser" (HP-001, HP-012): a Dialog "Choose a habit" with a SearchField, then
+   the Published catalog habits and the user's custom habits, each list in name order and shown only when it has a
+   match. The catalog list comes from browsing with the search text; the custom list matches names with the same
+   rule (HabitName). Choosing a row hands the habit to the form; Cancel, × and Esc close with no change. Focus goes to
+   the SearchField on open and back to the opening button on close. Every use case runs in its own scope. *@
+<HtDialog Open="Open" OnClose="OnClose" FocusOnOpen="FocusSearchAsync" FocusOnClose="FocusOnClose">
+    <Title>Choose a habit</Title>
+    <Subtitle>Catalog habits and your custom habits</Subtitle>
+    <ChildContent>
+        <SearchField @ref="_search" Label="Search habits" Value="@_searchText" ValueChanged="SearchAsync" />
+        @if (_loaded)
+        {
+            @if (_catalog.Count == 0 && MatchingCustom.Count == 0)
+            {
+                <p class="ht-muted">No habit matches your search.</p>
+            }
+            @if (_catalog.Count > 0)
+            {
+                <div>
+                    <div class="ht-eyebrow" id="@CatalogListId">Catalog</div>
+                    <ul class="ht-pick-list" aria-labelledby="@CatalogListId">
+                        @foreach (var habit in _catalog)
+                        {
+                            <li>@Row(new GoalHabit(habit.Id, HabitKind.Catalog), habit.Icon, habit.Name, habit.Category, habit.Intent)</li>
+                        }
+                    </ul>
+                </div>
+            }
+            @if (MatchingCustom.Count > 0)
+            {
+                <div>
+                    <div class="ht-eyebrow" id="@CustomListId">Your custom habits</div>
+                    <ul class="ht-pick-list" aria-labelledby="@CustomListId">
+                        @foreach (var habit in MatchingCustom)
+                        {
+                            <li>@Row(new GoalHabit(habit.Id, HabitKind.Custom), habit.Icon, habit.Name, habit.Category, habit.Intent)</li>
+                        }
+                    </ul>
+                </div>
+            }
+        }
+    </ChildContent>
+    <Footer>
+        <HtButton Variant="HtButton.ButtonVariant.Secondary" @onclick="() => OnClose.InvokeAsync()">Cancel</HtButton>
+    </Footer>
+</HtDialog>
+
+@code {
+    private readonly string _idPrefix = $"habit-chooser-{Guid.NewGuid():N}";
+    private SearchField? _search;
+    private string _searchText = string.Empty;
+    private IReadOnlyList<CatalogHabitSummary> _catalog = [];
+    private IReadOnlyList<CustomHabitView> _custom = [];
+    private bool _loaded;
+    private bool _wasOpen;
+
+    /// <summary>Whether the chooser is shown; the form owns this value.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>The acting user, whose custom habits are listed.</summary>
+    [Parameter, EditorRequired]
+    public ActingUser ActingUser { get; set; } = ActingUser.Anonymous;
+
+    /// <summary>A row was chosen.</summary>
+    [Parameter]
+    public EventCallback<GoalHabit> OnChoose { get; set; }
+
+    /// <summary>Cancel, × or Esc: the form should close the chooser.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>Gives the focus back to the button that opened the chooser.</summary>
+    [Parameter]
+    public Func<ValueTask>? FocusOnClose { get; set; }
+
+    private string CatalogListId => _idPrefix + "-catalog";
+
+    private string CustomListId => _idPrefix + "-custom";
+
+    private List<CustomHabitView> MatchingCustom =>
+        _custom.Where(h => HabitName.TryCreate(h.Name, out var name, out _) && name.Matches(_searchText)).ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Open && !_wasOpen)
+        {
+            _wasOpen = true;
+            _searchText = string.Empty;
+            _loaded = false;
+            var custom = await UseCases.RunAsync<CustomHabitService, CustomHabitListResult>(
+                (service, token) => service.ListAsync(ActingUser, token), CancellationToken.None);
+            _custom = custom.Habits;
+            await LoadCatalogAsync();
+            _loaded = true;
+        }
+        else if (!Open)
+        {
+            _wasOpen = false;
+        }
+    }
+
+    private async Task SearchAsync(string text)
+    {
+        _searchText = text;
+        await LoadCatalogAsync();
+    }
+
+    private async Task LoadCatalogAsync()
+    {
+        var search = _searchText;
+        var browsed = await UseCases.RunAsync<CatalogService, CatalogBrowseResult>(
+            (service, token) => service.BrowseAsync(new CatalogFilter { Search = search }, token), CancellationToken.None);
+        if (string.Equals(search, _searchText, StringComparison.Ordinal))
+        {
+            // An answer to an older text that arrives late is dropped.
+            _catalog = browsed.Habits;
+        }
+    }
+
+    private ValueTask FocusSearchAsync() => _search is { } search ? search.FocusAsync() : ValueTask.CompletedTask;
+
+    private RenderFragment Row(GoalHabit habit, string icon, string name, Category category, Intent intent) =>
+        @<button type="button" class="ht-select-row" @onclick="() => OnChoose.InvokeAsync(habit)">
+            <span class="ht-habit__glyph ht-habit__glyph--row"><HtIcon Name="@icon" Size="HtIcon.IconSize.Large" /></span>
+            <span class="ht-row__main"><span class="ht-row__name">@name</span><span class="ht-row__meta">@category · @intent</span></span>
+        </button>;
+}

@@ -72,6 +72,49 @@ public sealed class PageReaderTests
     }
 
     [Fact]
+    public void ReadHabitNames_ignores_goal_items()
+    {
+        Assert.Empty(PageReader.ReadHabitNames("""<a class="ht-goalitem__name" href="/goals/1">Reading</a>"""));
+    }
+
+    [Fact]
+    public void ReadGoalNames_returns_the_goal_item_names_after_html_decoding()
+    {
+        const string html = """
+            <div class="ht-goalitem ht-goalitem--reduced">
+                <div><a class="ht-goalitem__name" href="/goals/1">Read &amp; reflect, 15 min, 5 days a week</a>
+                <div class="ht-goalitem__meta"><span class="ht-tag">Build</span><span>Mon–Fri</span></div></div>
+            </div>
+            <div class="ht-goalitem ht-goalitem--reduced">
+                <div><a class="ht-goalitem__name" href="/goals/2">Don&#x27;t snooze</a></div>
+            </div>
+            <a href="/goals/new">New goal</a>
+            <h3 class="ht-habit__name">A habit card</h3>
+            """;
+
+        Assert.Equal(["Read & reflect, 15 min, 5 days a week", "Don't snooze"], PageReader.ReadGoalNames(html));
+    }
+
+    [Fact]
+    public void ReadGoalNames_reads_nested_markup_and_other_classes_on_the_same_element()
+    {
+        const string html = """
+            <a href="/goals/1" class="ht-link ht-goalitem__name is-current" data-x="1"><span>Morning</span> <em>yoga</em></a>
+            <A CLASS="ht-goalitem__name" HREF="/goals/2">Coffee, at most 2 cups a day</A >
+            <a class="ht-goalitem__name-extra" href="/goals/3">Not a goal name</a>
+            <a class="ht-goalitem__meta" href="/goals/4">Not a goal name either</a>
+            """;
+
+        Assert.Equal(["Morning yoga", "Coffee, at most 2 cups a day"], PageReader.ReadGoalNames(html));
+    }
+
+    [Fact]
+    public void ReadGoalNames_is_empty_without_a_goal_item()
+    {
+        Assert.Empty(PageReader.ReadGoalNames("<h1>Goals</h1><p>No goals yet.</p>"));
+    }
+
+    [Fact]
     public void ReadAssetUrls_returns_stylesheets_and_scripts_in_document_order_without_inline_scripts()
     {
         const string html = """

@@ -19,3 +19,12 @@ The second part of the preview shows the page as slice 2 builds it (US2-AS6, US2
 - No "You track this · N goals", no "Your goals on this habit" (slice 4), no community card (slice 9).
 - A habit without suggested starting goals has no "Suggested starting goals" card.
 - A Draft, an Unpublished or an unknown habit's address shows the Not found page (`components/EmptyState`), for every audience.
+
+## Slice 4 state
+
+The last part of the preview shows the page for registered users as slice 4 builds it (HP-006, ADR 0008). Visitors and administrators keep the slice 2 state.
+
+- Head: the primary button "Use this habit" (→ `/goals/new?habit={id}&kind=catalog`), and the strong Tag "You track this · N goals" after the category and intent Tags when the user has at least one goal on the habit ("You track this · 1 goal" for one).
+- "Suggested starting goals": each row adds secondary "Start with this" (→ `/goals/new?habit={id}&kind=catalog&suggestion={n}`, counted from 1).
+- "Your goals on this habit", only when the user has goals on it: each goal's name links to its goal page, in name order. No consistency or streak (slice 6).
+- No community card (slice 9).

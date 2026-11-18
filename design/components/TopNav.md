@@ -32,3 +32,10 @@ The last three bars of the preview are slice 2 (HP-011, ADR 0008):
 - Registered user: "Today" and "Catalog", then the avatar menu.
 - Administrator: "Today", "Catalog" and "Admin", then the avatar menu.
 - No "Goals", "Community" or "+ New goal" yet (slices 4 and 9). The current page's link has `aria-current="page"`; "Catalog" is current on the catalog pages, and "Admin" on the Admin page and the administrator's catalog habit form.
+
+## Slice 4
+
+The last bars of the preview are slice 4 (HP-009, HP-017, ADR 0008):
+- Registered user: "Today", "Goals" and "Catalog", then primary "+ New goal" (hidden on phones, `ht-hide-sm`) and the avatar menu. "Goals" is current on the Goals page, the goal page and the New goal page.
+- Administrator and visitor: the slice 2 bars, with no "Goals" and no "+ New goal" (FR-021).
+- The avatar shows one letter: the first letter of the account name in upper case ("Y" for Yuri), or of the email when the account has no name ("A" for ana@example.com). Its accessible name stays "Account menu for <email>".
