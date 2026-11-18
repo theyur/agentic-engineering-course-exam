@@ -95,8 +95,8 @@ Each step names the requirement it shows.
 9. Secrets (SC-004, HP-007): with the values shown in the portal's app settings, search the repository, the
    downloaded logs of the runs in steps 2, 6 and 7, and the downloaded operator log. Expected: no password and
    no connection string; the administrator email only in the operator log.
-10. Exam day and weekly (SC-001, SC-006, SC-007, SC-008): run `mode` = `check` on 2026-11-23 and at least once a
-    week until 2026-12-31, each time after the app has had no requests for at least 30 minutes, and add runs
+10. Exam day and weekly (SC-001, SC-006, SC-007, SC-008): run `mode` = `check` on the exam day, 2026-12-14, and at least once a
+    week until 2027-01-31, each time after the app has had no requests for at least 30 minutes, and add runs
     until there are at least 10. Expected: every run passes; across those `check` runs (deployment and refresh
     runs measure a cold start and do not count, nor does a `first … (retried)` value), `first` is within 30
     seconds and `later` within 3 seconds in at least 9 of 10; the resource group's month-to-date cost stays

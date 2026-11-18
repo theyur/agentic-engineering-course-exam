@@ -1,4 +1,4 @@
-# Deletes the hosted demo after 2026-12-31 (ADR 0015, research R-03): the resource group with everything in it,
+# Deletes the hosted demo after 2027-01-31 (ADR 0015, research R-03): the resource group with everything in it,
 # the Entra application registration of the deployment workflow (its service principal goes with it), and the
 # GitHub environment `demo` with its variables. Run by the Operator after `az login` and `gh auth login`.
 #

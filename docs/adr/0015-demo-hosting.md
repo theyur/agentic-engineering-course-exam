@@ -4,7 +4,8 @@
 plan session 2026-11-15). Settles the four ARCHITECTURE §9 rows of the roadmap that slice 3 owns: hosting
 services and secrets, schema migration rollout, demo refresh, and how the hosted app gets the demo sign-ins.
 Leaves [ADR 0007](0007-startup-operator-tasks.md) unchanged: the host still applies no migrations outside
-Development.
+Development. Amended 2026-11-18 by the owner: the exam moved to 2026-12-14, so the demo end date moved from
+2026-12-31 to 2027-01-31 (slice 3 spec, Session 2026-11-18). Nothing else changed.
 
 ## Context
 
@@ -14,7 +15,7 @@ Development.
   (HP-016); every deployment and every Operator-started refresh starts the hosted app on an empty database
   (HP-005, HP-011); a deployment or refresh succeeds only when the startup tasks created the administrator and
   all demo data (HP-017); sessions survive a restart that is not a deployment or refresh (HP-018); the hosted
-  demo stays reachable until 2026-12-31.
+  demo stays reachable until 2027-01-31.
 - ADR 0007: administrator creation and demo loading run at every start, are non-fatal, and log their results to
   the operator log. Outside Development the host applies no migrations.
 - The repository is public, so GitHub Actions run logs are public.
@@ -65,7 +66,7 @@ Secrets and sessions:
   - server firewall rules for the web app's possible outbound addresses only (not "allow all Azure services").
 
   The budget of SC-007 is **USD 25 a month**. The Operator checks the actual cost at each weekly smoke check.
-  The resource group is deleted after 2026-12-31.
+  The resource group is deleted after 2027-01-31.
 - **Provisioning.** A PowerShell script in the repository creates or updates the resources with the Azure CLI.
   It is idempotent and run by the Operator once, and again after a change. It reads the secret values from
   prompts, never from arguments or files in the repository, and refuses an administrator email outside
@@ -126,7 +127,7 @@ Secrets and sessions:
   quota, far longer at demo volume), read live with `az webapp log tail` or Log stream and stored through the
   web app's Kudu site, all behind an Azure sign-in. The workflow never prints it.
 - **Not decided here.** Time-relative demo data and scheduled evaluation (slice 5 onward) did not exist when this
-  ADR was accepted. The slice that adds them decides, citing this ADR, how they stay current until 2026-12-31,
+  ADR was accepted. The slice that adds them decides, citing this ADR, how they stay current until 2027-01-31,
   and supersedes the relevant part if it needs a different mechanism.
 
 ## Consequences

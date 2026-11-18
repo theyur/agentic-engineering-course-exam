@@ -1,6 +1,6 @@
 # Hosted demo: Operator guide
 
-The hosted demo is the one public instance of Habit Tracker on Azure that reviewers use until 2026-12-31. This
+The hosted demo is the one public instance of Habit Tracker on Azure that reviewers use until 2027-01-31. This
 page is for the Operator: the person who provisions it, starts deployments, refreshes and checks, holds the
 secret configuration and reads the operator log (HP-015).
 
@@ -166,7 +166,7 @@ entries just before it come from the two starts without a database (steps 6 and 
 
 ## Exam-day and weekly checks
 
-Run `check` on 2026-11-23 and at least once a week until 2026-12-31, each time after the app has had no
+Run `check` on the exam day, 2026-12-14, and at least once a week until 2027-01-31, each time after the app has had no
 requests for at least 30 minutes. Add runs until there are at least 10 such idle `check` runs. The workflow's
 run history is the record; nothing is committed.
 
@@ -226,7 +226,7 @@ dotnet run --project tools/HT.SmokeCheck -- https://localhost:7194 --skip-http-r
 After a change under `tools/hosting/`, run `pwsh -NoProfile -File tools/hosting/selftest.ps1`. It must print
 `PASSED`. It runs offline and calls neither Azure nor GitHub.
 
-## Teardown after 2026-12-31
+## Teardown after 2027-01-31
 
 ```powershell
 pwsh -NoProfile -File tools/hosting/teardown.ps1 -Subscription <id or name> -ResourceGroup <rg> `

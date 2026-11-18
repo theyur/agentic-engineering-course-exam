@@ -101,7 +101,7 @@ Warnings are treated as errors — the build must stay warning-free.
 
 ## Hosted demo
 
-Reviewers use one Azure-hosted instance with demo data until 2026-12-31. The Operator provisions it with
+Reviewers use one Azure-hosted instance with demo data until 2027-01-31. The Operator provisions it with
 `tools/hosting/provision.ps1`, then deploys, refreshes and checks it with the manual GitHub Actions workflow
 **Deploy demo** (`.github/workflows/deploy-demo.yml`); a merge never deploys. How to do each, and what the exam
 submission gives reviewers: [docs/operations/hosted-demo.md](docs/operations/hosted-demo.md). Decisions:
