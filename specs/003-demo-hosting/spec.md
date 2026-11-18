@@ -59,6 +59,17 @@ any slice deployed after it, reachable for reviewers.
   persistent storage. [ADR 0015](../../docs/adr/0015-demo-hosting.md) adds the setting that puts them there,
   because App Service on Linux documents no automatic key persistence.
 
+### Session 2026-11-18
+
+- Q: The exam moved from 2026-11-23 to 2026-12-14. What changes here? → A: The exam-day `check` run (SC-006,
+  T049) moves to 2026-12-14. SC-008 was met when the demo was first hosted on 2026-11-15. The other dates that
+  name 2026-11-23 record the plan as it was made and stay as they are.
+- Q: Does the hosted demo still end on 2026-12-31? → A: No: it stays reachable until 2027-01-31, which keeps
+  time for late review after the later exam and adds one billing month (about USD 18). This replaces the end
+  date of the 2026-11-15 answer above. HP-013, SC-006, the Edge Cases, ADR 0015, T049, T050, the quickstart
+  and the Operator guide now say 2027-01-31; plan.md, research.md, data-model.md and the critic reviews keep
+  2026-12-31 as the record of the plan as it was made.
+
 ### Critic revision 2026-11-15
 
 Decisions made by the author while revising after [critic pass 1](critic-spec-pass-1.md) and
@@ -263,7 +274,7 @@ a demo refresh, and sign in to that account again with the original demo passwor
   account and writes no private data into it (ADR 0013).
 - Demo data that depends on the current time (slice 5 onward, for example Pending results inside the 48-hour
   grace period or a rolling 30-day community window) goes stale between refreshes. If such slices have shipped
-  when this slice resumes, the refresh decision covers keeping that data current until 2026-12-31 (Decisions
+  when this slice resumes, the refresh decision covers keeping that data current until 2027-01-31 (Decisions
   due below).
 - The hosted app is opened from a phone: the pages behave as they do locally at that width; no extra mobile
   work is in scope.
@@ -310,7 +321,7 @@ a demo refresh, and sign in to that account again with the original demo passwor
   version itself; secret and environment values are set once, outside source control, and reused.
 - **HP-013**: The hosted demo MUST use the lowest-cost Azure options that meet the other HP requirements,
   SC-001 and SC-006; no redundancy, autoscaling, multi-region setup or disaster recovery (SPEC §9,
-  ARCHITECTURE §7). Nothing has to keep running after 2026-12-31.
+  ARCHITECTURE §7). Nothing has to keep running after 2027-01-31.
 - **HP-014**: The hosted demo data and the configured administrator MUST stay visibly synthetic: emails only in
   `example.com`, no real people (constitution VI).
 - **HP-015**: The repository MUST document, for the Operator, how to deploy, how to refresh the demo, how to run
@@ -360,8 +371,8 @@ a demo refresh, and sign in to that account again with the original demo passwor
   the values in the secret configuration finds none of the passwords or the connection.
 - **SC-005**: After every succeeded deployment and demo refresh, the smoke check signs in to every demo
   account with the demo password and finds every shipped slice's demo data, and finds the full seed catalog.
-- **SC-006**: The smoke check passes (it reaches the hosted demo and finds what SC-005 checks) on 2026-11-23
-  and on each weekly check from the first deployment until 2026-12-31, apart from the minutes of an
+- **SC-006**: The smoke check passes (it reaches the hosted demo and finds what SC-005 checks) on 2026-12-14
+  and on each weekly check from the first deployment until 2027-01-31, apart from the minutes of an
   Operator-started deployment or refresh.
 - **SC-007**: The monthly hosting cost stays at or under USD 25, the budget of ADR 0015.
 - **SC-008**: The hosted demo, with every slice shipped by then, is reachable before the exam on 2026-11-23.

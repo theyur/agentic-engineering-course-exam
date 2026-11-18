@@ -253,8 +253,8 @@ SC-006).
 - [X] T047 (user) PR 2 when the user asks: the results of T041–T046 in the description, any fixes, `docs/roadmap.md` row 3 `shipped` with Horizon `—` and both PRs in Shipped. The description lists as **still unverified, with their dates**: SC-001 and SC-006 (T049), SC-007 (T049), and the 30-day log retention (T048).
   - 2026-11-15: the fixes found on the hosted runs went to `master` ahead of PR 2, because the workflow runs only from `master`: PR #27 (plan check, OIDC subject, `dotnet-ef` install), #28 (restore before the bundle in refresh mode), #29 (deploy without start tracking). PR 2 carries the results and the roadmap; Shipped lists PR 1 (#26), the three fix PRs and PR 2.
 - [ ] T048 [US3] (user) Quickstart B5, last part, at the first weekly check: the first deployment's operator log lines are still there (HP-010, research R-09). If they are gone, report it: R-09's retention needs another mechanism.
-- [ ] T049 [US4] (user) Quickstart B10: `check` run on 2026-11-23 and at least weekly until 2026-12-31, after at least 30 minutes without requests, until at least 10 such runs exist; month-to-date cost against USD 25 (SC-001, SC-006, SC-007).
-- [ ] T050 (user) Close-out after the last T049 run: the user posts one line per criterion (SC-001 tally, SC-006 pass/fail per date, SC-007 highest monthly cost, T048's outcome) as a comment on PR 2; the evidence stays in the workflow's run history (research R-10), so no further change to the repository and no third PR. Then `tools/hosting/teardown.ps1` after 2026-12-31.
+- [ ] T049 [US4] (user) Quickstart B10: `check` run on the exam day, 2026-12-14, and at least weekly until 2027-01-31, after at least 30 minutes without requests, until at least 10 such runs exist; month-to-date cost against USD 25 (SC-001, SC-006, SC-007).
+- [ ] T050 (user) Close-out after the last T049 run: the user posts one line per criterion (SC-001 tally, SC-006 pass/fail per date, SC-007 highest monthly cost, T048's outcome) as a comment on PR 2; the evidence stays in the workflow's run history (research R-10), so no further change to the repository and no third PR. Then `tools/hosting/teardown.ps1` after 2027-01-31.
 
 ---
 
@@ -324,7 +324,7 @@ Task: "Align contracts/smoke-check.md and plan.md with the fixed names (T037)"
 1. PR 1 = Phases 1–7 (code, scripts, workflow, docs), by the dates of research R-15.
 2. Operator: provisioning (T041), first deployment (T042), hosted checks (T043–T046) by 2026-11-22.
 3. PR 2 = hosted results and fixes, with the time-bound criteria listed as unverified; roadmap `shipped`.
-4. First weekly check (T048), exam day and weekly checks (T049) until 2026-12-31, close-out (T050).
+4. First weekly check (T048), exam day and weekly checks (T049) until 2027-01-31, close-out (T050).
 
 ---
 
