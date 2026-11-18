@@ -1,4 +1,3 @@
-using System.Collections.Frozen;
 using NodaTime;
 using NodaTime.TimeZones;
 
@@ -12,15 +11,13 @@ namespace HT.Domain.Time;
 /// </summary>
 public readonly record struct NamedTimeZone
 {
-    private const string UtcId = "UTC";
-
     private NamedTimeZone(string id) => Id = id;
 
     /// <summary>The identifier, exactly as given.</summary>
     public string Id { get; }
 
     /// <summary>The named time zone <c>UTC</c>.</summary>
-    public static NamedTimeZone Utc { get; } = new(UtcId);
+    public static NamedTimeZone Utc { get; } = new(TzdbIdentifiers.Utc);
 
     /// <summary>
     /// Accepts exactly <c>UTC</c>, or a tzdb identifier that contains <c>/</c> and does not start with <c>Etc/</c>.
@@ -34,7 +31,7 @@ public readonly record struct NamedTimeZone
             return false;
         }
 
-        if (string.Equals(text, UtcId, StringComparison.Ordinal))
+        if (string.Equals(text, TzdbIdentifiers.Utc, StringComparison.Ordinal))
         {
             zone = Utc;
             return true;
@@ -42,7 +39,7 @@ public readonly record struct NamedTimeZone
 
         if (!text.Contains('/', StringComparison.Ordinal)
             || text.StartsWith("Etc/", StringComparison.Ordinal)
-            || !TzdbIds.Contains(text))
+            || !TzdbIdentifiers.All.Contains(text))
         {
             return false;
         }
@@ -76,14 +73,8 @@ public readonly record struct NamedTimeZone
 
     internal static TzdbDateTimeZoneSource Source => TzdbDateTimeZoneSource.Default;
 
-    /// <summary>Every identifier of the embedded tzdb, zones and links, compared ordinally.</summary>
-    private static FrozenSet<string> TzdbIds => LazyTzdbIds.Value;
-
-    private static readonly Lazy<FrozenSet<string>> LazyTzdbIds =
-        new(() => DateTimeZoneProviders.Tzdb.Ids.ToFrozenSet(StringComparer.Ordinal));
-
     private DateTimeZone Zone =>
-        Id is null || string.Equals(Id, UtcId, StringComparison.Ordinal)
+        Id is null || string.Equals(Id, TzdbIdentifiers.Utc, StringComparison.Ordinal)
             ? DateTimeZone.Utc
             : DateTimeZoneProviders.Tzdb[Id];
 }
