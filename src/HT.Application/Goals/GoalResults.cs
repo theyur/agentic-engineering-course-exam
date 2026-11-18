@@ -176,3 +176,39 @@ public sealed class GoalReadResult
 
     internal static GoalReadResult Found(GoalDetails goal) => new(GoalReadOutcome.Found, null, goal);
 }
+
+/// <summary>The outcomes of <see cref="GoalService.GetCalendarAsync"/>, in FR-023's check order (contracts/application-api.md).</summary>
+public enum GoalCalendarOutcome
+{
+    NotSignedIn,
+    NotForAdministrators,
+    NotFound,
+    RangeOutOfBounds,
+    Found,
+}
+
+/// <summary>
+/// The evaluation calendar of one of the acting user's own goals for a range of dates (FR-013), or the refusal. An unknown
+/// identifier and another account's goal give the same <see cref="GoalCalendarOutcome.NotFound"/> (FR-020).
+/// </summary>
+public sealed class GoalCalendarResult
+{
+    private GoalCalendarResult(GoalCalendarOutcome outcome, string? message, GoalCalendarView? calendar)
+    {
+        Outcome = outcome;
+        Message = message;
+        Calendar = calendar;
+    }
+
+    public GoalCalendarOutcome Outcome { get; }
+
+    /// <summary>The refusal's text; null for <see cref="GoalCalendarOutcome.Found"/>.</summary>
+    public string? Message { get; }
+
+    /// <summary>Set only for <see cref="GoalCalendarOutcome.Found"/>.</summary>
+    public GoalCalendarView? Calendar { get; }
+
+    internal static GoalCalendarResult Refused(GoalCalendarOutcome outcome, string message) => new(outcome, message, null);
+
+    internal static GoalCalendarResult Found(GoalCalendarView calendar) => new(GoalCalendarOutcome.Found, null, calendar);
+}

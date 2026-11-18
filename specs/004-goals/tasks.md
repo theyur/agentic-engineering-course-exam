@@ -645,7 +645,7 @@ weeks, including a clock-change day (US4-AS1 to AS5).
 
 ### Tests for User Story 4
 
-- [ ] T073 [P] [US4] Create `tests/HT.UnitTests/Application/Goals/GoalCalendarTests.cs` for `GetCalendarAsync`, through `FakeGoalStore` (depends on T075):
+- [X] T073 [P] [US4] Create `tests/HT.UnitTests/Application/Goals/GoalCalendarTests.cs` for `GetCalendarAsync`, through `FakeGoalStore` (depends on T075):
   - US4-AS1 to AS3 with UTC instant literals;
   - US4-AS5: a clock-change day lasts 23 or 25 hours, with a goal starting within 365 days of a fixed "now" in November 2026;
   - US4-AS6: an empty calendar;
@@ -653,11 +653,11 @@ weeks, including a clock-change day (US4-AS1 to AS5).
   - FR-013's "weeks that overlap the range": a per-week goal read from a Wednesday to the Tuesday after gives both weeks, each whole from Monday to Sunday, and a range inside one week gives that one week;
   - `Commitments` filled for a commitment-based goal and `Periods` for a period-based one;
   - US4-AS4 for reading: `FirstWeekStarts` is the Monday after a Wednesday start, or the start date itself when it is a Monday.
-- [ ] T074 [P] [US4] Create `tests/HT.IntegrationTests/Goals/GoalCalendarTests.cs` on `HT-IT` (US10-AS3): a goal of an account registered with `Europe/Kyiv`, created through `GoalService`, whose calendar gives Kyiv midnights as UTC literals over a range that includes 2027-03-28 (depends on T075)
+- [X] T074 [P] [US4] Create `tests/HT.IntegrationTests/Goals/GoalCalendarTests.cs` on `HT-IT` (US10-AS3): a goal of an account registered with `Europe/Kyiv`, created through `GoalService`, whose calendar gives Kyiv midnights as UTC literals over a range that includes 2027-03-28 (depends on T075)
 
 ### Implementation for User Story 4
 
-- [ ] T075 [US4] Add `GoalCalendarOutcome` and `GoalCalendarResult` to `src/HT.Application/Goals/GoalResults.cs`, and `GetCalendarAsync` to `GoalService.cs`. It follows FR-023's order (not signed in, role, goal identifier, range), then maps `GoalTimeline.TryCalendar` into `GoalCalendarView` (FR-012, FR-013, FR-027) (depends on T068)
+- [X] T075 [US4] Add `GoalCalendarOutcome` and `GoalCalendarResult` to `src/HT.Application/Goals/GoalResults.cs`, and `GetCalendarAsync` to `GoalService.cs`. It follows FR-023's order (not signed in, role, goal identifier, range), then maps `GoalTimeline.TryCalendar` into `GoalCalendarView` (FR-012, FR-013, FR-027) (depends on T068)
 
 **Checkpoint**: full suite green, with SC-003's boundary tests (T032, T033, T073). Commit.
 

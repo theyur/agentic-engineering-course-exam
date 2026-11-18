@@ -8,7 +8,7 @@ using HT.Domain.Time;
 namespace HT.Application.Goals;
 
 /// <summary>
-/// Personal goals for registered users (FR-001 to FR-016, FR-018, FR-020 to FR-023, FR-034; research R-06 to R-08). Every use
+/// Personal goals for registered users (FR-001 to FR-016, FR-018, FR-020 to FR-023, FR-027, FR-034; research R-06 to R-08). Every use
 /// case takes the acting user first and checks in FR-023's order: signed in, not an administrator, the acting user's
 /// account, the identifiers, then the fields. Every store call passes the acting user's account as the owner, so a
 /// use case acts only on that user's own goals (constitution III). "Today" is the date in the account's time zone at
@@ -232,6 +232,36 @@ public sealed class GoalService
         }
 
         return GoalReadResult.Found(DetailsOf(stored, _clock.GetUtcNow()));
+    }
+
+    /// <summary>
+    /// The evaluation calendar of one of the acting user's goals from <paramref name="first"/> to <paramref name="last"/>,
+    /// both included (FR-012, FR-013, FR-027), checking in FR-023's order: signed in, not an administrator, the goal
+    /// identifier (an unknown goal and another account's goal both give "This goal does not exist.", FR-020), then the
+    /// range (1 to 366 days). Each commitment or period starts and ends at midnight in the time zone of its own version,
+    /// in UTC instants. It reads no clock: the calendar depends only on the goal and the range.
+    /// </summary>
+    public async Task<GoalCalendarResult> GetCalendarAsync(
+        ActingUser actingUser, GoalId id, DateOnly first, DateOnly last, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await AccessAsync(actingUser, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return GoalCalendarResult.Refused(refusal == AccessRefusal.NotSignedIn ? GoalCalendarOutcome.NotSignedIn : GoalCalendarOutcome.NotForAdministrators, access.Message!);
+        }
+
+        if (await _goals.FindAsync(access.Owner, id, cancellationToken).ConfigureAwait(false) is not { } stored)
+        {
+            return GoalCalendarResult.Refused(GoalCalendarOutcome.NotFound, GoalTexts.NotFound);
+        }
+
+        if (!GoalTimeline.TryCalendar(stored.Goal, first, last, out var calendar))
+        {
+            return GoalCalendarResult.Refused(GoalCalendarOutcome.RangeOutOfBounds, GoalTexts.RangeOutOfBounds);
+        }
+
+        return GoalCalendarResult.Found(new GoalCalendarView(calendar.Kind, calendar.Commitments, calendar.Periods));
     }
 
     /// <summary>The list fields of FR-015 and FR-014 at <paramref name="now"/>.</summary>
