@@ -69,6 +69,10 @@ public sealed class PreSliceAccountMigrationTests(MigrationDatabaseFixture datab
         Assert.Equal(((string?)null, 0), await AccountStateAsync(database.ConnectionString, owner));
         Assert.Equal("Europe/Kyiv", await ReadTimeZoneAsync(provider, owner));
 
+        // US11-AS6's second half: the account's own profile has no name and no "member since" (FR-030).
+        var profile = await ReadProfileAsync(provider, owner);
+        Assert.Equal(((string?)null, Email, (string?)null), (profile.Name, profile.Email, profile.MemberSince));
+
         var habit = await CatalogHabitAsync(provider, "It-Mi Pre-slice catalog");
         await using (var scope = provider.CreateAsyncScope())
         {
@@ -83,6 +87,16 @@ public sealed class PreSliceAccountMigrationTests(MigrationDatabaseFixture datab
 
         Assert.Equal(((string?)"Europe/Kyiv", 1), await AccountStateAsync(database.ConnectionString, owner));
         Assert.Equal("Europe/Kyiv", await ReadTimeZoneAsync(provider, owner));
+    }
+
+    /// <summary>The account's own profile as <see cref="ProfileService.GetProfileAsync"/> gives it to the account itself (T114).</summary>
+    private static async Task<ProfileView> ReadProfileAsync(IServiceProvider provider, AccountId owner)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<ProfileService>()
+            .GetProfileAsync(ActingUser.ForAccount(owner, Role.RegisteredUser), CancellationToken.None);
+        Assert.Equal(ProfileReadOutcome.Found, result.Outcome);
+        return result.Profile!;
     }
 
     /// <summary>The account's time zone as <see cref="ProfileService.GetTimeZoneAsync"/> gives it to the account itself (T107).</summary>

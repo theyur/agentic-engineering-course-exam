@@ -47,7 +47,7 @@
                         <button type="button" class="ht-avatar ht-avatar-btn" id="@AccountButtonId"
                                 aria-label="@("Account menu for " + _email)" aria-haspopup="true"
                                 aria-expanded="@AriaBool(_open == Menu.Account)" aria-controls="@AccountMenuId"
-                                @ref="_accountButton" @onclick="() => Toggle(Menu.Account)">@Avatar.LetterOf(_email)</button>
+                                @ref="_accountButton" @onclick="() => Toggle(Menu.Account)">@Avatar.LetterOf(_name, _email)</button>
                         @if (_open == Menu.Account)
                         {
                             <div class="ht-popover" id="@AccountMenuId">
@@ -114,6 +114,7 @@
 
     private Menu _open;
     private string? _email;
+    private string? _name;
     private bool _isAdministrator;
     private bool _isRegisteredUser;
     private ElementReference _accountButton;
@@ -158,6 +159,9 @@
         var wasSignedIn = _email is not null;
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
         _email = user?.Identity?.IsAuthenticated == true ? user.Identity.Name ?? string.Empty : null;
+
+        // The avatar letter follows the account name in the cookie (HP-017); a name change refreshes the cookie.
+        _name = AccountClaims.NameOf(user);
         _isAdministrator = _email is not null && user!.IsInRole(nameof(Role.Administrator));
         _isRegisteredUser = _email is not null && user!.IsInRole(nameof(Role.RegisteredUser));
 

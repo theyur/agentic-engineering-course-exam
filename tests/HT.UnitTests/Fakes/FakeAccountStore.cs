@@ -33,6 +33,9 @@ public sealed class FakeAccountStore : IAccountStore
     /// <summary>Calls of <see cref="CreateAsync"/>.</summary>
     public int CreateCount { get; private set; }
 
+    /// <summary>Calls of <see cref="TrySetNameAsync"/>.</summary>
+    public int NameWriteCount { get; private set; }
+
     /// <summary>
     /// Off by default. When on, <see cref="FindByIdAsync"/> of an identifier no account has answers a registered user
     /// with no stored time zone, no name and no creation time, and keeps it, so a later write (a goal's first time
@@ -99,10 +102,17 @@ public sealed class FakeAccountStore : IAccountStore
 
     /// <summary>
     /// Adds an account directly, for arranging a test. <paramref name="timeZone"/> is its stored time zone; null is an
-    /// account created before slice 4, which has the installation's default.
+    /// account created before slice 4, which has the installation's default. <paramref name="name"/> and
+    /// <paramref name="createdAt"/> are its stored name and creation time (null for none).
     /// </summary>
     public Account Add(
-        string email, string password, Role role = Role.RegisteredUser, SignInBlock? block = null, string? timeZone = null)
+        string email,
+        string password,
+        Role role = Role.RegisteredUser,
+        SignInBlock? block = null,
+        string? timeZone = null,
+        string? name = null,
+        DateTimeOffset? createdAt = null)
     {
         if (!Email.TryParse(email, out var parsed))
         {
@@ -114,6 +124,8 @@ public sealed class FakeAccountStore : IAccountStore
             var account = new Account(new AccountId(Guid.NewGuid()), parsed, role, block ?? SignInBlock.None)
             {
                 StoredTimeZone = timeZone,
+                Name = name,
+                CreatedAt = createdAt,
             };
             _byEmail.Add(parsed, new Entry(account, password));
             return account;
@@ -304,6 +316,22 @@ public sealed class FakeAccountStore : IAccountStore
 
             entry.Account = entry.Account with { SignInBlock = next };
             SuccessfulSaveCount++;
+            return Task.FromResult(true);
+        }
+    }
+
+    public Task<bool> TrySetNameAsync(AccountId id, AccountName? name, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            NameWriteCount++;
+            var entry = FindEntry(id);
+            if (entry is null)
+            {
+                return Task.FromResult(false);
+            }
+
+            entry.Account = entry.Account with { Name = name?.Value };
             return Task.FromResult(true);
         }
     }

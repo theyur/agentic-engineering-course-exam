@@ -4,7 +4,10 @@
    The error goes into the form's validation messages, so InputText sets aria-invalid itself. The account forms
    take their refusals from the use cases, so they submit with OnSubmit, not OnValidSubmit. *@
 <label class="ht-field">
-    <span class="ht-field__label">@Label</span>
+    <span class="ht-field__label">@Label@(Optional ? " " : null)@if (Optional)
+        {
+            <span class="ht-muted">(optional)</span>
+        }</span>
     <InputText id="@Id"
                type="@Type"
                class="ht-input"
@@ -31,6 +34,10 @@
 
     [Parameter, EditorRequired]
     public string Label { get; set; } = string.Empty;
+
+    /// <summary>Adds "(optional)" after the label.</summary>
+    [Parameter]
+    public bool Optional { get; set; }
 
     /// <summary>Why or where the value is used, or the rule it must meet.</summary>
     [Parameter]

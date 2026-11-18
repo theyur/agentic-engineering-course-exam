@@ -208,6 +208,9 @@ public sealed class AccountStoreTests(DatabaseFixture database)
         public Task<bool> TrySaveSignInBlockAsync(
             AccountId accountId, SignInBlock expected, SignInBlock next, PasswordVersion? passwordVersion, CancellationToken cancellationToken) =>
             inner.TrySaveSignInBlockAsync(accountId, expected, next, passwordVersion, cancellationToken);
+
+        public Task<bool> TrySetNameAsync(AccountId accountId, AccountName? name, CancellationToken cancellationToken) =>
+            inner.TrySetNameAsync(accountId, name, cancellationToken);
     }
 
     private static Email EmailOf(string text) =>

@@ -51,6 +51,46 @@ public sealed class SharedComponentTests : BunitContext
     }
 
     [Fact]
+    public void Avatar_with_a_name_shows_the_first_letter_of_the_name_and_keeps_the_email_label()
+    {
+        var cut = Render<Avatar>(p => p.Add(x => x.Email, "ana@example.com").Add(x => x.Name, "yuri").Add(x => x.Large, true));
+
+        var avatar = cut.Find(".ht-avatar.ht-avatar--lg");
+        Assert.Equal("Y", avatar.TextContent);
+        Assert.Equal("Account of ana@example.com", avatar.GetAttribute("aria-label"));
+    }
+
+    [Theory]
+    [InlineData("Yuri", "ana@example.com", "Y")]
+    [InlineData("yuri", "ana@example.com", "Y")]
+    [InlineData("élodie", "ana@example.com", "É")]
+    [InlineData(null, "ana@example.com", "A")]
+    [InlineData("", "ana@example.com", "A")]
+    [InlineData(null, "", "")]
+    public void LetterOf_takes_the_first_letter_of_the_name_or_of_the_email_upper_cased_invariantly(
+        string? name, string email, string letter)
+    {
+        Assert.Equal(letter, Avatar.LetterOf(name, email));
+    }
+
+    [Fact]
+    public void LetterOf_does_not_follow_the_current_culture()
+    {
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+
+            // Turkish upper-cases "i" as "İ"; the invariant rule keeps "I".
+            Assert.Equal("I", Avatar.LetterOf("ira", "ana@example.com"));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+        }
+    }
+
+    [Fact]
     public void EmptyState_renders_its_heading_and_text()
     {
         var cut = Render<EmptyState>(p => p

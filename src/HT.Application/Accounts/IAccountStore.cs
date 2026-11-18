@@ -37,4 +37,10 @@ public interface IAccountStore
     /// </summary>
     Task<bool> TrySaveSignInBlockAsync(
         AccountId id, SignInBlock expected, SignInBlock next, PasswordVersion? passwordVersion, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sets the account's own name, or removes it when <paramref name="name"/> is null (FR-028); false when there is no
+    /// such account. Used only with the acting user's own identifier.
+    /// </summary>
+    Task<bool> TrySetNameAsync(AccountId id, AccountName? name, CancellationToken cancellationToken);
 }

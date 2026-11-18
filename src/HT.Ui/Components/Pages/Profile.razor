@@ -7,7 +7,7 @@
 @using HT.Ui.Components.Account
 @using Microsoft.AspNetCore.Authorization
 @inject ActingUserAccessor ActingUsers
-@inject AccountService AccountService
+@inject ProfileService Profiles
 @inject CustomHabitService CustomHabits
 @inject AccountSession AccountSession
 @inject NavigationManager Navigation
@@ -17,17 +17,17 @@
    only, without Tabs (HP-014). The page stays static, so the change-password form keeps working. An anonymous
    request never gets here: the endpoint's [Authorize] sends it to Sign in (HP-008). After a change the session
    that made it is re-issued with the new security stamp (HP-007). Slice 4 (HP-015): the Account card has the
-   "Time zone" form before "Change password", for every account. *@
+   "Time zone" form before "Change password", for every account. HP-017: the header shows the name as its h1 when the
+   account has one, then the email and "member since …" when known; the Account card starts with the "Name" form. *@
 <PageTitle>Profile · Habit Tracker</PageTitle>
 
-@if (_details is { } details)
+@if (_profile is { } profile)
 {
     <div class="ht-container">
         <div class="ht-page-head ht-profile-head">
-            <Avatar Email="@details.Email" Large="true" />
+            <Avatar Email="@profile.Email" Name="@profile.Name" Large="true" />
             <div>
-                <h1>@details.Email</h1>
-                <span class="ht-muted">Profile</span>
+                <h1>@(profile.Name ?? profile.Email)</h1><span class="ht-muted">@HeadLine(profile)</span>
             </div>
         </div>
         @if (_customHabits is not null)
@@ -73,8 +73,9 @@
                 <section class="ht-card">
                     <h2 class="ht-card__title">Account</h2>
                     <div class="ht-form-section">
-                        <dl class="ht-kv"><dt>Email</dt><dd>@details.Email</dd></dl>
+                        <KeyValue Rows="@([new KeyValue.Row("Email", profile.Email)])" />
                     </div>
+                    <NameForm ActingUser="_actingUser" CurrentName="@profile.Name" OnChanged="NameChangedAsync" />
                     <TimeZoneForm ActingUser="_actingUser" />
                     <ChangePasswordForm ActingUser="_actingUser" OnSucceeded="RefreshSessionAsync" />
                 </section>
@@ -87,7 +88,7 @@
     private const string CustomHabitsTab = "custom-habits";
 
     private ActingUser _actingUser = ActingUser.Anonymous;
-    private AccountDetails? _details;
+    private ProfileView? _profile;
     private IReadOnlyList<CustomHabitView>? _customHabits;
 
     /// <summary>"custom-habits" opens the Custom habits tab; anything else is Account.</summary>
@@ -105,17 +106,35 @@
     protected override async Task OnInitializedAsync()
     {
         _actingUser = await ActingUsers.GetAsync();
-        var result = await AccountService.GetAccountDetailsAsync(_actingUser, CancellationToken.None);
-        if (result.Outcome != AccountDetailsOutcome.Found)
+        var result = await Profiles.GetProfileAsync(_actingUser, CancellationToken.None);
+        if (result.Outcome != ProfileReadOutcome.Found)
         {
             Navigation.NavigateTo("/sign-in?returnUrl=%2Fprofile");
             return;
         }
 
-        _details = result.AccountDetails;
+        _profile = result.Profile;
         var custom = await CustomHabits.ListAsync(_actingUser, CancellationToken.None);
         _customHabits = custom.Outcome == CustomHabitListOutcome.Found ? custom.Habits : null;
     }
 
+    // The muted line of the header (design/pages/PageProfile, slice 4): with a name, the email and "member since" when
+    // known; without one, "member since" or, for an account created before slice 4, "Profile" as in slice 1.
+    private static string HeadLine(ProfileView profile) =>
+        profile.Name is not null
+            ? profile.MemberSince is { } since ? profile.Email + " · " + since : profile.Email
+            : profile.MemberSince ?? "Profile";
+
     private Task RefreshSessionAsync(PasswordChangeResult result) => AccountSession.RefreshSignInAsync(_actingUser);
+
+    // After a name change the header is read again and the cookie re-issued, so the avatar letter follows (HP-017).
+    private async Task NameChangedAsync()
+    {
+        if ((await Profiles.GetProfileAsync(_actingUser, CancellationToken.None)).Profile is { } profile)
+        {
+            _profile = profile;
+        }
+
+        await AccountSession.RefreshSignInAsync(_actingUser);
+    }
 }

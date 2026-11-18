@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using HT.Application.Accounts;
 using HT.Domain.Accounts;
 using HT.Domain.Habits;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using static HT.UnitTests.Fakes.HabitSamples;
 
@@ -10,7 +11,8 @@ namespace HT.UiTests.Host;
 
 /// <summary>
 /// US3-AS6, US6-AS8, US6-AS11, HP-007, HP-008, HP-014 (slice 1); slice 2's HP-008 and US4-AS14 (the Tabs for
-/// registered users): Profile through the real host.
+/// registered users); slice 4's HP-015 (the time zone) and HP-017, US11 (the name, the header and the avatar letter):
+/// Profile through the real host. The name tests use emails "ui-pr-…" and names "Ui-Pr …".
 /// </summary>
 [Collection(HostCollection.Name)]
 public sealed partial class ProfilePageTests(HostFixture host)
@@ -31,7 +33,7 @@ public sealed partial class ProfilePageTests(HostFixture host)
     }
 
     [Fact]
-    public async Task US6_AS11_profile_shows_the_avatar_letter_and_the_email_and_no_member_since()
+    public async Task US6_AS11_profile_shows_the_avatar_letter_and_the_email_and_since_slice_4_the_member_since_line()
     {
         await host.CreateAccountAsync("ana.profile@example.com", Password);
         using var browser = host.CreateBrowser();
@@ -42,11 +44,195 @@ public sealed partial class ProfilePageTests(HostFixture host)
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("aria-label=\"Account of ana.profile@example.com\">A</span>", html, StringComparison.Ordinal);
-        Assert.Contains("<h1>ana.profile@example.com</h1>", html, StringComparison.Ordinal);
-        Assert.Contains("<dt>Email</dt><dd>ana.profile@example.com</dd>", html, StringComparison.Ordinal);
+        Assert.Contains(
+            "<h1>ana.profile@example.com</h1><span class=\"ht-muted\">member since November 2026</span>", html, StringComparison.Ordinal);
+        AssertEmailRow(html, "ana.profile@example.com");
         Assert.Contains("Change password", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("member since", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Goal history", html, StringComparison.Ordinal);
+    }
+
+    // ---- The name (HP-017, US11) -----------------------------------------------------------------------------------
+
+    private const string NameNotice = "Your name is changed.";
+
+    private static string? FirstHeadingOf(string html) =>
+        FirstHeadingPattern().Match(html) is { Success: true } match ? WebUtility.HtmlDecode(match.Groups["text"].Value) : null;
+
+    private static string? NavLetterOf(string html) =>
+        NavLetterPattern().Match(html) is { Success: true } match ? match.Groups["letter"].Value : null;
+
+    private static string? NameValueOf(string html) =>
+        NameValuePattern().Match(html) is { Success: true } match ? WebUtility.HtmlDecode(match.Groups["value"].Value) : null;
+
+    /// <summary>The Profile header's h1 and muted line, decoded (the encoder writes "·" as a character reference).</summary>
+    private static (string Heading, string Line) HeaderOf(string html)
+    {
+        var match = HeaderPattern().Match(html);
+        Assert.True(match.Success, "The Profile header has an h1 and a muted line.");
+        return (WebUtility.HtmlDecode(match.Groups["heading"].Value), WebUtility.HtmlDecode(match.Groups["line"].Value));
+    }
+
+    /// <summary>The KeyValue row "Email" with the account's email (T120: KeyValue writes it, with whitespace between rows).</summary>
+    private static void AssertEmailRow(string html, string email) =>
+        Assert.Matches(@"<dl class=""ht-kv"">\s*<dt>Email</dt>\s*<dd>" + Regex.Escape(email) + @"</dd>\s*</dl>", html);
+
+    private async Task<string> NamedAccountAsync(string prefix, string? name, Role role = Role.RegisteredUser)
+    {
+        var email = $"{prefix}.{Guid.NewGuid():N}@example.com";
+        await host.CreateAccountAsync(email, Password, role, name: name);
+        return email;
+    }
+
+    private async Task ClearCreatedAtAsync(string email)
+    {
+        await using var connection = new SqlConnection(host.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand("UPDATE [AspNetUsers] SET [CreatedAt] = NULL WHERE [UserName] = @email", connection);
+        command.Parameters.AddWithValue("@email", email);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
+    private async Task<string?> StoredNameAsync(string email)
+    {
+        Assert.True(Email.TryParse(email, out var parsed));
+        await using var scope = host.Services.CreateAsyncScope();
+        return (await scope.ServiceProvider.GetRequiredService<IAccountStore>().FindByEmailAsync(parsed, CancellationToken.None))?.Name;
+    }
+
+    [Theory]
+    [InlineData(Role.RegisteredUser)]
+    [InlineData(Role.Administrator)]
+    public async Task HP_017_with_a_name_the_header_has_the_name_as_its_first_heading_then_the_email_and_member_since(Role role)
+    {
+        var email = await NamedAccountAsync("ui-pr-named", "yuri Ui-Pr", role);
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+
+        var (status, html) = await browser.GetPageAsync("/profile");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Equal("yuri Ui-Pr", FirstHeadingOf(html));
+        Assert.Equal(("yuri Ui-Pr", $"{email} · member since November 2026"), HeaderOf(html));
+        Assert.Contains($"aria-label=\"Account of {email}\">Y</span>", html, StringComparison.Ordinal);
+        Assert.Equal("Y", NavLetterOf(html));
+        AssertEmailRow(html, email);
+    }
+
+    [Fact]
+    public async Task HP_017_without_a_name_the_email_stays_the_heading_with_member_since()
+    {
+        var email = await NamedAccountAsync("ui-pr-unnamed", null);
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+
+        var (_, html) = await browser.GetPageAsync("/profile");
+
+        Assert.Equal(email, FirstHeadingOf(html));
+        Assert.Contains($"<h1>{email}</h1><span class=\"ht-muted\">member since November 2026</span>", html, StringComparison.Ordinal);
+        Assert.Equal("U", NavLetterOf(html));
+    }
+
+    [Theory]
+    [InlineData("Olena Ui-Pr", "Olena Ui-Pr", true)]
+    [InlineData(null, null, false)]
+    public async Task HP_017_an_account_created_before_slice_4_has_no_member_since(string? name, string? heading, bool withName)
+    {
+        var email = await NamedAccountAsync("ui-pr-pre-slice", name);
+        await ClearCreatedAtAsync(email);
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+
+        var (_, html) = await browser.GetPageAsync("/profile");
+
+        var expected = withName
+            ? $"<h1>{heading}</h1><span class=\"ht-muted\">{email}</span>"
+            : $"<h1>{email}</h1><span class=\"ht-muted\">Profile</span>";
+        Assert.Contains(expected, html, StringComparison.Ordinal);
+        Assert.DoesNotContain("member since", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HP_017_the_Account_tab_has_the_Name_form_before_the_Time_zone_form_with_the_current_name()
+    {
+        var email = await NamedAccountAsync("ui-pr-form", "Ui-Pr Form");
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+
+        var form = await browser.GetFormAsync("/profile", "name");
+        var html = form.Html;
+
+        Assert.Contains("<span class=\"ht-field__label\">Name <span class=\"ht-muted\">(optional)</span></span>", html, StringComparison.Ordinal);
+        Assert.Contains("<span class=\"ht-field__help\" id=\"profile-name-help\">Only you can see it. Home uses it to greet you.</span>", html, StringComparison.Ordinal);
+        Assert.Equal("Ui-Pr Form", NameValueOf(html));
+        var nameForm = html.IndexOf("id=\"profile-name\"", StringComparison.Ordinal);
+        var emailRow = html.IndexOf("<dt>Email</dt>", StringComparison.Ordinal);
+        var zoneForm = html.IndexOf("Time zone</span>", StringComparison.Ordinal);
+        Assert.True(emailRow >= 0 && nameForm > emailRow && zoneForm > nameForm, "The email, then Name, then Time zone.");
+        Assert.DoesNotContain(NameNotice, html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HP_017_a_name_change_shows_the_Notice_the_new_header_and_after_the_cookie_refresh_the_new_letter()
+    {
+        var email = await NamedAccountAsync("ui-pr-change", null);
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+        var form = await browser.GetFormAsync("/profile", "name");
+        Assert.Equal("U", NavLetterOf(form.Html));
+
+        using (var response = await browser.PostFormAsync("/profile", form, [new("Input.Name", "  bohdan Ui-Pr  ")]))
+        {
+            var html = await response.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains($"<div class=\"ht-notice\" role=\"status\"><span>{NameNotice}</span></div>", html, StringComparison.Ordinal);
+            Assert.Equal("bohdan Ui-Pr", FirstHeadingOf(html));
+            Assert.Contains($"aria-label=\"Account of {email}\">B</span>", html, StringComparison.Ordinal);
+            Assert.Equal("bohdan Ui-Pr", NameValueOf(html));
+            Assert.NotNull(response.SetCookieAttributes(".AspNetCore.Identity.Application"));
+        }
+
+        Assert.Equal("bohdan Ui-Pr", await StoredNameAsync(email));
+        var (_, after) = await browser.GetPageAsync("/profile");
+        Assert.Equal("B", NavLetterOf(after));
+        Assert.DoesNotContain(NameNotice, after, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HP_017_an_empty_name_removes_the_name_and_the_email_is_the_heading_again()
+    {
+        var email = await NamedAccountAsync("ui-pr-remove", "Ui-Pr Remove");
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+        var form = await browser.GetFormAsync("/profile", "name");
+
+        using var response = await browser.PostFormAsync("/profile", form, [new("Input.Name", "   ")]);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains(NameNotice, html, StringComparison.Ordinal);
+        Assert.Equal(email, FirstHeadingOf(html));
+        Assert.Null(await StoredNameAsync(email));
+        var (_, after) = await browser.GetPageAsync("/profile");
+        Assert.Equal("U", NavLetterOf(after));
+    }
+
+    [Fact]
+    public async Task US11_AS2_a_name_of_61_characters_shows_the_refusal_under_the_field_and_changes_nothing()
+    {
+        var email = await NamedAccountAsync("ui-pr-long", "Ui-Pr Long");
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+        var form = await browser.GetFormAsync("/profile", "name");
+        var name = new string('n', 61);
+
+        using var response = await browser.PostFormAsync("/profile", form, [new("Input.Name", name)]);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains(
+            "<span class=\"ht-field__error\" id=\"profile-name-error\">The name can have at most 60 characters.</span>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(NameNotice, html, StringComparison.Ordinal);
+        Assert.Equal(name, NameValueOf(html));
+        Assert.Equal("Ui-Pr Long", FirstHeadingOf(html));
+        Assert.Equal("Ui-Pr Long", await StoredNameAsync(email));
     }
 
     [Fact]
@@ -62,7 +248,7 @@ public sealed partial class ProfilePageTests(HostFixture host)
         Assert.Contains("<nav class=\"ht-tabs\" aria-label=\"Profile sections\">"
             + "<a class=\"ht-tab\" href=\"/profile\" aria-current=\"page\">Account</a>"
             + "<a class=\"ht-tab\" href=\"/profile?tab=custom-habits\">Custom habits</a></nav>", html, StringComparison.Ordinal);
-        Assert.Contains("<dt>Email</dt><dd>tabs.profile@example.com</dd>", html, StringComparison.Ordinal);
+        AssertEmailRow(html, "tabs.profile@example.com");
         Assert.Contains("Change password", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Private habits for your own goals.", html, StringComparison.Ordinal);
     }
@@ -124,7 +310,7 @@ public sealed partial class ProfilePageTests(HostFixture host)
 
         Assert.Equal(HttpStatusCode.OK, status);
         Assert.Contains($"<h1>{email}</h1>", html, StringComparison.Ordinal);
-        Assert.Contains($"<dt>Email</dt><dd>{email}</dd>", html, StringComparison.Ordinal);
+        AssertEmailRow(html, email);
         Assert.Contains("Change password", html, StringComparison.Ordinal);
         Assert.DoesNotContain("ht-tabs", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Custom habits", html, StringComparison.Ordinal);
@@ -316,6 +502,18 @@ public sealed partial class ProfilePageTests(HostFixture host)
 
     [GeneratedRegex("""<option value="(?<value>[^"]*)" selected[^>]*>""")]
     private static partial Regex SelectedPattern();
+
+    [GeneratedRegex("""<h1[^>]*>(?<text>[^<]*)</h1>""")]
+    private static partial Regex FirstHeadingPattern();
+
+    [GeneratedRegex("""<div class="ht-page-head ht-profile-head">.*?<h1>(?<heading>[^<]*)</h1><span class="ht-muted">(?<line>[^<]*)</span>""", RegexOptions.Singleline)]
+    private static partial Regex HeaderPattern();
+
+    [GeneratedRegex("""id="account-menu-button"[^>]*>(?<letter>[^<]*)</button>""")]
+    private static partial Regex NavLetterPattern();
+
+    [GeneratedRegex("""<input[^>]*id="profile-name"[^>]*value="(?<value>[^"]*)"|<input[^>]*value="(?<value>[^"]*)"[^>]*id="profile-name"[^>]*>""")]
+    private static partial Regex NameValuePattern();
 
     private static string? RedirectTarget(HttpResponseMessage response, HttpClient browser) =>
         response.Headers.Location is { } location ? new Uri(browser.BaseAddress!, location).AbsoluteUri : null;

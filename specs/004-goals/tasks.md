@@ -935,7 +935,7 @@ each greeting boundary (US11-AS1, AS3).
 
 ### Tests for User Story 11
 
-- [ ] T112 [P] [US11] Create `tests/HT.UnitTests/Application/Accounts/ProfileNameTests.cs` (depends on T116):
+- [X] T112 [P] [US11] Create `tests/HT.UnitTests/Application/Accounts/ProfileNameTests.cs` (depends on T116):
   - US11-AS1 and AS2 for `ChangeNameAsync`: trimmed, spaces only remove the name, 60 accepted, and 61 gives the refusal with nothing changed;
   - `GetProfileAsync` gives the name, the email and `MemberSince`:
     - US11-AS6: "member since November 2026" for an account created on 17 November 2026 in Kyiv;
@@ -943,32 +943,32 @@ each greeting boundary (US11-AS1, AS3).
     - a null `CreatedAt` gives none;
   - US11-AS7: an administrator sets and reads their own name;
   - US11-AS8: an anonymous visitor gets "You are not signed in.".
-- [ ] T113 [P] [US11] Create `tests/HT.UnitTests/Application/Accounts/HomeHeadingTests.cs` for `GetHomeHeadingAsync` (depends on T116):
+- [X] T113 [P] [US11] Create `tests/HT.UnitTests/Application/Accounts/HomeHeadingTests.cs` for `GetHomeHeadingAsync` (depends on T116):
   - US11-AS3: "Yuri" in Kyiv at 04:59, 05:00, 11:59, 12:00, 17:59 and 18:00, as UTC literals from `2026-11-18T02:59:00Z` on;
   - US11-AS4: "Good evening" without a name;
   - US11-AS5: at `2026-11-16T23:30:00Z` in Kyiv, "Tuesday, 17 November" and "Good evening";
   - the same results inside a non-English `CultureScope`;
   - an anonymous visitor's refusal.
-- [ ] T114 [P] [US11] Add the integration tests (depends on T115, T116, T117):
+- [X] T114 [P] [US11] Add the integration tests (depends on T115, T116, T117):
   - extend `tests/HT.IntegrationTests/Accounts/AccountProfileStoreTests.cs`: `TrySetNameAsync` round-trips, gives false for an unknown account, and a password change with a stale `HtUser` keeps the name;
   - extend `tests/HT.IntegrationTests/Accounts/ClaimsPrincipalFactoryTests.cs`: `ht:name` is present with a name and absent without one;
   - extend `tests/HT.IntegrationTests/Goals/PreSliceAccountMigrationTests.cs`: the pre-slice account's `GetProfileAsync` gives no name and no "member since" (HP-019, the API-untestable half of US11-AS6).
 
 ### Implementation for User Story 11
 
-- [ ] T115 [US11] Add `TrySetNameAsync(AccountId, AccountName?, …) → bool` to `IAccountStore`, to `AccountStore` (one `ExecuteUpdate` scoped by account) and to `FakeAccountStore`
-- [ ] T116 [US11] Add `ChangeNameAsync`, `GetProfileAsync` and `GetHomeHeadingAsync` to `src/HT.Application/Accounts/ProfileService.cs`, with `ProfileView` and `HomeHeading` (FR-028 to FR-030, research R-11; depends on T115, T103, T037):
+- [X] T115 [US11] Add `TrySetNameAsync(AccountId, AccountName?, …) → bool` to `IAccountStore`, to `AccountStore` (one `ExecuteUpdate` scoped by account) and to `FakeAccountStore`
+- [X] T116 [US11] Add `ChangeNameAsync`, `GetProfileAsync` and `GetHomeHeadingAsync` to `src/HT.Application/Accounts/ProfileService.cs`, with `ProfileView` and `HomeHeading` (FR-028 to FR-030, research R-11; depends on T115, T103, T037):
   - the greeting hour comes from `NamedTimeZone.TimeAt`, with the bands 05:00 to 11:59, 12:00 to 17:59 and the rest;
   - the date comes from `DateTexts.LongDate`, and "member since" from `MonthYear` of `CreatedAt` in the account's zone.
-- [ ] T117 [US11] In `src/HT.Persistence/Identity/HtUserClaimsPrincipalFactory.cs`, add the claim `ht:name` when the account has a name (depends on T045)
-- [ ] T118 [US11] Add `Avatar.LetterOf(string? name, string email)` to `src/HT.Ui/Components/Shared/Avatar.razor`: the first letter of the name, upper-cased with `char.ToUpperInvariant`, or of the email. `SiteNav.razor` and the Profile header read the name from `ht:name` (HP-017; depends on T117, T110)
-- [ ] T119 [US11] In `src/HT.Ui/Components/Pages/Home.razor`, replace the "Today" heading with the greeting as `heading-1` and the date from `GetHomeHeadingAsync`, for registered users and administrators (HP-010; depends on T116, T111)
-- [ ] T120 [US11] Add the name to the pages (HP-017; depends on T116, T118, T105):
+- [X] T117 [US11] In `src/HT.Persistence/Identity/HtUserClaimsPrincipalFactory.cs`, add the claim `ht:name` when the account has a name (depends on T045)
+- [X] T118 [US11] Add `Avatar.LetterOf(string? name, string email)` to `src/HT.Ui/Components/Shared/Avatar.razor`: the first letter of the name, upper-cased with `char.ToUpperInvariant`, or of the email. `SiteNav.razor` and the Profile header read the name from `ht:name` (HP-017; depends on T117, T110)
+- [X] T119 [US11] In `src/HT.Ui/Components/Pages/Home.razor`, replace the "Today" heading with the greeting as `heading-1` and the date from `GetHomeHeadingAsync`, for registered users and administrators (HP-010; depends on T116, T111)
+- [X] T120 [US11] Add the name to the pages (HP-017; depends on T116, T118, T105):
   - `src/HT.Ui/Components/Account/NameForm.razor` on the Profile Account tab, with the Notice "Your name is changed.";
   - after a name change, `Profile.razor` refreshes the session cookie as the password change does (`RefreshSessionAsync`), so TopNav shows the new letter;
   - the Profile header shows the name when set as its `h1`, then the email, and "member since …" when known; without a name the email stays the `h1`, as in T013's preview. KeyValue replaces the rows the page wrote as `.ht-kv` by hand. The smoke check reads the name from this `h1` (T131);
   - `RegisterForm.razor` gets the optional "Name" field.
-- [ ] T121 [P] [US11] Add the UI tests (depends on T118–T120):
+- [X] T121 [P] [US11] Add the UI tests (depends on T118–T120):
   - `LetterOf` cases in `tests/HT.UiTests/Components/Shared/SharedComponentTests.cs`;
   - `SiteNavTests.cs`: the avatar letter comes from the name, or from the email without one;
   - `HomeSignedInTests.cs`: the greeting is `heading-1`, followed by the date, for a registered user and an administrator, whose slice 1 "Today" expectation changes;

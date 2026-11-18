@@ -165,6 +165,17 @@ internal sealed class AccountStore : IAccountStore
         return rows == 1;
     }
 
+    // One statement scoped by account: Identity's full-row update never writes Name (research R-04), so a password
+    // change with a user loaded before this keeps the new name.
+    public async Task<bool> TrySetNameAsync(AccountId id, AccountName? name, CancellationToken cancellationToken)
+    {
+        var value = name?.Value;
+        var rows = await _db.Users.Where(u => u.Id == id.Value)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(u => u.Name, value), cancellationToken)
+            .ConfigureAwait(false);
+        return rows == 1;
+    }
+
     private static Account ToAccount(HtUser user)
     {
         if (!Email.TryParse(user.UserName, out var email))

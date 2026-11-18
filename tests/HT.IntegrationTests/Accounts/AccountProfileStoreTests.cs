@@ -154,4 +154,74 @@ public sealed class AccountProfileStoreTests(DatabaseFixture database)
         await using var check = database.CreateScope();
         Assert.NotNull(await check.ServiceProvider.GetRequiredService<IAccountStore>().CheckPasswordAsync(owner, "running34", CancellationToken.None));
     }
+
+    [Fact]
+    public async Task TrySetNameAsync_sets_and_removes_the_name_of_that_account_only()
+    {
+        const string email = "it-ap-set-name@example.com";
+        const string otherEmail = "it-ap-set-name-other@example.com";
+        await Sql.DeleteUserAsync(database.ConnectionString, email);
+        await Sql.DeleteUserAsync(database.ConnectionString, otherEmail);
+        Assert.True(AccountName.TryCreate("It-Ap Other", out var otherName, out _));
+        await using var scope = database.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IAccountStore>();
+        var owner = (await store.CreateAsync(EmailOf(email), Role.RegisteredUser, Password, TestProfiles.Utc, CancellationToken.None)).Account!.Id;
+        var other = (await store.CreateAsync(
+            EmailOf(otherEmail), Role.RegisteredUser, Password, TestProfiles.Utc with { Name = otherName }, CancellationToken.None)).Account!.Id;
+        Assert.True(AccountName.TryCreate("It-Ap Olena", out var name, out _));
+
+        Assert.True(await store.TrySetNameAsync(owner, name, CancellationToken.None));
+        Assert.Equal("It-Ap Olena", (await store.FindByIdAsync(owner, CancellationToken.None))!.Name);
+        Assert.Equal("It-Ap Olena", (string?)(await Sql.ReadUserAsync(database.ConnectionString, email))!["Name"]);
+
+        Assert.True(await store.TrySetNameAsync(owner, null, CancellationToken.None));
+        Assert.Null((await store.FindByIdAsync(owner, CancellationToken.None))!.Name);
+        Assert.Null((await Sql.ReadUserAsync(database.ConnectionString, email))!["Name"]);
+        Assert.Equal("It-Ap Other", (await store.FindByIdAsync(other, CancellationToken.None))!.Name);
+    }
+
+    [Fact]
+    public async Task TrySetNameAsync_gives_false_for_an_unknown_account()
+    {
+        Assert.True(AccountName.TryCreate("It-Ap Nobody", out var name, out _));
+        await using var scope = database.CreateScope();
+
+        var set = await scope.ServiceProvider.GetRequiredService<IAccountStore>()
+            .TrySetNameAsync(new AccountId(Guid.NewGuid()), name, CancellationToken.None);
+
+        Assert.False(set);
+    }
+
+    [Fact]
+    public async Task A_password_change_of_a_user_loaded_before_a_name_change_was_saved_keeps_the_new_name()
+    {
+        const string email = "it-ap-stale-name@example.com";
+        await Sql.DeleteUserAsync(database.ConnectionString, email);
+        Assert.True(AccountName.TryCreate("It-Ap Before", out var before, out _));
+        AccountId owner;
+        await using (var scope = database.CreateScope())
+        {
+            owner = (await scope.ServiceProvider.GetRequiredService<IAccountStore>()
+                .CreateAsync(EmailOf(email), Role.RegisteredUser, Password, TestProfiles.Utc with { Name = before }, CancellationToken.None)).Account!.Id;
+        }
+
+        await using var stale = database.CreateScope();
+        var users = stale.ServiceProvider.GetRequiredService<UserManager<HtUser>>();
+        var user = (await users.FindByIdAsync(owner.Value.ToString()))!;
+        Assert.Equal("It-Ap Before", user.Name);
+
+        await using (var other = database.CreateScope())
+        {
+            var result = await other.ServiceProvider.GetRequiredService<ProfileService>().ChangeNameAsync(
+                ActingUser.ForAccount(owner, Role.RegisteredUser), "  It-Ap After  ", CancellationToken.None);
+            Assert.Equal(NameChangeOutcome.Changed, result.Outcome);
+        }
+
+        var changed = await users.ChangePasswordAsync(user, Password, "running34");
+
+        Assert.True(changed.Succeeded);
+        Assert.Equal("It-Ap After", (string?)(await Sql.ReadUserAsync(database.ConnectionString, email))!["Name"]);
+        await using var check = database.CreateScope();
+        Assert.NotNull(await check.ServiceProvider.GetRequiredService<IAccountStore>().CheckPasswordAsync(owner, "running34", CancellationToken.None));
+    }
 }

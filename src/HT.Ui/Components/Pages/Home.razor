@@ -1,4 +1,5 @@
 @page "/"
+@using HT.Application.Accounts
 @using HT.Application.Goals
 @using HT.Application.Habits
 @using HT.Domain.Accounts
@@ -7,6 +8,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject CatalogService Catalog
 @inject GoalService GoalService
+@inject ProfileService Profiles
 @inject ActingUserAccessor ActingUsers
 @* One address for both Homes (HP-009). Static: the services are injected directly. The visitor Home: the hero,
    "How it works" and "Popular in the catalog" with the wording of design/pages/PageHomeVisitor, slice 2 state
@@ -15,11 +17,19 @@
 
 <AuthorizeView>
     <Authorized>
-        @* design/pages/PageHomeSignedIn, slice 4 state: the heading, and for a registered user with no goals the
-           EmptyState of the Goals page (HP-010); with goals nothing more until slice 6 (ADR 0008). An administrator's
-           Home keeps the heading only (slice 2 HP-013, HP-015). *@
+        @* design/pages/PageHomeSignedIn, slice 4 state: the greeting as heading-1 and today's date, both from the use
+           case at the current time in the account's time zone (HP-010, FR-029), and for a registered user with no goals
+           the EmptyState of the Goals page; with goals nothing more until slice 6 (ADR 0008). An administrator's Home
+           has the page head only. A session whose account is gone gets no greeting, only the slice 1 heading. *@
         <div class="ht-container">
-            <div class="ht-page-head"><h1>Today</h1></div>
+            @if (_heading?.Heading is { } heading)
+            {
+                <div class="ht-page-head"><h1>@heading.Greeting</h1><span class="ht-muted">@heading.Date</span></div>
+            }
+            else
+            {
+                <div class="ht-page-head"><h1>Today</h1></div>
+            }
             @if (_goals is { Outcome: GoalListOutcome.Found, Goals.Count: 0 })
             {
                 <NoGoalsEmptyState />
@@ -72,6 +82,7 @@
 @code {
     private HomePreviewResult? _preview;
     private GoalListResult? _goals;
+    private HomeHeadingResult? _heading;
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationState { get; set; }
@@ -83,10 +94,15 @@
         {
             _preview = await Catalog.GetHomePreviewAsync(CancellationToken.None);
         }
-        else if (!user.IsInRole(nameof(Role.Administrator)))
+        else
         {
-            // Whether the registered user has goals is the use case's answer; a refusal shows nothing more.
-            _goals = await GoalService.ListAsync(await ActingUsers.GetAsync(), CancellationToken.None);
+            var actingUser = await ActingUsers.GetAsync();
+            _heading = await Profiles.GetHomeHeadingAsync(actingUser, CancellationToken.None);
+            if (!user.IsInRole(nameof(Role.Administrator)))
+            {
+                // Whether the registered user has goals is the use case's answer; a refusal shows nothing more.
+                _goals = await GoalService.ListAsync(actingUser, CancellationToken.None);
+            }
         }
     }
 }

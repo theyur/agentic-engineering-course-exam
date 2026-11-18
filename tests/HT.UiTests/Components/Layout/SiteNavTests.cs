@@ -136,6 +136,32 @@ public sealed class SiteNavTests : BunitContext
         Assert.Equal(SiteNav.AccountMenuId, avatar.GetAttribute("aria-controls"));
     }
 
+    [Theory]
+    [InlineData("RegisteredUser", "yuri", "Y")]
+    [InlineData("Administrator", "élodie", "É")]
+    [InlineData("RegisteredUser", "Bohdan", "B")]
+    public void HP_017_the_avatar_shows_the_first_letter_of_the_account_name_in_upper_case(string role, string name, string letter)
+    {
+        SignIn(role);
+        _authorization.SetClaims(new System.Security.Claims.Claim("ht:name", name));
+        var cut = Render<SiteNav>();
+
+        var avatar = cut.Find(AccountButton);
+        Assert.Equal(letter, avatar.TextContent);
+        Assert.Equal("Account menu for ana@example.com", avatar.GetAttribute("aria-label"));
+        Assert.DoesNotContain(name, cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HP_017_without_a_name_claim_the_avatar_shows_the_first_letter_of_the_email()
+    {
+        SignIn("RegisteredUser");
+        _authorization.SetClaims(new System.Security.Claims.Claim("ht:name", string.Empty));
+        var cut = Render<SiteNav>();
+
+        Assert.Equal("A", cut.Find(AccountButton).TextContent);
+    }
+
     [Fact]
     public void US5_AS4_the_narrow_menu_of_a_visitor_lists_catalog_sign_in_and_register()
     {
