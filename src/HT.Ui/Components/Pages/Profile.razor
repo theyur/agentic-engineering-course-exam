@@ -16,7 +16,8 @@
    administrator, who has no custom habits (the use case refuses, FR-025), keeps the slice 1 state: Account
    only, without Tabs (HP-014). The page stays static, so the change-password form keeps working. An anonymous
    request never gets here: the endpoint's [Authorize] sends it to Sign in (HP-008). After a change the session
-   that made it is re-issued with the new security stamp (HP-007). *@
+   that made it is re-issued with the new security stamp (HP-007). Slice 4 (HP-015): the Account card has the
+   "Time zone" form before "Change password", for every account. *@
 <PageTitle>Profile · Habit Tracker</PageTitle>
 
 @if (_details is { } details)
@@ -74,6 +75,7 @@
                     <div class="ht-form-section">
                         <dl class="ht-kv"><dt>Email</dt><dd>@details.Email</dd></dl>
                     </div>
+                    <TimeZoneForm ActingUser="_actingUser" />
                     <ChangePasswordForm ActingUser="_actingUser" OnSucceeded="RefreshSessionAsync" />
                 </section>
             </div>

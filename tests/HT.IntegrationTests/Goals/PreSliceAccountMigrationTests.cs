@@ -67,6 +67,7 @@ public sealed class PreSliceAccountMigrationTests(MigrationDatabaseFixture datab
         }
 
         Assert.Equal(((string?)null, 0), await AccountStateAsync(database.ConnectionString, owner));
+        Assert.Equal("Europe/Kyiv", await ReadTimeZoneAsync(provider, owner));
 
         var habit = await CatalogHabitAsync(provider, "It-Mi Pre-slice catalog");
         await using (var scope = provider.CreateAsyncScope())
@@ -81,5 +82,16 @@ public sealed class PreSliceAccountMigrationTests(MigrationDatabaseFixture datab
         }
 
         Assert.Equal(((string?)"Europe/Kyiv", 1), await AccountStateAsync(database.ConnectionString, owner));
+        Assert.Equal("Europe/Kyiv", await ReadTimeZoneAsync(provider, owner));
+    }
+
+    /// <summary>The account's time zone as <see cref="ProfileService.GetTimeZoneAsync"/> gives it to the account itself (T107).</summary>
+    private static async Task<string?> ReadTimeZoneAsync(IServiceProvider provider, AccountId owner)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<ProfileService>()
+            .GetTimeZoneAsync(ActingUser.ForAccount(owner, Role.RegisteredUser), CancellationToken.None);
+        Assert.Equal(TimeZoneReadOutcome.Found, result.Outcome);
+        return result.TimeZone;
     }
 }

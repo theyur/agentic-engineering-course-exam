@@ -30,6 +30,34 @@ public interface IGoalStore
         AccountId owner, NewGoal goal, NamedTimeZone expectedZone, NamedTimeZone defaultZone, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The owner's stored time zone and goal revision, then all the owner's goals as <see cref="ListAsync"/> reads them,
+    /// in that order (research R-08): a goal committed before the account row was read is in the goals read after it,
+    /// and one committed later has moved the revision on, so a <see cref="TryChangeTimeZoneAsync"/> with this revision
+    /// fails. Null when the owner has no account.
+    /// </summary>
+    Task<OwnerGoals?> ReadOwnerGoalsAsync(AccountId owner, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Changes the owner's time zone in one transaction under the account row's update lock (FR-026, research R-08).
+    /// False, with nothing written, when the stored time zone is no longer <paramref name="expectedStoredZone"/> (null:
+    /// none stored) or the goal revision is no longer <paramref name="expectedRevision"/>, and when a write names a goal
+    /// that is not one of the owner's (another owner's or an unknown one, constitution III) or names a goal twice.
+    /// Otherwise it applies every write to the goal's settings versions:
+    /// <see cref="GoalVersionChangeKind.ReplaceFirst"/> gives version 1 the new zone,
+    /// <see cref="GoalVersionChangeKind.ReplacePending"/> replaces the last version with one of the new zone and date,
+    /// <see cref="GoalVersionChangeKind.Add"/> adds a version with the last version's target, and
+    /// <see cref="GoalVersionChangeKind.None"/> writes nothing; then stores <paramref name="next"/> as the account's
+    /// zone and increments the goal revision.
+    /// </summary>
+    Task<bool> TryChangeTimeZoneAsync(
+        AccountId owner,
+        string? expectedStoredZone,
+        int expectedRevision,
+        NamedTimeZone next,
+        IReadOnlyList<GoalVersionWrite> writes,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// The owner's goals in creation order, each with its habit's current name, category and state, read in one query.
     /// </summary>
     Task<IReadOnlyList<StoredGoal>> ListAsync(AccountId owner, CancellationToken cancellationToken);

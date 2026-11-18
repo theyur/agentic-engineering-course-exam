@@ -1,4 +1,7 @@
 using System.Net;
+using HT.Application.Accounts;
+using HT.Domain.Accounts;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HT.UiTests.Host;
 
@@ -74,6 +77,39 @@ public sealed class RegisterPageTests(HostFixture host)
         Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Redirect);
         Assert.Single(responses, r => r.StatusCode == HttpStatusCode.OK);
         Assert.Equal(1, await HostClient.CountUsersAsync(host.ConnectionString, "page.parallel@example.com"));
+    }
+
+    [Fact]
+    public async Task HP_016_the_page_has_the_hidden_browser_time_zone_input_and_no_visible_time_zone_field()
+    {
+        using var browser = host.CreateBrowser();
+
+        var form = await browser.GetFormAsync("/register", "register");
+
+        var marked = System.Text.RegularExpressions.Regex.Matches(form.Html, "<input[^>]*data-ht-browser-time-zone[^>]*>").Select(m => m.Value).ToList();
+        Assert.Equal(["<input type=\"hidden\" name=\"TimeZone\" data-ht-browser-time-zone>"], marked);
+        Assert.DoesNotContain("<select", form.Html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Time zone", form.Html, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("page.zone.kyiv@example.com", "Europe/Kyiv")]
+    [InlineData("page.zone.empty@example.com", "")]
+    [InlineData("page.zone.windows@example.com", "FLE Standard Time")]
+    public async Task HP_016_a_posted_named_time_zone_is_stored_and_an_empty_or_other_value_stores_the_default(string email, string posted)
+    {
+        await HostClient.DeleteUserAsync(host.ConnectionString, email);
+        using var browser = host.CreateBrowser();
+        var form = await browser.GetFormAsync("/register", "register");
+
+        using var response = await browser.PostFormAsync("/register", form, [.. Fields(email, "walking42", "walking42"), new("TimeZone", posted)]);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        await using var scope = host.Services.CreateAsyncScope();
+        var expected = posted == "Europe/Kyiv" ? posted : scope.ServiceProvider.GetRequiredService<InstallationTimeZone>().Value.Id;
+        Assert.True(Email.TryParse(email, out var parsed));
+        var account = await scope.ServiceProvider.GetRequiredService<IAccountStore>().FindByEmailAsync(parsed, CancellationToken.None);
+        Assert.Equal(expected, account?.StoredTimeZone);
     }
 
     private static string? RedirectTarget(HttpResponseMessage response, HttpClient browser) =>

@@ -96,6 +96,33 @@ public sealed class RegisterFormTests : BunitContext
         Assert.Equal(_store.Find("new.user@example.com")!.Id, result.AccountId);
     }
 
+    [Fact]
+    public void HP_016_the_form_has_the_hidden_browser_time_zone_input_and_no_visible_time_zone_field()
+    {
+        var cut = RenderForm();
+
+        var marked = Assert.Single(cut.FindAll("input[data-ht-browser-time-zone]"));
+        Assert.Equal("hidden", marked.GetAttribute("type"));
+        Assert.Equal("TimeZone", marked.GetAttribute("name"));
+        Assert.True(string.IsNullOrEmpty(marked.GetAttribute("value")));
+        Assert.Empty(cut.FindAll("select"));
+        Assert.Equal(
+            ["register-email", "register-password", "register-repeat-password"],
+            cut.FindAll("input:not([type=hidden])").Select(input => input.Id));
+        Assert.DoesNotContain("time zone", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void HP_016_a_registration_without_a_browser_time_zone_stores_the_installations_default()
+    {
+        var cut = RenderForm();
+
+        Submit(cut, "no.zone@example.com", "walking42", "walking42");
+
+        Assert.Single(_succeeded);
+        Assert.Equal("UTC", _store.Find("no.zone@example.com")!.StoredTimeZone);
+    }
+
     private IRenderedComponent<RegisterForm> RenderForm() =>
         Render<RegisterForm>(p => p.Add(x => x.OnSucceeded, result => _succeeded.Add(result)));
 

@@ -22,6 +22,7 @@ public sealed class FakeGoalStore : IGoalStore
     private readonly List<StoredGoal> _goals = [];
     private readonly Dictionary<AccountId, int> _revisions = [];
     private int _timeZoneChangesToReport;
+    private int _timeZoneConflictsToReport;
 
     /// <summary>Takes the fakes it reads, and sets <see cref="FakeCustomHabitStore.Goals"/> to itself.</summary>
     public FakeGoalStore(FakeAccountStore accounts, FakeCatalogHabitStore catalogHabits, FakeCustomHabitStore customHabits)
@@ -57,12 +58,33 @@ public sealed class FakeGoalStore : IGoalStore
         }
     }
 
-    /// <summary>The owner's goal revision: incremented by every created goal (research R-08); 0 before the first.</summary>
+    /// <summary>Calls of <see cref="TryChangeTimeZoneAsync"/>, refused ones included.</summary>
+    public int TimeZoneWriteCount { get; private set; }
+
+    /// <summary>Calls of <see cref="TryChangeTimeZoneAsync"/> that wrote the change.</summary>
+    public int TimeZoneChangeCount { get; private set; }
+
+    /// <summary>
+    /// The owner's goal revision: incremented by every created goal and every time-zone change (research R-08); 0 before
+    /// the first.
+    /// </summary>
     public int RevisionOf(AccountId owner)
     {
         lock (_gate)
         {
             return _revisions.GetValueOrDefault(owner);
+        }
+    }
+
+    /// <summary>
+    /// Makes the next <paramref name="count"/> time-zone writes lose: each increments the owner's revision, as a goal
+    /// created in another session would, writes nothing else and returns false.
+    /// </summary>
+    public void ConflictOnNextTimeZoneWrites(int count)
+    {
+        lock (_gate)
+        {
+            _timeZoneConflictsToReport = count;
         }
     }
 
@@ -153,6 +175,77 @@ public sealed class FakeGoalStore : IGoalStore
                 [new GoalSettingsVersion(new GoalSettings(goal.Target, expectedZone), goal.StartDate)]);
             _goals.Add(new StoredGoal(created, habit));
             return Task.FromResult(GoalWriteOutcome.Created(created.Id));
+        }
+    }
+
+    /// <summary>The account's stored zone and revision, then its goals, read together under this store's lock; null without an account.</summary>
+    public Task<OwnerGoals?> ReadOwnerGoalsAsync(AccountId owner, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            if (_accounts.FindById(owner) is not { } account)
+            {
+                return Task.FromResult<OwnerGoals?>(null);
+            }
+
+            var goals = _goals.Where(g => g.Goal.Owner == owner).Select(Current).ToList();
+            return Task.FromResult<OwnerGoals?>(new OwnerGoals(account.StoredTimeZone, _revisions.GetValueOrDefault(owner), goals));
+        }
+    }
+
+    /// <summary>
+    /// Research R-08 step 3, all or nothing: false when the stored zone or the revision changed, or when a write names a
+    /// goal that is not one of the owner's or names a goal twice. Otherwise every change is applied through
+    /// <see cref="GoalVersionChange.ApplyTo"/>, the account's zone is set and the revision incremented.
+    /// </summary>
+    public Task<bool> TryChangeTimeZoneAsync(
+        AccountId owner,
+        string? expectedStoredZone,
+        int expectedRevision,
+        NamedTimeZone next,
+        IReadOnlyList<GoalVersionWrite> writes,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(writes);
+        lock (_gate)
+        {
+            TimeZoneWriteCount++;
+            if (_timeZoneConflictsToReport > 0)
+            {
+                _timeZoneConflictsToReport--;
+                _revisions[owner] = _revisions.GetValueOrDefault(owner) + 1;
+                return Task.FromResult(false);
+            }
+
+            if (_accounts.FindById(owner) is not { } account
+                || !string.Equals(account.StoredTimeZone, expectedStoredZone, StringComparison.Ordinal)
+                || _revisions.GetValueOrDefault(owner) != expectedRevision)
+            {
+                return Task.FromResult(false);
+            }
+
+            var positions = new List<int>();
+            foreach (var write in writes)
+            {
+                var position = _goals.FindIndex(g => g.Goal.Owner == owner && g.Goal.Id == write.Goal);
+                if (position < 0 || positions.Contains(position))
+                {
+                    return Task.FromResult(false);
+                }
+
+                positions.Add(position);
+            }
+
+            var changed = positions.Select((position, i) => _goals[position] with { Goal = writes[i].Change.ApplyTo(_goals[position].Goal) }).ToList();
+            for (var i = 0; i < positions.Count; i++)
+            {
+                _goals[positions[i]] = changed[i];
+            }
+
+            _accounts.SetStoredTimeZone(owner, next.Id);
+            _revisions[owner] = _revisions.GetValueOrDefault(owner) + 1;
+            TimeZoneChangeCount++;
+            return Task.FromResult(true);
         }
     }
 

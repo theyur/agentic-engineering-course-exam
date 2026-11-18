@@ -838,7 +838,7 @@ Goals follow it from their next day or week.
 
 ### Tests for User Story 10
 
-- [ ] T100 [P] [US10] Create `tests/HT.UnitTests/Application/Accounts/TimeZoneTests.cs` for `ProfileService` (depends on T103):
+- [X] T100 [P] [US10] Create `tests/HT.UnitTests/Application/Accounts/TimeZoneTests.cs` for `ProfileService` (depends on T103):
   - `GetTimeZoneAsync` gives the stored zone, or the default when it is null;
   - US10-AS7: a value that is not a named time zone gives "Choose a time zone from the list." and changes nothing;
   - the same zone gives `Unchanged` and writes nothing;
@@ -849,7 +849,7 @@ Goals follow it from their next day or week.
   - US10-AS8: an administrator reads and changes their own zone, and an anonymous visitor gets "You are not signed in.", as does a registered acting user with no account in the store;
   - a conflicting write makes the service re-read and recompute, and ten conflicts throw a fault exception that names no value;
   - US10-AS9: no method takes another account's identifier, which `UseCaseParameterTests` enforces structurally.
-- [ ] T101 [P] [US10] Create `tests/HT.IntegrationTests/Goals/TimeZoneChangeTests.cs` on `HT-IT` (research R-08; depends on T102, T103):
+- [X] T101 [P] [US10] Create `tests/HT.IntegrationTests/Goals/TimeZoneChangeTests.cs` on `HT-IT` (research R-08; depends on T102, T103):
   - a change through `ProfileService` over SQL writes the account's zone, each goal's versions and `GoalsRevision + 1`;
   - `ReadOwnerGoalsAsync` returns the revision it read together with the goals;
   - `TryChangeTimeZoneAsync` with a stale `expectedRevision`, or a stale stored zone, writes nothing and returns false;
@@ -861,7 +861,7 @@ Goals follow it from their next day or week.
 
 ### Implementation for User Story 10
 
-- [ ] T102 [US10] Add the time-zone write to the goal port (research R-08):
+- [X] T102 [US10] Add the time-zone write to the goal port (research R-08):
   - `OwnerGoals` and `GoalVersionWrite` in `src/HT.Application/Goals/`;
   - `ReadOwnerGoalsAsync(owner, …)` and `TryChangeTimeZoneAsync(owner, expectedStoredZone, expectedRevision, next, writes, …)` in `IGoalStore` and `FakeGoalStore`;
   - in `GoalStore`, the read takes the account row first, then the goals, and documents that order. The write is one transaction under the account row's update lock, conditioned on the stored zone and the revision:
@@ -870,30 +870,30 @@ Goals follow it from their next day or week.
     - `Add` inserts a version;
     - the account's zone is written, and `GoalsRevision` is incremented;
     - every version row it updates, deletes or inserts belongs to a goal of `owner`. A `GoalVersionWrite` that names another account's goal, or an unknown one, makes the whole write roll back and return false (constitution III). `FakeGoalStore` applies the same rule.
-- [ ] T103 [US10] Create `src/HT.Application/Accounts/ProfileService.cs` with `GetTimeZoneAsync` and `ChangeTimeZoneAsync`, and its results in `src/HT.Application/Accounts/ProfileResults.cs` (FR-024 to FR-027; depends on T102):
+- [X] T103 [US10] Create `src/HT.Application/Accounts/ProfileService.cs` with `GetTimeZoneAsync` and `ChangeTimeZoneAsync`, and its results in `src/HT.Application/Accounts/ProfileResults.cs` (FR-024 to FR-027; depends on T102):
   - its constructor takes `IAccountStore`, `IGoalStore`, `TimeProvider` and `InstallationTimeZone`;
   - an acting user whose account is not found gets "You are not signed in.", as in `GoalService` (T058);
   - the change returns `Unchanged` before computing anything when the zone is the same;
   - otherwise it calls `GoalTimeline.ChangeOf` per goal, then the conditional write, retrying up to 10 times.
 
   Register it as scoped, add it to `AddGoals` in `PageServices.cs`, and add it to `SignedInServices` in `UseCaseParameterTests.cs`.
-- [ ] T104 [US10] Send the browser's time zone with the registration (HP-016, research R-12; depends on T041):
+- [X] T104 [US10] Send the browser's time zone with the registration (HP-016, research R-12; depends on T041):
   - `src/HT.Ui/Components/Account/RegisterForm.razor` gets a hidden input marked `data-ht-browser-time-zone`, and calls the four-argument `RegisterAsync`;
   - new `src/HT.Ui/wwwroot/js/time-zone.js`: one document-level `submit` listener in the capture phase, which fills every marked input of the submitted form from `Intl.DateTimeFormat().resolvedOptions().timeZone`;
   - `src/HT.Ui/Components/App.razor` loads the script once, after `blazor.web.js`.
-- [ ] T105 [US10] Create `src/HT.Ui/Components/Account/TimeZoneForm.razor`, a static form on the Profile Account tab in `src/HT.Ui/Components/Pages/Profile.razor` (HP-015; depends on T103):
+- [X] T105 [US10] Create `src/HT.Ui/Components/Account/TimeZoneForm.razor`, a static form on the Profile Account tab in `src/HT.Ui/Components/Pages/Profile.razor` (HP-015; depends on T103):
   - a select of `NamedTimeZones.Choices`, plus the current value when it is not among them;
   - Save;
   - the Notice "Your time zone is changed. Your goals use it from their next day or week; earlier days keep their time zone.";
   - a refusal's text under the field.
-- [ ] T106 [P] [US10] Add the UI tests (depends on T104, T105):
+- [X] T106 [P] [US10] Add the UI tests (depends on T104, T105):
   - `tests/HT.UiTests/Components/Account/RegisterFormTests.cs`: the marked hidden input, and no visible time-zone field;
   - `tests/HT.UiTests/Host/ShellTests.cs`: `App.razor`'s output references `js/time-zone.js` once;
   - `tests/HT.UiTests/Host/RegisterPageTests.cs`: a posted `Europe/Kyiv` is stored, and an empty value stores the default;
   - `tests/HT.UiTests/Host/ProfilePageTests.cs`: the list has "UTC", "Europe/Kyiv" and "America/New_York", plus a stored "Europe/Kiev" when that is the current value, and a change shows the Notice.
 
   The script itself runs only in a real browser, so it stays unverified here (T136).
-- [ ] T107 [US10] Extend `tests/HT.IntegrationTests/Goals/PreSliceAccountMigrationTests.cs`: with `InstallationTimeZone.From("Europe/Kyiv")` registered, `ProfileService.GetTimeZoneAsync` gives `Europe/Kyiv` for the pre-slice account, before and after its first goal (HP-019) (depends on T103, T049)
+- [X] T107 [US10] Extend `tests/HT.IntegrationTests/Goals/PreSliceAccountMigrationTests.cs`: with `InstallationTimeZone.From("Europe/Kyiv")` registered, `ProfileService.GetTimeZoneAsync` gives `Europe/Kyiv` for the pre-slice account, before and after its first goal (HP-019) (depends on T103, T049)
 
 **Checkpoint**: full suite green. Commit.
 

@@ -58,28 +58,55 @@ public sealed class GoalWorld
         return Goals.Add(owner, goal, new GoalHabitView(habit.Id, HabitKind.Catalog, habit.Definition.Name.Value, habit.Definition.Category, true));
     }
 
+    /// <summary>The profile use cases over the same fakes, clock and default time zone (US10).</summary>
+    public ProfileService Profiles => new(Accounts, Goals, Clock, DefaultZone);
+
     /// <summary>The service over the goal store, with <paramref name="beforeFirstCreate"/> run once just before the first creation reaches it.</summary>
     public GoalService ServiceChangingBeforeFirstCreate(Func<Task> beforeFirstCreate) =>
-        new(new BeforeFirstCreate(Goals, beforeFirstCreate), Accounts, CatalogHabits, CustomHabits, Clock, DefaultZone);
+        new(new BeforeFirstCreate(Goals, beforeFirstCreate, null), Accounts, CatalogHabits, CustomHabits, Clock, DefaultZone);
 
     /// <summary>
-    /// Runs an action once before the first <see cref="IGoalStore.CreateAsync"/>, as another session's commit between
-    /// the use case's reads and the store's transaction would.
+    /// The profile use cases over the goal store, with <paramref name="beforeFirstTimeZoneWrite"/> run once just before the
+    /// first time-zone write reaches it, after the use case has read the account's goals.
     /// </summary>
-    private sealed class BeforeFirstCreate(IGoalStore inner, Func<Task> action) : IGoalStore
+    public ProfileService ProfilesChangingBeforeFirstTimeZoneWrite(Func<Task> beforeFirstTimeZoneWrite) =>
+        new(Accounts, new BeforeFirstCreate(Goals, null, beforeFirstTimeZoneWrite), Clock, DefaultZone);
+
+    /// <summary>
+    /// Runs an action once before the first <see cref="IGoalStore.CreateAsync"/>, and another once before the first
+    /// <see cref="IGoalStore.TryChangeTimeZoneAsync"/>, as another session's commit between the use case's reads and the
+    /// store's transaction would. Every other member is forwarded as it is.
+    /// </summary>
+    private sealed class BeforeFirstCreate(IGoalStore inner, Func<Task>? beforeCreate, Func<Task>? beforeTimeZoneWrite) : IGoalStore
     {
-        private Func<Task>? _action = action;
+        private Func<Task>? _beforeCreate = beforeCreate;
+        private Func<Task>? _beforeTimeZoneWrite = beforeTimeZoneWrite;
 
         public async Task<GoalWriteOutcome> CreateAsync(
             AccountId owner, NewGoal goal, NamedTimeZone expectedZone,
             NamedTimeZone defaultZone, CancellationToken cancellationToken)
         {
-            if (Interlocked.Exchange(ref _action, null) is { } pending)
+            if (Interlocked.Exchange(ref _beforeCreate, null) is { } pending)
             {
                 await pending();
             }
 
             return await inner.CreateAsync(owner, goal, expectedZone, defaultZone, cancellationToken);
+        }
+
+        public Task<OwnerGoals?> ReadOwnerGoalsAsync(AccountId owner, CancellationToken cancellationToken) =>
+            inner.ReadOwnerGoalsAsync(owner, cancellationToken);
+
+        public async Task<bool> TryChangeTimeZoneAsync(
+            AccountId owner, string? expectedStoredZone, int expectedRevision, NamedTimeZone next,
+            IReadOnlyList<GoalVersionWrite> writes, CancellationToken cancellationToken)
+        {
+            if (Interlocked.Exchange(ref _beforeTimeZoneWrite, null) is { } pending)
+            {
+                await pending();
+            }
+
+            return await inner.TryChangeTimeZoneAsync(owner, expectedStoredZone, expectedRevision, next, writes, cancellationToken);
         }
 
         public Task<IReadOnlyList<StoredGoal>> ListAsync(AccountId owner, CancellationToken cancellationToken) =>

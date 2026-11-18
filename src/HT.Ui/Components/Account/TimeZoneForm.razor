@@ -1,0 +1,100 @@
+@using HT.Application.Accounts
+@using HT.Domain.Accounts
+@using HT.Domain.Time
+@inject ProfileService Profiles
+@* design/pages/PageProfile, slice 4 (HP-015): the "Time zone" form of the Account card, for every account. A static
+   SSR form: a select of UTC, then the installation's named time zones in ordinal order, plus the current value when
+   it is not among them, so the current value is always selected. Save calls the use case; a change shows the
+   Notice, a refusal its text under the field with the current value selected again. *@
+<EditForm Model="Input" method="post" FormName="time-zone" OnSubmit="SubmitAsync" class="ht-form-section ht-stack" novalidate>
+    @if (_changed)
+    {
+        <Notice Role="status">@TimeZoneChanged</Notice>
+    }
+    <label class="ht-field">
+        <span class="ht-field__label">Time zone</span>
+        <select id="@FieldId" name="Input.TimeZone" class="ht-input" aria-invalid="@(_error is null ? null : "true")"
+                aria-describedby="@(_error is null ? HelpId : ErrorId)">
+            @foreach (var choice in Choices)
+            {
+                <option value="@choice" selected="@string.Equals(choice, Selected, StringComparison.Ordinal)">@choice</option>
+            }
+        </select>
+        @if (_error is not null)
+        {
+            <span class="ht-field__error" id="@ErrorId">@_error</span>
+        }
+        else
+        {
+            <span class="ht-field__help" id="@HelpId">@Help</span>
+        }
+    </label>
+    <div><HtButton Type="submit" Variant="HtButton.ButtonVariant.Secondary">Save</HtButton></div>
+</EditForm>
+
+@code {
+    /// <summary>The help under the field (HP-015).</summary>
+    public const string Help = "Your goals' days and weeks start at midnight in this time zone.";
+
+    /// <summary>The Notice after a change (HP-015).</summary>
+    public const string TimeZoneChanged =
+        "Your time zone is changed. Your goals use it from their next day or week; earlier days keep their time zone.";
+
+    private const string FieldId = "profile-time-zone";
+    private const string HelpId = FieldId + "-help";
+    private const string ErrorId = FieldId + "-error";
+
+    [SupplyParameterFromForm(FormName = "time-zone")]
+    private TimeZoneInput Input { get; set; } = default!;
+
+    /// <summary>The signed-in account whose time zone the form shows and changes.</summary>
+    [Parameter, EditorRequired]
+    public ActingUser ActingUser { get; set; } = ActingUser.Anonymous;
+
+    private string? _current;
+    private bool _changed;
+    private string? _error;
+
+    /// <summary>The posted value after a change, otherwise the account's current value.</summary>
+    private string? Selected => Input.TimeZone ?? _current;
+
+    /// <summary>"UTC" and the installation's zones (HP-015), plus the current value when it is not among them.</summary>
+    private IReadOnlyList<string> Choices =>
+        _current is null || NamedTimeZones.Choices.Contains(_current, StringComparer.Ordinal)
+            ? NamedTimeZones.Choices
+            : [.. NamedTimeZones.Choices, _current];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new TimeZoneInput();
+        var result = await Profiles.GetTimeZoneAsync(ActingUser, CancellationToken.None);
+        _current = result.TimeZone;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _changed = false;
+        _error = null;
+
+        var result = await Profiles.ChangeTimeZoneAsync(ActingUser, Input.TimeZone, CancellationToken.None);
+        switch (result.Outcome)
+        {
+            case TimeZoneChangeOutcome.Changed:
+                _changed = true;
+                _current = Input.TimeZone;
+                return;
+            case TimeZoneChangeOutcome.Unchanged:
+                return;
+            default:
+                // NotANamedTimeZone, and NotSignedIn for a session whose account is gone.
+                _error = result.Message;
+                Input.TimeZone = null;
+                return;
+        }
+    }
+
+    private sealed class TimeZoneInput
+    {
+        public string? TimeZone { get; set; }
+    }
+}

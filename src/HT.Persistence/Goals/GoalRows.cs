@@ -74,3 +74,14 @@ internal sealed class GoalAttemptRow
 
     public DateOnly StartDate { get; set; }
 }
+
+/// <summary>
+/// What a time-zone change reads from the locked account row (research R-08): an unmapped result of a raw query, not
+/// an entity, so it never tracks or writes the row.
+/// </summary>
+internal sealed class AccountRevisionRow
+{
+    public string? TimeZone { get; set; }
+
+    public int GoalsRevision { get; set; }
+}

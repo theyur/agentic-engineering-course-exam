@@ -43,6 +43,50 @@ internal sealed class GoalStore : IGoalStore
         }
     }
 
+    /// <summary>
+    /// Research R-08 step 1. The order is fixed: the account row first, then the goals, as two statements under the
+    /// database's read committed (locking, or with read committed snapshot). Each sees what was committed when it
+    /// started, so a goal committed before the account row was read is in the goals read, and a goal committed after
+    /// it has incremented <c>GoalsRevision</c>, which makes the conditional write of <see cref="TryChangeTimeZoneAsync"/>
+    /// fail. Do not reorder the two reads.
+    /// </summary>
+    public async Task<OwnerGoals?> ReadOwnerGoalsAsync(AccountId owner, CancellationToken cancellationToken)
+    {
+        var account = await _db.Users.AsNoTracking()
+            .Where(u => u.Id == owner.Value)
+            .Select(u => new { u.TimeZone, u.GoalsRevision })
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (account is null)
+        {
+            return null;
+        }
+
+        var rows = await Read(owner).ToListAsync(cancellationToken).ConfigureAwait(false);
+        return new OwnerGoals(account.TimeZone, account.GoalsRevision, rows.Select(GoalMapping.ToStoredGoal).ToList());
+    }
+
+    public async Task<bool> TryChangeTimeZoneAsync(
+        AccountId owner,
+        string? expectedStoredZone,
+        int expectedRevision,
+        NamedTimeZone next,
+        IReadOnlyList<GoalVersionWrite> writes,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(writes);
+        _db.ChangeTracker.Clear();
+        try
+        {
+            return await WriteAsync(() => ChangeTimeZoneInTransactionAsync(owner, expectedStoredZone, expectedRevision, next, writes, cancellationToken))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _db.ChangeTracker.Clear();
+        }
+    }
+
     public async Task<IReadOnlyList<StoredGoal>> ListAsync(AccountId owner, CancellationToken cancellationToken)
     {
         var rows = await Read(owner).ToListAsync(cancellationToken).ConfigureAwait(false);
@@ -139,6 +183,129 @@ internal sealed class GoalStore : IGoalStore
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return GoalWriteOutcome.Created(new GoalId(id));
     }
+
+    /// <summary>
+    /// Research R-08 step 3, in one transaction: the account row under its update lock first, as in creation, then the
+    /// owner's goal rows. Nothing is written unless the stored zone and the revision are the expected ones and every write
+    /// names a different goal of the owner (constitution III).
+    /// </summary>
+    private async Task<bool> ChangeTimeZoneInTransactionAsync(
+        AccountId owner,
+        string? expectedStoredZone,
+        int expectedRevision,
+        NamedTimeZone next,
+        IReadOnlyList<GoalVersionWrite> writes,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        var accounts = await _db.Database.SqlQuery<AccountRevisionRow>(
+                $"SELECT [TimeZone], [GoalsRevision] FROM [AspNetUsers] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {owner.Value}")
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (accounts is not [var account]
+            || !string.Equals(account.TimeZone, expectedStoredZone, StringComparison.Ordinal)
+            || account.GoalsRevision != expectedRevision)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        // Every write names a different goal of the owner; the owner's goal rows stay locked until commit.
+        var ownGoals = await _db.Database.SqlQuery<Guid>(
+                $"SELECT [Id] AS [Value] FROM [Goals] WITH (UPDLOCK, HOLDLOCK) WHERE [OwnerId] = {owner.Value}")
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var named = writes.Select(w => w.Goal.Value).ToList();
+        if (named.Distinct().Count() != named.Count || !named.All(ownGoals.Contains))
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        foreach (var write in writes.Where(w => w.Change.Kind != GoalVersionChangeKind.None))
+        {
+            await ApplyAsync(write.Goal.Value, write.Change, cancellationToken).ConfigureAwait(false);
+        }
+
+        var zone = next.Id;
+        await _db.Users
+            .Where(u => u.Id == owner.Value)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(u => u.TimeZone, zone)
+                    .SetProperty(u => u.GoalsRevision, u => u.GoalsRevision + 1),
+                cancellationToken)
+            .ConfigureAwait(false);
+        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>
+    /// One goal's version rows for a change: ReplaceFirst updates version 1's zone; ReplacePending deletes the last
+    /// version's row and adds one with the new zone and date; Add adds a row with the last version's target. The rows to
+    /// add are saved by the caller, after every delete has run.
+    /// </summary>
+    private async Task ApplyAsync(Guid goal, GoalVersionChange change, CancellationToken cancellationToken)
+    {
+        var versions = await _db.GoalSettingsVersions.AsNoTracking()
+            .Where(v => v.GoalId == goal)
+            .OrderBy(v => v.AppliesFrom)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (versions.Count == 0)
+        {
+            throw new InvalidOperationException("A stored goal has no settings version.");
+        }
+
+        var zone = change.TimeZone!.Value.Id;
+        switch (change.Kind)
+        {
+            case GoalVersionChangeKind.ReplaceFirst:
+                var first = versions[0].AppliesFrom;
+                await _db.GoalSettingsVersions
+                    .Where(v => v.GoalId == goal && v.AppliesFrom == first)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(v => v.TimeZone, zone), cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+            case GoalVersionChangeKind.ReplacePending:
+                if (versions.Count < 2)
+                {
+                    throw new InvalidOperationException("A time-zone write replaces a version the goal does not have.");
+                }
+
+                var pending = versions[^1].AppliesFrom;
+                await _db.GoalSettingsVersions
+                    .Where(v => v.GoalId == goal && v.AppliesFrom == pending)
+                    .ExecuteDeleteAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                _db.GoalSettingsVersions.Add(CopyOf(versions[^1], change.AppliesFrom!.Value, zone));
+                return;
+            case GoalVersionChangeKind.Add:
+                _db.GoalSettingsVersions.Add(CopyOf(versions[^1], change.AppliesFrom!.Value, zone));
+                return;
+            default:
+                return;
+        }
+    }
+
+    /// <summary>A version row with the target of <paramref name="row"/>, another date and another zone.</summary>
+    private static GoalSettingsVersionRow CopyOf(GoalSettingsVersionRow row, DateOnly appliesFrom, string zone) => new()
+    {
+        GoalId = row.GoalId,
+        AppliesFrom = appliesFrom,
+        BuildOrReduce = row.BuildOrReduce,
+        Measurement = row.Measurement,
+        Amount = row.Amount,
+        CountUnit = row.CountUnit,
+        DurationUnit = row.DurationUnit,
+        ScheduleKind = row.ScheduleKind,
+        Days = row.Days,
+        Times = row.Times,
+        Period = row.Period,
+        TimeZone = zone,
+    };
 
     /// <summary>A Published catalog habit, or the owner's own custom habit; the row stays locked until commit.</summary>
     private async Task<bool> HabitIsUsableAsync(AccountId owner, GoalHabit habit, CancellationToken cancellationToken)

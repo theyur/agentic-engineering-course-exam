@@ -76,10 +76,10 @@ public static partial class HostClient
 
     /// <summary>
     /// Creates an account directly through the host's account store, so a story's host tests do not depend on
-    /// another story's page.
+    /// another story's page. The account's time zone is <paramref name="timeZone"/>, UTC when none is given.
     /// </summary>
     public static async Task<HT.Domain.Accounts.Account> CreateAccountAsync(
-        this HostFixture host, string email, string password, Role role = Role.RegisteredUser)
+        this HostFixture host, string email, string password, Role role = Role.RegisteredUser, string? timeZone = null)
     {
         ArgumentNullException.ThrowIfNull(host);
         if (!Email.TryParse(email, out var parsed))
@@ -87,9 +87,15 @@ public static partial class HostClient
             throw new ArgumentException("Not a valid email.", nameof(email));
         }
 
+        var zone = NamedTimeZone.Utc;
+        if (timeZone is not null && !NamedTimeZone.TryParse(timeZone, out zone))
+        {
+            throw new ArgumentException("Not a named time zone.", nameof(timeZone));
+        }
+
         await using var scope = host.Services.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<IAccountStore>();
-        var profile = new NewAccountProfile(null, NamedTimeZone.Utc, new DateTimeOffset(2026, 11, 18, 10, 0, 0, TimeSpan.Zero));
+        var profile = new NewAccountProfile(null, zone, new DateTimeOffset(2026, 11, 18, 10, 0, 0, TimeSpan.Zero));
         var outcome = await store.CreateAsync(parsed, role, password, profile, CancellationToken.None);
         return outcome.Account ?? throw new InvalidOperationException($"The email {email} already has an account.");
     }

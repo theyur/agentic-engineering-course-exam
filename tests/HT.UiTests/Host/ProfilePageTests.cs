@@ -1,6 +1,9 @@
 using System.Net;
+using System.Text.RegularExpressions;
+using HT.Application.Accounts;
 using HT.Domain.Accounts;
 using HT.Domain.Habits;
+using Microsoft.Extensions.DependencyInjection;
 using static HT.UnitTests.Fakes.HabitSamples;
 
 namespace HT.UiTests.Host;
@@ -10,7 +13,7 @@ namespace HT.UiTests.Host;
 /// registered users): Profile through the real host.
 /// </summary>
 [Collection(HostCollection.Name)]
-public sealed class ProfilePageTests(HostFixture host)
+public sealed partial class ProfilePageTests(HostFixture host)
 {
     private const string Password = "walking42";
 
@@ -207,6 +210,112 @@ public sealed class ProfilePageTests(HostFixture host)
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("https://localhost/sign-in?returnUrl=%2Fprofile", RedirectTarget(response, browser));
     }
+
+    private const string TimeZoneNotice =
+        "Your time zone is changed. Your goals use it from their next day or week; earlier days keep their time zone.";
+
+    private static List<string> OptionsOf(string html) =>
+        OptionPattern().Matches(html).Select(m => WebUtility.HtmlDecode(m.Groups["value"].Value)).ToList();
+
+    private static string? SelectedOf(string html) =>
+        SelectedPattern().Match(html) is { Success: true } match ? WebUtility.HtmlDecode(match.Groups["value"].Value) : null;
+
+    [Theory]
+    [InlineData("zone.profile@example.com", "Europe/Kyiv", Role.RegisteredUser)]
+    [InlineData("zone.admin.profile@example.com", "America/New_York", Role.Administrator)]
+    public async Task HP_015_the_Account_tab_has_the_Time_zone_list_with_UTC_first_and_the_current_value_selected(string email, string zone, Role role)
+    {
+        await HostClient.DeleteUserAsync(host.ConnectionString, email);
+        await host.CreateAccountAsync(email, Password, role, zone);
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+
+        var (status, html) = await browser.GetPageAsync("/profile");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("<span class=\"ht-field__label\">Time zone</span>", html, StringComparison.Ordinal);
+        Assert.Contains("Your goals&#x27; days and weeks start at midnight in this time zone.", html, StringComparison.Ordinal);
+        var options = OptionsOf(html);
+        Assert.Equal("UTC", options[0]);
+        Assert.Contains("Europe/Kyiv", options);
+        Assert.Contains("America/New_York", options);
+        Assert.DoesNotContain("Europe/Kiev", options);
+        Assert.Equal(zone, SelectedOf(html));
+        Assert.Contains(">Save</button>", html, StringComparison.Ordinal);
+        var timeZoneForm = html.IndexOf("Time zone</span>", StringComparison.Ordinal);
+        Assert.True(timeZoneForm >= 0 && timeZoneForm < html.IndexOf("Change password", StringComparison.Ordinal), "Time zone comes before Change password.");
+        Assert.DoesNotContain(TimeZoneNotice, html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HP_015_a_stored_link_that_is_not_in_the_list_is_added_and_selected()
+    {
+        const string email = "kiev.profile@example.com";
+        await HostClient.DeleteUserAsync(host.ConnectionString, email);
+        await host.CreateAccountAsync(email, Password, timeZone: "Europe/Kiev");
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+
+        var (_, html) = await browser.GetPageAsync("/profile");
+
+        var options = OptionsOf(html);
+        Assert.Single(options, o => o == "Europe/Kiev");
+        Assert.Contains("Europe/Kyiv", options);
+        Assert.Equal("Europe/Kiev", SelectedOf(html));
+    }
+
+    [Fact]
+    public async Task HP_015_a_change_shows_the_Notice_selects_the_new_zone_and_stores_it()
+    {
+        const string email = "change.zone.profile@example.com";
+        await HostClient.DeleteUserAsync(host.ConnectionString, email);
+        var account = await host.CreateAccountAsync(email, Password, timeZone: "Europe/Kyiv");
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+        var form = await browser.GetFormAsync("/profile", "time-zone");
+
+        using var response = await browser.PostFormAsync("/profile", form, [new("Input.TimeZone", "America/New_York")]);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("<div class=\"ht-notice\" role=\"status\">", html, StringComparison.Ordinal);
+        Assert.Contains(TimeZoneNotice, html, StringComparison.Ordinal);
+        Assert.Equal("America/New_York", SelectedOf(html));
+        Assert.Equal("America/New_York", await StoredZoneAsync(account.Id));
+    }
+
+    [Fact]
+    public async Task HP_015_a_value_that_is_not_a_named_time_zone_shows_the_refusal_under_the_field_and_keeps_the_zone()
+    {
+        const string email = "refused.zone.profile@example.com";
+        await HostClient.DeleteUserAsync(host.ConnectionString, email);
+        var account = await host.CreateAccountAsync(email, Password, timeZone: "Europe/Kyiv");
+        using var browser = host.CreateBrowser();
+        await SignInAsync(browser, email, Password, keepSignedIn: false);
+        var form = await browser.GetFormAsync("/profile", "time-zone");
+
+        using var response = await browser.PostFormAsync("/profile", form, [new("Input.TimeZone", "Mars/Olympus")]);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("<span class=\"ht-field__error\" id=\"profile-time-zone-error\">Choose a time zone from the list.</span>", html, StringComparison.Ordinal);
+        Assert.Contains("aria-invalid=\"true\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(TimeZoneNotice, html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Mars/Olympus", html, StringComparison.Ordinal);
+        Assert.Equal("Europe/Kyiv", SelectedOf(html));
+        Assert.Equal("Europe/Kyiv", await StoredZoneAsync(account.Id));
+    }
+
+    private async Task<string?> StoredZoneAsync(AccountId id)
+    {
+        await using var scope = host.Services.CreateAsyncScope();
+        return (await scope.ServiceProvider.GetRequiredService<IAccountStore>().FindByIdAsync(id, CancellationToken.None))?.StoredTimeZone;
+    }
+
+    [GeneratedRegex("""<option value="(?<value>[^"]*)"[^>]*>""")]
+    private static partial Regex OptionPattern();
+
+    [GeneratedRegex("""<option value="(?<value>[^"]*)" selected[^>]*>""")]
+    private static partial Regex SelectedPattern();
 
     private static string? RedirectTarget(HttpResponseMessage response, HttpClient browser) =>
         response.Headers.Location is { } location ? new Uri(browser.BaseAddress!, location).AbsoluteUri : null;

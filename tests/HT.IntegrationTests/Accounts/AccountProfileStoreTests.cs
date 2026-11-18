@@ -83,6 +83,39 @@ public sealed class AccountProfileStoreTests(DatabaseFixture database)
     }
 
     [Fact]
+    public async Task A_password_change_of_a_user_loaded_before_a_time_zone_change_committed_keeps_the_new_zone_and_the_revision()
+    {
+        const string email = "it-ap-stale-zone@example.com";
+        await Sql.DeleteUserAsync(database.ConnectionString, email);
+        AccountId owner;
+        await using (var scope = database.CreateScope())
+        {
+            var profile = new NewAccountProfile(null, Zone("Europe/Kyiv"), new DateTimeOffset(2026, 11, 11, 9, 0, 0, TimeSpan.Zero));
+            owner = (await scope.ServiceProvider.GetRequiredService<IAccountStore>()
+                .CreateAsync(EmailOf(email), Role.RegisteredUser, Password, profile, CancellationToken.None)).Account!.Id;
+        }
+
+        await using var stale = database.CreateScope();
+        var users = stale.ServiceProvider.GetRequiredService<UserManager<HtUser>>();
+        var user = (await users.FindByIdAsync(owner.Value.ToString()))!;
+        Assert.Equal(("Europe/Kyiv", 0), (user.TimeZone, user.GoalsRevision));
+
+        await using (var other = database.CreateScope())
+        {
+            var result = await other.ServiceProvider.GetRequiredService<ProfileService>().ChangeTimeZoneAsync(
+                ActingUser.ForAccount(owner, Role.RegisteredUser), "America/New_York", CancellationToken.None);
+            Assert.Equal(TimeZoneChangeOutcome.Changed, result.Outcome);
+        }
+
+        var changed = await users.ChangePasswordAsync(user, Password, "running34");
+
+        Assert.True(changed.Succeeded);
+        Assert.Equal(((string?)"America/New_York", 1), await AccountStateAsync(database.ConnectionString, owner));
+        await using var check = database.CreateScope();
+        Assert.NotNull(await check.ServiceProvider.GetRequiredService<IAccountStore>().CheckPasswordAsync(owner, "running34", CancellationToken.None));
+    }
+
+    [Fact]
     public async Task A_password_change_of_a_user_loaded_before_a_goal_was_created_keeps_the_zone_and_the_revision()
     {
         const string email = "it-ap-stale@example.com";

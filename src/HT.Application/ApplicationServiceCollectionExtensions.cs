@@ -25,6 +25,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<CatalogAdministrationService>();
         services.AddScoped<CustomHabitService>();
         services.AddScoped<GoalService>();
+        services.AddScoped<ProfileService>();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton(InstallationTimeZone.From(null));
         return services;

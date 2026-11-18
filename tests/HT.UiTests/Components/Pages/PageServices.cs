@@ -49,8 +49,8 @@ public static class PageServices
     /// <summary>
     /// Registers, each with TryAdd, the goal fakes every page test resolves: a <see cref="FakeCustomHabitStore"/>, a
     /// <see cref="FakeAccountStore"/> that knows every signed-in user, a <see cref="FakeGoalStore"/> built from the
-    /// registered fakes, a <see cref="FakeTimeProvider"/>, the UTC <see cref="InstallationTimeZone"/> and the
-    /// <see cref="GoalService"/> over them. Returns the
+    /// registered fakes, a <see cref="FakeTimeProvider"/>, the UTC <see cref="InstallationTimeZone"/>, and the
+    /// <see cref="GoalService"/> and <see cref="ProfileService"/> over them. Returns the
     /// registered goal store. The catalog store is the one <see cref="AddCatalog"/> registered, or a new one.
     /// </summary>
     public static FakeGoalStore AddGoals(this BunitContext context)
@@ -72,6 +72,7 @@ public static class PageServices
         services.TryAddSingleton<TimeProvider>(new FakeTimeProvider());
         services.TryAddSingleton(InstallationTimeZone.From(null));
         services.TryAddScoped<GoalService>();
+        services.TryAddScoped<ProfileService>();
         return Registered<IGoalStore, FakeGoalStore>(services);
     }
 
