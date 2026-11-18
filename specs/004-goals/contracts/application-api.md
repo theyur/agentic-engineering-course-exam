@@ -56,7 +56,11 @@ The rules behind these outcomes:
   - `CatalogSuggestionText` is `GoalText.TargetText` of the suggestion's values, or null when no suggestion
     was used.
 
-  With no habit, only `StartDate` is set (US8-AS4).
+  With no habit, only `StartDate` is set (US8-AS4), and a suggestion position is ignored. A custom habit has no
+  suggested starting goals, so any position gives `SuggestionNotFound`, as a position below 1 or above the catalog
+  habit's count does. A suggestion that is not a valid goal target (a Reduce amount of several times per period)
+  keeps slice 2's text as `CatalogSuggestionText`; for every other suggestion that text equals the goal rules' text.
+  `GoalHabitView.Icon` is set in the starting values (the Habit section's glyph, HP-001).
 - **The schedule text**: `GoalListItem.ScheduleText` and `GoalDetails.ScheduleText` are `GoalText.ScheduleText` of the
   goal's target ("Mon · Wed · Fri", "Every day", "Flexible · 3 times a week"). The list has no days, so the Goals
   page's meta line takes its schedule from it (HP-003, US2-AS6), and the Settings card's "Schedule" row too (HP-004).
@@ -132,7 +136,7 @@ The texts are defined once: `GoalTexts` (new), `AccountTexts` (extended), `Catal
 
 | Outcome | Text |
 |---|---|
-| `NotSignedIn` | "You are not signed in." (unchanged) |
+| `NotSignedIn` | "You are not signed in." (unchanged). A goal or profile use case also gives it, after the role check, when the acting user's account is not stored (deleted after sign-in, or a stale cookie): the spec defines no other outcome for it (FR-023), and it reveals nothing (`GoalService`, T058; `ProfileService`, T103). |
 | `NotForAdministrators` (goals, and "Only habits I track") | "Goals are for registered users." |
 | `HabitMissing` | "Choose a habit." |
 | `NotInCatalog` | "This habit is not in the catalog." (slice 2 text) |

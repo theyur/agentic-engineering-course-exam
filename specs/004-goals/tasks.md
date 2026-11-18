@@ -495,7 +495,7 @@ through the store with the same settings (US1-AS1, AS5).
 
 ### Tests for User Story 1
 
-- [ ] T053 [P] [US1] Create `tests/HT.UnitTests/Application/Goals/GoalStartingValuesTests.cs` for `StartNewGoalAsync` (depends on T057, T058):
+- [X] T053 [P] [US1] Create `tests/HT.UnitTests/Application/Goals/GoalStartingValuesTests.cs` for `StartNewGoalAsync` (depends on T057, T058):
   - US1-AS1: Reading without a position gives its marked suggestion's values, today's start date, no name, and "15 min, 5 days a week" as the catalog suggestion text;
   - US1-AS2: position 2 gives Count, 20 "pages", 3 times per week, and "20 pages, 3 times a week";
   - US1-AS3: a Reduce habit with no suggestion gives only the habit, Reduce and the start date;
@@ -508,7 +508,7 @@ through the store with the same settings (US1-AS1, AS5).
   - "today" uses the account's stored zone, or the installation's default when it is null;
   - a registered acting user with no account in the store gets "You are not signed in.";
   - the FR-023 order: an administrator with an unknown habit gets the role refusal, and an anonymous visitor gets "You are not signed in.".
-- [ ] T054 [P] [US1] Create `tests/HT.UnitTests/Application/Goals/GoalCreateTests.cs` for `CreateAsync` (depends on T057, T058):
+- [X] T054 [P] [US1] Create `tests/HT.UnitTests/Application/Goals/GoalCreateTests.cs` for `CreateAsync` (depends on T057, T058):
   - US1-AS5: unchanged starting values create a goal that the store holds with exactly those settings, version 1 with the account's zone, and attempt 1 on the start date (FR-018);
   - US1-AS6: Reduce, Count, at most 2 "cups", 1 time per day, with the target text "at most 2 cups a day";
   - US1-AS7: one test per FR-006 message, in order, each with its `Field`;
@@ -519,21 +519,21 @@ through the store with the same settings (US1-AS1, AS5).
   - an empty name gives no name;
   - one `TimeZoneChanged` from the store makes the service re-read the account and check the start date again in the new zone. Ten in a row throw a fault exception whose message contains no value;
   - a refusal echoes no input value (HP-011).
-- [ ] T055 [P] [US1] Add a test to `tests/HT.UnitTests/Application/Operator/SeedCatalogTests.cs` for SC-004 and FR-007: for every Published seed catalog habit (the ones `CatalogService.BrowseAsync` returns, so not the Draft "Music practice" or the Unpublished "Coffee") and every suggestion position, `StartNewGoalAsync` followed by `CreateAsync` with the starting values unchanged gives `Created` (depends on T058)
-- [ ] T056 [P] [US1] Create `tests/HT.IntegrationTests/Goals/GoalCreationTests.cs` on `HT-IT` (depends on T058, T046):
+- [X] T055 [P] [US1] Add a test to `tests/HT.UnitTests/Application/Operator/SeedCatalogTests.cs` for SC-004 and FR-007: for every Published seed catalog habit (the ones `CatalogService.BrowseAsync` returns, so not the Draft "Music practice" or the Unpublished "Coffee") and every suggestion position, `StartNewGoalAsync` followed by `CreateAsync` with the starting values unchanged gives `Created` (depends on T058)
+- [X] T056 [P] [US1] Create `tests/HT.IntegrationTests/Goals/GoalCreationTests.cs` on `HT-IT` (depends on T058, T046):
   - creation through `GoalService` on a Published catalog habit, read back through `IGoalStore.FindAsync`;
   - the race of a goal created against an unpublish, forced with two contexts: no goal exists on a habit that was Unpublished at commit, and creation gives "This habit is not in the catalog.";
   - log capture for HP-011 (`LogCapture`): a creation and each kind of refusal, with a distinctive goal name, unit and amount, leave none of them in any log entry or exception text.
 
 ### Implementation for User Story 1
 
-- [ ] T057 [US1] Create `src/HT.Application/Goals/GoalResults.cs`:
+- [X] T057 [US1] Create `src/HT.Application/Goals/GoalResults.cs`:
   - `GoalStartOutcome` and `GoalStartResult`, with `StartingValues`;
   - `GoalCreateOutcome`, in the check order of data-model.md;
   - `GoalCreateResult`, with `Message`, `Field` (`GoalField?`) and `GoalId?`.
 
   Depends on T039 and T036.
-- [ ] T058 [US1] Create `src/HT.Application/Goals/GoalService.cs` (depends on T040, T041, T057):
+- [X] T058 [US1] Create `src/HT.Application/Goals/GoalService.cs` (depends on T040, T041, T057):
   - its constructor takes `IGoalStore`, `IAccountStore`, `ICatalogHabitStore`, `ICustomHabitStore`, `TimeProvider` and `InstallationTimeZone`;
   - `StartNewGoalAsync` and `CreateAsync` follow contracts/application-api.md and FR-023's order;
   - one shared habit lookup, through `ICatalogHabitStore.FindPublishedAsync` or `ICustomHabitStore.FindAsync(owner, …)`;
@@ -544,14 +544,14 @@ through the store with the same settings (US1-AS1, AS5).
   - `HabitGone` maps to FR-008's texts.
 
   Register it as scoped in `ApplicationServiceCollectionExtensions.cs`, add it to `AddGoals` in `PageServices.cs`, and add `GoalService` to `SignedInServices` in `tests/HT.ArchitectureTests/UseCaseParameterTests.cs`.
-- [ ] T059 [P] [US1] Create `src/HT.Application/Goals/GoalSummaryText.cs` and `tests/HT.UnitTests/Application/Goals/GoalSummaryTextTests.cs` (HP-002, research R-11; depends on T026, T037, T005):
+- [X] T059 [P] [US1] Create `src/HT.Application/Goals/GoalSummaryText.cs` and `tests/HT.UnitTests/Application/Goals/GoalSummaryTextTests.cs` (HP-002, research R-11; depends on T026, T037, T005):
   - the sentence: the habit name, ": ", "at least " for a Build count or duration goal only, the target text, ", starting " and the start date as `ShortDate`, then ".". The tests use HP-002's three examples;
   - Evaluated, "Met when", "Streak counted in" and "Late records" for each schedule kind, with the values T005 wrote;
   - the catalog suggestion line only when a suggestion was used;
   - the first-week line for a per-week goal whose start date is not a Monday, and none for a Monday;
   - the incomplete-form state of T005 while the target does not pass the checks.
-- [ ] T060 [P] [US1] Create `src/HT.Ui/Components/Shared/ChoiceCard.razor`, following `design/components/ChoiceCard`, with its bUnit tests (selected state as text and not by color alone, keyboard focus) in `tests/HT.UiTests/Components/Shared/SharedComponentTests.cs` (depends on T018)
-- [ ] T061 [US1] Build the New goal page (HP-001, HP-002, contracts/host.md; depends on T058, T059, T060):
+- [X] T060 [P] [US1] Create `src/HT.Ui/Components/Shared/ChoiceCard.razor`, following `design/components/ChoiceCard`, with its bUnit tests (selected state as text and not by color alone, keyboard focus) in `tests/HT.UiTests/Components/Shared/SharedComponentTests.cs` (depends on T018)
+- [X] T061 [US1] Build the New goal page (HP-001, HP-002, contracts/host.md; depends on T058, T059, T060):
   - `src/HT.Ui/Components/Goals/NewGoalForm.razor`: the sections of HP-001, with SegmentedControl, ChoiceCard, Stepper (minimum 0 for Reduce and 1 for Build, maximum 999) and DayPicker. "At least" switches to "At most" for Reduce;
   - `HabitChooser.razor`: an `HtDialog` with a SearchField over `CatalogService.BrowseAsync(CatalogFilter)` and `CustomHabitService.ListAsync`;
   - `GoalSummaryCard.razor`, which calls `GoalSummaryText` on every change;
@@ -562,7 +562,7 @@ through the store with the same settings (US1-AS1, AS5).
     - each refusal shows under its `Field`;
     - success navigates to `/goals/{id}`;
     - the BackLink goes to the habit's details, the custom habit page, or `/goals` when the address names no habit.
-- [ ] T062 [P] [US1] Create `tests/HT.UiTests/Components/Pages/NewGoalPageTests.cs` (depends on T061):
+- [X] T062 [P] [US1] Create `tests/HT.UiTests/Components/Pages/NewGoalPageTests.cs` (depends on T061):
   - the head line for a catalog habit, a custom habit and no habit (US8-AS3);
   - the sections and their wording;
   - US1-AS11: the summary card rewrites on every change, and Reduce switches the target word to "At most";
@@ -570,7 +570,7 @@ through the store with the same settings (US1-AS1, AS5).
   - the habit chooser opens, moves focus into the Dialog, searches, and closes back to the Change button;
   - a refused address value;
   - success navigates to the goal page.
-- [ ] T063 [P] [US1] Create `tests/HT.UiTests/Host/GoalsHostTests.cs` with the `/goals/new` cases: a signed-out visitor is sent to Sign in, an administrator gets the Not found page (404), and a registered user gets the page (depends on T061)
+- [X] T063 [P] [US1] Create `tests/HT.UiTests/Host/GoalsHostTests.cs` with the `/goals/new` cases: a signed-out visitor is sent to Sign in, an administrator gets the Not found page (404), and a registered user gets the page (depends on T061)
 
 **Checkpoint**: full suite green. A goal can be created on `/goals/new`; its page arrives with US2. Commit.
 

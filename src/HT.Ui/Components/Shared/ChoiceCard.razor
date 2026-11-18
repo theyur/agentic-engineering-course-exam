@@ -1,0 +1,40 @@
+@typeparam TValue where TValue : struct
+@* design/components/ChoiceCard: radio options shown as cards with a title and one line of description, in
+   div.ht-choices[role=radiogroup]: label.ht-choice with a native input[type=radio], ht-choice__title and
+   ht-choice__desc. The native radio shows the choice and takes the keyboard (Tab into the group, arrows between
+   its options); the accent border and fill only repeat it. None is checked until the user chooses. *@
+<div class="ht-choices" role="radiogroup" aria-labelledby="@LabelledBy" aria-describedby="@DescribedBy">
+    @foreach (var option in Options)
+    {
+        <label class="ht-choice">
+            <input type="radio" name="@Name" checked="@Equals(option.Value, Value)" @onchange="() => ValueChanged.InvokeAsync(option.Value)" />
+            <span class="ht-choice__title">@option.Title</span>
+            <span class="ht-choice__desc">@option.Description</span>
+        </label>
+    }
+</div>
+
+@code {
+    /// <summary>The 2 to 4 options in order, each with its title and a few words of description.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<(TValue Value, string Title, string Description)> Options { get; set; } = [];
+
+    /// <summary>The chosen option; null until the user chooses.</summary>
+    [Parameter]
+    public TValue? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<TValue> ValueChanged { get; set; }
+
+    /// <summary>The radios' shared name, unique on the page.</summary>
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The id of the heading that names the group ("How do you measure it?").</summary>
+    [Parameter, EditorRequired]
+    public string LabelledBy { get; set; } = string.Empty;
+
+    /// <summary>The id of an error text about this choice.</summary>
+    [Parameter]
+    public string? DescribedBy { get; set; }
+}

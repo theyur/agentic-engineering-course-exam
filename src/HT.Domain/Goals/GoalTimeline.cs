@@ -131,7 +131,17 @@ public static class GoalTimeline
     public static DateOnly? FirstWeekStart(Goal goal)
     {
         ArgumentNullException.ThrowIfNull(goal);
-        return goal.Target.PeriodLength == SchedulePeriod.Week ? MondayOnOrAfter(goal.StartDate) : null;
+        return FirstWeekStart(goal.Target, goal.StartDate);
+    }
+
+    /// <summary>
+    /// The same date for a goal not created yet, from its target and start date: the first Monday on or after
+    /// <paramref name="startDate"/> for a per-week target (the New goal summary card, HP-002). Null for other targets.
+    /// </summary>
+    public static DateOnly? FirstWeekStart(GoalTarget target, DateOnly startDate)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return target.PeriodLength == SchedulePeriod.Week ? MondayOnOrAfter(startDate) : null;
     }
 
     /// <summary>

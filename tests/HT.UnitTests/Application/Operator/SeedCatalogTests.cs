@@ -1,5 +1,9 @@
+using HT.Application.Goals;
+using HT.Application.Habits;
 using HT.Application.Operator;
+using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.UnitTests.Application.Goals;
 
 namespace HT.UnitTests.Application.Operator;
 
@@ -125,6 +129,57 @@ public sealed class SeedCatalogTests
     {
         Assert.All(DemoDataService.DemoEmails, email => Assert.Equal(2, DemoCustomHabits.For(email).Count));
         Assert.Throws<ArgumentException>(() => DemoCustomHabits.For("demo4@example.com"));
+    }
+
+    [Fact]
+    public async Task SC_004_every_suggestion_of_every_Published_seed_habit_creates_a_goal_unchanged()
+    {
+        var world = new GoalWorld();
+        foreach (var seed in Habits)
+        {
+            world.CatalogHabits.Add(new CatalogHabit(new HabitId(Guid.NewGuid()), seed.Definition, seed.SuggestedStartingGoals, seed.State));
+        }
+
+        var browsed = (await new CatalogService(world.CatalogHabits).BrowseAsync(new CatalogFilter(), CancellationToken.None)).Habits;
+        Assert.Equal(Published.Count, browsed.Count);
+        Assert.DoesNotContain(browsed, h => h.Name is "Music practice" or "Coffee");
+        var user = GoalInputs.RegisteredUser(world.Accounts);
+        var created = 0;
+        foreach (var habit in browsed)
+        {
+            var count = world.CatalogHabits.Get(habit.Id)!.SuggestedStartingGoals.Count;
+            foreach (var position in Enumerable.Range(1, count))
+            {
+                var started = await world.Service.StartNewGoalAsync(user, new GoalHabit(habit.Id, HabitKind.Catalog), position, CancellationToken.None);
+                Assert.Equal(GoalStartOutcome.Started, started.Outcome);
+                var values = started.StartingValues!;
+
+                var result = await world.Service.CreateAsync(user, new GoalInput
+                {
+                    Habit = new GoalHabit(values.Habit!.Id, values.Habit.Kind),
+                    Target = new GoalTargetFields
+                    {
+                        BuildOrReduce = values.BuildOrReduce,
+                        Measurement = values.Measurement,
+                        Amount = values.Amount,
+                        CountUnit = values.CountUnit,
+                        DurationUnit = values.DurationUnit,
+                        ScheduleKind = values.ScheduleKind,
+                        Days = values.Days,
+                        Times = values.Times,
+                        Period = values.Period,
+                    },
+                    StartDate = values.StartDate,
+                    Name = values.Name,
+                }, CancellationToken.None);
+
+                Assert.True(result.Outcome == GoalCreateOutcome.Created, $"{habit.Name} {position}: {result.Outcome}");
+                created++;
+            }
+        }
+
+        Assert.Equal(browsed.Sum(h => world.CatalogHabits.Get(h.Id)!.SuggestedStartingGoals.Count), created);
+        Assert.True(created > 0);
     }
 
     private static SuggestedStartingGoalFields Fields(SuggestedStartingGoal goal) => new()

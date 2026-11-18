@@ -30,6 +30,18 @@ public static class GoalText
             target.BuildOrReduce, target.Measurement, target.Amount, target.CountUnit, target.DurationUnit, target.Schedule);
     }
 
+    /// <summary>
+    /// The amount part of the target text: for count "N unit" with the unit as stored ("20 pages", "1 sweet"), for
+    /// duration "N min" or "N h"; null for yes/no, which has none. The New goal summary card's "Met when" uses it (HP-002).
+    /// </summary>
+    public static string? AmountText(GoalTarget target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return target.Measurement == Measurement.YesNo
+            ? null
+            : TargetTextParts.AmountPart(target.Measurement, target.Amount, target.CountUnit, target.DurationUnit);
+    }
+
     /// <summary>The kind: "Yes/no", "Count" or "Duration", " · ", then "flexible" or "fixed days " and the days ("Duration · fixed days Mon–Fri").</summary>
     public static string Kind(GoalTarget target)
     {

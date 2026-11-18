@@ -1,4 +1,5 @@
 using Bunit;
+using HT.Domain.Habits;
 using HT.Ui.Components.Shared;
 
 namespace HT.UiTests.Components.Shared;
@@ -86,5 +87,74 @@ public sealed class SharedComponentTests : BunitContext
         var cut = Render<KeyValue>(p => p.Add(x => x.Rows, []));
 
         Assert.Empty(cut.Find("dl.ht-kv").Children);
+    }
+
+    private static readonly IReadOnlyList<(Measurement, string, string)> MeasureChoices =
+    [
+        (Measurement.YesNo, "Yes / no", "Did it or not"),
+        (Measurement.Count, "Count", "Times, pages, cups"),
+        (Measurement.Duration, "Duration", "Minutes or hours"),
+    ];
+
+    private IRenderedComponent<ChoiceCard<Measurement>> RenderChoices(Measurement? value, Action<Measurement>? changed = null) =>
+        Render<ChoiceCard<Measurement>>(p => p
+            .Add(x => x.Options, MeasureChoices)
+            .Add(x => x.Value, value)
+            .Add(x => x.Name, "measure")
+            .Add(x => x.LabelledBy, "measure-title")
+            .Add(x => x.DescribedBy, "measure-error")
+            .Add(x => x.ValueChanged, (Measurement m) => changed?.Invoke(m)));
+
+    [Fact]
+    public void ChoiceCard_renders_a_labelled_radio_group_of_cards_with_title_and_description()
+    {
+        var cut = RenderChoices(null);
+
+        var group = cut.Find("div.ht-choices");
+        Assert.Equal("radiogroup", group.GetAttribute("role"));
+        Assert.Equal("measure-title", group.GetAttribute("aria-labelledby"));
+        Assert.Equal("measure-error", group.GetAttribute("aria-describedby"));
+        Assert.Equal(["Yes / no", "Count", "Duration"], cut.FindAll("label.ht-choice .ht-choice__title").Select(e => e.TextContent));
+        Assert.Equal(["Did it or not", "Times, pages, cups", "Minutes or hours"], cut.FindAll("label.ht-choice .ht-choice__desc").Select(e => e.TextContent));
+        Assert.All(cut.FindAll("label.ht-choice"), label => Assert.NotNull(label.QuerySelector("input[type=radio]")));
+        Assert.All(cut.FindAll("input[type=radio]"), radio => Assert.False(radio.HasAttribute("checked")));
+    }
+
+    [Fact]
+    public void ChoiceCard_shows_the_choice_by_the_native_checked_radio_not_by_colour_alone()
+    {
+        var cut = RenderChoices(Measurement.Duration);
+
+        var radios = cut.FindAll("input[type=radio]");
+        Assert.Equal([false, false, true], radios.Select(r => r.HasAttribute("checked")));
+        // The card's look only repeats the radio's state: every card has the same classes, chosen or not.
+        Assert.All(cut.FindAll("label"), label => Assert.Equal("ht-choice", label.ClassName));
+    }
+
+    [Fact]
+    public void ChoiceCard_is_reached_by_keyboard_as_one_radio_group()
+    {
+        var cut = RenderChoices(Measurement.Count);
+
+        var radios = cut.FindAll("input[type=radio]");
+        Assert.Equal(3, radios.Count);
+        Assert.All(radios, radio =>
+        {
+            Assert.Equal("measure", radio.GetAttribute("name"));
+            Assert.False(radio.HasAttribute("tabindex"));
+            Assert.False(radio.HasAttribute("disabled"));
+            Assert.False(radio.HasAttribute("hidden"));
+        });
+    }
+
+    [Fact]
+    public void ChoiceCard_reports_the_chosen_option()
+    {
+        Measurement? chosen = null;
+        var cut = RenderChoices(null, m => chosen = m);
+
+        cut.FindAll("input[type=radio]")[1].Change(true);
+
+        Assert.Equal(Measurement.Count, chosen);
     }
 }

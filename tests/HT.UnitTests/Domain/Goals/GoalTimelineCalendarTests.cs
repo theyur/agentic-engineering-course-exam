@@ -239,6 +239,15 @@ public class GoalTimelineCalendarTests
     }
 
     [Fact]
+    public void FirstWeekStart_of_a_target_and_a_start_date_matches_the_goals()
+    {
+        Assert.Equal(MondayAfter, GoalTimeline.FirstWeekStart(PerWeek(), Wednesday));
+        Assert.Equal(MondayAfter, GoalTimeline.FirstWeekStart(PerWeek(), MondayAfter));
+        Assert.Null(GoalTimeline.FirstWeekStart(PerDay(), Wednesday));
+        Assert.Null(GoalTimeline.FirstWeekStart(OnDays(MonWedFri), Wednesday));
+    }
+
+    [Fact]
     public void Only_a_per_week_goal_has_a_first_week()
     {
         Assert.Null(GoalTimeline.FirstWeekStart(Goal(PerDay(), Wednesday, Kyiv)));

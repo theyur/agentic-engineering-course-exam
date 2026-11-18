@@ -166,6 +166,24 @@ public class GoalTextTests
         Assert.Equal((9 * 3 * 2) - (2 * 2), Schedules.Count);
     }
 
+    [Theory]
+    [MemberData(nameof(Amounts))]
+    public void AmountText_is_the_amount_part_of_the_target_text(GoalTargetFields fields, string? amount)
+    {
+        Assert.Equal(amount, GoalText.AmountText(Target(fields)));
+    }
+
+    public static TheoryData<GoalTargetFields, string?> Amounts => new()
+    {
+        { DurationDays(15, DurationUnit.Minutes, BuildOrReduce.Build, Weekdays), "15 min" },
+        { DurationTimes(1, DurationUnit.Hours, 1, SchedulePeriod.Day, BuildOrReduce.Reduce), "1 h" },
+        { CountTimes(20, "pages", 3, SchedulePeriod.Week), "20 pages" },
+        { CountTimes(1, "sweet", 1, SchedulePeriod.Day, BuildOrReduce.Reduce), "1 sweet" },
+        { CountDays(0, "cigarettes", BuildOrReduce.Reduce, AllDays), "0 cigarettes" },
+        { YesNoTimes(3, SchedulePeriod.Week), null },
+        { YesNoDays(BuildOrReduce.Reduce, AllDays), null },
+    };
+
     [Fact]
     public void No_culture_is_read()
     {

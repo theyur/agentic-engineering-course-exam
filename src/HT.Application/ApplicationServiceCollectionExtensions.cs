@@ -1,4 +1,5 @@
 using HT.Application.Accounts;
+using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Application.Operator;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<CatalogService>();
         services.AddScoped<CatalogAdministrationService>();
         services.AddScoped<CustomHabitService>();
+        services.AddScoped<GoalService>();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton(InstallationTimeZone.From(null));
         return services;
