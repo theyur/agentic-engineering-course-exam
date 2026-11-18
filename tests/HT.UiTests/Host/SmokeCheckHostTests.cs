@@ -9,8 +9,9 @@ namespace HT.UiTests.Host;
 /// HP-017, SC-005 (research R-11): the smoke check in process against a real host on database <c>HT-UI-SMOKE</c>,
 /// reset before each case, with check 2 skipped (no HTTP front end). A freshly seeded host passes every check; a
 /// demo password that fails the password rule (no demo accounts, no seed catalog) fails <c>catalog</c> and every
-/// <c>demo</c> check; a demo account that lost a custom habit fails that account's check only. The output never
-/// contains a password, the administrator email or a demo custom-habit name.
+/// <c>demo</c> check; a demo account that lost a custom habit or a goal fails that account's check only. The output
+/// never contains a password, the administrator email, a demo custom-habit name, a demo goal name or demo1's account
+/// name (slice 4 HP-018).
 /// </summary>
 [Collection(DerivedDatabaseHostCollection.Name)]
 public sealed partial class SmokeCheckHostTests
@@ -34,8 +35,25 @@ public sealed partial class SmokeCheckHostTests
         Assert.Equal(
             ["home", "https-redirect", "catalog", "administrator", .. DemoDataService.DemoEmails.Select(e => "demo " + e)],
             result.CheckLines.Select(CheckName));
+
+        // Slice 4 HP-018: each demo line counts its custom habits, its goal names and, for demo1, its account name.
+        Assert.Equal("PASS demo demo1@example.com (5 of 5)", Line(result, "demo demo1@example.com"));
+        Assert.Equal("PASS demo demo2@example.com (4 of 4)", Line(result, "demo demo2@example.com"));
+        Assert.Equal("PASS demo demo3@example.com (5 of 5)", Line(result, "demo demo3@example.com"));
         Assert.Matches(LaterTiming(), result.TimingLine);
         Assert.True(result.LaterRequests >= 1);
+    }
+
+    [Fact]
+    public async Task A_demo_account_that_lost_a_goal_fails_only_its_own_check()
+    {
+        const string affected = "demo3@example.com";
+
+        var (result, _) = await RunAsync(DemoPassword, host => DeleteOneGoalAsync(host.ConnectionString, affected));
+
+        Assert.False(result.Passed);
+        var failed = Assert.Single(result.CheckLines, line => line.StartsWith(SmokeCheckRunner.FailPrefix, StringComparison.Ordinal));
+        Assert.Equal($"FAIL demo {affected}: 2 of 3 goals shown", failed);
     }
 
     [Fact]
@@ -101,6 +119,8 @@ public sealed partial class SmokeCheckHostTests
             AdministratorEmail,
             AdministratorPassword,
             .. DemoDataService.DemoEmails.SelectMany(DemoCustomHabits.For).Select(h => h.Name.Value),
+            .. DemoDataService.DemoEmails.SelectMany(DemoGoals.DisplayNames),
+            DemoAccounts.Demo1Name,
         ];
         Assert.All(forbidden, value => Assert.DoesNotContain(value, text, StringComparison.OrdinalIgnoreCase));
         return (result, text);
@@ -126,6 +146,22 @@ public sealed partial class SmokeCheckHostTests
             DELETE TOP (1) habit
             FROM [CustomHabits] AS habit
             JOIN [AspNetUsers] AS owner ON owner.[Id] = habit.[OwnerId]
+            WHERE owner.[UserName] = @email
+            """,
+            connection);
+        command.Parameters.AddWithValue("@email", email);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
+    private static async Task DeleteOneGoalAsync(string connectionString, string email)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(
+            """
+            DELETE TOP (1) goal
+            FROM [Goals] AS goal
+            JOIN [AspNetUsers] AS owner ON owner.[Id] = goal.[OwnerId]
             WHERE owner.[UserName] = @email
             """,
             connection);

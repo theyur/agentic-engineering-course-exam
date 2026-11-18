@@ -6,7 +6,9 @@ namespace HT.UiTests.Operator;
 
 /// <summary>
 /// Slice 1 HP-021: demo loading runs at every start, right after administrator creation, and never logs the password.
-/// Slice 2 HP-017: its custom-habit and catalog results are logged too, never with a custom-habit name.
+/// Slice 2 HP-017: its custom-habit and catalog results are logged too, never with a custom-habit name. Slice 4
+/// HP-013: the catalog line comes first, and each created account's goal line follows its custom-habit line; no line
+/// holds a goal, habit or account name.
 /// </summary>
 [Collection(StartupTasksCollection.Name)]
 public sealed class StartupTasksDemoTests
@@ -21,16 +23,17 @@ public sealed class StartupTasksDemoTests
     {
         var log = await StartupTasksHarness.RunAsync("Development", Configured(DemoPassword));
 
-        // HP-017: each account line is followed by its custom-habit line; the catalog line comes once, last.
+        // Slice 4 HP-013: the catalog line once, first; then each account line, its custom-habit line and its goal line.
         AssertDemoLines(
             log,
             [
+                "Demo catalog: seed catalog loaded",
                 .. Emails.SelectMany(email => new[]
                 {
                     $"Demo account {email}: created",
                     $"Demo custom habits {email}: demo custom habits added",
+                    $"Demo goals {email}: demo goals added",
                 }),
-                "Demo catalog: seed catalog loaded",
             ]);
     }
 
@@ -41,21 +44,35 @@ public sealed class StartupTasksDemoTests
 
         var log = await StartupTasksHarness.RunWithoutDropAsync("Development", Configured(DemoPassword));
 
-        // HP-017: an existing account has no custom-habit line; the catalog is not empty any more.
+        // An existing account has no custom-habit line and no goal line; the catalog is not empty any more and comes first.
         AssertDemoLines(
             log,
-            [.. Emails.Select(email => $"Demo account {email}: already exists"), "Demo catalog: catalog not empty"]);
+            ["Demo catalog: catalog not empty", .. Emails.Select(email => $"Demo account {email}: already exists")]);
     }
 
     [Fact]
-    public async Task No_log_entry_contains_a_demo_custom_habit_name()
+    public async Task No_log_entry_contains_a_demo_custom_habit_goal_or_account_name()
     {
         var first = await StartupTasksHarness.RunAsync("Development", Configured(DemoPassword));
         var second = await StartupTasksHarness.RunWithoutDropAsync("Development", Configured(DemoPassword));
-        var names = Emails.SelectMany(DemoCustomHabits.For).Select(h => h.Name.Value).ToList();
+
+        // "Reading" alone is left out: framework messages may contain the word; the goal names that hold it are in.
+        var names = Emails.SelectMany(DemoCustomHabits.For).Select(h => h.Name.Value)
+            .Concat(Emails.SelectMany(DemoGoals.DisplayNames))
+            .Concat(["Yoga", "Meditation", "Sugar", "Coffee", DemoAccounts.Demo1Name, "sweet", "cups"])
+            .ToList();
 
         Assert.All(first.Concat(second), e => Assert.DoesNotContain(
             names, name => (e.Message + e.Exception).Contains(name, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
+    public async Task Every_demo_goals_line_holds_the_demo_email_and_the_result_text_only()
+    {
+        var log = await StartupTasksHarness.RunAsync("Development", Configured(DemoPassword));
+
+        var lines = log.Where(e => e.Message.StartsWith("Demo goals ", StringComparison.Ordinal)).Select(e => e.Message).ToList();
+        Assert.Equal([.. Emails.Select(email => $"Demo goals {email}: {OperatorTexts.DemoGoalsAdded}")], lines);
     }
 
     [Fact]
@@ -76,6 +93,7 @@ public sealed class StartupTasksDemoTests
         Assert.Contains(log, e => e.Message == "Demo loading: demo password does not meet the password rule");
         Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo account ", StringComparison.Ordinal));
         Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo custom habits ", StringComparison.Ordinal));
+        Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo goals ", StringComparison.Ordinal));
         Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo catalog", StringComparison.Ordinal));
         foreach (var email in Emails)
         {

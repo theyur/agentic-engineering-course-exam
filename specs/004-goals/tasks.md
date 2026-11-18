@@ -989,18 +989,18 @@ goals (US9-AS1, AS5).
 
 ### Tests for User Story 9
 
-- [ ] T122 [P] [US9] Create `tests/HT.UnitTests/Application/Operator/DemoGoalsTests.cs` (depends on T127):
+- [X] T122 [P] [US9] Create `tests/HT.UnitTests/Application/Operator/DemoGoalsTests.cs` (depends on T127):
   - `DemoGoals.For(email, today)` gives exactly the FR-040 goals per account, with `today` and `today + 7` for Meditation;
   - every target passes `GoalDraft`;
   - `DisplayNames(email)` gives "Reading, 15 min, 5 days a week", "No phone in bed, avoided every day", "Morning yoga", "Meditation, 10 min, 3 days a week", "Sugar, at most 1 sweet a day", "Late snacks, at most once a day" and "Coffee, at most 2 cups a day", each under its account;
   - the profile of demo1 has the name "Demo One", and demo2 and demo3 have none;
   - no demo goal uses "Cold shower", "Evening stretch" or "Plan tomorrow".
-- [ ] T123 [P] [US9] Rewrite `tests/HT.UnitTests/Application/Operator/DemoLoadingTests.cs` for the new order (depends on T129):
+- [X] T123 [P] [US9] Rewrite `tests/HT.UnitTests/Application/Operator/DemoLoadingTests.cs` for the new order (depends on T129):
   - rename and invert `The_work_runs_in_order_each_account_with_its_custom_habits_then_the_seed_catalog` and `An_existing_account_is_skipped_and_the_seed_catalog_still_comes_last`: the password checks, then the seed catalog, then each account;
   - a created account gets `Goals` "demo goals added", and an existing account gets none and nothing of its data is read;
   - "the day of the run" is `InstallationTimeZone`'s date at the supplied time, with a non-UTC default and a time just after its midnight;
   - the profile passes the default zone and the supplied `CreatedAt`.
-- [ ] T124 [P] [US9] Create `tests/HT.IntegrationTests/Operator/DemoGoalsTests.cs` on `HT-IT-SEED` (depends on T128, T129):
+- [X] T124 [P] [US9] Create `tests/HT.IntegrationTests/Operator/DemoGoalsTests.cs` on `HT-IT-SEED` (depends on T128, T129):
   - US9-AS1 and AS5 on an empty database:
     - each demo account's goals, through `GoalService.ListAsync` as that account;
     - demo3's "Coffee" goal with `Habit.IsInCatalog` false, read through `GoalService.GetAsync` (`GoalListItem` has no `IsInCatalog`);
@@ -1011,8 +1011,8 @@ goals (US9-AS1, AS5).
   - US9-AS4: `LogCapture` finds no goal name, habit name, account name or setting.
 
   Update `tests/HT.IntegrationTests/Operator/SeedCatalogLoadingTests.cs` only where its `CreateDemoAccountAsync` call gains the profile and an empty goal list. Its assertions stay.
-- [ ] T125 [P] [US9] Update `tests/HT.UiTests/Operator/StartupTasksDemoTests.cs` for HP-013: "Demo catalog" first, then for each demo email its account line, its custom-habit line and its new `Demo goals {Email}: {Result}` line. No line holds a goal, habit or account name (depends on T130)
-- [ ] T126 [P] [US9] Update the smoke check's tests (HP-018; depends on T131):
+- [X] T125 [P] [US9] Update `tests/HT.UiTests/Operator/StartupTasksDemoTests.cs` for HP-013: "Demo catalog" first, then for each demo email its account line, its custom-habit line and its new `Demo goals {Email}: {Result}` line. No line holds a goal, habit or account name (depends on T130)
+- [X] T126 [P] [US9] Update the smoke check's tests (HP-018; depends on T131):
   - `tests/HT.UiTests/SmokeChecks/RunnerBehaviourTests.cs`: `GoodSite()` scripts `GET /goals` with every display name in `ht-goalitem__name` links and `GET /profile` with "Demo One" as the first heading, plus failing cases for a missing goal name and a missing name;
   - `tests/HT.UiTests/SmokeChecks/PageReaderTests.cs`: `ReadGoalNames`, with entities, nested markup and other classes on the same element, as the `ReadHabitNames` tests do;
   - `tests/HT.UiTests/SmokeChecks/CoverageTests.cs`: its two new entries;
@@ -1020,14 +1020,14 @@ goals (US9-AS1, AS5).
 
 ### Implementation for User Story 9
 
-- [ ] T127 [US9] Create the demo goal types in `src/HT.Application/Operator/` (FR-040, research R-10):
+- [X] T127 [US9] Create the demo goal types in `src/HT.Application/Operator/` (FR-040, research R-10):
   - `DemoGoal`;
   - `DemoGoals`, with `For(email, today)` and `DisplayNames(email)` derived with `GoalText` and the seed habit names;
   - `DemoAccountProfile`;
   - `DemoGoalsResult`;
   - `DemoAccountResult.Goals`, a new `init` property;
   - `DemoAccounts.ProfileFor(email)`, a new static class `DemoAccounts` as research R-10 names it, which gives the account name ("Demo One" for demo1, none for demo2 and demo3). The emails stay in `DemoDataService.DemoEmails`.
-- [ ] T128 [US9] Extend the demo data port (research R-10, HP-018; depends on T127, T046):
+- [X] T128 [US9] Extend the demo data port (research R-10, HP-018; depends on T127, T046):
   - `IDemoDataStore.CreateDemoAccountAsync` gains `DemoAccountProfile profile` and `IReadOnlyList<DemoGoal> goals`. Its XML doc widens "the only read is whether the catalog is empty" to "the state of the named catalog habits";
   - `src/HT.Persistence/Habits/DemoDataStore.cs`, in the account's one transaction:
     - sets `HtUser`'s name, zone and `CreatedAt`;
@@ -1035,7 +1035,7 @@ goals (US9-AS1, AS5).
     - uses the identifiers it has just generated for the custom-habit positions, without reading them;
     - writes the qualifying goals, each with version 1 and attempt 1, and skips the others with no error;
   - `tests/HT.UnitTests/Fakes/FakeDemoDataStore.cs`.
-- [ ] T129 [US9] Extend `src/HT.Application/Operator/DemoDataService.cs` (FR-040; depends on T128):
+- [X] T129 [US9] Extend `src/HT.Application/Operator/DemoDataService.cs` (FR-040; depends on T128):
   - its constructor gains `TimeProvider` and `InstallationTimeZone`;
   - `LoadAsync` runs the password checks, then the seed catalog, then each account;
   - today is computed once in the default zone;
@@ -1043,8 +1043,8 @@ goals (US9-AS1, AS5).
   - goal results are set.
 
   Update the hand-built instances.
-- [ ] T130 [US9] In `src/HT.Ui/Operator/StartupTasks.cs`, log the lines in HP-013's order: `Demo catalog: {Result}` first, then per demo email its account line, its custom-habit line and `Demo goals {Email}: {Result}` (depends on T129)
-- [ ] T131 [US9] Extend the smoke check (HP-018; depends on T127, T069 and T120):
+- [X] T130 [US9] In `src/HT.Ui/Operator/StartupTasks.cs`, log the lines in HP-013's order: `Demo catalog: {Result}` first, then per demo email its account line, its custom-habit line and `Demo goals {Email}: {Result}` (depends on T129)
+- [X] T131 [US9] Extend the smoke check (HP-018; depends on T127, T069 and T120):
   - `tools/HT.SmokeCheck/SmokeCheckCoverage.cs` gets the entries `CreateDemoAccountAsync`/`profile` and `CreateDemoAccountAsync`/`goals`;
   - `tools/HT.SmokeCheck/PageReader.cs` gets `ReadGoalNames(html)`, which reads the text of every `<a class="ht-goalitem__name">` (`GoalItem.razor`, T069) the way `ReadHabitNames` reads `ht-habit__name`;
   - `tools/HT.SmokeCheck/SmokeCheckRunner.cs`'s check 5, after the custom habits, reads `GET /goals` for every `DemoGoals.DisplayNames(email)` with `ReadGoalNames`, and on demo1 `GET /profile` for "Demo One" with the existing `ReadFirstHeading` (the Profile header's `h1` is the name when one is set, T120). It stays one line per account:

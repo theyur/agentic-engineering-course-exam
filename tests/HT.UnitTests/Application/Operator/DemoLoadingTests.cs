@@ -10,11 +10,15 @@ namespace HT.UnitTests.Application.Operator;
 /// <summary>
 /// Slice 1 US7, FR-016, SC-006: demo loading creates the three demo accounts once and never changes them. Slice 2
 /// US6, FR-030, FR-031, SC-007: it also gives each account it creates its demo custom habits, and loads the seed
-/// catalog into an empty catalog (research R-13).
+/// catalog into an empty catalog (research R-13). Slice 4 US9, FR-040: the seed catalog now comes first, and each
+/// created account also gets its profile and its demo goals.
 /// </summary>
 public sealed class DemoLoadingTests
 {
     private static readonly string[] Emails = ["demo1@example.com", "demo2@example.com", "demo3@example.com"];
+
+    /// <summary>Wednesday 11 November 2026, 09:00 UTC; with the UTC default, the day of the run is 11 November.</summary>
+    private static readonly DateTimeOffset Now = new(2026, 11, 11, 9, 0, 0, TimeSpan.Zero);
 
     private readonly FakeAccountStore _store = new();
     private readonly FakeDemoDataStore _demoData;
@@ -24,8 +28,8 @@ public sealed class DemoLoadingTests
     public DemoLoadingTests()
     {
         _demoData = new FakeDemoDataStore(_store);
-        _demo = new DemoDataService(_store, _demoData);
-        _accounts = new AccountService(_store, new FakeTimeProvider(new DateTimeOffset(2026, 11, 11, 9, 0, 0, TimeSpan.Zero)), InstallationTimeZone.From(null));
+        _demo = new DemoDataService(_store, _demoData, new FakeTimeProvider(Now), InstallationTimeZone.From(null));
+        _accounts = new AccountService(_store, new FakeTimeProvider(Now), InstallationTimeZone.From(null));
     }
 
     // Slice 1 (US7, FR-016, SC-006)
@@ -272,30 +276,151 @@ public sealed class DemoLoadingTests
         Assert.NotNull(result.Accounts[2].CustomHabits);
     }
 
+    // Slice 4: the order of the work and the demo goals (US9, FR-040)
+
     [Fact]
-    public async Task The_work_runs_in_order_each_account_with_its_custom_habits_then_the_seed_catalog()
+    public async Task The_work_runs_in_order_the_seed_catalog_then_each_account_with_its_custom_habits_and_goals()
     {
         await LoadAsync("example2026");
 
         Assert.Equal(
-            ["account demo1@example.com", "account demo2@example.com", "account demo3@example.com", "catalog"],
+            ["catalog", "account demo1@example.com", "account demo2@example.com", "account demo3@example.com"],
             _demoData.Calls);
     }
 
     [Fact]
-    public async Task An_existing_account_is_skipped_and_the_seed_catalog_still_comes_last()
+    public async Task An_existing_account_is_skipped_and_the_seed_catalog_still_comes_first()
     {
         _store.Add("demo2@example.com", "owner2026");
 
         await LoadAsync("example2026");
 
-        Assert.Equal(["account demo1@example.com", "account demo3@example.com", "catalog"], _demoData.Calls);
+        Assert.Equal(["catalog", "account demo1@example.com", "account demo3@example.com"], _demoData.Calls);
     }
 
     [Fact]
-    public async Task No_result_text_contains_a_demo_custom_habit_name()
+    public async Task US9_AS1_each_created_account_gets_demo_goals_added_and_its_FR_040_goals()
     {
-        var names = Emails.SelectMany(DemoCustomHabits.For).Select(h => h.Name.Value).ToList();
+        var result = await LoadAsync("example2026");
+
+        Assert.All(result.Accounts, a =>
+        {
+            Assert.NotNull(a.Goals);
+            Assert.Equal(DemoGoalsOutcome.Added, a.Goals.Outcome);
+            Assert.Equal("demo goals added", a.Goals.Message);
+        });
+        foreach (var email in Emails)
+        {
+            var goals = _demoData.GoalsOf(_store.Find(email)!.Id);
+            var expected = DemoGoals.For(email, new DateOnly(2026, 11, 11));
+            Assert.Equal(expected.Count, goals.Count);
+            Assert.All(expected.Zip(goals), pair =>
+            {
+                Assert.Equal(pair.First.CatalogHabitName, pair.Second.CatalogHabitName);
+                Assert.Equal(pair.First.CustomHabitPosition, pair.Second.CustomHabitPosition);
+                Assert.Equal(pair.First.Target, pair.Second.Target);
+                Assert.Equal(pair.First.OwnName, pair.Second.OwnName);
+                Assert.Equal(pair.First.StartDate, pair.Second.StartDate);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(Role.RegisteredUser)]
+    [InlineData(Role.Administrator)]
+    public async Task US9_AS2_an_existing_account_gets_no_goal_result_and_none_of_its_data_is_read(Role role)
+    {
+        var owner = _store.Add("demo2@example.com", "owner2026", role, name: "A person", createdAt: Now.AddDays(-3));
+
+        var result = await LoadAsync("example2026");
+
+        Assert.Null(result.Accounts[1].Goals);
+        Assert.NotNull(result.Accounts[0].Goals);
+        Assert.NotNull(result.Accounts[2].Goals);
+        Assert.Empty(_demoData.GoalsOf(owner.Id));
+        Assert.Null(_demoData.ProfileOf(owner.Id));
+        Assert.DoesNotContain("account demo2@example.com", _demoData.Calls);
+        Assert.Equal(0, _store.PasswordCheckCount);
+        Assert.Equal(0, _store.NameWriteCount);
+        Assert.Equal(owner, _store.Find("demo2@example.com"));
+    }
+
+    [Fact]
+    public async Task A_second_run_has_no_goal_result_and_passes_no_goal()
+    {
+        await LoadAsync("example2026");
+        var before = _demoData.AllGoals;
+
+        var result = await LoadAsync("example2026");
+
+        Assert.All(result.Accounts, a => Assert.Null(a.Goals));
+        Assert.Equal(before, _demoData.AllGoals);
+    }
+
+    [Fact]
+    public async Task A_lost_race_gives_no_goal_result_and_records_no_goal_for_that_email()
+    {
+        _store.TakeEmailOnNextCreate();
+
+        var result = await LoadAsync("example2026");
+
+        Assert.Null(result.Accounts[0].Goals);
+        Assert.Empty(_demoData.GoalsOf(_store.Find("demo1@example.com")!.Id));
+        Assert.NotNull(result.Accounts[1].Goals);
+    }
+
+    [Fact]
+    public async Task The_day_of_the_run_is_the_default_zones_date_at_the_supplied_time()
+    {
+        // 22:30 UTC on Wednesday 18 November 2026 is 00:30 on Thursday 19 November in Kyiv (UTC+2).
+        var now = new DateTimeOffset(2026, 11, 18, 22, 30, 0, TimeSpan.Zero);
+        var demo = new DemoDataService(_store, _demoData, new FakeTimeProvider(now), InstallationTimeZone.From("Europe/Kyiv"));
+
+        await demo.LoadAsync("example2026", CancellationToken.None);
+
+        var thursday = new DateOnly(2026, 11, 19);
+        foreach (var email in Emails)
+        {
+            var goals = _demoData.GoalsOf(_store.Find(email)!.Id);
+            Assert.Equal(DemoGoals.For(email, thursday).Select(g => g.StartDate), goals.Select(g => g.StartDate));
+        }
+
+        var meditation = Assert.Single(_demoData.GoalsOf(_store.Find("demo2@example.com")!.Id), g => g.CatalogHabitName == "Meditation");
+        Assert.Equal(new DateOnly(2026, 11, 26), meditation.StartDate);
+        Assert.Contains(_demoData.GoalsOf(_store.Find("demo1@example.com")!.Id), g => g.StartDate == thursday);
+    }
+
+    [Fact]
+    public async Task The_profile_passes_the_default_zone_and_the_supplied_creation_time()
+    {
+        var now = new DateTimeOffset(2026, 11, 18, 22, 30, 0, TimeSpan.Zero);
+        var demo = new DemoDataService(_store, _demoData, new FakeTimeProvider(now), InstallationTimeZone.From("Europe/Kyiv"));
+
+        await demo.LoadAsync("example2026", CancellationToken.None);
+
+        foreach (var email in Emails)
+        {
+            var account = _store.Find(email)!;
+            var profile = _demoData.ProfileOf(account.Id)!;
+            Assert.Equal("Europe/Kyiv", profile.TimeZone.Id);
+            Assert.Equal(now, profile.CreatedAt);
+            Assert.Equal("Europe/Kyiv", account.StoredTimeZone);
+            Assert.Equal(now, account.CreatedAt);
+        }
+
+        Assert.Equal("Demo One", _demoData.ProfileOf(_store.Find("demo1@example.com")!.Id)!.Name);
+        Assert.Equal("Demo One", _store.Find("demo1@example.com")!.Name);
+        Assert.Null(_demoData.ProfileOf(_store.Find("demo2@example.com")!.Id)!.Name);
+        Assert.Null(_demoData.ProfileOf(_store.Find("demo3@example.com")!.Id)!.Name);
+    }
+
+    [Fact]
+    public async Task No_result_text_contains_a_demo_custom_habit_goal_or_account_name()
+    {
+        var names = Emails.SelectMany(DemoCustomHabits.For).Select(h => h.Name.Value)
+            .Concat(Emails.SelectMany(DemoGoals.DisplayNames))
+            .Concat(["Reading", "Yoga", "Meditation", "Sugar", "Coffee", "Demo One"])
+            .ToList();
 
         var texts = new List<string?>();
         foreach (var password in new[] { "example2026", "example2026", null, "examplepass" })
@@ -305,7 +430,7 @@ public sealed class DemoLoadingTests
             texts.Add(result.Catalog?.Message);
             foreach (var account in result.Accounts)
             {
-                texts.AddRange([account.Email, account.Message, account.CustomHabits?.Message]);
+                texts.AddRange([account.Email, account.Message, account.CustomHabits?.Message, account.Goals?.Message]);
             }
         }
 

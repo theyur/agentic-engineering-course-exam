@@ -32,7 +32,7 @@ with its own cookies on every call.
 | 2 | `https-redirect` | `GET http://<host>/` returns 301, 302, 307 or 308 to `https://<host>/` |
 | 3 | `catalog` | `GET /catalog` shows the name of every Published habit of `SeedCatalog.Habits` |
 | 4 | `administrator` | the configured administrator signs in and `GET /admin` returns 200 |
-| 5 | `demo <email>`, one per `DemoDataService.DemoEmails` | the account signs in with the demo password and `GET /custom-habits` shows the name of every habit of `DemoCustomHabits.For(<email>)` |
+| 5 | `demo <email>`, one per `DemoDataService.DemoEmails` | the account signs in with the demo password, `GET /custom-habits` shows the name of every habit of `DemoCustomHabits.For(<email>)`, `GET /goals` shows every name of `DemoGoals.DisplayNames(<email>)` (slice 4 HP-018), and for an account with a name (`DemoAccounts.NameFor(<email>)`: demo1, "Demo One") `GET /profile` has that name as its first `h1` |
 
 - Sign-in: `GET /sign-in`, read the antiforgery token and the `sign-in` handler, `POST /sign-in` with
   `Input.Email` and `Input.Password`, and expect a redirect that is not back to `/sign-in`.
@@ -61,6 +61,8 @@ type, with the check that verifies it:
 |---|---|---|
 | `CreateDemoAccountAsync` | `email` (`Email`), `password` (`string`) | 5, the sign-in |
 | `CreateDemoAccountAsync` | `customHabits` (`IReadOnlyList<HabitDefinition>`) | 5, the custom habit names |
+| `CreateDemoAccountAsync` | `profile` (`DemoAccountProfile`) | 5, the account name on Profile (slice 4 HP-018) |
+| `CreateDemoAccountAsync` | `goals` (`IReadOnlyList<DemoGoal>`) | 5, the goal names on Goals (slice 4 HP-018) |
 | `TryCreateSeedCatalogAsync` | `habits` (`IReadOnlyList<SeedCatalogHabit>`) | 3 |
 
 A test (research R-11) reflects over `IDemoDataStore` and fails when a method or a data parameter has no
@@ -76,13 +78,20 @@ checks 2–5):
 
 - a check with a list of expected names (`catalog`, `demo <email>`): `PASS <name> (<found> of <expected>)` or
   `FAIL <name>: <reason>`, where `<found>` counts the expected names present on the page, not the cards shown;
+- `demo <email>` (slice 4 HP-018) stays one line per account over its pages. `<expected>` counts every expected
+  name of its pages together: the custom habits, the goal display names and, for demo1, the account name.
+  `<found>` counts those present on their own page, so a healthy account's line has `<found>` equal to
+  `<expected>` (demo1 `5 of 5`, demo2 `4 of 4`, demo3 `5 of 5` today). Every page is still read; a `FAIL` names
+  the first part that misses, in this order: `<n> of <m> custom habits shown`, `<n> of <m> goals shown`, or
+  `account name not shown` (a page that does not return 200 gives `GET <path> gave status <code>` for its part).
+  No name is printed;
 - a check without a list (`home`, `https-redirect`, `administrator`): `PASS <name>` or `FAIL <name>: <reason>`;
 - check 2 with `--skip-http-redirect`: `SKIP https-redirect`.
 
 Then `TIMING first <ms> ms[ (retried)], later <ms> ms (<n> requests)`, or `TIMING first <ms> ms[ (retried)], later n/a`
 when no demo account signed in, then `RESULT PASS` or `RESULT FAIL`. "Every check line" means the lines before
 `TIMING`. `<name>` contains a demo email or the word `administrator`, never the administrator email. No
-password, habit name, note or page content is printed.
+password, habit name, goal name, account name, note or page content is printed.
 
 ## Exit codes
 
