@@ -673,19 +673,19 @@ list it and read its calendar (US3-AS1 to AS4).
 
 ### Tests for User Story 3
 
-- [ ] T076 [P] [US3] Create `tests/HT.UnitTests/Application/Goals/GoalAccessTests.cs`, covering every `GoalService` method (`StartNewGoalAsync`, `CreateAsync`, `ListAsync`, `GetAsync` and `GetCalendarAsync`) (SC-002):
+- [X] T076 [P] [US3] Create `tests/HT.UnitTests/Application/Goals/GoalAccessTests.cs`, covering every `GoalService` method (`StartNewGoalAsync`, `CreateAsync`, `ListAsync`, `GetAsync` and `GetCalendarAsync`) (SC-002):
   - US3-AS4: an anonymous visitor gets "You are not signed in.";
   - US3-AS3: an administrator gets "Goals are for registered users." with no goal data, also when other accounts have goals;
   - US3-AS1: user B reading user A's goal, or its calendar, gets "This goal does not exist.", the same result and text as for an unknown identifier;
   - US3-AS2: B's list holds none of A's goals;
   - US3-AS5: A starting or creating a goal on B's custom habit gets "This custom habit does not exist.", and nothing is created;
   - FR-023: a refusal earlier in the order wins over a later one, for each method.
-- [ ] T077 [P] [US3] Create `tests/HT.IntegrationTests/Goals/GoalPrivacyTests.cs` on `HT-IT`: the same cases as T076 over SQL, with two registered users and an administrator created through `AccountService` and `OperatorService`
-- [ ] T078 [P] [US3] Create `tests/HT.IntegrationTests/Goals/GoalLogTests.cs` for HP-011, with `LogCapture`:
+- [X] T077 [P] [US3] Create `tests/HT.IntegrationTests/Goals/GoalPrivacyTests.cs` on `HT-IT`: the same cases as T076 over SQL, with two registered users and an administrator created through `AccountService` and `OperatorService`
+- [X] T078 [P] [US3] Create `tests/HT.IntegrationTests/Goals/GoalLogTests.cs` for HP-011, with `LogCapture`:
   - every goal use case runs: creation and each kind of refusal, list, read, calendar, and a read of another user's goal;
   - the goal name, custom-habit name, unit and amount are distinctive;
   - `AssertContainsNone` finds none of them in any log entry or exception text.
-- [ ] T079 [P] [US3] Create `tests/HT.UiTests/Host/GoalPrivacyHostTests.cs`: a registered user who opens another account's `/goals/{id}` gets the Not found page with 404, and the response contains neither the goal's name nor its habit's name
+- [X] T079 [P] [US3] Create `tests/HT.UiTests/Host/GoalPrivacyHostTests.cs`: a registered user who opens another account's `/goals/{id}` gets the Not found page with 404, and the response contains neither the goal's name nor its habit's name
 
 **Checkpoint**: full suite green. The MVP (US1, US2, US4 and US3) is demonstrable: goals are created, listed, opened
 and private. Commit.
