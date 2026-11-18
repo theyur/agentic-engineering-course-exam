@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using HT.Application.Goals
 @using HT.Ui.Account
+@using HT.Ui.Components.Goals
 @using Microsoft.AspNetCore.Authorization
 @inject GoalService GoalService
 @inject ActingUserAccessor ActingUsers
@@ -18,11 +19,7 @@
         <div class="ht-page-head"><h1>Goals</h1></div>
         @if (result.Goals.Count == 0)
         {
-            <EmptyState Icon="list-checks" Title="No goals yet"
-                        Text="Pick a habit from the catalog or create your own, then set a target and a schedule for it.">
-                <HtButton Href="/catalog">Browse the catalog</HtButton>
-                <HtButton Variant="HtButton.ButtonVariant.Secondary" Href="/custom-habits/new">Create custom habit</HtButton>
-            </EmptyState>
+            <NoGoalsEmptyState />
         }
         else
         {

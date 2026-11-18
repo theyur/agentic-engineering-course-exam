@@ -908,18 +908,18 @@ later.
 
 ### Tests for User Story 8
 
-- [ ] T108 [P] [US8] Update `tests/HT.UiTests/Components/Layout/SiteNavTests.cs`, whose slice 2 HP-011 expectations change (depends on T110):
+- [X] T108 [P] [US8] Update `tests/HT.UiTests/Components/Layout/SiteNavTests.cs`, whose slice 2 HP-011 expectations change (depends on T110):
   - US8-AS1: a registered user's TopNav has "Goals" and "+ New goal", the bar's "+ New goal" carries `ht-hide-sm`, and MobileNav lists Goals, with "New goal" after the divider and before Profile;
   - US8-AS2: neither link for an administrator or a visitor.
-- [ ] T109 [P] [US8] Update `tests/HT.UiTests/Components/Pages/HomeSignedInTests.cs`, whose slice 2 HP-013 expectations change (depends on T111):
+- [X] T109 [P] [US8] Update `tests/HT.UiTests/Components/Pages/HomeSignedInTests.cs`, whose slice 2 HP-013 expectations change (depends on T111):
   - US8-AS5: a registered user with no goals sees T012's EmptyState;
   - "Goals come in a later version." is gone;
   - with goals, nothing more.
 
 ### Implementation for User Story 8
 
-- [ ] T110 [US8] Add "Goals" and "+ New goal" for registered users to `src/HT.Ui/Components/Layout/SiteNav.razor`, as T015 designed them (HP-009)
-- [ ] T111 [US8] In `src/HT.Ui/Components/Pages/Home.razor`, a registered user with no goals (`GoalService.ListAsync`) sees T012's EmptyState (HP-010). An administrator's Home is unchanged here (depends on T068)
+- [X] T110 [US8] Add "Goals" and "+ New goal" for registered users to `src/HT.Ui/Components/Layout/SiteNav.razor`, as T015 designed them (HP-009)
+- [X] T111 [US8] In `src/HT.Ui/Components/Pages/Home.razor`, a registered user with no goals (`GoalService.ListAsync`) sees T012's EmptyState (HP-010). An administrator's Home is unchanged here (depends on T068)
 
 **Checkpoint**: full suite green. Commit.
 

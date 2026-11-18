@@ -10,15 +10,19 @@ using Microsoft.Extensions.DependencyInjection;
 namespace HT.UiTests.Components.Layout;
 
 /// <summary>
-/// Slice 1 US5-AS1 to AS5, HP-010, HP-014, amended by slice 2 HP-011 (US5-AS1): the items of each audience and the
-/// behaviour of both menus.
+/// Slice 1 US5-AS1 to AS5, HP-010, HP-014, amended by slice 2 HP-011 (US5-AS1) and slice 4 HP-009 (US8-AS1, US8-AS2):
+/// the items of each audience and the behaviour of both menus.
 /// </summary>
 public sealed class SiteNavTests : BunitContext
 {
     private const string Email = "ana@example.com";
 
-    // Links of later slices (ADR 0008); none of them may appear in slice 2 ("Catalog" and "Admin" came with it).
-    private static readonly string[] LaterLinks = ["Community", "Goals", "New goal", "Send feedback"];
+    // Links of later slices (ADR 0008); none of them may appear in slice 4 ("Catalog" and "Admin" came with slice 2,
+    // "Goals" and "New goal" with slice 4).
+    private static readonly string[] LaterLinks = ["Community", "Send feedback"];
+
+    // The slice 4 links, for registered users only (HP-009, FR-021).
+    private static readonly string[] GoalLinks = ["Goals", "New goal"];
 
     private readonly BunitAuthorizationContext _authorization;
 
@@ -44,11 +48,11 @@ public sealed class SiteNavTests : BunitContext
         Assert.Equal("/catalog", catalog.GetAttribute("href"));
         Assert.Equal("Main", cut.Find("nav.ht-nav__links").GetAttribute("aria-label"));
         Assert.Empty(cut.FindAll(".ht-avatar"));
-        AssertAbsent(cut, [.. LaterLinks, "Admin", "Today", "Profile", "Sign out"]);
+        AssertAbsent(cut, [.. LaterLinks, .. GoalLinks, "Admin", "Today", "Profile", "Sign out"]);
     }
 
     [Theory]
-    [InlineData("RegisteredUser", new[] { "Today", "Catalog" }, new[] { "/", "/catalog" })]
+    [InlineData("RegisteredUser", new[] { "Today", "Goals", "Catalog" }, new[] { "/", "/goals", "/catalog" })]
     [InlineData("Administrator", new[] { "Today", "Catalog", "Admin" }, new[] { "/", "/catalog", "/admin" })]
     public void US5_AS2_AS3_a_signed_in_user_sees_the_links_of_the_role_and_the_avatar_menu_with_profile_and_sign_out(
         string role, string[] links, string[] hrefs)
@@ -65,6 +69,58 @@ public sealed class SiteNavTests : BunitContext
         Assert.Equal(["Profile", "Sign out"], Texts(cut.FindAll(".ht-popover a, .ht-popover button")));
         Assert.Equal("/profile", cut.Find(".ht-popover a").GetAttribute("href"));
         AssertAbsent(cut, [.. LaterLinks, "Sign in", "Register"]);
+    }
+
+    [Fact]
+    public void US8_AS1_a_registered_users_bar_has_goals_and_new_goal_hidden_on_phones_before_the_avatar()
+    {
+        SignIn("RegisteredUser");
+        var cut = Render<SiteNav>();
+
+        var goals = cut.Find(".ht-nav__links a[href='/goals']");
+        Assert.Equal("Goals", goals.TextContent);
+        var end = cut.Find(".ht-nav__end").Children;
+        Assert.Equal(["A", "DIV", "BUTTON"], end.Select(c => c.TagName));
+        var newGoal = end[0];
+        Assert.Equal("+ New goal", newGoal.TextContent);
+        Assert.Equal("/goals/new", newGoal.GetAttribute("href"));
+        Assert.Equal(["ht-btn", "ht-btn--primary", "ht-btn--sm", "ht-hide-sm"], newGoal.ClassList);
+        Assert.Contains("ht-account", end[1].ClassList);
+    }
+
+    [Fact]
+    public void US8_AS1_a_registered_users_narrow_menu_lists_goals_and_puts_new_goal_after_the_divider_before_profile()
+    {
+        SignIn("RegisteredUser");
+        var cut = Render<SiteNav>();
+
+        cut.Find(MobileButton).Click();
+
+        var menu = cut.Find("#" + SiteNav.MobileMenuId);
+        Assert.Equal(
+            ["Today", "Goals", "Catalog", "hr", "New goal", "Profile", "Sign out"],
+            menu.Children.Select(c => c.TagName == "HR" ? "hr" : c.TextContent.Trim()));
+        Assert.Single(menu.QuerySelectorAll("a[href='/goals'] svg.ht-icon"));
+        var newGoal = Assert.Single(menu.QuerySelectorAll("a[href='/goals/new']"));
+        Assert.Equal("New goal", newGoal.TextContent.Trim());
+        Assert.Single(newGoal.QuerySelectorAll("svg.ht-icon"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Administrator")]
+    public void US8_AS2_a_visitor_or_an_administrator_gets_neither_goals_nor_new_goal_in_either_menu(string? role)
+    {
+        if (role is not null)
+        {
+            SignIn(role);
+        }
+
+        var cut = Render<SiteNav>();
+        cut.Find(MobileButton).Click();
+
+        AssertAbsent(cut, GoalLinks);
+        Assert.Empty(cut.FindAll("a[href^='/goals']"));
     }
 
     [Fact]
@@ -95,14 +151,18 @@ public sealed class SiteNavTests : BunitContext
     }
 
     [Theory]
-    [InlineData("RegisteredUser", new[] { "Today", "Catalog", "Profile", "Sign out" })]
+    [InlineData("RegisteredUser", new[] { "Today", "Goals", "Catalog", "New goal", "Profile", "Sign out" })]
     [InlineData("Administrator", new[] { "Today", "Catalog", "Admin", "Profile", "Sign out" })]
     public void US5_AS4_the_narrow_menu_of_a_signed_in_user_lists_the_same_items_as_the_wide_navigation(string role, string[] items)
     {
         SignIn(role);
         var cut = Render<SiteNav>();
         cut.Find(AccountButton).Click();
-        var wide = Texts(cut.FindAll(".ht-nav__links a")).Concat(Texts(cut.FindAll(".ht-popover a, .ht-popover button"))).ToList();
+        // The bar's "+ New goal" is the menu's "New goal" (design/components/MobileNav, slice 4).
+        var wide = Texts(cut.FindAll(".ht-nav__links a"))
+            .Concat(Texts(cut.FindAll(".ht-nav__end > a")).Select(t => t.TrimStart('+', ' ')))
+            .Concat(Texts(cut.FindAll(".ht-popover a, .ht-popover button")))
+            .ToList();
 
         cut.Find(MobileButton).Click();
 
@@ -121,8 +181,8 @@ public sealed class SiteNavTests : BunitContext
 
         cut.Find(MobileButton).Click();
 
-        string[] links = role == "Administrator" ? ["Today", "Catalog", "Admin"] : ["Today", "Catalog"];
-        string[] hrefs = role == "Administrator" ? ["/", "/catalog", "/admin"] : ["/", "/catalog"];
+        string[] links = role == "Administrator" ? ["Today", "Catalog", "Admin"] : ["Today", "Goals", "Catalog"];
+        string[] hrefs = role == "Administrator" ? ["/", "/catalog", "/admin"] : ["/", "/goals", "/catalog"];
         var children = cut.Find("#" + SiteNav.MobileMenuId).Children.Select(c => c.TagName == "HR" ? "hr" : c.TextContent.Trim()).ToList();
         Assert.Equal(links, children.TakeWhile(c => c != "hr"));
         foreach (var href in hrefs)
@@ -150,6 +210,27 @@ public sealed class SiteNavTests : BunitContext
         string[] expected = current is null ? [] : [current];
 
         Assert.Equal(expected, Texts(cut.FindAll(".ht-nav__links a[aria-current=page]")));
+        cut.Find(MobileButton).Click();
+        Assert.Equal(expected, Texts(cut.FindAll($"#{SiteNav.MobileMenuId} a[aria-current=page]")));
+    }
+
+    [Theory]
+    [InlineData("/goals", "Goals")]
+    [InlineData("/goals/new", "Goals")]
+    [InlineData("/goals/new?habit=2b1f9c3e-0000-4000-8000-000000000001", "Goals")]
+    [InlineData("/goals/2b1f9c3e-0000-4000-8000-000000000001", "Goals")]
+    [InlineData("/goalsx", null)]
+    [InlineData("/catalog", "Catalog")]
+    [InlineData("/", "Today")]
+    public void HP_009_goals_is_marked_current_on_the_goal_pages_in_both_menus(string path, string? current)
+    {
+        SignIn("RegisteredUser");
+        Services.GetRequiredService<NavigationManager>().NavigateTo(path);
+        var cut = Render<SiteNav>();
+        string[] expected = current is null ? [] : [current];
+
+        Assert.Equal(expected, Texts(cut.FindAll(".ht-nav__links a[aria-current=page]")));
+        Assert.Empty(cut.FindAll(".ht-nav__end a[aria-current]"));
         cut.Find(MobileButton).Click();
         Assert.Equal(expected, Texts(cut.FindAll($"#{SiteNav.MobileMenuId} a[aria-current=page]")));
     }

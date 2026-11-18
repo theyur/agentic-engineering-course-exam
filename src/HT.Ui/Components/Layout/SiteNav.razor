@@ -4,8 +4,9 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
 @using HT.Domain.Accounts
-@* design/components/TopNav and MobileNav, slice 2 (HP-011): "Catalog" for every audience and "Admin" for
-   administrators; no links of later slices (ADR 0008). The only interactive component: it
+@* design/components/TopNav and MobileNav, slice 4 (HP-009): "Catalog" for every audience, "Admin" for
+   administrators, and "Goals" and "+ New goal" for registered users only (FR-021); no links of later slices
+   (ADR 0008). The only interactive component: it
    holds the state of the avatar menu and the narrow-screen menu. Each closes on Esc, on a click outside (the
    click-away layer) and on choosing an item, and focus goes back to its button. Opening one closes the other. *@
 <div @onkeydown="OnKeyDownAsync">
@@ -27,6 +28,10 @@
             {
                 <nav class="ht-nav__links" aria-label="Main">
                     <a href="/" aria-current="@TodayCurrent" @onclick="ChooseItemAsync">Today</a>
+                    @if (_isRegisteredUser)
+                    {
+                        <a href="/goals" aria-current="@GoalsCurrent" @onclick="ChooseItemAsync">Goals</a>
+                    }
                     <a href="/catalog" aria-current="@CatalogCurrent" @onclick="ChooseItemAsync">Catalog</a>
                     @if (_isAdministrator)
                     {
@@ -34,6 +39,10 @@
                     }
                 </nav>
                 <div class="ht-nav__end">
+                    @if (_isRegisteredUser)
+                    {
+                        <a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="/goals/new" @onclick="ChooseItemAsync">+ New goal</a>
+                    }
                     <div class="ht-account ht-layer-top">
                         <button type="button" class="ht-avatar ht-avatar-btn" id="@AccountButtonId"
                                 aria-label="@("Account menu for " + _email)" aria-haspopup="true"
@@ -64,12 +73,20 @@
             else
             {
                 <a href="/" aria-current="@TodayCurrent" @onclick="ChooseItemAsync"><HtIcon Name="list-checks" />Today</a>
+                @if (_isRegisteredUser)
+                {
+                    <a href="/goals" aria-current="@GoalsCurrent" @onclick="ChooseItemAsync"><HtIcon Name="flag" />Goals</a>
+                }
                 <a href="/catalog" aria-current="@CatalogCurrent" @onclick="ChooseItemAsync"><HtIcon Name="layout-grid" />Catalog</a>
                 @if (_isAdministrator)
                 {
                     <a href="/admin" aria-current="@AdminCurrent" @onclick="ChooseItemAsync"><HtIcon Name="shield" />Admin</a>
                 }
                 <hr />
+                @if (_isRegisteredUser)
+                {
+                    <a href="/goals/new" @onclick="ChooseItemAsync"><HtIcon Name="plus" />New goal</a>
+                }
                 <a href="/profile" @onclick="ChooseItemAsync"><HtIcon Name="user" />Profile</a>
                 @SignOutForm
             }
@@ -98,6 +115,7 @@
     private Menu _open;
     private string? _email;
     private bool _isAdministrator;
+    private bool _isRegisteredUser;
     private ElementReference _accountButton;
     private ElementReference _mobileButton;
 
@@ -116,6 +134,9 @@
     private string CurrentPath => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
 
     private string? TodayCurrent => CurrentPath.Length == 0 ? "page" : null;
+
+    // The Goals page, a goal's page and the New goal page.
+    private string? GoalsCurrent => IsIn("goals") ? "page" : null;
 
     // The catalog pages: the public catalog, a habit's details, and "My custom habits" with the custom habit form.
     private string? CatalogCurrent => IsIn("catalog") || IsIn("custom-habits") ? "page" : null;
@@ -138,6 +159,7 @@
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
         _email = user?.Identity?.IsAuthenticated == true ? user.Identity.Name ?? string.Empty : null;
         _isAdministrator = _email is not null && user!.IsInRole(nameof(Role.Administrator));
+        _isRegisteredUser = _email is not null && user!.IsInRole(nameof(Role.RegisteredUser));
 
         // The circuit's revalidation ended the session while the page stays open, for example after a password
         // change in another browser (HP-007). The page body is rendered statically, so reload it: the new request
