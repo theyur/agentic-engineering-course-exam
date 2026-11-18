@@ -1,5 +1,6 @@
 using HT.Application;
 using HT.Application.Accounts;
+using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Application.Operator;
 using HT.Domain.Accounts;
@@ -48,13 +49,15 @@ public sealed class F002Driver : IDisposable
         InScopeAsync(services => Accounts(services).SignInAsync(email, password, None));
 
     public Task<AdministratorCreationResult> CreateAdministratorAsync(string? email, string? password) =>
-        InScopeAsync(services => new OperatorService(services.GetRequiredService<IAccountStore>())
+        InScopeAsync(services => new OperatorService(services.GetRequiredService<IAccountStore>(), Time, DefaultZone)
             .CreateAdministratorAsync(email, password, None));
 
     public Task<DemoLoadingResult> LoadDemoDataAsync(string? demoPassword) =>
         InScopeAsync(services => new DemoDataService(
                 services.GetRequiredService<IAccountStore>(),
-                services.GetRequiredService<IDemoDataStore>())
+                services.GetRequiredService<IDemoDataStore>(),
+                Time,
+                DefaultZone)
             .LoadAsync(demoPassword, None));
 
     // ------------------------------------------------------------ public catalog (any audience)
@@ -110,17 +113,20 @@ public sealed class F002Driver : IDisposable
 
     public void Dispose() => _services.Dispose();
 
+    /// <summary>Acceptance tests supply no default time zone (slice 4 FR-025), so the installation's default is UTC.</summary>
+    private static readonly InstallationTimeZone DefaultZone = InstallationTimeZone.From(null);
+
     private AccountService Accounts(IServiceProvider services) =>
-        new(services.GetRequiredService<IAccountStore>(), Time);
+        new(services.GetRequiredService<IAccountStore>(), Time, DefaultZone);
 
     private static CatalogService Catalog(IServiceProvider services) =>
-        new(services.GetRequiredService<ICatalogHabitStore>());
+        new(services.GetRequiredService<ICatalogHabitStore>(), services.GetRequiredService<IGoalStore>());
 
     private static CatalogAdministrationService Administration(IServiceProvider services) =>
-        new(services.GetRequiredService<ICatalogHabitStore>());
+        new(services.GetRequiredService<ICatalogHabitStore>(), services.GetRequiredService<IGoalStore>());
 
     private static CustomHabitService CustomHabits(IServiceProvider services) =>
-        new(services.GetRequiredService<ICustomHabitStore>());
+        new(services.GetRequiredService<ICustomHabitStore>(), services.GetRequiredService<IGoalStore>());
 
     private async Task<T> InScopeAsync<T>(Func<IServiceProvider, Task<T>> useCase)
     {

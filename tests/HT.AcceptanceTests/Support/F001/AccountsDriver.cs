@@ -38,28 +38,31 @@ public sealed class AccountsDriver : IDisposable
 
     public void SetNow(DateTimeOffset now) => Time.SetUtcNow(now);
 
+    /// <summary>Acceptance tests supply no default time zone (slice 4 FR-025), so the installation's default is UTC.</summary>
+    private static readonly InstallationTimeZone DefaultZone = InstallationTimeZone.From(null);
+
     public Task<RegistrationResult> RegisterAsync(string? email, string? password) =>
-        WithStoreAsync(store => new AccountService(store, Time).RegisterAsync(email, password, CancellationToken.None));
+        WithStoreAsync(store => new AccountService(store, Time, DefaultZone).RegisterAsync(email, password, CancellationToken.None));
 
     public Task<SignInResult> SignInAsync(string? email, string? password) =>
-        WithStoreAsync(store => new AccountService(store, Time).SignInAsync(email, password, CancellationToken.None));
+        WithStoreAsync(store => new AccountService(store, Time, DefaultZone).SignInAsync(email, password, CancellationToken.None));
 
     public Task<AccountDetailsResult> GetAccountDetailsAsync(ActingUser actingUser) =>
-        WithStoreAsync(store => new AccountService(store, Time).GetAccountDetailsAsync(actingUser, CancellationToken.None));
+        WithStoreAsync(store => new AccountService(store, Time, DefaultZone).GetAccountDetailsAsync(actingUser, CancellationToken.None));
 
     public Task<PasswordChangeResult> ChangePasswordAsync(ActingUser actingUser, string? currentPassword, string? newPassword) =>
-        WithStoreAsync(store => new AccountService(store, Time)
+        WithStoreAsync(store => new AccountService(store, Time, DefaultZone)
             .ChangePasswordAsync(actingUser, currentPassword, newPassword, CancellationToken.None));
 
     public Task<AdministratorCreationResult> CreateAdministratorAsync(string? email, string? password) =>
-        WithStoreAsync(store => new OperatorService(store).CreateAdministratorAsync(email, password, CancellationToken.None));
+        WithStoreAsync(store => new OperatorService(store, Time, DefaultZone).CreateAdministratorAsync(email, password, CancellationToken.None));
 
     public async Task<DemoLoadingResult> LoadDemoDataAsync(string? demoPassword)
     {
         await using var scope = _services.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<IAccountStore>();
         var demoData = scope.ServiceProvider.GetRequiredService<IDemoDataStore>();
-        return await new DemoDataService(store, demoData).LoadAsync(demoPassword, CancellationToken.None);
+        return await new DemoDataService(store, demoData, Time, DefaultZone).LoadAsync(demoPassword, CancellationToken.None);
     }
 
     public static Task ResetDatabaseAsync() =>
