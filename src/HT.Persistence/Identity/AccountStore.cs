@@ -41,8 +41,10 @@ internal sealed class AccountStore : IAccountStore
         return user is null ? null : ToAccount(user);
     }
 
-    public async Task<CreateAccountOutcome> CreateAsync(Email email, Role role, string password, CancellationToken cancellationToken)
+    public async Task<CreateAccountOutcome> CreateAsync(
+        Email email, Role role, string password, NewAccountProfile profile, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(profile);
         _db.ChangeTracker.Clear();
         try
         {
@@ -52,6 +54,11 @@ internal sealed class AccountStore : IAccountStore
                 UserName = email.Value,
                 Email = email.Value,
                 Role = role,
+
+                // Written at insert only; afterwards only the stores' conditional statements write them (research R-04).
+                Name = profile.Name?.Value,
+                TimeZone = profile.TimeZone.Id,
+                CreatedAt = profile.CreatedAt,
             };
 
             IdentityResult result;
@@ -169,7 +176,12 @@ internal sealed class AccountStore : IAccountStore
             new AccountId(user.Id),
             email,
             user.Role,
-            new SignInBlock(user.FailedSignInCount, user.SignInBlockedSince));
+            new SignInBlock(user.FailedSignInCount, user.SignInBlockedSince))
+        {
+            StoredTimeZone = user.TimeZone,
+            Name = user.Name,
+            CreatedAt = user.CreatedAt,
+        };
     }
 
     private static bool IsUniqueIndexViolation(DbUpdateException exception) =>

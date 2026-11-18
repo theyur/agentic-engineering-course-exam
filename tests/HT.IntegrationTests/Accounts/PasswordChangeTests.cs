@@ -69,7 +69,7 @@ public sealed class PasswordChangeTests(DatabaseFixture database)
         Assert.True(Email.TryParse(email, out var parsed));
         await using var scope = database.CreateScope();
         var outcome = await scope.ServiceProvider.GetRequiredService<IAccountStore>()
-            .CreateAsync(parsed, Role.RegisteredUser, "walking42", CancellationToken.None);
+            .CreateAsync(parsed, Role.RegisteredUser, "walking42", TestProfiles.Utc, CancellationToken.None);
         return outcome.Account ?? throw new InvalidOperationException($"{email} already has an account.");
     }
 

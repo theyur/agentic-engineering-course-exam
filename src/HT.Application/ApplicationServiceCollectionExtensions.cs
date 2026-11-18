@@ -10,8 +10,9 @@ namespace HT.Application;
 public static class ApplicationServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the use-case services (scoped, they use the scoped account store) and
-    /// <see cref="TimeProvider.System"/> with TryAdd, so a test can register a fake clock before or after it.
+    /// Registers the use-case services (scoped, they use the scoped account store), and with TryAdd
+    /// <see cref="TimeProvider.System"/> and the UTC <see cref="InstallationTimeZone"/>, so a test can register a fake
+    /// clock before or after it, and the host its configured default time zone before it (research R-03).
     /// </summary>
     public static IServiceCollection AddHtApplication(this IServiceCollection services)
     {
@@ -23,6 +24,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<CatalogAdministrationService>();
         services.AddScoped<CustomHabitService>();
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton(InstallationTimeZone.From(null));
         return services;
     }
 }

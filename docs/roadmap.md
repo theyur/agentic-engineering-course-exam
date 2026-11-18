@@ -30,7 +30,7 @@ in its idea brief, which assumed the catalog also carried the account foundation
 | 1 | `accounts-and-access` | People can register, sign in and sign out. The app tells anonymous visitors apart from signed-in registered users and administrators. | §3; ARCH §4 | — | — | — | shipped | [001](../specs/001-accounts-and-access/spec.md) |
 | 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | — | shipped | [002](../specs/002-habit-catalog/spec.md) |
 | 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | — | shipped | [003](../specs/003-demo-hosting/spec.md) |
-| 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Now | tasks ready | [004](../specs/004-goals/spec.md) |
+| 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | Now | implementing | [004](../specs/004-goals/spec.md) |
 | 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Next | not started | — |
 | 6 | `personal-reports` | A user sees how consistent they are: a dashboard of upcoming, due and overdue commitments and Missed results, consistency with its count, strict streaks with their unit, trends. | §6 | 5 | — | Next | not started | — |
 | 7 | `excusals-and-pauses` | Excused commitments and paused expectations are left out of consistency and neither extend nor break the streak. | §5.3 | 5, 6 | — | Later | not started | — |
@@ -112,20 +112,20 @@ decision R7.
 
 | Page or shell (`design/`) | Created in | Extended in |
 |---|---|---|
-| Shell: `TopNav` (visitor, signed-in, admin), `MobileNav`, `Footer` | 1 (Today, avatar menu, "Privacy") | each slice adds its links (Catalog and Admin 2, Goals and "+ New goal" 4, Community 9); "Send feedback" 11 |
-| `PageSignIn`, `PageRegister` | 1 | 11 (deactivated notice) |
+| Shell: `TopNav` (visitor, signed-in, admin), `MobileNav`, `Footer` | 1 (Today, avatar menu, "Privacy") | each slice adds its links (Catalog and Admin 2, Goals and "+ New goal" 4, Community 9); 4 (the avatar letter from the account name); "Send feedback" 11 |
+| `PageSignIn`, `PageRegister` | 1 | 4 (Register: optional "Name", the browser's time zone with no visible field), 11 (deactivated notice) |
 | `PagePrivacy` (new, designed in 1) | 1 | — |
 | `PageAdminCatalogHabit` (new, designed in 2) | 2 | — |
 | `PageHomeVisitor` | 1 (hero with "Register free", how it works) | 2 ("Browse the catalog", catalog preview), 6 (GoalStats card from demo data), 9 (BandSummary) |
-| `PageHomeSignedIn` | 1 ("Today" heading; the greeting and date wait for the time-zone decision of slice 4) | 2 (empty state pointing to the catalog), 6 (stat tiles, Today list, GoalSummary, recent notes), 7 ("Excuse" on Pending rows) |
-| `PageProfile` | 1 (Account tab) | 2 (Custom habits), 8 (Goal history), 9 (Community) |
+| `PageHomeSignedIn` | 1 ("Today" heading; the greeting and date wait for the time-zone decision of slice 4) | 2 (empty state pointing to the catalog), 4 (greeting and date; the empty state points to the catalog and custom habits), 6 (stat tiles, Today list, GoalSummary, recent notes), 7 ("Excuse" on Pending rows) |
+| `PageProfile` | 1 (Account tab) | 2 (Custom habits), 4 (name and "member since" in the header; "Name" and "Time zone" on the Account tab), 8 (Goal history), 9 (Community) |
 | `PageCatalogVisitor` | 2 | — |
 | `PageCatalogSignedIn` | 2 | 4 ("Use this habit", "N goals", "Add another goal", "Only habits I track"), 10 ("Suggest for catalog" on custom-habit cards) |
 | `PageCustomHabit` | 2 (including "Delete") | 4 ("Save and create goal"; "Delete" only when no goals use it), 10 ("Suggest for catalog") |
 | `PageHabitDetail` | 2 | 4 ("Use this habit", "You track this · N goals", "Start with this", your goals), 9 (community performance) |
-| `PageNewGoal`, `PageGoals`, `PageGoalDetail` | 4 | 5 (Record, history, notes), 6 (GoalStats, trend), 7 (Pause, Excuse, Paused tab), 8 (Edit settings, End goal, Ended tab, earlier attempts) |
+| `PageNewGoal`, `PageGoals`, `PageGoalDetail` | 4 (New goal with the habit chooser and summary card; Goals without Tabs; the goal page's head and Settings card) | 5 (Record, history, notes), 6 (GoalStats, trend), 7 (Pause, Excuse, Paused tab), 8 (Edit settings, End goal, Ended tab, earlier attempts) |
 | `PageCommunity` | 9 | — |
-| `PageAdmin` | 2 (Catalog tab) | 10 (Suggestions), 11 (Feedback, Accounts) |
+| `PageAdmin` | 2 (Catalog tab) | 4 (unpublish confirmation Dialog), 10 (Suggestions), 11 (Feedback, Accounts) |
 | `PageAdminSuggestions` | 10 | — |
 | `PageAdminFeedback` | 11 | — |
 | `PageAdminAccounts` | 11 | 9 (public display name and community state, if 9 lands after 11) |

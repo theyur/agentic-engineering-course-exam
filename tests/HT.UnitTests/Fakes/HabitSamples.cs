@@ -26,6 +26,16 @@ public static class HabitSamples
         SuggestedStartingGoals? goals = null) =>
         new(new HabitId(Guid.NewGuid()), Definition(name, category, intent, icon, description), goals ?? SuggestedStartingGoals.None, state);
 
+    /// <summary>
+    /// The catalog habit "Reading" (Mind, Build) with its marked suggested starting goal "15 min, 5 days a week"
+    /// (duration, Mon–Fri, Build) and its second one "20 pages, 3 times a week". Each call has a new identifier.
+    /// </summary>
+    public static CatalogHabit Reading(CatalogHabitState state = CatalogHabitState.Published) =>
+        Catalog(
+            "Reading",
+            state,
+            goals: Goals(0, DurationDays(15, DurationUnit.Minutes, Weekdays), Count(20, "pages", 3, SchedulePeriod.Week)));
+
     public static SuggestedStartingGoals Goals(int marked, params SuggestedStartingGoalFields[] fields)
     {
         if (!SuggestedStartingGoals.TryCreate(fields.Select((f, i) => (f, i == marked)).ToList(), out var goals, out var problem))

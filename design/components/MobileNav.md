@@ -22,3 +22,10 @@ The top navigation under 860px: product name, avatar and a menu button that open
 - Registered user: Today and Catalog, a divider, Profile and Sign out.
 - Administrator: Today, Catalog and Admin, a divider, Profile and Sign out.
 - Icons: `list-checks` for Today, `layout-grid` for Catalog, `shield` for Admin. No Goals, Community, New goal or Send feedback yet.
+
+## Slice 4
+
+- Registered user: Today, Goals and Catalog, a divider, then New goal, Profile and Sign out. "+ New goal" in the bar is hidden on phones; the menu's "New goal" takes its place.
+- Administrator and visitor: unchanged from slice 2.
+- Icons: `flag` for Goals, `plus` for New goal. No Community or Send feedback yet.
+- The avatar letter follows TopNav: the first letter of the account name, or of the email.

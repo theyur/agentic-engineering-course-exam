@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text.RegularExpressions;
 using HT.Application.Accounts;
 using HT.Domain.Accounts;
+using HT.Domain.Time;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -88,7 +89,8 @@ public static partial class HostClient
 
         await using var scope = host.Services.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<IAccountStore>();
-        var outcome = await store.CreateAsync(parsed, role, password, CancellationToken.None);
+        var profile = new NewAccountProfile(null, NamedTimeZone.Utc, new DateTimeOffset(2026, 11, 18, 10, 0, 0, TimeSpan.Zero));
+        var outcome = await store.CreateAsync(parsed, role, password, profile, CancellationToken.None);
         return outcome.Account ?? throw new InvalidOperationException($"The email {email} already has an account.");
     }
 

@@ -18,6 +18,12 @@ public sealed class FakeCustomHabitStore : ICustomHabitStore
     /// <summary>Writes that changed the store: creates, updates and deletes.</summary>
     public int WriteCount { get; private set; }
 
+    /// <summary>
+    /// The goal store that reads this store; set by <see cref="FakeGoalStore"/>'s constructor, so there is one
+    /// construction order and no cycle. The delete rule for habits that goals use reads it (FR-035).
+    /// </summary>
+    public FakeGoalStore? Goals { get; set; }
+
     /// <summary>Every stored habit of every owner, for assertions.</summary>
     public IReadOnlyList<CustomHabit> Habits
     {

@@ -25,7 +25,7 @@ public sealed class DemoLoadingTests
     {
         _demoData = new FakeDemoDataStore(_store);
         _demo = new DemoDataService(_store, _demoData);
-        _accounts = new AccountService(_store, new FakeTimeProvider(new DateTimeOffset(2026, 11, 11, 9, 0, 0, TimeSpan.Zero)));
+        _accounts = new AccountService(_store, new FakeTimeProvider(new DateTimeOffset(2026, 11, 11, 9, 0, 0, TimeSpan.Zero)), InstallationTimeZone.From(null));
     }
 
     // Slice 1 (US7, FR-016, SC-006)

@@ -31,7 +31,7 @@ public sealed class AccountStoreTests(DatabaseFixture database)
         await using var scope = database.CreateScope();
         var store = Store(scope);
 
-        await store.CreateAsync(EmailOf("  Store-Normal@Example.COM "), Role.RegisteredUser, Password, CancellationToken.None);
+        await store.CreateAsync(EmailOf("  Store-Normal@Example.COM "), Role.RegisteredUser, Password, TestProfiles.Utc, CancellationToken.None);
         var row = await Sql.ReadUserAsync(database.ConnectionString, "store-normal@example.com");
 
         Assert.NotNull(row);
@@ -49,7 +49,7 @@ public sealed class AccountStoreTests(DatabaseFixture database)
         var store = Store(scope);
 
         await CreateAsync(store, "store-twice@example.com");
-        var second = await store.CreateAsync(EmailOf("STORE-TWICE@example.com"), Role.RegisteredUser, Password, CancellationToken.None);
+        var second = await store.CreateAsync(EmailOf("STORE-TWICE@example.com"), Role.RegisteredUser, Password, TestProfiles.Utc, CancellationToken.None);
 
         Assert.True(second.IsEmailTaken);
         Assert.Equal(1, await Sql.CountUsersAsync(database.ConnectionString, "store-twice@example.com"));
@@ -122,7 +122,7 @@ public sealed class AccountStoreTests(DatabaseFixture database)
         var store = Store(scope);
         var account = await CreateAsync(store, "service-version@example.com");
         await store.TrySaveSignInBlockAsync(account.Id, SignInBlock.None, new SignInBlock(2, null), null, CancellationToken.None);
-        var service = new AccountService(new PasswordChangingStore(store, account.Id, Password, "running34"), database.Clock);
+        var service = new AccountService(new PasswordChangingStore(store, account.Id, Password, "running34"), database.Clock, InstallationTimeZone.From(null));
 
         var result = await service.SignInAsync("service-version@example.com", Password, CancellationToken.None);
 
@@ -186,8 +186,9 @@ public sealed class AccountStoreTests(DatabaseFixture database)
         public Task<Account?> FindByIdAsync(AccountId accountId, CancellationToken cancellationToken) =>
             inner.FindByIdAsync(accountId, cancellationToken);
 
-        public Task<CreateAccountOutcome> CreateAsync(Email email, Role role, string password, CancellationToken cancellationToken) =>
-            inner.CreateAsync(email, role, password, cancellationToken);
+        public Task<CreateAccountOutcome> CreateAsync(
+            Email email, Role role, string password, NewAccountProfile profile, CancellationToken cancellationToken) =>
+            inner.CreateAsync(email, role, password, profile, cancellationToken);
 
         public async Task<PasswordVersion?> CheckPasswordAsync(AccountId accountId, string password, CancellationToken cancellationToken)
         {
@@ -214,7 +215,7 @@ public sealed class AccountStoreTests(DatabaseFixture database)
 
     private static async Task<Account> CreateAsync(IAccountStore store, string email, Role role = Role.RegisteredUser)
     {
-        var outcome = await store.CreateAsync(EmailOf(email), role, Password, CancellationToken.None);
+        var outcome = await store.CreateAsync(EmailOf(email), role, Password, TestProfiles.Utc, CancellationToken.None);
         return outcome.Account ?? throw new InvalidOperationException("The email was taken.");
     }
 }

@@ -28,7 +28,7 @@ public sealed class CatalogHabitStoreTests(DatabaseFixture database)
     [Fact]
     public async Task A_created_habit_is_a_Draft_with_every_field_and_its_list_in_order()
     {
-        var goals = Goals(1, Duration(15, DurationUnit.Minutes, Weekdays), Count(20, "pages", 3, SchedulePeriod.Week), YesNo(1, SchedulePeriod.Day));
+        var goals = HabitSamples.Goals(1, Duration(15, DurationUnit.Minutes, Weekdays), Count(20, "pages", 3, SchedulePeriod.Week), YesNo(1, SchedulePeriod.Day));
         var id = await CreatedAsync(Definition("It-Cat Reading", Category.Mind, Intent.Build, "book-open", "Books and articles."), goals);
 
         var found = await WithStoreAsync(s => s.FindAsync(id, CancellationToken.None));
@@ -57,11 +57,11 @@ public sealed class CatalogHabitStoreTests(DatabaseFixture database)
         var a = Count(1, "a", 1, SchedulePeriod.Day);
         var b = Count(2, "b", 1, SchedulePeriod.Day);
         var c = Count(3, "c", 1, SchedulePeriod.Day);
-        var id = await CreatedAsync(Definition("It-Cat Lists"), Goals(0, a, b));
+        var id = await CreatedAsync(Definition("It-Cat Lists"), HabitSamples.Goals(0, a, b));
 
-        await AssertUpdatedAsync(id, Goals(2, a, b, c), ["a", "b", "c"], 3);
-        await AssertUpdatedAsync(id, Goals(0, c), ["c"], 1);
-        await AssertUpdatedAsync(id, Goals(1, b, c, a), ["b", "c", "a"], 2);
+        await AssertUpdatedAsync(id, HabitSamples.Goals(2, a, b, c), ["a", "b", "c"], 3);
+        await AssertUpdatedAsync(id, HabitSamples.Goals(0, c), ["c"], 1);
+        await AssertUpdatedAsync(id, HabitSamples.Goals(1, b, c, a), ["b", "c", "a"], 2);
         await AssertUpdatedAsync(id, SuggestedStartingGoals.None, [], null);
     }
 

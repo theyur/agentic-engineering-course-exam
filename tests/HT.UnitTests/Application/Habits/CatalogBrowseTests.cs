@@ -18,7 +18,7 @@ public sealed class CatalogBrowseTests
     public async Task US1_AS1_only_Published_habits_with_their_fields_and_marked_suggested_starting_goal()
     {
         var reading = _store.Add(Catalog("Ac1 Reading", category: Category.Mind, icon: "book-open", description: "Books and articles.",
-            goals: Goals(1, YesNo(1, SchedulePeriod.Day), Count(20, "pages", 3, SchedulePeriod.Week))));
+            goals: HabitSamples.Goals(1, YesNo(1, SchedulePeriod.Day), Count(20, "pages", 3, SchedulePeriod.Week))));
         _store.Add(Catalog("Ac1 Yoga", category: Category.Body, icon: "person-standing"));
         _store.Add(Catalog("Ac1 Journaling", CatalogHabitState.Draft));
         _store.Add(Catalog("Ac1 Stretching", CatalogHabitState.Unpublished));

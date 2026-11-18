@@ -57,6 +57,9 @@ The rules behind these outcomes:
     was used.
 
   With no habit, only `StartDate` is set (US8-AS4).
+- **The schedule text**: `GoalListItem.ScheduleText` and `GoalDetails.ScheduleText` are `GoalText.ScheduleText` of the
+  goal's target ("Mon · Wed · Fri", "Every day", "Flexible · 3 times a week"). The list has no days, so the Goals
+  page's meta line takes its schedule from it (HP-003, US2-AS6), and the Settings card's "Schedule" row too (HP-004).
 - **What `GoalDetails` gives about the habit**:
   - `Habit.IsInCatalog` is false for a goal on an Unpublished catalog habit;
   - it is null for a custom habit.

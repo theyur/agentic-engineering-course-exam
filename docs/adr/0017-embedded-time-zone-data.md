@@ -38,8 +38,8 @@ plan, "Gates before the next step"). It applies [ADR 0016](0016-time-zones.md)
 
 ## Decision
 
-- `HT.Domain` references NodaTime 3.2.x, pinned to one patch version in `HT.Domain.csproj`. No other project
-  references it directly.
+- `HT.Domain` references NodaTime 3.2.x, pinned to one patch version in `HT.Domain.csproj` (3.2.5, chosen
+  2026-11-18). No other project references it directly.
 - Every time-zone conversion and every date calculation of goals goes through `DateTimeZoneProviders.Tzdb`.
   Architecture rules forbid the following in Domain and Application:
   - `SystemClock`, the BCL provider and `TimeZoneInfo` lookups or conversions;

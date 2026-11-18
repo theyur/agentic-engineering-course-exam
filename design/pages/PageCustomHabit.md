@@ -19,3 +19,11 @@ The second part of the preview shows the page as slice 2 builds it (US4-AS13, HP
 - Refusals sit under their field as `ht-field__error`, one at a time, in this order: "Enter a name.", "The name can have at most 60 characters.", "The description can have at most 500 characters.", "Choose a category.", "Choose Build or Reduce.", "Choose an icon.", then "You already have a custom habit with this name." under Name.
 - "This custom habit does not exist." (the habit was deleted in another browser) belongs to no field: a Notice (`role="alert"`) above the form with a link to "My custom habits". The form can no longer be saved.
 - The address of another user's, a deleted or an unknown custom habit, and any custom habit address for an administrator, shows the Not found page.
+
+## Slice 4 state
+
+The last part of the preview shows the page as slice 4 builds it (HP-007, ADR 0008).
+
+- Actions, for a new and an edited habit: primary "Save and create goal", which saves the habit and opens the New goal page with it (`/goals/new?habit={id}&kind=custom`), secondary "Save habit" and ghost "Cancel".
+- Editing a habit that at least one of the user's goals uses: no "Delete". Editing a habit that no goal uses keeps "Delete" and its Dialog, as in slice 2.
+- The privacy card is the slice 2 one. No "Suggest for catalog" (slice 10).

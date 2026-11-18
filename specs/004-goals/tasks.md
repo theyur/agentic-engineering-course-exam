@@ -104,19 +104,19 @@ every goal use case, the evaluation calendar included.
 **Purpose**: the roadmap state, a baseline of the public API, the NodaTime package, and the migration test
 database.
 
-- [ ] T001 Set slice 4's Status to `implementing` and `updated_at` to today in `docs/roadmap.md`
-- [ ] T002 [P] Save the public API baseline before any code change (quickstart §1, research R-07):
+- [X] T001 Set slice 4's Status to `implementing` and `updated_at` to today in `docs/roadmap.md`
+- [X] T002 [P] Save the public API baseline before any code change (quickstart §1, research R-07):
   - run `dotnet restore HabitTracker.slnx`;
   - write `roslynator list-symbols HabitTracker.slnx --projects HT.Application --visibility public --depth member` and the same for `HT.Domain` into two files in the session scratchpad, never in the repo. T133 compares them.
 
   The scratchpad does not survive a reboot or a later session. If T133 finds the files missing, it regenerates them from the branch's merge base with `master` (`git merge-base HEAD master`, the state T002 captured; `master` itself may have gained API from other merges since) in a temporary `git worktree` under the scratchpad (restore, then the same two commands), and removes that worktree afterwards.
-- [ ] T003 Add NodaTime to `src/HT.Domain/HT.Domain.csproj` (ADR 0017, research R-01):
+- [X] T003 Add NodaTime to `src/HT.Domain/HT.Domain.csproj` (ADR 0017, research R-01):
   - look up the latest `NodaTime` 3.2.x patch on nuget.org;
   - **ask the owner first**, naming the package, the exact version, the source (nuget.org) and its approximate size, and restore only after an explicit yes;
   - add `<PackageReference Include="NodaTime" Version="3.2.N" />` with that exact version. No other project references it directly;
   - record the version in ADR 0017's Decision section ("pinned to one patch version");
   - run `dotnet restore HabitTracker.slnx` again, because Roslynator needs it after a new package.
-- [ ] T004 [P] Create `tests/HT.IntegrationTests/MigrationDatabaseFixture.cs` for HP-019 (research R-14), on the pattern of `SeedDatabaseFixture`:
+- [X] T004 [P] Create `tests/HT.IntegrationTests/MigrationDatabaseFixture.cs` for HP-019 (research R-14), on the pattern of `SeedDatabaseFixture`:
   - its connection string is `HT_IT_CONNECTION` (or `DatabaseFixture`'s local default), with the database name replaced by `HT-IT-MIGRATE` through `SqlConnectionStringBuilder`, so CI needs no extra variable;
   - the same guard as `DatabaseFixture` against `HT` and `HT-AC`;
   - a `FakeTimeProvider` clock;
@@ -151,7 +151,7 @@ Two kinds of edit, as in slices 1 and 2:
   stay whole, because they are the design source of slices 5 to 11. "No …" in a task below describes the slice-4
   state; it never deletes anything from the full preview.
 
-- [ ] T005 [P] Update `design/pages/PageNewGoal.html` and `.md` (HP-001, HP-002):
+- [X] T005 [P] Update `design/pages/PageNewGoal.html` and `.md` (HP-001, HP-002):
   - the head line for a catalog habit ("Based on the catalog habit Reading. Change anything you like."), for a custom habit, and with no habit;
   - the Habit section with Change, and the habit chooser: a Dialog with a SearchField over Published catalog habits and the user's custom habits;
   - "How do you measure it?" and "When?" as ChoiceCards (`design/components/ChoiceCard`);
@@ -166,7 +166,7 @@ Two kinds of edit, as in slices 1 and 2:
   - "Streak counted in Days" for a commitment-based goal becomes "commitments" (constitution I).
 
   The "Met when" values and the card's incomplete-form state are settled here, and `GoalSummaryText` (T059) uses them as written.
-- [ ] T006 [P] Add the slice-4 state to `design/pages/PageGoals.html` and `.md`, and to `design/components/GoalListItem.html` and `.md` (HP-003):
+- [X] T006 [P] Add the slice-4 state to `design/pages/PageGoals.html` and `.md`, and to `design/components/GoalListItem.html` and `.md` (HP-003):
   - "Goals" with no Tabs;
   - one `ht-list` of GoalListItems, each with the name link, the Build or Reduce Tag (never "intent", `CONTEXT.md`) and the meta line;
   - the meta line: the schedule text of T026 ("Mon · Wed · Fri", "Mon–Fri", "Every day", "2 times a day", "Flexible · 3 times a week"), then " · " and the four variants in their order of precedence: "first week starts Mon 23 Nov", "starts Mon 23 Nov", "next today" or "next Wed 18 Nov", and nothing;
@@ -174,7 +174,7 @@ Two kinds of edit, as in slices 1 and 2:
   - the EmptyState "No goals yet" with "Browse the catalog" and "Create custom habit".
 
   Fix the goal names the previews get wrong: "Yoga, 3 times a week" for fixed days Mon/Wed/Fri becomes "Yoga, 3 days a week", and "Coffee, at most 2 cups" becomes "Coffee, at most 2 cups a day".
-- [ ] T007 [P] Add the slice-4 state to `design/pages/PageGoalDetail.html` and `.md` (HP-004):
+- [X] T007 [P] Add the slice-4 state to `design/pages/PageGoalDetail.html` and `.md` (HP-004):
   - "← Goals", the name, and the tags: category, Build or Reduce, Commitment-based or Period-based;
   - the attempt line "Attempt 1 · started 14 Jul" or "Attempt 1 · starts 23 Nov";
   - the Settings card as KeyValue rows: Habit with "catalog" or "custom", "Build or reduce", Measure, Target, Schedule, Evaluated and Started, with the sentence "Changes apply from the next commitment. Past results keep their rules.";
@@ -185,54 +185,54 @@ Two kinds of edit, as in slices 1 and 2:
   - the "Intent" row becomes "Build or reduce";
   - "Evaluated: Each commitment" becomes "Each scheduled day";
   - "Streak, sessions" for a commitment-based goal becomes commitments.
-- [ ] T008 [P] Add the slice-4 state to `design/pages/PageCatalogSignedIn.html` and `.md`, and to `design/components/HabitCard.html` and `.md` (HP-005):
+- [X] T008 [P] Add the slice-4 state to `design/pages/PageCatalogSignedIn.html` and `.md`, and to `design/components/HabitCard.html` and `.md` (HP-005):
   - the "N goals" Tag and "Add another goal" on a tracked habit's card;
   - "Use this habit" on the others;
   - "Show: Only habits I track" in the FilterPanel;
   - "· you track N" after the count.
-- [ ] T009 [P] Add the slice-4 state to `design/pages/PageHabitDetail.html` and `.md` (HP-006), for registered users:
+- [X] T009 [P] Add the slice-4 state to `design/pages/PageHabitDetail.html` and `.md` (HP-006), for registered users:
   - the head button "Use this habit";
   - the Tag "You track this · N goals" when N is at least 1;
   - "Start with this" on each suggested starting goal;
   - "Your goals on this habit", each name linking to its goal page;
   - no consistency, streak or community card.
-- [ ] T010 [P] Add the slice-4 state to `design/pages/PageCustomHabit.html` and `.md` (HP-007): "Save and create goal" beside "Save habit", and the edit state of a habit that goals use, without "Delete"
-- [ ] T011 [P] Add the unpublish confirmation Dialog to `design/pages/PageAdmin.html` and `.md` (HP-008, `design/components/Dialog`): "N goals use this habit.", a sentence that the goals keep working for their owners, Cancel and the confirm button. The table keeps having no "Updated" column (slice 2 HP-009)
-- [ ] T012 [P] Add the slice-4 state to `design/pages/PageHomeSignedIn.html` and `.md` (HP-010, FR-029):
+- [X] T010 [P] Add the slice-4 state to `design/pages/PageCustomHabit.html` and `.md` (HP-007): "Save and create goal" beside "Save habit", and the edit state of a habit that goals use, without "Delete"
+- [X] T011 [P] Add the unpublish confirmation Dialog to `design/pages/PageAdmin.html` and `.md` (HP-008, `design/components/Dialog`): "N goals use this habit.", a sentence that the goals keep working for their owners, Cancel and the confirm button. The table keeps having no "Updated" column (slice 2 HP-009)
+- [X] T012 [P] Add the slice-4 state to `design/pages/PageHomeSignedIn.html` and `.md` (HP-010, FR-029):
   - the page head with the greeting as `heading-1` and today's date, with and without a name, for registered users and administrators. It replaces the "Today" heading;
   - a registered user's slice-4 EmptyState, which replaces "Goals come in a later version.";
   - nothing more with goals (slice 6).
 
   Write the EmptyState's title, text and actions here. T109 tests them as written.
-- [ ] T013 [P] Update `design/pages/PageProfile.html` and `.md` (HP-015, HP-017):
+- [X] T013 [P] Update `design/pages/PageProfile.html` and `.md` (HP-015, HP-017):
   - the Account tab's "Name" field with Save and the Notice "Your name is changed.";
   - the "Time zone" field (a select) with Save and the Notice "Your time zone is changed. Your goals use it from their next day or week; earlier days keep their time zone.";
   - the header with the name as its `h1`, then the email and "member since November 2026", plus its states without a name (the email as the `h1`, as now) and without "member since";
   - the avatar letter from the account name.
-- [ ] T014 [P] Add the optional "Name" field to `design/pages/PageRegister.html` and `.md` (HP-017). Say in the notes that the browser's time zone is sent with no visible field (HP-016)
-- [ ] T015 [P] Update `design/components/TopNav.html` and `.md` and `design/components/MobileNav.html` and `.md` (HP-009, HP-017):
+- [X] T014 [P] Add the optional "Name" field to `design/pages/PageRegister.html` and `.md` (HP-017). Say in the notes that the browser's time zone is sent with no visible field (HP-016)
+- [X] T015 [P] Update `design/components/TopNav.html` and `.md` and `design/components/MobileNav.html` and `.md` (HP-009, HP-017):
   - "Goals" and "+ New goal" for registered users only;
   - in MobileNav, Goals among the main links, and "New goal" after the divider, before Profile;
   - the bar's "+ New goal" hidden on phones (`ht-hide-sm`);
   - the avatar letter from the account name, or from the email without one.
-- [ ] T016 Add the styles this slice needs to `design/css/ht-components.css` from existing tokens: the reduced GoalListItem, ChoiceCard, KeyValue as a component, the summary card, and any rule the changed previews need and the file lacks. Change `design/tokens.json` and `design/css/tokens.css` only if a new token is needed (depends on T005–T015)
-- [ ] T017 Update `design/pages.md` and `design/README.md` with the slice-4 structure of New goal, Goals, the goal page, the catalog, details, custom habit, Admin, both Homes, Profile, Register and the navigation. Then:
+- [X] T016 Add the styles this slice needs to `design/css/ht-components.css` from existing tokens: the reduced GoalListItem, ChoiceCard, KeyValue as a component, the summary card, and any rule the changed previews need and the file lacks. Change `design/tokens.json` and `design/css/tokens.css` only if a new token is needed (depends on T005–T015)
+- [X] T017 Update `design/pages.md` and `design/README.md` with the slice-4 structure of New goal, Goals, the goal page, the catalog, details, custom habit, Admin, both Homes, Profile, Register and the navigation. Then:
   - grep `design/` for the texts the spec lists as wrong, and fix any T005–T015 missed: an "intent" Tag or row for a goal's own Build or Reduce, "Streak counted in Days", "Streak, sessions", "Each commitment", "3 times a week" on fixed days, and "2 cups" without "a day";
   - in `docs/roadmap.md` ("Pages across slices"), adjust the slice-4 entries only where they now differ from what the previews show.
 
   Depends on T005–T016.
-- [ ] T018 Copy every `design/css` file that T016 changed to `src/HT.Ui/wwwroot/css/` and run `dotnet test tests/HT.UiTests --filter "FullyQualifiedName~DesignSyncTests"` (depends on T016)
+- [X] T018 Copy every `design/css` file that T016 changed to `src/HT.Ui/wwwroot/css/` and run `dotnet test tests/HT.UiTests --filter "FullyQualifiedName~DesignSyncTests"` (depends on T016)
 
 ### Domain: time (`src/HT.Domain/Time/`, namespace `HT.Domain.Time`; research R-01, R-02)
 
-- [ ] T019 [P] Create `NamedTimeZone.cs`, a readonly record struct (depends on T003):
+- [X] T019 [P] Create `NamedTimeZone.cs`, a readonly record struct (depends on T003):
   - `Id`, as given, and `static Utc`;
   - `static bool TryParse(string? text, out NamedTimeZone zone)`, following FR-024: exactly `UTC`, or an identifier in `DateTimeZoneProviders.Tzdb.Ids` that contains `/` and does not start with `Etc/`. It is ordinal and case-sensitive, and it does not trim;
   - `DateAt(DateTimeOffset) → DateOnly`, `TimeAt(DateTimeOffset) → TimeOnly`, and `StartOfDay(DateOnly) → DateTimeOffset` in UTC through `DateTimeZone.AtStartOfDay`, so a day whose midnight does not exist starts at its first instant.
 
   A link keeps its identifier and uses its zone's rules. NodaTime stays internal.
-- [ ] T020 [P] Create `NamedTimeZones.cs`: `Choices` is `UTC` first, then every canonical tzdb zone (`CanonicalIdMap` value equal to its key) that `NamedTimeZone.TryParse` accepts, in ordinal order (HP-015) (depends on T003)
-- [ ] T021 [P] Create `tests/HT.UnitTests/Domain/Time/NamedTimeZoneTests.cs` and `NamedTimeZonesTests.cs` (depends on T019, T020):
+- [X] T020 [P] Create `NamedTimeZones.cs`: `Choices` is `UTC` first, then every canonical tzdb zone (`CanonicalIdMap` value equal to its key) that `NamedTimeZone.TryParse` accepts, in ordinal order (HP-015) (depends on T003)
+- [X] T021 [P] Create `tests/HT.UnitTests/Domain/Time/NamedTimeZoneTests.cs` and `NamedTimeZonesTests.cs` (depends on T019, T020):
   - every FR-024 example:
     - accepted: `UTC`, `Europe/Kyiv`, `America/Argentina/Buenos_Aires`, and the links `Europe/Kiev`, `Asia/Calcutta` and `US/Eastern`, each kept as given;
     - refused: `FLE Standard Time`, `Etc/GMT+3`, `Etc/UTC`, `EST`, `CET`, `GMT`, `+02:00` and `Mars/Olympus`;
@@ -249,12 +249,12 @@ Two kinds of edit, as in slices 1 and 2:
 
 ### Domain: goals (`src/HT.Domain/Goals/`, namespace `HT.Domain.Goals`; [data-model.md](data-model.md#domain-goals-htdomaingoals))
 
-- [ ] T022 Factor the shared parts out of slice 2's types, without changing their output (research R-05):
+- [X] T022 Factor the shared parts out of slice 2's types, without changing their output (research R-05):
   - an internal `TargetFieldCheck` in `src/HT.Domain/Habits/TargetFieldCheck.cs`, the FR-007 target checks in their order, which `SuggestedStartingGoal.TryCreate` now calls;
   - internal amount, schedule and day-list text parts in `src/HT.Domain/Habits/TargetTextParts.cs`, which `SuggestedStartingGoalText` now calls.
 
   `SuggestedStartingGoal`, `SuggestedStartingGoalProblem` and `SuggestedStartingGoalText` keep their public members and results exactly. Run `dotnet test tests/HT.UnitTests --filter "FullyQualifiedName~SuggestedStartingGoal"`: it must pass unchanged.
-- [ ] T023 [P] Create the value types, one per file:
+- [X] T023 [P] Create the value types, one per file:
   - `GoalId` (`Guid Value`);
   - `HabitKind` (`Catalog`, `Custom`);
   - `GoalHabit` (`HabitId Id`, `HabitKind Kind`);
@@ -263,10 +263,10 @@ Two kinds of edit, as in slices 1 and 2:
   - `GoalProblem` (the FR-006 order of data-model.md);
   - `GoalTargetFields` (one nullable value per form control);
   - `GoalName`: trimmed, 1 to 60 UTF-16 code units, empty means none, and `TryCreate(string?, out GoalName?, out bool tooLong)`.
-- [ ] T024 Create `GoalTarget.cs`, `GoalSettings.cs`, `GoalSettingsVersion.cs`, `GoalAttempt.cs` and `Goal.cs` as data-model.md describes (depends on T022, T023):
+- [X] T024 Create `GoalTarget.cs`, `GoalSettings.cs`, `GoalSettingsVersion.cs`, `GoalAttempt.cs` and `Goal.cs` as data-model.md describes (depends on T022, T023):
   - `GoalTarget` reuses slice 2's `Measurement`, `DurationUnit`, `Schedule`, `ScheduleKind`, `SchedulePeriod` and `BuildOrReduce`, stores no value that does not belong to the measurement or schedule, and gives `ScheduleKindOf` and `PeriodLength`;
   - `Goal`'s constructor enforces the invariants of data-model.md. `Versions` is non-empty, the first applies from `StartDate`, and the dates strictly increase.
-- [ ] T025 Create `GoalDraft.cs` (depends on T024):
+- [X] T025 Create `GoalDraft.cs` (depends on T024):
   - `CheckHabit(GoalHabit?)`;
   - `TryCreate(GoalTargetFields, DateOnly? startDate, DateOnly today, string? name, out GoalTarget, out DateOnly, out GoalName?) → GoalProblem`, which checks:
     1. the target checks through `TargetFieldCheck`, with the goal's yes/no problem;
@@ -274,7 +274,7 @@ Two kinds of edit, as in slices 1 and 2:
     3. `StartDateMissing`, `StartDateInPast` (before `today`) and `StartDateTooFar` (after `today` + 365);
     4. `NameTooLong`;
   - `FieldOf(GoalProblem) → GoalField` for every problem except `None`.
-- [ ] T026 Create `GoalText.cs` (depends on T022, T024):
+- [X] T026 Create `GoalText.cs` (depends on T022, T024):
   - `TargetText(GoalTarget)` and `Kind(GoalTarget)`, through `TargetTextParts`;
   - the one exception: Reduce, yes/no, fixed days gives "avoided on " followed by the days as `Kind` writes them, or "avoided every day";
   - `Name(Goal goal, string habitName)`: the own name, or the habit name, ", " and the target text;
@@ -286,8 +286,8 @@ Two kinds of edit, as in slices 1 and 2:
     "Every day" is then the text of both a seven-day fixed-days goal and a once-a-day goal. The goal page's tags (Commitment-based or Period-based) tell them apart.
 
     Record `ScheduleText` in data-model.md's `GoalText` row in the same task.
-- [ ] T027 [P] Create `Commitment.cs`, `EvaluationPeriod.cs`, `EvaluationCalendar.cs` and `GoalVersionChange.cs` (`None`, `ReplaceFirst(zone)`, `ReplacePending(zone, appliesFrom)`, `Add(appliesFrom, zone)`), with UTC `DateTimeOffset` instants (depends on T019, T023)
-- [ ] T028 Create `GoalTimeline.cs`, exactly as research R-06 describes (depends on T024, T027):
+- [X] T027 [P] Create `Commitment.cs`, `EvaluationPeriod.cs`, `EvaluationCalendar.cs` and `GoalVersionChange.cs` (`None`, `ReplaceFirst(zone)`, `ReplacePending(zone, appliesFrom)`, `Add(appliesFrom, zone)`), with UTC `DateTimeOffset` instants (depends on T019, T023)
+- [X] T028 Create `GoalTimeline.cs`, exactly as research R-06 describes (depends on T024, T027):
   - `MaxCalendarDays` = 366;
   - `VersionOf`;
   - day and week boundaries through `NamedTimeZone.StartOfDay` of each date's own version;
@@ -298,8 +298,8 @@ Two kinds of edit, as in slices 1 and 2:
   - `ChangeOf`, where E is D + 1 for commitment-based and per-day goals and the Monday after D's week for per-week goals.
 
   It takes no clock, no culture and no machine time zone.
-- [ ] T029 [P] Extend `src/HT.Domain/Accounts/Account.cs` with the `init` properties `string? StoredTimeZone`, `string? Name` and `DateTimeOffset? CreatedAt`, keeping the positional constructor. Create `src/HT.Domain/Accounts/AccountName.cs`: trimmed, 1 to 60 code units, and empty means none (FR-028)
-- [ ] T030 [P] Create `tests/HT.UnitTests/Domain/Goals/GoalDraftTests.cs` (depends on T025):
+- [X] T029 [P] Extend `src/HT.Domain/Accounts/Account.cs` with the `init` properties `string? StoredTimeZone`, `string? Name` and `DateTimeOffset? CreatedAt`, keeping the positional constructor. Create `src/HT.Domain/Accounts/AccountName.cs`: trimmed, 1 to 60 code units, and empty means none (FR-028)
+- [X] T030 [P] Create `tests/HT.UnitTests/Domain/Goals/GoalDraftTests.cs` (depends on T025):
   - one test per FR-006 refusal, in order, with every earlier field valid;
   - both sides of every limit:
     - amount 0, 1, 999 and 1000, for Build and for Reduce;
@@ -310,14 +310,14 @@ Two kinds of edit, as in slices 1 and 2:
     - name of 60 and 61 code units after trimming, and spaces only as no name;
   - values that do not belong to the measurement or schedule are neither refused nor stored;
   - `FieldOf` for every problem.
-- [ ] T031 [P] Create `tests/HT.UnitTests/Domain/Goals/GoalTextTests.cs` (depends on T026):
+- [X] T031 [P] Create `tests/HT.UnitTests/Domain/Goals/GoalTextTests.cs` (depends on T026):
   - every target-text and kind example of spec "Target text and kind";
   - "avoided on Mon–Fri", "avoided on Sat, Sun" and "avoided every day";
   - the derived names "Reading, 15 min, 5 days a week", "Cold shower, daily", "Sugar, at most 1 sweet a day", "No phone in bed, avoided every day", "Coffee, at most 2 cups a day" and "Meditation, 10 min, 3 days a week";
   - an own name wins over the derived one;
   - `ScheduleText`: "Mon · Wed · Fri", "Mon–Fri", "Mon–Wed · Sat", "Sat · Sun", "Every day" for seven fixed days and for 1 time a day, "2 times a day", "Flexible · once a week" and "Flexible · 3 times a week", for every measurement and both intents;
   - `SuggestedStartingGoalText` still gives "at most 5 days a week" for a Reduce yes/no suggestion on five days.
-- [ ] T032 [P] Create `tests/HT.UnitTests/Domain/Goals/GoalTimelineCalendarTests.cs`, part of SC-003 (depends on T028). For each schedule kind:
+- [X] T032 [P] Create `tests/HT.UnitTests/Domain/Goals/GoalTimelineCalendarTests.cs`, part of SC-003 (depends on T028). For each schedule kind:
   - US4-AS1: a Mon/Wed/Fri goal starting on a Wednesday, read for 14 days from that Monday, gives 5 commitments, the first on the start date;
   - US4-AS2: 7 per-day periods;
   - US4-AS3: three weeks of a per-week goal starting on a Wednesday, the first period being the following Monday to Sunday;
@@ -327,15 +327,15 @@ Two kinds of edit, as in slices 1 and 2:
   - the clock-change days: Kyiv 2027-03-28 (23 hours) and 2027-10-31 (25 hours), New York 2027-03-14 and 2027-11-07;
   - a day whose midnight does not exist;
   - `FirstWeekStart` from a Wednesday (the next Monday) and from a Monday (itself).
-- [ ] T033 [P] Create `tests/HT.UnitTests/Domain/Goals/GoalTimelineChangeTests.cs`, the rest of SC-003 (depends on T028):
+- [X] T033 [P] Create `tests/HT.UnitTests/Domain/Goals/GoalTimelineChangeTests.cs`, the rest of SC-003 (depends on T028):
   - `CurrentDate` and `NextCommitment` across moves west and east: Kyiv to New York, New York to Kyiv, and Pacific/Pago_Pago to Pacific/Kiritimati;
   - a goal whose start date's day has not begun has no current date;
   - every `ChangeOf` case: `None`, `ReplaceFirst`, `ReplacePending` and `Add`, with E for commitment-based, per-day and per-week goals;
   - a second change before the first applies replaces it, and a second change after the first has begun adds a version from the next day;
   - never more than one version after the current date, and never two on one date;
   - the dates of US10-AS4, AS5, AS6 and AS10: the change at `2026-11-18T10:00:00Z` (12:00 Kyiv) and the second change at `2026-11-19T17:00:00Z` (12:00 New York).
-- [ ] T034 [P] Create `tests/HT.UnitTests/Domain/Goals/GoalTests.cs` (`Goal`'s invariants, `GoalTarget`'s schedule kind and period length) and `tests/HT.UnitTests/Domain/Accounts/AccountNameTests.cs` (`"  Yuri  "` → "Yuri", spaces only → none, 60 accepted, 61 too long) (depends on T024, T029)
-- [ ] T035 Extend the architecture rules for Domain and Application (research R-13; depends on T019–T029):
+- [X] T034 [P] Create `tests/HT.UnitTests/Domain/Goals/GoalTests.cs` (`Goal`'s invariants, `GoalTarget`'s schedule kind and period length) and `tests/HT.UnitTests/Domain/Accounts/AccountNameTests.cs` (`"  Yuri  "` → "Yuri", spaces only → none, 60 accepted, 61 too long) (depends on T024, T029)
+- [X] T035 Extend the architecture rules for Domain and Application (research R-13; depends on T019–T029):
   - `tests/HT.ArchitectureTests/DomainDependencyTests.cs`: NodaTime is Domain's only non-BCL assembly, and Microsoft types stay forbidden;
   - `tests/HT.ArchitectureTests/ClockReadTests.cs`: add to `ForbiddenMembers` the member calls `NodaTime.SystemClock::get_Instance(`, `NodaTime.DateTimeZoneProviders::get_Bcl(`, `System.TimeZoneInfo::FindSystemTimeZoneById(`, `System.TimeZoneInfo::GetSystemTimeZones(` and `System.TimeZoneInfo::ConvertTime` (every overload; `TimeZoneInfo.Local` is already listed):
     - `DateTimeZoneProviders.Serialization` is not added. It is `[Obsolete]` in NodaTime 3.2.x, so any use in Domain or Application is already CS0618, which `TreatWarningsAsErrors` turns into a build error, and the canary could not call it without suppressing that warning. Check the attribute in the pinned version (T003); if it is not obsolete there, add the entry and its canary call like the others;
@@ -346,7 +346,7 @@ Two kinds of edit, as in slices 1 and 2:
 
 ### Application: texts, dates, the default time zone and goal views
 
-- [ ] T036 Add the texts of contracts/application-api.md "Texts", each defined once:
+- [X] T036 Add the texts of contracts/application-api.md "Texts", each defined once:
   - `src/HT.Application/Goals/GoalTexts.cs` (new), with the goal texts, "Goals are for registered users." and "Choose a range of 1 to 366 days.". The goal's `NameTooLong` has no constant of its own: `GoalService` uses `AccountTexts.NameTooLong`, the one definition of "The name can have at most 60 characters.";
   - in `src/HT.Application/Accounts/AccountTexts.cs`: "The name can have at most 60 characters.", "Choose a time zone from the list.", the three greetings with `", {name}"`, and `MemberSince(int year, int month)` (research R-11), which is "member since " followed by `DateTexts.MonthYear` of the first of that month and has no month names of its own;
   - in `src/HT.Application/Habits/CatalogTexts.cs`: `GoalsUseThisHabit(int count)`, giving "1 goal uses this habit." or "{N} goals use this habit.";
@@ -354,16 +354,16 @@ Two kinds of edit, as in slices 1 and 2:
   - in `src/HT.Application/Operator/OperatorTexts.cs`: "demo goals added".
 
   Depends on T037, because `MemberSince` calls `DateTexts`.
-- [ ] T037 [P] Create `src/HT.Application/Accounts/DateTexts.cs` (research R-11): `Weekday`, `LongDate` ("Tuesday, 17 November"), `ShortDate` ("Tue 17 Nov"), `DayMonth` ("23 Nov"), `DayMonthYear` ("14 Jul 2026", the Settings card's "Started" row, HP-004) and `MonthYear` ("November 2026"), all from fixed English arrays. `DayMonthYear` is not in research R-11's list: record it there in the same task. Create `tests/HT.UnitTests/Application/Accounts/DateTextsTests.cs`, which checks every format for every weekday and month inside a non-English `CultureScope`
-- [ ] T038 [P] Create `src/HT.Application/Accounts/InstallationTimeZone.cs` (research R-03):
+- [X] T037 [P] Create `src/HT.Application/Accounts/DateTexts.cs` (research R-11): `Weekday`, `LongDate` ("Tuesday, 17 November"), `ShortDate` ("Tue 17 Nov"), `DayMonth` ("23 Nov"), `DayMonthYear` ("14 Jul 2026", the Settings card's "Started" row, HP-004) and `MonthYear` ("November 2026"), all from fixed English arrays. `DayMonthYear` is not in research R-11's list: record it there in the same task. Create `tests/HT.UnitTests/Application/Accounts/DateTextsTests.cs`, which checks every format for every weekday and month inside a non-English `CultureScope`
+- [X] T038 [P] Create `src/HT.Application/Accounts/InstallationTimeZone.cs` (research R-03):
   - `NamedTimeZone Value`;
   - `From(string?)`, which gives UTC when the value is absent or not a named time zone.
 
   Register `InstallationTimeZone.From(null)` with `TryAddSingleton` in `src/HT.Application/ApplicationServiceCollectionExtensions.cs`. Create `tests/HT.UnitTests/Application/Accounts/InstallationTimeZoneTests.cs`: null, "", `Mars/Olympus` and `Etc/UTC` give UTC, and `Europe/Kyiv` is kept. Depends on T019.
-- [ ] T039 [P] Create the goal views and store types in `src/HT.Application/Goals/`, as data-model.md "Application inputs and views" describes: `GoalInput`, `GoalHabitView`, `GoalStartingValues`, `GoalListItem`, `GoalDetails`, `GoalCalendarView`, `StoredGoal`, `NewGoal` and `GoalWriteOutcome` (`Created(GoalId)`, `HabitGone`, `TimeZoneChanged`). Depends on T024, T026 and T027.
+- [X] T039 [P] Create the goal views and store types in `src/HT.Application/Goals/`, as data-model.md "Application inputs and views" describes: `GoalInput`, `GoalHabitView`, `GoalStartingValues`, `GoalListItem`, `GoalDetails`, `GoalCalendarView`, `StoredGoal`, `NewGoal` and `GoalWriteOutcome` (`Created(GoalId)`, `HabitGone`, `TimeZoneChanged`). Depends on T024, T026 and T027.
 
   `GoalListItem` and `GoalDetails` also get `string ScheduleText` (`GoalText.ScheduleText`). Without it the Goals page cannot write "Mon · Wed · Fri", because the list has no days (HP-003, US2-AS6). Record the member in data-model.md and contracts/application-api.md in the same task
-- [ ] T040 Create the goal port and its fake (depends on T039, T029):
+- [X] T040 Create the goal port and its fake (depends on T039, T029):
   - `src/HT.Application/Goals/IGoalStore.cs` with its core members: `CreateAsync(owner, NewGoal, expectedZone, defaultZone, …) → GoalWriteOutcome`, `ListAsync(owner, …)` in creation order, and `FindAsync(owner, GoalId, …)`. Its XML doc states the owner-first rule and the single exception that US7 adds;
   - `tests/HT.UnitTests/Fakes/FakeGoalStore.cs`, which gives the same outcomes as research R-08:
     - it reads the account's zone from `FakeAccountStore`, with null as `defaultZone`, and returns `TimeZoneChanged` when that zone is not `expectedZone`;
@@ -383,7 +383,7 @@ Two kinds of edit, as in slices 1 and 2:
 
 ### Accounts: profile columns and the new account-store signature (research R-04, R-07)
 
-- [ ] T041 Change the account port and every creator (depends on T029, T038):
+- [X] T041 Change the account port and every creator (depends on T029, T038):
   - create `src/HT.Application/Accounts/NewAccountProfile.cs` (`AccountName? Name`, `NamedTimeZone TimeZone`, `DateTimeOffset CreatedAt`);
   - change `IAccountStore.CreateAsync` to `CreateAsync(Email, Role, string password, NewAccountProfile profile, …)`, and update `tests/HT.UnitTests/Fakes/FakeAccountStore.cs`;
   - `AccountService` gains `InstallationTimeZone` in its constructor. The new overload `RegisterAsync(string? email, string? password, string? timeZone, string? name, …)`:
@@ -400,7 +400,7 @@ Two kinds of edit, as in slices 1 and 2:
     - `tests/HT.IntegrationTests/Accounts/ClaimsPrincipalFactoryTests.cs`, `PasswordChangeTests.cs`, `AccountDetailsTests.cs` and `AccountStoreTests.cs`, with its `PasswordChangingStore`;
     - the hand-built `AccountService` and `OperatorService` in `tests/HT.UnitTests/Application/Accounts/{AccountDetails,ChangePassword,Register,SignIn}Tests.cs`, `tests/HT.UnitTests/Application/Operator/AdministratorCreationTests.cs` and `tests/HT.UiTests/Components/Account/{ChangePassword,Register,SignIn}FormTests.cs`;
     - any further hand-built instance that the grep convention finds.
-- [ ] T042 [P] Create `tests/HT.UnitTests/Application/Accounts/RegisterProfileTests.cs` (depends on T041):
+- [X] T042 [P] Create `tests/HT.UnitTests/Application/Accounts/RegisterProfileTests.cs` (depends on T041):
   - US10-AS1: registration with `Europe/Kyiv` stores that zone;
   - US10-AS2: no zone, `Mars/Olympus` and `FLE Standard Time` store the default, which is `UTC` with no configured default and `Europe/Kyiv` with `InstallationTimeZone.From("Europe/Kyiv")`;
   - US11-AS1: the name `"  Yuri  "` is stored as "Yuri", and spaces only store none;
@@ -412,7 +412,7 @@ Two kinds of edit, as in slices 1 and 2:
 
 ### Persistence: tables, migration, account store and the goal store's core (`src/HT.Persistence/`; research R-04, R-08)
 
-- [ ] T043 Map the new data (depends on T024, T029):
+- [X] T043 Map the new data (depends on T024, T029):
   - create `src/HT.Persistence/Goals/GoalRows.cs` (`GoalRow`, `GoalSettingsVersionRow`, `GoalAttemptRow`) and `GoalMapping.cs`. The mapping goes row ↔ Domain, with `Days` as a bit mask from Monday 1 to Sunday 64, as `HabitMapping` does;
   - add `TimeZone`, `Name`, `CreatedAt` and `GoalsRevision` to `src/HT.Persistence/Identity/HtUser.cs`;
   - in `src/HT.Persistence/HtDbContext.cs`:
@@ -421,16 +421,16 @@ Two kinds of edit, as in slices 1 and 2:
     - enums as `varchar(16)`, and binary collation for keys;
     - `GoalsRevision` defaulting to 0;
     - `SetAfterSaveBehavior(PropertySaveBehavior.Ignore)` on `TimeZone`, `Name`, `CreatedAt` and `GoalsRevision`, as slice 1 does for `FailedSignInCount`.
-- [ ] T044 Add the migration `Goals` with the EF tool from the repo's tool manifest (`dotnet tool restore` first), into `src/HT.Persistence/Migrations/` (depends on T043). Read the generated code before keeping it:
+- [X] T044 Add the migration `Goals` with the EF tool from the repo's tool manifest (`dotnet tool restore` first), into `src/HT.Persistence/Migrations/` (depends on T043). Read the generated code before keeping it:
   - the four nullable or defaulted `AspNetUsers` columns, with `TimeZone` nullable;
   - the three tables;
   - no other default and no check constraint.
 
   `HtDatabase.ResetAsync` and `MigrateAsync` must apply it.
-- [ ] T045 Extend `src/HT.Persistence/Identity/AccountStore.cs` (depends on T041, T043):
+- [X] T045 Extend `src/HT.Persistence/Identity/AccountStore.cs` (depends on T041, T043):
   - `CreateAsync` writes the profile's name, zone and `CreatedAt` into the new `HtUser` before `UserManager.CreateAsync`;
   - `FindByIdAsync` and `FindByEmailAsync` fill `StoredTimeZone`, `Name` and `CreatedAt`.
-- [ ] T046 Create `src/HT.Persistence/Goals/GoalStore.cs`, internal sealed, with the core members of T040, and register it as `IGoalStore` in `src/HT.Persistence/PersistenceServiceCollectionExtensions.cs` (depends on T040, T044):
+- [X] T046 Create `src/HT.Persistence/Goals/GoalStore.cs`, internal sealed, with the core members of T040, and register it as `IGoalStore` in `src/HT.Persistence/PersistenceServiceCollectionExtensions.cs` (depends on T040, T044):
   - `CreateAsync` is one transaction, following research R-08 steps 2 to 6:
     1. read the account row `WITH (UPDLOCK, HOLDLOCK)`;
     2. compare its zone, with NULL read as `defaultZone`, to `expectedZone`; on a difference, write nothing and return `TimeZoneChanged`;
@@ -441,7 +441,7 @@ Two kinds of edit, as in slices 1 and 2:
   - `FindAsync` is scoped by owner.
 
   No statement may raise a database error whose message carries a value.
-- [ ] T047 [P] Create `tests/HT.IntegrationTests/Goals/GoalStoreTests.cs` on `HT-IT` (depends on T046):
+- [X] T047 [P] Create `tests/HT.IntegrationTests/Goals/GoalStoreTests.cs` on `HT-IT` (depends on T046):
   - every field round-trips through create, find and list: each measurement, each schedule, both duration units, a count unit, and zones `UTC`, `Europe/Kyiv` and the link `Europe/Kiev`;
   - another owner's `FindAsync` gives null, and `ListAsync` leaves the goal out;
   - creation order follows insertion for equal names and equal supplied times;
@@ -449,13 +449,13 @@ Two kinds of edit, as in slices 1 and 2:
   - `TimeZoneChanged` writes nothing;
   - a NULL account zone becomes `expectedZone` with the first goal, and `GoalsRevision` increments with every goal;
   - `HabitGone` for a Draft catalog habit, an Unpublished one, a missing custom habit and another owner's custom habit.
-- [ ] T048 [P] Create `tests/HT.IntegrationTests/Accounts/AccountProfileStoreTests.cs` (depends on T045, T046):
+- [X] T048 [P] Create `tests/HT.IntegrationTests/Accounts/AccountProfileStoreTests.cs` (depends on T045, T046):
   - `CreateAsync` stores the name, the zone and `CreatedAt`, and `FindByIdAsync` and `FindByEmailAsync` return them;
   - registration through `AccountService` stores `Europe/Kyiv`, and stores the default for `FLE Standard Time`;
   - a password change whose `HtUser` was loaded before a goal creation committed keeps the account's zone, which went from NULL to concrete, and `GoalsRevision` (research R-04).
 
   US10 and US11 add the time-zone and name variants.
-- [ ] T049 Create `tests/HT.IntegrationTests/Goals/PreSliceAccountMigrationTests.cs` on `HT-IT-MIGRATE` (T004), following research R-14 steps 1 to 6 (depends on T044, T046):
+- [X] T049 Create `tests/HT.IntegrationTests/Goals/PreSliceAccountMigrationTests.cs` on `HT-IT-MIGRATE` (T004), following research R-14 steps 1 to 6 (depends on T044, T046):
   1. compose with `AddHtPersistence`;
   2. resolve the internal `HtDbContext` by its type name, through reflection over `DbContext`;
   3. delete the database, then migrate to `HabitCatalog` with EF's public `IMigrator`;
@@ -464,7 +464,7 @@ Two kinds of edit, as in slices 1 and 2:
   6. check that `StoredTimeZone`, `Name` and `CreatedAt` are null, that `GoalsRevision` is 0, and that a first goal created through `IGoalStore.CreateAsync` with the default `Europe/Kyiv` writes `Europe/Kyiv` into the row.
 
   US10 (T107) and US11 (T114) add the use-case checks.
-- [ ] T050 Extend the architecture rules for the goal port (research R-13; depends on T046):
+- [X] T050 Extend the architecture rules for the goal port (research R-13; depends on T046):
   - `tests/HT.ArchitectureTests/UseCaseParameterTests.cs`: every `IGoalStore` member takes the owner first, except one named `CountUsingCatalogHabitAsync`;
   - `tests/HT.ArchitectureTests/ApplicationDependencyTests.cs`: `IGoalStore` is used only by `HT.Application.Goals`, the three services of `HT.Application.Habits` and `HT.Application.Accounts.ProfileService`, and not by `HT.Application.Operator`;
   - `tests/HT.ArchitectureTests/UiDependencyTests.cs`: no `HT.Ui` type depends on `IGoalStore`.
@@ -473,12 +473,12 @@ Two kinds of edit, as in slices 1 and 2:
 
 ### Host and shared components (`src/HT.Ui/`)
 
-- [ ] T051 Wire the installation's default time zone in the host (research R-03, contracts/host.md "Operator log"; depends on T038):
+- [X] T051 Wire the installation's default time zone in the host (research R-03, contracts/host.md "Operator log"; depends on T038):
   - in `src/HT.Ui/Program.cs`, register `InstallationTimeZone.From(builder.Configuration["Operator:DefaultTimeZone"])` before `AddHtApplication`;
   - in `src/HT.Ui/Operator/StartupTasks.cs`, log the Warning `Default time zone: not a named time zone, using UTC` under category `HT.Ui.Operator.StartupTasks`, only when the value is present but not a named time zone. Never log the value.
 
   Add the tests to `tests/HT.UiTests/Host/StartupLogTests.cs`: an invalid value logs the line without the value, while an absent value and `Europe/Kyiv` log nothing.
-- [ ] T052 [P] Create `src/HT.Ui/Components/Shared/KeyValue.razor`, the `.ht-kv` rows of `design/components/KeyValue`, and its bUnit tests in `tests/HT.UiTests/Components/Shared/SharedComponentTests.cs` (depends on T018)
+- [X] T052 [P] Create `src/HT.Ui/Components/Shared/KeyValue.razor`, the `.ht-kv` rows of `design/components/KeyValue`, and its bUnit tests in `tests/HT.UiTests/Components/Shared/SharedComponentTests.cs` (depends on T018)
 
 **Checkpoint**: `dotnet build HabitTracker.slnx` and `dotnet test HabitTracker.slnx` pass. Commit design, Domain, the
 Application and Persistence foundation, and the host change together (plan, Work order 3 and 4).

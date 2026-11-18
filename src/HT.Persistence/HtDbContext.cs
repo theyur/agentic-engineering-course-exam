@@ -1,4 +1,7 @@
+using HT.Domain.Accounts;
+using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Persistence.Goals;
 using HT.Persistence.Habits;
 using HT.Persistence.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -7,16 +10,27 @@ using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace HT.Persistence;
 
-/// <summary>Identity's user tables (no role tables, research R-02) and the habit tables of slice 2.</summary>
+/// <summary>
+/// Identity's user tables (no role tables, research R-02), the habit tables of slice 2 and the goal tables of slice 4.
+/// </summary>
 internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
     : IdentityUserContext<HtUser, Guid>(options)
 {
     /// <summary>A binary collation, so a unique index compares exactly what the domain's equality compares (research R-04, R-03).</summary>
     public const string BinaryCollation = "Latin1_General_100_BIN2";
 
+    /// <summary>The length of a named time zone column (data-model.md "Tables").</summary>
+    public const int TimeZoneMaxLength = 64;
+
     public DbSet<CatalogHabitRow> CatalogHabits => Set<CatalogHabitRow>();
 
     public DbSet<CustomHabitRow> CustomHabits => Set<CustomHabitRow>();
+
+    public DbSet<GoalRow> Goals => Set<GoalRow>();
+
+    public DbSet<GoalSettingsVersionRow> GoalSettingsVersions => Set<GoalSettingsVersionRow>();
+
+    public DbSet<GoalAttemptRow> GoalAttempts => Set<GoalAttemptRow>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -37,6 +51,16 @@ internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
             // Only TrySaveSignInBlockAsync writes the block; UserManager.UpdateAsync never overwrites it (research R-05).
             user.Property(u => u.FailedSignInCount).Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
             user.Property(u => u.SignInBlockedSince).Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
+
+            // Slice 4 (research R-04, R-08): written at insert, then only by the stores' conditional statements, so a
+            // stale user saved by Identity's full-row update never rolls back the zone, the name or the revision.
+            user.Property(u => u.TimeZone).HasMaxLength(TimeZoneMaxLength);
+            user.Property(u => u.Name).HasMaxLength(AccountName.MaxLength);
+            user.Property(u => u.GoalsRevision).HasDefaultValue(0);
+            user.Property(u => u.TimeZone).Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
+            user.Property(u => u.Name).Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
+            user.Property(u => u.CreatedAt).Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
+            user.Property(u => u.GoalsRevision).Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
         });
 
         // No check constraints and no default values: the rules live in HT.Domain (data-model.md, ADR 0011).
@@ -82,6 +106,45 @@ internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
             habit.Property(h => h.Category).HasConversion<string>().HasMaxLength(16).IsUnicode(false).IsRequired();
             habit.Property(h => h.Intent).HasConversion<string>().HasMaxLength(16).IsUnicode(false).IsRequired();
             habit.Property(h => h.Icon).HasMaxLength(32).IsUnicode(false).IsRequired();
+        });
+
+        // Slice 4 (data-model.md "Tables"): no check constraints and no default values but the identity column.
+        builder.Entity<GoalRow>(goal =>
+        {
+            goal.ToTable("Goals");
+            goal.HasKey(g => g.Id);
+            goal.Property(g => g.Id).ValueGeneratedNever();
+            goal.HasOne<HtUser>().WithMany().HasForeignKey(g => g.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            goal.HasIndex(g => g.OwnerId).HasDatabaseName("IX_Goals_OwnerId");
+            goal.HasOne(g => g.CatalogHabit).WithMany().HasForeignKey(g => g.CatalogHabitId).OnDelete(DeleteBehavior.NoAction);
+            goal.HasIndex(g => g.CatalogHabitId).HasDatabaseName("IX_Goals_CatalogHabitId");
+            goal.HasOne(g => g.CustomHabit).WithMany().HasForeignKey(g => g.CustomHabitId).OnDelete(DeleteBehavior.NoAction);
+            goal.HasIndex(g => g.CustomHabitId).HasDatabaseName("IX_Goals_CustomHabitId");
+            goal.Property(g => g.Name).HasMaxLength(GoalName.MaxLength);
+            goal.Property(g => g.CreationSequence).UseIdentityColumn();
+            goal.HasIndex(g => g.CreationSequence).IsUnique().HasDatabaseName("IX_Goals_CreationSequence");
+            goal.HasMany(g => g.Versions).WithOne().HasForeignKey(v => v.GoalId).OnDelete(DeleteBehavior.Cascade);
+            goal.HasMany(g => g.Attempts).WithOne().HasForeignKey(a => a.GoalId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<GoalSettingsVersionRow>(version =>
+        {
+            version.ToTable("GoalSettingsVersions");
+            version.HasKey(v => new { v.GoalId, v.AppliesFrom });
+            version.Property(v => v.BuildOrReduce).HasConversion<string>().HasMaxLength(16).IsUnicode(false).IsRequired();
+            version.Property(v => v.Measurement).HasConversion<string>().HasMaxLength(16).IsUnicode(false).IsRequired();
+            version.Property(v => v.CountUnit).HasMaxLength(SuggestedStartingGoal.CountUnitMaxLength);
+            version.Property(v => v.DurationUnit).HasConversion<string>().HasMaxLength(16).IsUnicode(false);
+            version.Property(v => v.ScheduleKind).HasConversion<string>().HasMaxLength(16).IsUnicode(false).IsRequired();
+            version.Property(v => v.Period).HasConversion<string>().HasMaxLength(16).IsUnicode(false);
+            version.Property(v => v.TimeZone).HasMaxLength(TimeZoneMaxLength).IsRequired();
+        });
+
+        builder.Entity<GoalAttemptRow>(attempt =>
+        {
+            attempt.ToTable("GoalAttempts");
+            attempt.HasKey(a => new { a.GoalId, a.Number });
+            attempt.Property(a => a.Number).ValueGeneratedNever();
         });
     }
 }

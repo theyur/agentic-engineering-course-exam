@@ -1,5 +1,6 @@
 using HT.Application.Accounts;
 using HT.Domain.Accounts;
+using HT.IntegrationTests.Accounts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HT.IntegrationTests.Habits;
@@ -15,7 +16,7 @@ public static class HabitAccounts
         await Sql.DeleteUserAsync(connectionString, email);
         Assert.True(Email.TryParse(email, out var parsed));
         await using var scope = services.CreateAsyncScope();
-        var created = await scope.ServiceProvider.GetRequiredService<IAccountStore>().CreateAsync(parsed, Role.RegisteredUser, Password, CancellationToken.None);
+        var created = await scope.ServiceProvider.GetRequiredService<IAccountStore>().CreateAsync(parsed, Role.RegisteredUser, Password, TestProfiles.Utc, CancellationToken.None);
         var account = created.Account ?? throw new InvalidOperationException("The test email is taken.");
         return ActingUser.ForAccount(account.Id, account.Role);
     }

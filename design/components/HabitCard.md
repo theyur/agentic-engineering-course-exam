@@ -26,3 +26,11 @@ The second part of the preview shows the card as slice 2 builds it (ADR 0008):
 - the signed-in catalog card with "Details" only: no "Use this habit", no "Add another goal", no "N goals" (slice 4);
 - a catalog habit without a suggested starting goal: no "Suggested starting goal" line;
 - the custom-habit card with the "Private" Tag and "Edit", without "Suggest for catalog".
+
+## Slice 4 state
+
+The last part of the preview shows the registered user's catalog card as slice 4 builds it (HP-005, ADR 0008):
+- tracked: the strong Tag "1 goal" or "N goals" after the name, secondary "Add another goal" and ghost "Details";
+- not tracked: primary "Use this habit" and ghost "Details".
+
+Visitor cards, administrator cards and custom-habit cards keep the slice 2 state.

@@ -38,7 +38,7 @@ public sealed class AccountDetailsTests(DatabaseFixture database)
         Assert.True(Email.TryParse(email, out var parsed));
         await using var scope = database.CreateScope();
         var outcome = await scope.ServiceProvider.GetRequiredService<IAccountStore>()
-            .CreateAsync(parsed, role, Password, CancellationToken.None);
+            .CreateAsync(parsed, role, Password, TestProfiles.Utc, CancellationToken.None);
         return outcome.Account ?? throw new InvalidOperationException($"{email} already has an account.");
     }
 

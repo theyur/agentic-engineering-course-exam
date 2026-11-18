@@ -1,4 +1,5 @@
 using System.Reflection;
+using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Domain.Accounts;
 using Xunit;
@@ -8,10 +9,12 @@ namespace HT.ArchitectureTests;
 /// <summary>
 /// Research R-12, constitution III: the parameters of the habit use cases and ports, checked by reflection. The
 /// public catalog takes no acting user; use cases for signed-in users take the acting user first and never an
-/// account identifier; the custom-habit port takes the owner first.
+/// account identifier; the custom-habit port and the goal port take the owner first.
 /// </summary>
 public sealed class UseCaseParameterTests
 {
+    private const string CountAcrossOwners = "CountUsingCatalogHabitAsync";
+
     private static IEnumerable<MethodInfo> PublicMethods(Type type) =>
         type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Where(m => !m.IsSpecialName);
@@ -28,6 +31,21 @@ public sealed class UseCaseParameterTests
         Assert.NotEmpty(methods);
 
         var offenders = methods
+            .Where(m => m.GetParameters() is not [{ } first, ..] || first.ParameterType != typeof(AccountId))
+            .Select(m => m.Name)
+            .ToList();
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
+    public void Every_method_of_the_goal_port_takes_the_owner_first_except_the_count_across_owners()
+    {
+        var methods = typeof(IGoalStore).GetMethods();
+        Assert.NotEmpty(methods);
+
+        // The one exception (slice 4 research R-08, R-13): a count across owners for the unpublish confirmation.
+        var offenders = methods
+            .Where(m => m.Name != CountAcrossOwners)
             .Where(m => m.GetParameters() is not [{ } first, ..] || first.ParameterType != typeof(AccountId))
             .Select(m => m.Name)
             .ToList();

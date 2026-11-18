@@ -13,7 +13,7 @@ public sealed class ChangePasswordTests
 
     public ChangePasswordTests()
     {
-        _service = new AccountService(_store, new FakeTimeProvider(new DateTimeOffset(2026, 11, 11, 9, 0, 0, TimeSpan.Zero)));
+        _service = new AccountService(_store, new FakeTimeProvider(new DateTimeOffset(2026, 11, 11, 9, 0, 0, TimeSpan.Zero)), InstallationTimeZone.From(null));
     }
 
     [Fact]

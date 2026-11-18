@@ -431,3 +431,28 @@ a.ht-tab { display:inline-block; text-decoration:none; }
 #components-reconnect-modal button { font:inherit; font-size:14px; line-height:20px; font-weight:700; min-height:var(--control-height); margin:var(--space-4) auto 0; padding:8px 16px; border:1px solid transparent; border-radius:var(--radius-sm); background:var(--accent); color:var(--on-accent); cursor:pointer; }
 #components-reconnect-modal button:hover { background:var(--accent-hover); }
 #components-reconnect-modal button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+/* ---------- slice 4: goals ---------- */
+/* the reduced GoalListItem: name, Build or Reduce Tag and meta line only */
+.ht-goalitem--reduced { grid-template-columns:minmax(0,1fr); }
+/* the tags under a detail page's heading, and the goal page's attempt line */
+.ht-head-tags { margin-top:var(--space-2); }
+.ht-attempt { font-size:13px; line-height:18px; color:var(--ink-muted); }
+/* a Notice right under a detail page's head (the goal page's "no longer in the public catalog") */
+.ht-detail-head + .ht-notice { margin:0 0 var(--space-4); }
+/* KeyValue in a card: after the card title, and the card's closing sentence after it */
+.ht-card__title + .ht-kv { margin-top:var(--space-2); }
+.ht-kv + .ht-card__sub { margin:var(--space-3) 0 0; }
+/* the New goal summary card */
+.ht-summary > * + * { margin-top:var(--space-3); }
+.ht-summary > .ht-eyebrow + * { margin-top:var(--space-1); }
+.ht-summary .ht-card__title { margin-bottom:0; }
+/* New goal form sections: the control under the ChoiceCards, a note after a control, an error under a group */
+.ht-choices + .ht-days, .ht-choices + .ht-inline { margin-top:var(--space-3); }
+.ht-form-section__note { font-size:13px; line-height:18px; color:var(--ink-muted); margin:var(--space-2) 0 0; }
+.ht-form-section > .ht-field__error { display:block; margin-top:var(--space-2); }
+/* the habit chooser: two lists of habits, each row a button */
+.ht-pick-list { list-style:none; margin:var(--space-2) 0 0; padding:0; display:grid; gap:2px; }
+button.ht-select-row { font:inherit; width:100%; border:0; background:transparent; color:var(--ink); text-align:left; }
+.ht-select-row:hover { background:var(--surface-2); }
+.ht-select-row .ht-row__name, .ht-select-row .ht-row__meta { display:block; }

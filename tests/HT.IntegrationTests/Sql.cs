@@ -90,6 +90,20 @@ public static class Sql
         return result is DBNull ? null : result;
     }
 
+    /// <summary>Runs a parameterized statement and returns the number of rows it affected. Pass <see cref="DBNull.Value"/> for NULL.</summary>
+    public static async Task<int> ExecuteAsync(string connectionString, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(sql, connection);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        return await command.ExecuteNonQueryAsync();
+    }
+
     /// <summary>True when a table with this name exists in the database.</summary>
     public static async Task<bool> TableExistsAsync(string connectionString, string table)
     {

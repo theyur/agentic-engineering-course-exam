@@ -14,6 +14,8 @@ This folder is the single source of truth for the UI of `HT.Ui` (Blazor).
 
 All `.html` files open directly in a browser (they link `../css/*.css`). They are references with demo data, not production code.
 
+Many previews end with "Slice N state" blocks after the full design: what slice N builds of that page or component (ADR 0008). Build from the latest slice block that exists, and keep the full design as the target of later slices. [pages.md](pages.md) sums up each slice; slice 4 (goals) adds the states of New goal, Goals, the goal page, the signed-in catalog, the habit details, the custom habit page, Admin, the signed-in Home, Profile, Register, TopNav, MobileNav, HabitCard and GoalListItem.
+
 ## Rules for implementation
 
 - Copy `css/tokens.css` and `css/ht-components.css` to `src/HT.Ui/wwwroot/css/` and link them in `App.razor` (tokens first). Remove the template Bootstrap leftovers from `app.css`.
@@ -40,7 +42,7 @@ All `.html` files open directly in a browser (they link `../css/*.css`). They ar
 - `PageCommunity` — The full Community page: participation status, Consistency Bands with names, rules, and catalog habit performance. ([notes](pages/PageCommunity.md), [preview](pages/PageCommunity.html))
 - `PageCustomHabit` — Create or edit a private custom habit. ([notes](pages/PageCustomHabit.md), [preview](pages/PageCustomHabit.html))
 - `PageGoalDetail` — The goal page: everything about one attempt of one goal — stats, trend, history with corrections, settings, pauses, notes and earlier attempts. ([notes](pages/PageGoalDetail.md), [preview](pages/PageGoalDetail.html))
-- `PageGoals` — The Goals list: Tabs Active · Paused · Ended, and one GoalListItem per goal. ([notes](pages/PageGoals.md), [preview](pages/PageGoals.html))
+- `PageGoals` — The Goals list: Tabs Active · Paused · Ended, and one GoalListItem per goal. Built first in slice 4, without Tabs. ([notes](pages/PageGoals.md), [preview](pages/PageGoals.html))
 - `PageHabitDetail` — The catalog habit page, opened from "See details" / "Details" on a HabitCard. ([notes](pages/PageHabitDetail.md), [preview](pages/PageHabitDetail.html))
 - `PageHomeSignedIn` — The signed-in Home (Today): greeting, four StatTiles, the Today list and active goals. ([notes](pages/PageHomeSignedIn.md), [preview](pages/PageHomeSignedIn.html))
 - `PageHomeVisitor` — The visitor Home in layout A: hero with an example goal, How it works, catalog preview and community bands. ([notes](pages/PageHomeVisitor.md), [preview](pages/PageHomeVisitor.html))
@@ -79,7 +81,7 @@ All `.html` files open directly in a browser (they link `../css/*.css`). They ar
 **Tracking**
 - `CommitmentRow` — One row per commitment or period in the Today list: name, schedule or progress, a status chip and the next action. ([guide](components/CommitmentRow.md), [preview](components/CommitmentRow.html))
 - `ConsistencyStrip` — A grid of small squares, one per commitment or period, oldest first, showing how each was evaluated. ([guide](components/ConsistencyStrip.md), [preview](components/ConsistencyStrip.html))
-- `GoalListItem` — One goal in the Goals list: name and schedule, consistency, current streak, the last 15 results and the next action. ([guide](components/GoalListItem.md), [preview](components/GoalListItem.html))
+- `GoalListItem` — One goal in the Goals list: name and schedule, consistency, current streak, the last 15 results and the next action. Slice 4 builds a reduced item: name, Build or Reduce Tag and meta line. ([guide](components/GoalListItem.md), [preview](components/GoalListItem.html))
 - `GoalStats` — The goal summary card: consistency, current streak and longest streak, with the history strip below. ([guide](components/GoalStats.md), [preview](components/GoalStats.html))
 - `GoalSummary` — A compact list of active goals with consistency and streak, used on the signed-in Home. ([guide](components/GoalSummary.md), [preview](components/GoalSummary.html))
 - `StatTile` — A tile with one big number and a short label, in a row of four at the top of the signed-in Home. ([guide](components/StatTile.md), [preview](components/StatTile.html))

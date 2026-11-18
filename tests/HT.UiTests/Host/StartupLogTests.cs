@@ -1,11 +1,22 @@
+using HT.Application.Accounts;
 using HT.Ui.Operator;
+using HT.UiTests.Fakes;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace HT.UiTests.Host;
 
-/// <summary>HP-018: Program.cs runs the startup tasks at all, before the host serves requests.</summary>
+/// <summary>
+/// HP-018: Program.cs runs the startup tasks at all, before the host serves requests. Slice 4 (research R-03,
+/// contracts/host.md "Operator log"): the default time zone's warning, only for a value that is not a named time zone.
+/// </summary>
 [Collection(HostCollection.Name)]
 public sealed class StartupLogTests(HostFixture host)
 {
+    private const string DefaultTimeZoneLine = "Default time zone: not a named time zone, using UTC";
+
     [Fact]
     public void The_started_host_has_logged_administrator_creation_without_the_password()
     {
@@ -33,5 +44,58 @@ public sealed class StartupLogTests(HostFixture host)
             ["demo1@example.com", "demo2@example.com", "demo3@example.com"],
             demoLines.Select(m => m["Demo account ".Length..m.IndexOf(':', StringComparison.Ordinal)]));
         Assert.All(log, m => Assert.DoesNotContain(HostFixture.DemoPassword, m, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Without_a_configured_default_time_zone_nothing_is_logged_about_it()
+    {
+        using var browser = host.CreateBrowser();
+
+        Assert.DoesNotContain(host.Logs.EntriesOf(StartupTasks.LoggerCategory), e => e.Message.StartsWith(DefaultTimeZoneLine, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Mars/Olympus")]
+    [InlineData("FLE Standard Time")]
+    public async Task A_configured_value_that_is_not_a_named_time_zone_logs_one_warning_without_the_value(string value)
+    {
+        await using var zoneHost = new DefaultTimeZoneHost(host.ConnectionString, value);
+        using var browser = zoneHost.CreateClient();
+
+        var log = zoneHost.Logs.EntriesOf(StartupTasks.LoggerCategory);
+
+        var line = Assert.Single(log, e => e.Message.StartsWith("Default time zone: ", StringComparison.Ordinal));
+        Assert.Equal(DefaultTimeZoneLine, line.Message);
+        Assert.Equal(LogLevel.Warning, line.Level);
+        Assert.All(log, e => Assert.DoesNotContain(value, e.Message, StringComparison.Ordinal));
+        Assert.Equal("UTC", zoneHost.Services.GetRequiredService<InstallationTimeZone>().Value.Id);
+    }
+
+    [Fact]
+    public async Task A_configured_named_time_zone_is_used_and_logs_nothing()
+    {
+        await using var zoneHost = new DefaultTimeZoneHost(host.ConnectionString, "Europe/Kyiv");
+        using var browser = zoneHost.CreateClient();
+
+        Assert.DoesNotContain(zoneHost.Logs.EntriesOf(StartupTasks.LoggerCategory), e => e.Message.StartsWith("Default time zone: ", StringComparison.Ordinal));
+        Assert.Equal("Europe/Kyiv", zoneHost.Services.GetRequiredService<InstallationTimeZone>().Value.Id);
+    }
+
+    /// <summary>
+    /// A second host over the shared host's database with only <c>Operator:DefaultTimeZone</c> set. Without the
+    /// administrator and demo settings its startup tasks stop before any database access, so the shared database is
+    /// neither reset nor written.
+    /// </summary>
+    private sealed class DefaultTimeZoneHost(string connectionString, string defaultTimeZone) : WebApplicationFactory<Program>
+    {
+        public ListLoggerProvider Logs { get; } = new();
+
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("ConnectionStrings:HabitTracker", connectionString);
+            builder.UseSetting(StartupTasks.DefaultTimeZoneKey, defaultTimeZone);
+            builder.ConfigureLogging(logging => logging.AddProvider(Logs));
+        }
     }
 }

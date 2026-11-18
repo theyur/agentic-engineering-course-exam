@@ -1,4 +1,5 @@
 using HT.Application;
+using HT.Application.Accounts;
 using HT.Persistence;
 using HT.Persistence.Identity;
 using HT.Ui.Account;
@@ -22,6 +23,9 @@ if (string.IsNullOrWhiteSpace(connectionString))
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// FR-025, research R-03: the installation's default time zone, registered before AddHtApplication's UTC fallback.
+// A value that is not a named time zone gives UTC; StartupTasks logs that fact, never the value.
+builder.Services.AddSingleton(InstallationTimeZone.From(builder.Configuration[StartupTasks.DefaultTimeZoneKey]));
 builder.Services.AddHtApplication();
 builder.Services.AddHtPersistence(connectionString);
 

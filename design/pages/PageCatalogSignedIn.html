@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="../css/ht-components.css"><title>PageCatalogSignedIn — preview</title></head>
 <body>
 <div class="ht ht-page">
-<header class="ht-nav"><div class="ht-nav__inner"><a class="ht-nav__brand" href="#">Habit Tracker</a><nav class="ht-nav__links" aria-label="Main"><a href="#">Today</a><a href="#">Goals</a><a href="#" aria-current="page">Catalog</a><a href="#">Community</a></nav><div class="ht-nav__end"><a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="#">+ New goal</a><span class="ht-avatar" aria-label="Account menu">YD</span><button class="ht-nav__menu-btn" aria-label="Menu" aria-expanded="false"><svg class="ht-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg></button></div></div></header>
+<header class="ht-nav"><div class="ht-nav__inner"><a class="ht-nav__brand" href="#">Habit Tracker</a><nav class="ht-nav__links" aria-label="Main"><a href="#">Today</a><a href="#">Goals</a><a href="#" aria-current="page">Catalog</a><a href="#">Community</a></nav><div class="ht-nav__end"><a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="#">+ New goal</a><span class="ht-avatar" aria-label="Account menu">Y</span><button class="ht-nav__menu-btn" aria-label="Menu" aria-expanded="false"><svg class="ht-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg></button></div></div></header>
 <main class="ht-container">
   <div class="ht-page-head"><h1>Habit catalog</h1><span class="ht-spacer"></span><div class="ht-search" style="width:220px"><svg class="ht-icon ht-icon--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg><input class="ht-input" type="search" placeholder="Search habits" aria-label="Search habits"></div><button class="ht-btn ht-btn--secondary">+ Create custom habit</button></div>
   <div class="ht-tabs" role="tablist"><button class="ht-tab" role="tab" aria-selected="true">Public catalog<span class="ht-count">24</span></button><button class="ht-tab" role="tab" aria-selected="false">My custom habits<span class="ht-count">3</span></button></div>
@@ -160,6 +160,68 @@
   <div class="ht-habit__tags"><span class="ht-chip">Home</span><span class="ht-chip">Build</span></div>
   <p class="ht-habit__desc">A short tidy of one room or one surface.</p>
   <div class="ht-habit__actions"><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">Details</a></div>
+</article></div></div>
+</div>
+</div>
+<!-- Slice 4 state (HP-005): for registered users, a tracked habit's card has the strong "N goals" Tag and "Add another goal"; the others have "Use this habit". Both keep "Details". The FilterPanel adds "Show: Only habits I track" (kept in the address as tracked=true), and the count adds "· you track N". Visitors and administrators keep their slice 2 state. -->
+<header class="ht-nav"><div class="ht-nav__inner"><a class="ht-nav__brand" href="#">Habit Tracker</a><nav class="ht-nav__links" aria-label="Main"><a href="#">Today</a><a href="#">Goals</a><a href="#" aria-current="page">Catalog</a></nav><div class="ht-nav__end"><a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="#">+ New goal</a><div class="ht-account ht-layer-top"><button type="button" class="ht-avatar ht-avatar-btn" aria-label="Account menu for yuri@example.com" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu">Y</button></div><button class="ht-nav__menu-btn" aria-label="Menu" aria-expanded="false" aria-controls="mobile-menu"><svg class="ht-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg></button></div></div></header>
+<div class="ht-container" aria-label="Slice 4 state">
+<div class="ht-eyebrow" style="padding-top:28px">Slice 4 state · registered user, Public catalog</div>
+<div class="ht-page-head"><h1>Habit catalog</h1><span class="ht-spacer"></span><div class="ht-search"><svg class="ht-icon ht-icon--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg><input class="ht-input" type="search" placeholder="Search habits" aria-label="Search habits"></div><a class="ht-btn ht-btn--secondary" href="#">+ Create custom habit</a></div>
+<nav class="ht-tabs" aria-label="Catalog views"><a class="ht-tab" href="/catalog" aria-current="page">Public catalog<span class="ht-count">22</span></a><a class="ht-tab" href="/custom-habits">My custom habits<span class="ht-count">2</span></a></nav>
+<div class="ht-sidebar-layout">
+<aside class="ht-card" aria-label="Filters">
+  <div class="ht-filter__group"><div class="ht-filter__title">Category</div><label class="ht-check"><input type="radio" name="s4-cat" checked> All</label><label class="ht-check"><input type="radio" name="s4-cat"> Body</label><label class="ht-check"><input type="radio" name="s4-cat"> Mind</label><label class="ht-check"><input type="radio" name="s4-cat"> Health</label><label class="ht-check"><input type="radio" name="s4-cat"> Money</label><label class="ht-check"><input type="radio" name="s4-cat"> Home</label></div>
+  <div class="ht-filter__group"><div class="ht-filter__title">Intent</div><label class="ht-check"><input type="checkbox"> Build</label><label class="ht-check"><input type="checkbox"> Reduce</label></div>
+  <div class="ht-filter__group"><div class="ht-filter__title">Show</div><label class="ht-check"><input type="checkbox"> Only habits I track</label></div>
+</aside>
+<div><div class="ht-results-bar"><span>22 habits · you track 2</span><span class="ht-spacer"></span><span>Sort: A–Z</span></div><div class="ht-grid-cards"><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Reading</h3><span class="ht-spacer"></span><span class="ht-chip ht-chip--strong">2 goals</span></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Mind</span><span class="ht-chip">Build</span></div>
+  <p class="ht-habit__desc">Read books, articles or papers.</p><div class="ht-habit__start">Suggested starting goal: <b>15 min, 5 days a week</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--secondary ht-btn--sm" href="#">Add another goal</a><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">Details</a></div>
+</article><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Screen time</h3></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Mind</span><span class="ht-chip">Reduce</span></div>
+  <p class="ht-habit__desc">Time on phone and social apps outside work.</p><div class="ht-habit__start">Suggested starting goal: <b>at most 2 h a day</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--primary ht-btn--sm" href="#">Use this habit</a><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">Details</a></div>
+</article><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /><path d="M20 3v4" /><path d="M22 5h-4" /><path d="M4 17v2" /><path d="M5 18H3" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Tidying</h3></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Home</span><span class="ht-chip">Build</span></div>
+  <p class="ht-habit__desc">A short tidy of one room or one surface.</p>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--primary ht-btn--sm" href="#">Use this habit</a><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">Details</a></div>
+</article><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1" /><path d="m9 20 3-6 3 6" /><path d="m6 8 6 2 6-2" /><path d="M12 10v4" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Yoga</h3><span class="ht-spacer"></span><span class="ht-chip ht-chip--strong">1 goal</span></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Body</span><span class="ht-chip">Build</span></div>
+  <p class="ht-habit__desc">Any yoga practice, at home or in class.</p><div class="ht-habit__start">Suggested starting goal: <b>3 times a week</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--secondary ht-btn--sm" href="#">Add another goal</a><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">Details</a></div>
+</article></div></div>
+</div>
+<div class="ht-eyebrow" style="margin:24px 0 8px">Slice 4 state · "Only habits I track"</div>
+<div class="ht-page-head"><h1>Habit catalog</h1><span class="ht-spacer"></span><div class="ht-search"><svg class="ht-icon ht-icon--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg><input class="ht-input" type="search" placeholder="Search habits" aria-label="Search habits"></div><a class="ht-btn ht-btn--secondary" href="#">+ Create custom habit</a></div>
+<nav class="ht-tabs" aria-label="Catalog views"><a class="ht-tab" href="/catalog" aria-current="page">Public catalog<span class="ht-count">22</span></a><a class="ht-tab" href="/custom-habits">My custom habits<span class="ht-count">2</span></a></nav>
+<div class="ht-sidebar-layout">
+<aside class="ht-card" aria-label="Filters">
+  <div class="ht-filter__group"><div class="ht-filter__title">Category</div><label class="ht-check"><input type="radio" name="s4-cat-tracked" checked> All</label><label class="ht-check"><input type="radio" name="s4-cat-tracked"> Body</label><label class="ht-check"><input type="radio" name="s4-cat-tracked"> Mind</label><label class="ht-check"><input type="radio" name="s4-cat-tracked"> Health</label><label class="ht-check"><input type="radio" name="s4-cat-tracked"> Money</label><label class="ht-check"><input type="radio" name="s4-cat-tracked"> Home</label></div>
+  <div class="ht-filter__group"><div class="ht-filter__title">Intent</div><label class="ht-check"><input type="checkbox"> Build</label><label class="ht-check"><input type="checkbox"> Reduce</label></div>
+  <div class="ht-filter__group"><div class="ht-filter__title">Show</div><label class="ht-check"><input type="checkbox" checked> Only habits I track</label></div>
+</aside>
+<div><div class="ht-results-bar"><span>2 habits · you track 2</span><span class="ht-spacer"></span><span>Sort: A–Z</span></div><div class="ht-grid-cards"><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Reading</h3><span class="ht-spacer"></span><span class="ht-chip ht-chip--strong">2 goals</span></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Mind</span><span class="ht-chip">Build</span></div>
+  <p class="ht-habit__desc">Read books, articles or papers.</p><div class="ht-habit__start">Suggested starting goal: <b>15 min, 5 days a week</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--secondary ht-btn--sm" href="#">Add another goal</a><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">Details</a></div>
+</article><article class="ht-card ht-habit">
+  <div class="ht-habit__glyph"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1" /><path d="m9 20 3-6 3 6" /><path d="m6 8 6 2 6-2" /><path d="M12 10v4" /></svg></div>
+  <div class="ht-habit__head"><h3 class="ht-habit__name">Yoga</h3><span class="ht-spacer"></span><span class="ht-chip ht-chip--strong">1 goal</span></div>
+  <div class="ht-habit__tags"><span class="ht-chip">Body</span><span class="ht-chip">Build</span></div>
+  <p class="ht-habit__desc">Any yoga practice, at home or in class.</p><div class="ht-habit__start">Suggested starting goal: <b>3 times a week</b></div>
+  <div class="ht-habit__actions"><a class="ht-btn ht-btn--secondary ht-btn--sm" href="#">Add another goal</a><a class="ht-btn ht-btn--ghost ht-btn--sm" href="#">Details</a></div>
 </article></div></div>
 </div>
 </div>

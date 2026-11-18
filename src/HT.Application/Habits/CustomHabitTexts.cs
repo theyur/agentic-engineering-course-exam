@@ -6,4 +6,5 @@ public static class CustomHabitTexts
     public const string NotForAdministrators = "Custom habits are for registered users.";
     public const string NotFound = "This custom habit does not exist.";
     public const string NameTaken = "You already have a custom habit with this name.";
+    public const string UsedByGoals = "Goals use this custom habit, so it cannot be deleted.";
 }

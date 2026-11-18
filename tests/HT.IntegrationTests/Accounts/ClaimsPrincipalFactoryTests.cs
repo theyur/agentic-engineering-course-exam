@@ -20,7 +20,7 @@ public sealed class ClaimsPrincipalFactoryTests(DatabaseFixture database)
         Assert.True(Email.TryParse(email, out var parsed));
         await using var scope = database.CreateScope();
         var created = await scope.ServiceProvider.GetRequiredService<IAccountStore>()
-            .CreateAsync(parsed, role, "walking42", CancellationToken.None);
+            .CreateAsync(parsed, role, "walking42", TestProfiles.Utc, CancellationToken.None);
         var id = created.Account!.Id.Value.ToString();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<HtUser>>();
         var user = await userManager.FindByIdAsync(id);

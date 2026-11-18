@@ -8,14 +8,17 @@ namespace HT.UnitTests.Application.Operator;
 
 public sealed class AdministratorCreationTests
 {
+    private static readonly DateTimeOffset Now = new(2026, 11, 11, 9, 0, 0, TimeSpan.Zero);
+
     private readonly FakeAccountStore _store = new();
+    private readonly FakeTimeProvider _clock = new(Now);
     private readonly OperatorService _operator;
     private readonly AccountService _accounts;
 
     public AdministratorCreationTests()
     {
-        _operator = new OperatorService(_store);
-        _accounts = new AccountService(_store, new FakeTimeProvider(new DateTimeOffset(2026, 11, 11, 9, 0, 0, TimeSpan.Zero)));
+        _operator = new OperatorService(_store, _clock, InstallationTimeZone.From(null));
+        _accounts = new AccountService(_store, _clock, InstallationTimeZone.From(null));
     }
 
     [Fact]
@@ -163,6 +166,27 @@ public sealed class AdministratorCreationTests
 
         Assert.NotEqual(AdministratorCreationOutcome.Created, result.Outcome);
         Assert.Single(_store.Accounts);
+    }
+
+    [Fact]
+    public async Task A_created_administrator_has_the_default_zone_no_name_and_the_supplied_creation_time()
+    {
+        var withDefault = new OperatorService(_store, _clock, InstallationTimeZone.From("Europe/Kyiv"));
+
+        await withDefault.CreateAdministratorAsync("zone.admin@example.com", "curator2026", CancellationToken.None);
+
+        var account = _store.Find("zone.admin@example.com")!;
+        Assert.Equal("Europe/Kyiv", account.StoredTimeZone);
+        Assert.Null(account.Name);
+        Assert.Equal(Now, account.CreatedAt);
+    }
+
+    [Fact]
+    public async Task Without_a_configured_default_the_administrator_gets_UTC()
+    {
+        await CreateAsync("utc.admin@example.com", "curator2026");
+
+        Assert.Equal("UTC", _store.Find("utc.admin@example.com")!.StoredTimeZone);
     }
 
     private Task<AdministratorCreationResult> CreateAsync(string? email, string? password) =>

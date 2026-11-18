@@ -17,7 +17,7 @@ public sealed class SignInTests
 
     public SignInTests()
     {
-        _service = new AccountService(_store, _clock);
+        _service = new AccountService(_store, _clock, InstallationTimeZone.From(null));
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using HT.Domain.Accounts;
+using HT.Domain.Time;
 
 namespace HT.Application.Accounts;
 
@@ -13,20 +14,35 @@ public sealed class AccountService
 
     private readonly IAccountStore _store;
     private readonly TimeProvider _timeProvider;
+    private readonly InstallationTimeZone _defaultTimeZone;
 
-    public AccountService(IAccountStore store, TimeProvider timeProvider)
+    public AccountService(IAccountStore store, TimeProvider timeProvider, InstallationTimeZone defaultTimeZone)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(timeProvider);
+        ArgumentNullException.ThrowIfNull(defaultTimeZone);
         _store = store;
         _timeProvider = timeProvider;
+        _defaultTimeZone = defaultTimeZone;
     }
 
     /// <summary>
-    /// Registers an anonymous visitor (FR-001 to FR-004). Checks, in order: a valid email, the password rule,
-    /// the email not taken. A registration that loses a race for the email gives <see cref="RegistrationOutcome.EmailTaken"/>.
+    /// Registers an anonymous visitor (FR-001 to FR-004) with no time zone and no name: the same as
+    /// <see cref="RegisterAsync(string?, string?, string?, string?, CancellationToken)"/> with both null, so slice 1's
+    /// outcomes are unchanged (FR-019).
     /// </summary>
-    public async Task<RegistrationResult> RegisterAsync(string? email, string? password, CancellationToken cancellationToken)
+    public Task<RegistrationResult> RegisterAsync(string? email, string? password, CancellationToken cancellationToken) =>
+        RegisterAsync(email, password, null, null, cancellationToken);
+
+    /// <summary>
+    /// Registers an anonymous visitor (FR-001 to FR-004, FR-024, FR-025, FR-028). Checks, in order: a valid email, the
+    /// password rule, the email not taken, then the name at most 60 characters after trimming. A registration that
+    /// loses a race for the email gives <see cref="RegistrationOutcome.EmailTaken"/>. A time zone that is not a named
+    /// time zone is not refused: the account gets the installation's default (FR-025). The account records the
+    /// supplied current time as its creation time (FR-030).
+    /// </summary>
+    public async Task<RegistrationResult> RegisterAsync(
+        string? email, string? password, string? timeZone, string? name, CancellationToken cancellationToken)
     {
         if (!Email.TryParse(email, out var parsed))
         {
@@ -43,7 +59,14 @@ public sealed class AccountService
             return RegistrationResult.EmailTaken;
         }
 
-        var created = await _store.CreateAsync(parsed, Role.RegisteredUser, password!, cancellationToken);
+        if (!AccountName.TryCreate(name, out var accountName, out _))
+        {
+            return RegistrationResult.NameTooLong;
+        }
+
+        var zone = NamedTimeZone.TryParse(timeZone, out var chosen) ? chosen : _defaultTimeZone.Value;
+        var profile = new NewAccountProfile(accountName, zone, _timeProvider.GetUtcNow());
+        var created = await _store.CreateAsync(parsed, Role.RegisteredUser, password!, profile, cancellationToken);
         return created.Account is { } account
             ? RegistrationResult.Registered(account.Id)
             : RegistrationResult.EmailTaken;

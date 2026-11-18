@@ -1,3 +1,4 @@
+using HT.Application.Accounts;
 using HT.Application.Operator;
 using HT.Persistence;
 
@@ -21,11 +22,20 @@ internal static partial class StartupTasks
     /// <summary>The configuration key of the demo password (research R-11), kept out of source control.</summary>
     public const string DemoPasswordKey = "Operator:DemoPassword";
 
+    /// <summary>The configuration key of the installation's default time zone (slice 4 research R-03); not a secret.</summary>
+    public const string DefaultTimeZoneKey = "Operator:DefaultTimeZone";
+
     public static async Task RunAsync(IServiceProvider services, IHostEnvironment environment, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(environment);
         ArgumentNullException.ThrowIfNull(logger);
+
+        // Slice 4 contracts/host.md: only a configured value that is not a named time zone is reported, never the value.
+        if (services.GetRequiredService<InstallationTimeZone>().IsConfiguredValueIgnored)
+        {
+            LogDefaultTimeZoneIgnored(logger);
+        }
 
         if (environment.IsDevelopment())
         {
@@ -104,6 +114,9 @@ internal static partial class StartupTasks
             LogStepFailed(logger, exception, step);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Default time zone: not a named time zone, using UTC")]
+    private static partial void LogDefaultTimeZoneIgnored(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Schema migrations applied: {Count}")]
     private static partial void LogMigrationsApplied(ILogger logger, int count);

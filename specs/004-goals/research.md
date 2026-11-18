@@ -551,6 +551,7 @@ Accepted by the owner on 2026-11-18 (plan.md, "Spec discrepancies" 1).
     - `LongDate`, which gives "Tuesday, 17 November";
     - `ShortDate`, which gives "Tue 17 Nov";
     - `DayMonth`, which gives "23 Nov";
+    - `DayMonthYear`, which gives "14 Jul 2026" (the Settings card's "Started" row, HP-004; added by T037);
     - `MonthYear`, which gives "November 2026".
 
     The pages and the summary card use the same `DateTexts`.

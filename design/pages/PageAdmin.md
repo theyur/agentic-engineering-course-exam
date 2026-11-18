@@ -17,3 +17,12 @@ The second part of the preview shows the page as slice 2 builds it (US3-AS20, HP
 - Status is a Tag with its word: "Draft" and "Unpublished" neutral, "Published" strong. Never colour alone.
 - Row actions: ghost "Edit" (→ the form), then primary "Publish" for a Draft or Unpublished habit, or secondary "Unpublish" for a Published one. Each action's accessible name includes the habit's name ("Publish Cold shower"). Publish and Unpublish act at once and the row shows the new state; there is no confirmation in this slice.
 - Rows are in name order, every state mixed.
+
+## Slice 4 state
+
+The last part of the preview shows the page as slice 4 builds it (HP-008, ADR 0008).
+
+- The table is the slice 2 one; it still has no "Updated" column (slice 2 HP-009; no page of slice 4 needs it).
+- "Unpublish" on a Published habit that at least one goal uses opens a Dialog first (`components/Dialog`): the title "Unpublish this habit?", the sub line "Reading · Published", then "2 goals use this habit." ("1 goal uses this habit." for one) and "The goals keep working for their owners. No new goal can be based on this habit until you publish it again.", then primary "Unpublish" and secondary "Cancel". The Dialog shows the number only: no owner, email, goal name or setting.
+- "Unpublish" in the Dialog unpublishes the habit and the row shows "Unpublished". Cancel, × and Esc close the Dialog and nothing changes; focus returns to the row's "Unpublish".
+- A habit that no goal uses is unpublished at once, as in slice 2.

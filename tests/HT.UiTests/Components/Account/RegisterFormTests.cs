@@ -13,7 +13,7 @@ public sealed class RegisterFormTests : BunitContext
 
     public RegisterFormTests()
     {
-        Services.AddSingleton(new AccountService(_store, TimeProvider.System));
+        Services.AddSingleton(new AccountService(_store, TimeProvider.System, InstallationTimeZone.From(null)));
     }
 
     [Fact]

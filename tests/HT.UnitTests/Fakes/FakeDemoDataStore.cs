@@ -1,6 +1,8 @@
+using HT.Application.Accounts;
 using HT.Application.Operator;
 using HT.Domain.Accounts;
 using HT.Domain.Habits;
+using HT.Domain.Time;
 
 namespace HT.UnitTests.Fakes;
 
@@ -84,7 +86,9 @@ public sealed class FakeDemoDataStore(FakeAccountStore accounts) : IDemoDataStor
             _calls.Add($"account {email.Value}");
         }
 
-        var created = await accounts.CreateAsync(email, Role.RegisteredUser, password, cancellationToken);
+        // The demo profile comes with IDemoDataStore's new signature (research R-10); until then UTC, no name and no real time.
+        var profile = new NewAccountProfile(null, NamedTimeZone.Utc, DateTimeOffset.UnixEpoch);
+        var created = await accounts.CreateAsync(email, Role.RegisteredUser, password, profile, cancellationToken);
         if (created.IsEmailTaken)
         {
             return CreateDemoAccountOutcome.EmailTaken;

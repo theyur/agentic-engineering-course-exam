@@ -60,4 +60,31 @@ public sealed class SharedComponentTests : BunitContext
         Assert.Equal("Page not found", cut.Find(".ht-empty h1").TextContent);
         Assert.Equal("The page you asked for does not exist.", cut.Find(".ht-empty p").TextContent);
     }
+
+    [Fact]
+    public void KeyValue_renders_one_dt_and_dd_pair_per_row_in_order()
+    {
+        var cut = Render<KeyValue>(p => p.Add(x => x.Rows,
+        [
+            new KeyValue.Row("Habit", "Yoga · catalog"),
+            new KeyValue.Row("Build or reduce", "Build"),
+            new KeyValue.Row("Measure", "Yes / no"),
+            new KeyValue.Row("Schedule", "Mon · Wed · Fri"),
+        ]));
+
+        var list = cut.Find("dl.ht-kv");
+        Assert.Equal(
+            ["DT", "DD", "DT", "DD", "DT", "DD", "DT", "DD"],
+            list.Children.Select(c => c.TagName));
+        Assert.Equal(["Habit", "Build or reduce", "Measure", "Schedule"], cut.FindAll(".ht-kv dt").Select(e => e.TextContent));
+        Assert.Equal(["Yoga · catalog", "Build", "Yes / no", "Mon · Wed · Fri"], cut.FindAll(".ht-kv dd").Select(e => e.TextContent));
+    }
+
+    [Fact]
+    public void KeyValue_without_rows_renders_an_empty_list()
+    {
+        var cut = Render<KeyValue>(p => p.Add(x => x.Rows, []));
+
+        Assert.Empty(cut.Find("dl.ht-kv").Children);
+    }
 }

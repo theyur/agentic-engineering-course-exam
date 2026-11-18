@@ -1,5 +1,6 @@
 using ArchUnitNET.xUnit;
 using HT.Application.Accounts;
+using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Application.Operator;
 using Xunit;
@@ -59,6 +60,15 @@ public sealed class UiDependencyTests
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
             .Should().NotDependOnAny(Types(true).That().Are(typeof(ICustomHabitStore)))
             .Because("custom habits are private; pages reach them only through CustomHabitService, which scopes every call to the acting user (constitution III, research R-12)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
+    public void NoUiTypeMayDependOnTheGoalStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IGoalStore)))
+            .Because("goals are private; pages reach them only through the use cases, which scope every call to the acting user (constitution III, slice 4 research R-13)")
             .Check(ArchitectureModel.Architecture);
     }
 

@@ -15,8 +15,12 @@ public interface IAccountStore
     /// <summary>Finds the account with this identifier. Used only with the acting user's own identifier.</summary>
     Task<Account?> FindByIdAsync(AccountId id, CancellationToken cancellationToken);
 
-    /// <summary>Creates an account. An email that already has an account gives <see cref="CreateAccountOutcome.EmailTaken"/>.</summary>
-    Task<CreateAccountOutcome> CreateAsync(Email email, Role role, string password, CancellationToken cancellationToken);
+    /// <summary>
+    /// Creates an account with its profile: name, time zone and creation time (research R-04). An email that already
+    /// has an account gives <see cref="CreateAccountOutcome.EmailTaken"/>.
+    /// </summary>
+    Task<CreateAccountOutcome> CreateAsync(
+        Email email, Role role, string password, NewAccountProfile profile, CancellationToken cancellationToken);
 
     /// <summary>
     /// The version of the account's password when <paramref name="password"/> is that password; null when it is
