@@ -585,7 +585,7 @@ opens one to see its settings, attempt line and evaluation.
 
 ### Tests for User Story 2
 
-- [ ] T064 [P] [US2] Create `tests/HT.UnitTests/Application/Goals/GoalListTests.cs` (depends on T067, T068):
+- [X] T064 [P] [US2] Create `tests/HT.UnitTests/Application/Goals/GoalListTests.cs` (depends on T067, T068):
   - US2-AS1: name order through `HabitName.KeyOf`, then creation order for equal names, with every FR-015 field and the `ScheduleText` ("Mon · Wed · Fri", "Flexible · 3 times a week");
   - US2-AS2: a started Mon/Wed/Fri goal read on Wednesday 18 November 2026 gives that Wednesday as its next commitment, and read on Thursday 19 November gives Friday 20 November;
   - US2-AS3: a per-day goal starting later gives its start date and no next commitment, and a Mon/Wed/Fri goal starting on a later Tuesday gives that start date and the following Wednesday;
@@ -593,7 +593,7 @@ opens one to see its settings, attempt line and evaluation.
   - US2-AS5: an empty list;
   - FR-014 across a time-zone switch, with a goal of two versions in `FakeGoalStore`: a commitment already over is not given as next, and one in progress is not skipped;
   - the result's `Today` is the account's date.
-- [ ] T065 [P] [US2] Create `tests/HT.UnitTests/Application/Goals/GoalReadTests.cs` (depends on T067, T068):
+- [X] T065 [P] [US2] Create `tests/HT.UnitTests/Application/Goals/GoalReadTests.cs` (depends on T067, T068):
   - US2-AS4: every FR-016 field, and the `ScheduleText`;
   - US1-AS9: the derived name "Reading, 15 min, 5 days a week", and the own name "Morning pages" with `HasOwnName`;
   - US7-AS7: the habit's current name after a rename;
@@ -602,23 +602,23 @@ opens one to see its settings, attempt line and evaluation.
   - `FirstWeekStarts` for a per-week goal, given always;
   - attempt 1 and its start date, and `HasStarted` before and after the start date's day begins;
   - an unknown identifier and another user's goal both give "This goal does not exist.".
-- [ ] T066 [P] [US2] Create `tests/HT.IntegrationTests/Goals/GoalReadingTests.cs` on `HT-IT`: list and read through `GoalService` over SQL, with the habit renamed by an administrator so the goal shows the current name, and owner scoping (depends on T068)
+- [X] T066 [P] [US2] Create `tests/HT.IntegrationTests/Goals/GoalReadingTests.cs` on `HT-IT`: list and read through `GoalService` over SQL, with the habit renamed by an administrator so the goal shows the current name, and owner scoping (depends on T068)
 
 ### Implementation for User Story 2
 
-- [ ] T067 [US2] Add the list and read results to `src/HT.Application/Goals/GoalResults.cs`:
+- [X] T067 [US2] Add the list and read results to `src/HT.Application/Goals/GoalResults.cs`:
   - `GoalListOutcome` and `GoalListResult`, with `Goals` and `DateOnly Today`, the acting user's date at the supplied time;
   - `GoalReadOutcome` and `GoalReadResult`.
 
   Add `bool HasStarted` (the goal has a current date) to `GoalDetails` in `src/HT.Application/Goals/`. These two members let the pages say "next today", "started" and "starts" without reading a clock. Record both in data-model.md and contracts/application-api.md in the same task.
-- [ ] T068 [US2] Add `ListAsync` and `GetAsync` to `src/HT.Application/Goals/GoalService.cs` (FR-014 to FR-016, FR-018, FR-020; depends on T067):
+- [X] T068 [US2] Add `ListAsync` and `GetAsync` to `src/HT.Application/Goals/GoalService.cs` (FR-014 to FR-016, FR-018, FR-020; depends on T067):
   - FR-023's order;
   - `GoalTimeline.CurrentDate`, `NextCommitment` and `FirstWeekStart` at the supplied time;
   - `GoalText.Name` with the habit's current name;
   - a stable sort by `HabitName.KeyOf(name)` over the store's creation order;
   - the version of the current date and the one later version.
-- [ ] T069 [P] [US2] Create `src/HT.Ui/Components/Shared/GoalItem.razor`, the design's GoalListItem (HP-003). It is not named `GoalListItem`, because the view `HT.Application.Goals.GoalListItem` would then be ambiguous in `Goals.razor` (CS0104). It shows the name link, the Build or Reduce Tag and the meta line. The meta line is the item's `ScheduleText` (T039), then " · " and the first that applies of "first week starts Mon 23 Nov", "starts Mon 23 Nov" (exactly when the item has `StartDate`, plan "Spec discrepancies" 5), "next today" (`NextCommitment` equals `Today`), "next Wed 18 Nov", or nothing, in which case the line is the schedule text alone. All dates come from `DateTexts.ShortDate`. Add its bUnit tests for every variant to `tests/HT.UiTests/Components/Shared/HabitComponentTests.cs` (depends on T018, T067)
-- [ ] T070 [US2] Build the Goals page and the goal page (HP-003, HP-004; depends on T068, T069, T052):
+- [X] T069 [P] [US2] Create `src/HT.Ui/Components/Shared/GoalItem.razor`, the design's GoalListItem (HP-003). It is not named `GoalListItem`, because the view `HT.Application.Goals.GoalListItem` would then be ambiguous in `Goals.razor` (CS0104). It shows the name link, the Build or Reduce Tag and the meta line. The meta line is the item's `ScheduleText` (T039), then " · " and the first that applies of "first week starts Mon 23 Nov", "starts Mon 23 Nov" (exactly when the item has `StartDate`, plan "Spec discrepancies" 5), "next today" (`NextCommitment` equals `Today`), "next Wed 18 Nov", or nothing, in which case the line is the schedule text alone. All dates come from `DateTexts.ShortDate`. Add its bUnit tests for every variant to `tests/HT.UiTests/Components/Shared/HabitComponentTests.cs` (depends on T018, T067)
+- [X] T070 [US2] Build the Goals page and the goal page (HP-003, HP-004; depends on T068, T069, T052):
   - `src/HT.Ui/Components/Goals/GoalSettingsCard.razor`, made of KeyValue rows, with the sentence of HP-004. Schedule is `GoalDetails.ScheduleText`, Evaluated is "Each scheduled day", "Each day" or "Each week", and Started is the start date as `DateTexts.DayMonthYear` ("14 Jul 2026");
   - `src/HT.Ui/Components/Pages/Goals.razor` at `/goals`: static SSR and `[Authorize]`, with Not found for an administrator, an `ht-list` of `GoalItem`s, and the EmptyState;
   - `src/HT.Ui/Components/Pages/GoalDetail.razor` at `/goals/{Id:guid}`:
@@ -628,8 +628,8 @@ opens one to see its settings, attempt line and evaluation.
     - the attempt line "Attempt 1 · started {DayMonth}" or "· starts {DayMonth}", from `HasStarted`;
     - the Settings card;
     - the FR-034 Notice when `Habit.IsInCatalog` is false.
-- [ ] T071 [P] [US2] Create `tests/HT.UiTests/Components/Pages/GoalsPageTests.cs` (US2-AS6, the EmptyState) and `GoalDetailPageTests.cs` (US2-AS7, both attempt lines, the Settings rows and sentence, and US7-AS8: the Notice for an Unpublished habit and none on the list) (depends on T070)
-- [ ] T072 [US2] Extend `tests/HT.UiTests/Host/GoalsHostTests.cs` with `/goals` and `/goals/{id}`: a signed-out visitor is sent to Sign in, an administrator gets 404, the owner gets 200, and an unknown identifier gets 404 (depends on T070, T063)
+- [X] T071 [P] [US2] Create `tests/HT.UiTests/Components/Pages/GoalsPageTests.cs` (US2-AS6, the EmptyState) and `GoalDetailPageTests.cs` (US2-AS7, both attempt lines, the Settings rows and sentence, and US7-AS8: the Notice for an Unpublished habit and none on the list) (depends on T070)
+- [X] T072 [US2] Extend `tests/HT.UiTests/Host/GoalsHostTests.cs` with `/goals` and `/goals/{id}`: a signed-out visitor is sent to Sign in, an administrator gets 404, the owner gets 200, and an unknown identifier gets 404 (depends on T070, T063)
 
 **Checkpoint**: full suite green. Create, list and open goals in the browser. Commit.
 

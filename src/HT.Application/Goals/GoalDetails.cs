@@ -49,6 +49,12 @@ public sealed record GoalDetails
 
     public required DateOnly StartDate { get; init; }
 
+    /// <summary>
+    /// True when the goal has a current date at the supplied time (FR-012): its start date's day has begun in the zone
+    /// of its own version. The goal page says "started" or "starts" from it, without reading a clock (HP-004).
+    /// </summary>
+    public required bool HasStarted { get; init; }
+
     /// <summary>The first week's Monday; per-week goals only.</summary>
     public DateOnly? FirstWeekStarts { get; init; }
 

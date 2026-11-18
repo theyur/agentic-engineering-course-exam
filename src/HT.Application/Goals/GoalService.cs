@@ -8,7 +8,7 @@ using HT.Domain.Time;
 namespace HT.Application.Goals;
 
 /// <summary>
-/// Personal goals for registered users (FR-001 to FR-012, FR-018, FR-020 to FR-023; research R-07, R-08). Every use
+/// Personal goals for registered users (FR-001 to FR-016, FR-018, FR-020 to FR-023, FR-034; research R-06 to R-08). Every use
 /// case takes the acting user first and checks in FR-023's order: signed in, not an administrator, the acting user's
 /// account, the identifiers, then the fields. Every store call passes the acting user's account as the owner, so a
 /// use case acts only on that user's own goals (constitution III). "Today" is the date in the account's time zone at
@@ -183,6 +183,124 @@ public sealed class GoalService
 
             account = reread;
         }
+    }
+
+    /// <summary>
+    /// The acting user's goals (FR-014, FR-015): every goal of the account, in name order (the keys of
+    /// <see cref="HabitName.KeyOf"/> compared ordinally), then in the store's creation order. Each item carries, at the
+    /// supplied time and by the goal's own timeline rather than the account's "today": its start date while it has no
+    /// current date, its next commitment (commitment-based goals), and its first week's Monday while that week has not
+    /// begun (per-week goals). <see cref="GoalListResult.Today"/> is today in the account's time zone.
+    /// </summary>
+    public async Task<GoalListResult> ListAsync(ActingUser actingUser, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await AccessAsync(actingUser, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return GoalListResult.Refused(refusal == AccessRefusal.NotSignedIn ? GoalListOutcome.NotSignedIn : GoalListOutcome.NotForAdministrators, access.Message!);
+        }
+
+        var now = _clock.GetUtcNow();
+        var today = ZoneOf(access.Account!).DateAt(now);
+        var stored = await _goals.ListAsync(access.Owner, cancellationToken).ConfigureAwait(false);
+        var items = stored
+            .Select(goal => ListItemOf(goal, now))
+            .OrderBy(item => HabitName.KeyOf(item.Name), StringComparer.Ordinal)
+            .ToList();
+        return GoalListResult.Found(items, today);
+    }
+
+    /// <summary>
+    /// One of the acting user's goals (FR-016, FR-018, FR-034). An identifier that is not one of the acting user's
+    /// goals gives "This goal does not exist.", whether it belongs to nothing or to another account (FR-020). The time
+    /// zone is the one of the version of the goal's current date at the supplied time, or of the first version while
+    /// the goal has no current date; the later time zone is that of the one version after it, if any.
+    /// </summary>
+    public async Task<GoalReadResult> GetAsync(ActingUser actingUser, GoalId id, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await AccessAsync(actingUser, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return GoalReadResult.Refused(refusal == AccessRefusal.NotSignedIn ? GoalReadOutcome.NotSignedIn : GoalReadOutcome.NotForAdministrators, access.Message!);
+        }
+
+        if (await _goals.FindAsync(access.Owner, id, cancellationToken).ConfigureAwait(false) is not { } stored)
+        {
+            return GoalReadResult.Refused(GoalReadOutcome.NotFound, GoalTexts.NotFound);
+        }
+
+        return GoalReadResult.Found(DetailsOf(stored, _clock.GetUtcNow()));
+    }
+
+    /// <summary>The list fields of FR-015 and FR-014 at <paramref name="now"/>.</summary>
+    private static GoalListItem ListItemOf(StoredGoal stored, DateTimeOffset now)
+    {
+        var goal = stored.Goal;
+        var current = GoalTimeline.CurrentDate(goal, now);
+        var target = GoalTimeline.VersionOf(goal, current ?? goal.StartDate).Settings.Target;
+        return new GoalListItem
+        {
+            Id = goal.Id,
+            Name = GoalText.Name(goal, stored.Habit.Name),
+            HabitName = stored.Habit.Name,
+            HabitKind = stored.Habit.Kind,
+            BuildOrReduce = target.BuildOrReduce,
+            Measurement = target.Measurement,
+            TargetText = GoalText.TargetText(target),
+            ScheduleText = GoalText.ScheduleText(target),
+            ScheduleKind = target.ScheduleKindOf,
+            StartDate = current is null ? goal.StartDate : null,
+            NextCommitment = GoalTimeline.NextCommitment(goal, now),
+            FirstWeekStarts = FirstWeekNotBegun(goal, now),
+        };
+    }
+
+    /// <summary>A per-week goal's first Monday while its week has not begun at <paramref name="now"/>; null otherwise.</summary>
+    private static DateOnly? FirstWeekNotBegun(Goal goal, DateTimeOffset now) =>
+        GoalTimeline.FirstWeekStart(goal) is { } monday && GoalTimeline.VersionOf(goal, monday).Settings.TimeZone.StartOfDay(monday) > now
+            ? monday
+            : null;
+
+    /// <summary>The reading fields of FR-016 and FR-018 at <paramref name="now"/>.</summary>
+    private static GoalDetails DetailsOf(StoredGoal stored, DateTimeOffset now)
+    {
+        var goal = stored.Goal;
+        var current = GoalTimeline.CurrentDate(goal, now);
+        var version = current is { } date ? GoalTimeline.VersionOf(goal, date) : goal.Versions[0];
+        var later = goal.Versions.FirstOrDefault(v => v.AppliesFrom > version.AppliesFrom);
+        var target = version.Settings.Target;
+        var schedule = target.Schedule;
+        return new GoalDetails
+        {
+            Id = goal.Id,
+            Name = GoalText.Name(goal, stored.Habit.Name),
+            HasOwnName = goal.OwnName is not null,
+            Habit = stored.Habit,
+            BuildOrReduce = target.BuildOrReduce,
+            Measurement = target.Measurement,
+            Amount = target.Amount,
+            CountUnit = target.CountUnit,
+            DurationUnit = target.DurationUnit,
+            ScheduleKind = schedule.Kind,
+            Days = schedule.Days,
+            Times = schedule.Times,
+            Period = schedule.Period,
+            GoalScheduleKind = target.ScheduleKindOf,
+            TargetText = GoalText.TargetText(target),
+            ScheduleText = GoalText.ScheduleText(target),
+            Kind = GoalText.Kind(target),
+            StartDate = goal.StartDate,
+            HasStarted = current is not null,
+            FirstWeekStarts = GoalTimeline.FirstWeekStart(goal),
+            TimeZone = version.Settings.TimeZone.Id,
+            TimeZoneAppliesFrom = version.AppliesFrom,
+            LaterTimeZone = later?.Settings.TimeZone.Id,
+            LaterTimeZoneAppliesFrom = later?.AppliesFrom,
+            AttemptNumber = goal.Attempt.Number,
+            AttemptStartDate = goal.Attempt.StartDate,
+        };
     }
 
     /// <summary>

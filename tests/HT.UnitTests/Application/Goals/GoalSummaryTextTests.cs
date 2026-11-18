@@ -62,6 +62,7 @@ public sealed class GoalSummaryTextTests
         Assert.Equal(streak, Row(summary, "Streak counted in"));
         Assert.Equal(late, Row(summary, "Late records"));
         Assert.Equal(evaluated, GoalSummaryText.EvaluatedOf(Target(fields)));
+        Assert.Equal(evaluated, GoalSummaryText.EvaluatedOf(Target(fields).ScheduleKindOf, Target(fields).PeriodLength));
     }
 
     public static TheoryData<GoalTargetFields, string> MetWhen => new()

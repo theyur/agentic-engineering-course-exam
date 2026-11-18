@@ -1,4 +1,6 @@
 using Bunit;
+using HT.Application.Goals;
+using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Ui.Components.Shared;
 using static HT.Ui.Components.Shared.HabitCard;
@@ -154,6 +156,74 @@ public sealed class HabitComponentTests : BunitContext
         Assert.Null(category);
         cut.FindAll("input[type=checkbox]")[1].Change(true);
         Assert.Equal((true, true), intent);
+    }
+
+    /// <summary>Wednesday 18 November 2026, the list's today in the GoalItem tests.</summary>
+    private static readonly DateOnly GoalToday = new(2026, 11, 18);
+
+    private IRenderedComponent<GoalItem> RenderGoal(GoalListItem item) =>
+        Render<GoalItem>(p => p.Add(x => x.Item, item).Add(x => x.Today, GoalToday));
+
+    private static GoalListItem GoalAt(
+        string schedule, GoalScheduleKind kind, DateOnly? start = null, DateOnly? next = null, DateOnly? firstWeek = null,
+        BuildOrReduce side = BuildOrReduce.Build) => new()
+    {
+        Id = new GoalId(Guid.Parse("4b1d0c9e-0000-4000-8000-000000000001")),
+        Name = "Reading, 15 min, 5 days a week",
+        HabitName = "Reading",
+        HabitKind = HabitKind.Catalog,
+        BuildOrReduce = side,
+        Measurement = Measurement.Duration,
+        TargetText = "15 min, 5 days a week",
+        ScheduleText = schedule,
+        ScheduleKind = kind,
+        StartDate = start,
+        NextCommitment = next,
+        FirstWeekStarts = firstWeek,
+    };
+
+    /// <summary>Every meta-line variant of HP-003, in its order of precedence, and the schedule alone.</summary>
+    public static TheoryData<GoalListItem, string> GoalMetaLines => new()
+    {
+        {
+            GoalAt("Flexible · 2 times a week", GoalScheduleKind.PeriodBased, start: new(2026, 11, 20), firstWeek: new(2026, 11, 23)),
+            "Flexible · 2 times a week · first week starts Mon 23 Nov"
+        },
+        { GoalAt("Flexible · 2 times a week", GoalScheduleKind.PeriodBased, firstWeek: new(2026, 11, 23)), "Flexible · 2 times a week · first week starts Mon 23 Nov" },
+        { GoalAt("Mon · Wed · Fri", GoalScheduleKind.CommitmentBased, start: new(2026, 11, 24), next: new(2026, 11, 25)), "Mon · Wed · Fri · starts Tue 24 Nov" },
+        { GoalAt("Every day", GoalScheduleKind.PeriodBased, start: new(2026, 11, 18)), "Every day · starts Wed 18 Nov" },
+        { GoalAt("Mon–Fri", GoalScheduleKind.CommitmentBased, next: GoalToday), "Mon–Fri · next today" },
+        { GoalAt("Mon · Wed · Fri", GoalScheduleKind.CommitmentBased, next: new(2026, 11, 20)), "Mon · Wed · Fri · next Fri 20 Nov" },
+        { GoalAt("2 times a day", GoalScheduleKind.PeriodBased), "2 times a day" },
+        { GoalAt("Flexible · 3 times a week", GoalScheduleKind.PeriodBased), "Flexible · 3 times a week" },
+    };
+
+    [Theory]
+    [MemberData(nameof(GoalMetaLines))]
+    public void GoalItem_shows_the_name_link_the_tag_and_the_meta_line(GoalListItem item, string meta)
+    {
+        var cut = RenderGoal(item);
+
+        var root = cut.Find("div.ht-goalitem");
+        Assert.Contains("ht-goalitem--reduced", root.ClassList);
+        var link = cut.Find("a.ht-goalitem__name");
+        Assert.Equal("Reading, 15 min, 5 days a week", link.TextContent);
+        Assert.Equal("/goals/4b1d0c9e-0000-4000-8000-000000000001", link.GetAttribute("href"));
+        Assert.Equal("Build", cut.Find(".ht-goalitem__meta .ht-chip").TextContent);
+        Assert.Equal(meta, cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
+        foreach (var absent in new[] { "ht-strip", "ht-goalitem__actions", "Record", "%" })
+        {
+            Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void GoalItem_shows_Reduce_as_its_tag()
+    {
+        var cut = RenderGoal(GoalAt("Every day", GoalScheduleKind.PeriodBased, side: BuildOrReduce.Reduce));
+
+        Assert.Equal("Reduce", cut.Find(".ht-goalitem__meta .ht-chip").TextContent);
+        Assert.Equal("Every day", cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
     }
 
     [Fact]

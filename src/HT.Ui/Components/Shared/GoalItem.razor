@@ -1,0 +1,36 @@
+@using HT.Application.Accounts
+@using HT.Application.Goals
+@* design/components/GoalListItem, slice 4 state (HP-003): the reduced item, one column. The name links to the goal
+   page; the meta line has the Build or Reduce Tag, then the schedule and at most one of "first week starts …",
+   "starts …" (exactly when the item has a start date, plan "Spec discrepancies" 5), "next today" / "next …". No
+   consistency, streak, strip or action (slices 5 and 6). Named GoalItem, not GoalListItem, so the view
+   HT.Application.Goals.GoalListItem stays unambiguous in the pages. The class ht-goalitem__name is read by the smoke
+   check. *@
+<div class="ht-goalitem ht-goalitem--reduced">
+    <div>
+        <a class="ht-goalitem__name" href="@($"/goals/{Item.Id.Value}")">@Item.Name</a>
+        <div class="ht-goalitem__meta"><Tag Text="@Item.BuildOrReduce.ToString()" /><span>@MetaLine</span></div>
+    </div>
+</div>
+
+@code {
+    /// <summary>The goal as the list gives it.</summary>
+    [Parameter, EditorRequired]
+    public GoalListItem Item { get; set; } = default!;
+
+    /// <summary>Today in the acting user's time zone, as the list gives it (<see cref="GoalListResult.Today"/>).</summary>
+    [Parameter, EditorRequired]
+    public DateOnly Today { get; set; }
+
+    /// <summary>The schedule, then " · " and the first variant that applies, or the schedule alone.</summary>
+    private string MetaLine => Variant is { } variant ? Item.ScheduleText + " · " + variant : Item.ScheduleText;
+
+    private string? Variant => Item switch
+    {
+        { FirstWeekStarts: { } monday } => "first week starts " + DateTexts.ShortDate(monday),
+        { StartDate: { } start } => "starts " + DateTexts.ShortDate(start),
+        { NextCommitment: { } next } when next == Today => "next today",
+        { NextCommitment: { } next } => "next " + DateTexts.ShortDate(next),
+        _ => null,
+    };
+}

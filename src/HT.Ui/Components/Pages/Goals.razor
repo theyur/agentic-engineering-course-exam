@@ -1,0 +1,53 @@
+@page "/goals"
+@attribute [Authorize]
+@using HT.Application.Goals
+@using HT.Ui.Account
+@using Microsoft.AspNetCore.Authorization
+@inject GoalService GoalService
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageGoals, slice 4 state (HP-003, contracts/host.md): "Goals" with no Tabs (Paused and Ended come in
+   slices 7 and 8), one ht-list of GoalItems in the use case's order, or the EmptyState. Static. An administrator gets
+   the Not found page; the use case refuses on its own (FR-021). An anonymous request never gets here: the endpoint's
+   [Authorize] sends it to Sign in. *@
+<PageTitle>Goals · Habit Tracker</PageTitle>
+
+@if (_result is { } result)
+{
+    <div class="ht-container">
+        <div class="ht-page-head"><h1>Goals</h1></div>
+        @if (result.Goals.Count == 0)
+        {
+            <EmptyState Icon="list-checks" Title="No goals yet"
+                        Text="Pick a habit from the catalog or create your own, then set a target and a schedule for it.">
+                <HtButton Href="/catalog">Browse the catalog</HtButton>
+                <HtButton Variant="HtButton.ButtonVariant.Secondary" Href="/custom-habits/new">Create custom habit</HtButton>
+            </EmptyState>
+        }
+        else
+        {
+            <div class="ht-list">
+                @foreach (var goal in result.Goals)
+                {
+                    <GoalItem Item="goal" Today="result.Today" />
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private GoalListResult? _result;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await GoalService.ListAsync(await ActingUsers.GetAsync(), CancellationToken.None);
+        if (result.Outcome != GoalListOutcome.Found)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        _result = result;
+    }
+}

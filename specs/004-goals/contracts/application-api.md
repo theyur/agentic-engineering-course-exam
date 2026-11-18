@@ -35,8 +35,8 @@ together with the others.
 |---|---|---|
 | `StartNewGoalAsync(ActingUser, GoalHabit? habit, int? suggestionPosition)` | `NotSignedIn` · `NotForAdministrators` · `NotInCatalog` · `CustomHabitNotFound` · `SuggestionNotFound` · `Started` with `GoalStartingValues` | FR-007, FR-008, FR-012 |
 | `CreateAsync(ActingUser, GoalInput input)` | `NotSignedIn` · `NotForAdministrators` · `HabitMissing` · `NotInCatalog` · `CustomHabitNotFound` · the 12 target outcomes (`GoalCreateOutcome` members named as `GoalProblem`'s) · `ReduceAmountNeedsOneTime` · `StartDateMissing` · `StartDateInPast` · `StartDateTooFar` · `NameTooLong` · `Created` with `GoalId` | FR-001, FR-002, FR-005, FR-006, FR-008, FR-009, FR-011, FR-018 |
-| `ListAsync(ActingUser)` | `NotSignedIn` · `NotForAdministrators` · `Found` with `Goals` (`IReadOnlyList<GoalListItem>`, name order, then creation order) | FR-014, FR-015 |
-| `GetAsync(ActingUser, GoalId id)` | `NotSignedIn` · `NotForAdministrators` · `NotFound` · `Found` with `GoalDetails` | FR-016, FR-018, FR-020, FR-034 |
+| `ListAsync(ActingUser)` | `NotSignedIn` · `NotForAdministrators` · `Found` with `Goals` (`IReadOnlyList<GoalListItem>`, name order, then creation order) and `Today` | FR-014, FR-015 |
+| `GetAsync(ActingUser, GoalId id)` | `NotSignedIn` · `NotForAdministrators` · `NotFound` · `Found` with `Goal` (`GoalDetails`) | FR-016, FR-018, FR-020, FR-034 |
 | `GetCalendarAsync(ActingUser, GoalId id, DateOnly first, DateOnly last)` | `NotSignedIn` · `NotForAdministrators` · `NotFound` · `RangeOutOfBounds` · `Found` with `GoalCalendarView` | FR-012, FR-013, FR-027 |
 
 The rules behind these outcomes:
@@ -69,6 +69,18 @@ The rules behind these outcomes:
   - it is null for a custom habit.
 
   The page shows the FR-034 Notice from it.
+- **What the pages need instead of a clock** (constitution II):
+  - `GoalListResult.Today` is the acting user's date in their time zone at the supplied time (FR-012). The Goals
+    page says "next today" when an item's `NextCommitment` equals it (HP-003).
+  - `GoalDetails.HasStarted` is true when the goal has a current date at the supplied time (FR-012). The goal page's
+    attempt line says "started" or "starts", and its Settings card "Started" or "Starts", from it (HP-004), as the
+    list gives `StartDate` exactly when the goal has no current date (plan "Spec discrepancies" 5).
+  - The Settings card's "Evaluated" row is `GoalSummaryText.EvaluatedOf(GoalScheduleKind, SchedulePeriod?)`, the
+    same text as the New goal summary card's (HP-002).
+- **The list's order and dates**: name order compares `HabitName.KeyOf(name)` ordinally, and a stable sort keeps the
+  store's creation order for equal keys. `StartDate`, `NextCommitment` and `FirstWeekStarts` follow the goal's own
+  timeline at the supplied time (FR-014), not `Today`.
+- **An unknown goal and another account's goal** both give `NotFound` with "This goal does not exist." (FR-020).
 - **The time zones in `GoalDetails`**:
   - `TimeZone` and `TimeZoneAppliesFrom` are the version of the goal's current date at the supplied time, or the
     first version when the goal has no current date;

@@ -2,6 +2,7 @@ using HT.Application.Accounts;
 using HT.Application.Goals;
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
+using HT.Domain.Habits;
 using HT.Domain.Time;
 using HT.UnitTests.Fakes;
 using Microsoft.Extensions.Time.Testing;
@@ -41,6 +42,21 @@ public sealed class GoalWorld
     public InstallationTimeZone DefaultZone { get; }
 
     public GoalService Service => new(Goals, Accounts, CatalogHabits, CustomHabits, Clock, DefaultZone);
+
+    /// <summary>
+    /// Stores a goal on <paramref name="habit"/> directly, as creation on its first date and later time-zone changes
+    /// would leave it: the start date and attempt 1 begin on the first version's date, and each version has its own time
+    /// zone. For goals that started before the clock's time, which <see cref="Service"/> cannot create.
+    /// </summary>
+    public Goal AddGoal(AccountId owner, CatalogHabit habit, GoalTarget target, params (DateOnly From, NamedTimeZone Zone)[] versions)
+    {
+        ArgumentNullException.ThrowIfNull(habit);
+        ArgumentNullException.ThrowIfNull(versions);
+        var start = versions[0].From;
+        var goal = new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(habit.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+            versions.Select(v => new GoalSettingsVersion(new GoalSettings(target, v.Zone), v.From)).ToList());
+        return Goals.Add(owner, goal, new GoalHabitView(habit.Id, HabitKind.Catalog, habit.Definition.Name.Value, habit.Definition.Category, true));
+    }
 
     /// <summary>The service over the goal store, with <paramref name="beforeFirstCreate"/> run once just before the first creation reaches it.</summary>
     public GoalService ServiceChangingBeforeFirstCreate(Func<Task> beforeFirstCreate) =>

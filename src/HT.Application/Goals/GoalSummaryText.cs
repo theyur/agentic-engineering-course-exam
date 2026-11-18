@@ -89,13 +89,17 @@ public static class GoalSummaryText
     public static string EvaluatedOf(GoalTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);
-        return target.PeriodLength switch
-        {
-            null => "Each scheduled day",
-            SchedulePeriod.Day => "Each day",
-            _ => "Each week",
-        };
+        return EvaluatedOf(target.ScheduleKindOf, target.PeriodLength);
     }
+
+    /// <summary>
+    /// The same text from a goal view's schedule kind and period (the goal page's Settings card, HP-004): "Each
+    /// scheduled day" for a commitment-based goal, otherwise "Each day" or "Each week" by <paramref name="period"/>.
+    /// </summary>
+    public static string EvaluatedOf(GoalScheduleKind kind, SchedulePeriod? period) =>
+        kind == GoalScheduleKind.CommitmentBased
+            ? "Each scheduled day"
+            : period == SchedulePeriod.Day ? "Each day" : "Each week";
 
     /// <summary>
     /// The habit's name, ": ", "at least " for a Build count or duration goal only, the target text, ", starting ", the

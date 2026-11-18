@@ -100,3 +100,79 @@ public sealed class GoalCreateResult
 
     internal static GoalCreateResult Created(GoalId id) => new(GoalCreateOutcome.Created, null, null, id);
 }
+
+/// <summary>The outcomes of <see cref="GoalService.ListAsync"/>, in FR-023's check order (contracts/application-api.md).</summary>
+public enum GoalListOutcome
+{
+    NotSignedIn,
+    NotForAdministrators,
+    Found,
+}
+
+/// <summary>
+/// The acting user's goals (FR-014, FR-015), in name order and then creation order, with the acting user's date at the
+/// supplied time, so the Goals page can say "next today" without reading a clock.
+/// </summary>
+public sealed class GoalListResult
+{
+    private GoalListResult(GoalListOutcome outcome, string? message, IReadOnlyList<GoalListItem> goals, DateOnly today)
+    {
+        Outcome = outcome;
+        Message = message;
+        Goals = goals;
+        Today = today;
+    }
+
+    public GoalListOutcome Outcome { get; }
+
+    /// <summary>The refusal's text; null for <see cref="GoalListOutcome.Found"/>.</summary>
+    public string? Message { get; }
+
+    /// <summary>The goals; empty for a refusal.</summary>
+    public IReadOnlyList<GoalListItem> Goals { get; }
+
+    /// <summary>
+    /// Today in the acting user's time zone at the supplied time (FR-012); the default value for a refusal. It can differ
+    /// from a goal's own current date while a time-zone change is on its way (FR-026).
+    /// </summary>
+    public DateOnly Today { get; }
+
+    internal static GoalListResult Refused(GoalListOutcome outcome, string message) => new(outcome, message, [], default);
+
+    internal static GoalListResult Found(IReadOnlyList<GoalListItem> goals, DateOnly today) => new(GoalListOutcome.Found, null, goals, today);
+}
+
+/// <summary>The outcomes of <see cref="GoalService.GetAsync"/>, in FR-023's check order (contracts/application-api.md).</summary>
+public enum GoalReadOutcome
+{
+    NotSignedIn,
+    NotForAdministrators,
+    NotFound,
+    Found,
+}
+
+/// <summary>
+/// One of the acting user's own goals (FR-016), or the refusal. An unknown identifier and another account's goal give the
+/// same <see cref="GoalReadOutcome.NotFound"/>, so the result never reveals that someone else's goal exists (FR-020).
+/// </summary>
+public sealed class GoalReadResult
+{
+    private GoalReadResult(GoalReadOutcome outcome, string? message, GoalDetails? goal)
+    {
+        Outcome = outcome;
+        Message = message;
+        Goal = goal;
+    }
+
+    public GoalReadOutcome Outcome { get; }
+
+    /// <summary>The refusal's text; null for <see cref="GoalReadOutcome.Found"/>.</summary>
+    public string? Message { get; }
+
+    /// <summary>Set only for <see cref="GoalReadOutcome.Found"/>.</summary>
+    public GoalDetails? Goal { get; }
+
+    internal static GoalReadResult Refused(GoalReadOutcome outcome, string message) => new(outcome, message, null);
+
+    internal static GoalReadResult Found(GoalDetails goal) => new(GoalReadOutcome.Found, null, goal);
+}
