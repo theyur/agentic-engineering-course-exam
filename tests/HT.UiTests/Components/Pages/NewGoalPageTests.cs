@@ -280,6 +280,17 @@ public sealed class NewGoalPageTests : BunitContext
     }
 
     [Fact]
+    public void The_form_leaves_the_checks_to_the_use_case_so_its_refusal_text_is_shown()
+    {
+        // The Stepper's min and max would otherwise let the browser block "Create goal" with its own message
+        // (HP-001: the refusal sits under its field, in the spec's words).
+        SignInUser();
+        var cut = RenderReading();
+
+        Assert.True(cut.Find("form").HasAttribute("novalidate"));
+    }
+
+    [Fact]
     public void Refusals_follow_the_fields_the_use_case_names()
     {
         SignInUser();

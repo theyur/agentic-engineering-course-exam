@@ -10,7 +10,7 @@
    value follows (Build 1, Reduce 0). One refusal at a time sits under its field. The page decides what the actions
    and a chosen habit do. *@
 <div class="ht-grid-2">
-    <EditForm Model="Model" OnSubmit="OnSubmit" class="ht-card" FormName="new-goal">
+    <EditForm Model="Model" OnSubmit="OnSubmit" class="ht-card" FormName="new-goal" novalidate>
         <div class="ht-form-section">
             <h2 class="ht-form-section__title">Habit</h2>
             @if (Model.Habit is { } habit)

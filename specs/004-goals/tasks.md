@@ -1077,8 +1077,8 @@ demo goals (quickstart §3). Commit.
   - sentence case per `design/brand-book.md`.
 
   Then rerun `DesignSyncTests`.
-- [ ] T136 Run the quickstart's §3 in the running app after dropping the local `HT` database. Report each row's result. The HP-016 row (registering from a browser in another time zone) needs a real browser, so it is reported as unverified unless the owner checks it by hand
-- [ ] T137 Run the full build and `dotnet test HabitTracker.slnx`, and report `PASS` with the counts. Leave slice 4's roadmap Status at `implementing`: `AC tests green` comes after the owner's `/speckit-ac-tests-analyze`. Commit
+- [X] T136 Run the quickstart's §3 in the running app after dropping the local `HT` database. Report each row's result. The HP-016 row (registering from a browser in another time zone) needs a real browser, so it is reported as unverified unless the owner checks it by hand
+- [X] T137 Run the full build and `dotnet test HabitTracker.slnx`, and report `PASS` with the counts. Leave slice 4's roadmap Status at `implementing`: `AC tests green` comes after the owner's `/speckit-ac-tests-analyze`. Commit
 
 ---
 
