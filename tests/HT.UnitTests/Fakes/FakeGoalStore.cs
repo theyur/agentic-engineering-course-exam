@@ -166,6 +166,31 @@ public sealed class FakeGoalStore : IGoalStore
         }
     }
 
+    public Task<int> CountUsingCustomHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken)
+    {
+        var onHabit = new GoalHabit(habit, HabitKind.Custom);
+        lock (_gate)
+        {
+            return Task.FromResult(_goals.Count(g => g.Goal.Owner == owner && g.Goal.Habit == onHabit));
+        }
+    }
+
+    /// <summary>
+    /// Runs <paramref name="action"/> under this store's lock with whether any goal is based on the custom habit
+    /// <paramref name="habit"/>, so no goal can be created on it in between. For <see cref="FakeCustomHabitStore"/>'s
+    /// conditional delete (FR-035, research R-08), which takes its own lock inside the action: this store's lock comes
+    /// first, as everywhere else.
+    /// </summary>
+    public T WithGoalsOnCustomHabit<T>(HabitId habit, Func<bool, T> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        var onHabit = new GoalHabit(habit, HabitKind.Custom);
+        lock (_gate)
+        {
+            return action(_goals.Any(g => g.Goal.Habit == onHabit));
+        }
+    }
+
     /// <summary>The habit a new goal may use: a Published catalog habit, or the owner's own custom habit; null otherwise.</summary>
     private GoalHabitView? HabitViewOf(AccountId owner, GoalHabit habit) => habit.Kind switch
     {

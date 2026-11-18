@@ -142,6 +142,25 @@ public sealed class GoalStoreTests(DatabaseFixture database)
     }
 
     [Fact]
+    public async Task The_count_on_a_custom_habit_is_the_owners_goals_on_it_only()
+    {
+        var owner = await OwnerAsync("it-go-count-a@example.com");
+        var other = await OwnerAsync("it-go-count-b@example.com");
+        var catalog = await CatalogHabitAsync(database.Services, "It-Go Count catalog");
+        var used = await CustomHabitAsync(database.Services, owner, "It-Go Count used");
+        var unused = await CustomHabitAsync(database.Services, owner, "It-Go Count unused");
+        await CreatedAsync(owner, OnCustom(used), NamedTimeZone.Utc);
+        await CreatedAsync(owner, OnCustom(used, name: Name("It-Go Count second")), NamedTimeZone.Utc);
+        await CreatedAsync(owner, OnCatalog(catalog), NamedTimeZone.Utc);
+
+        Assert.Equal(2, await WithStoreAsync(s => s.CountUsingCustomHabitAsync(owner, used, CancellationToken.None)));
+        Assert.Equal(0, await WithStoreAsync(s => s.CountUsingCustomHabitAsync(owner, unused, CancellationToken.None)));
+        Assert.Equal(0, await WithStoreAsync(s => s.CountUsingCustomHabitAsync(owner, catalog, CancellationToken.None)));
+        Assert.Equal(0, await WithStoreAsync(s => s.CountUsingCustomHabitAsync(other, used, CancellationToken.None)));
+        Assert.Equal(0, await WithStoreAsync(s => s.CountUsingCustomHabitAsync(owner, new HabitId(Guid.NewGuid()), CancellationToken.None)));
+    }
+
+    [Fact]
     public async Task Creation_order_follows_insertion_for_equal_names_and_equal_start_dates()
     {
         var owner = await OwnerAsync("it-go-order@example.com");

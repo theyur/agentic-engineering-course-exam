@@ -1,7 +1,10 @@
 using Bunit;
 using Bunit.TestDoubles;
+using HT.Application.Goals;
 using HT.Domain.Accounts;
+using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Time;
 using CustomHabitPage = HT.Ui.Components.Pages.CustomHabit;
 using HT.UnitTests.Fakes;
 using Microsoft.AspNetCore.Components;
@@ -11,11 +14,16 @@ using static HT.UnitTests.Fakes.HabitSamples;
 
 namespace HT.UiTests.Components.Pages;
 
-/// <summary>HP-007, US4-AS13, US4-AS15: the custom habit page over the real CustomHabitService and the fake store.</summary>
+/// <summary>
+/// HP-007, US4-AS13, US4-AS15 and slice 4's US5-AS6: the custom habit page over the real CustomHabitService and the
+/// fakes. The page is Interactive Server, so a save never reaches the host as an HTTP redirect; where it goes is read
+/// from bUnit's NavigationManager.
+/// </summary>
 public sealed class CustomHabitPageTests : BunitContext
 {
     private readonly BunitAuthorizationContext _authorization;
     private readonly FakeCustomHabitStore _store;
+    private readonly FakeGoalStore _goals;
     private int _notFound;
 
     public CustomHabitPageTests()
@@ -23,8 +31,25 @@ public sealed class CustomHabitPageTests : BunitContext
         _authorization = AddAuthorization();
         this.AddCatalog();
         _store = this.AddCustomHabits();
+        _goals = this.AddGoals();
         Navigation.OnNotFound += (_, _) => _notFound++;
     }
+
+    /// <summary>Stores a yes/no daily goal of <paramref name="owner"/> on <paramref name="habit"/> directly.</summary>
+    private void GoalOn(AccountId owner, CustomHabit habit)
+    {
+        var start = new DateOnly(2026, 11, 18);
+        Assert.True(GoalTarget.TryCreate(new GoalTargetFields
+        {
+            BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.YesNo, ScheduleKind = ScheduleKind.Times, Times = 1, Period = SchedulePeriod.Day,
+        }, out var target, out _));
+        Assert.True(NamedTimeZone.TryParse("UTC", out var zone));
+        var goal = new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(habit.Id, HabitKind.Custom), start, null, new GoalAttempt(GoalAttempt.First, start),
+            [new GoalSettingsVersion(new GoalSettings(target!, zone), start)]);
+        _goals.Add(owner, goal, new GoalHabitView(habit.Id, HabitKind.Custom, habit.Definition.Name.Value, habit.Definition.Category, null));
+    }
+
+    private static string NewGoalAddress(HabitId habit) => $"/goals/new?habit={habit.Value:D}&kind=custom";
 
     private BunitNavigationManager Navigation => Services.GetRequiredService<BunitNavigationManager>();
 
@@ -60,7 +85,7 @@ public sealed class CustomHabitPageTests : BunitContext
         cut.FindAll(".ht-field__error").Select(e => e.TextContent).ToList();
 
     [Fact]
-    public void US4_AS13_the_new_page_has_the_form_and_the_privacy_card_and_no_later_actions()
+    public void US4_AS13_HP_007_the_new_page_has_the_form_the_slice_4_actions_and_the_privacy_card()
     {
         SignInOwner();
 
@@ -79,12 +104,13 @@ public sealed class CustomHabitPageTests : BunitContext
         Assert.All(cut.FindAll(".ht-seg button"), b => Assert.Equal("false", b.GetAttribute("aria-pressed")));
         Assert.Equal(HabitIcon.All.Select(i => i.Name), cut.FindAll("button.ht-icon-choice").Select(b => b.GetAttribute("aria-label")));
         Assert.All(cut.FindAll("button.ht-icon-choice"), b => Assert.Equal("false", b.GetAttribute("aria-pressed")));
-        Assert.Equal(["Save habit", "Cancel"], cut.FindAll(".ht-form-actions .ht-btn").Select(b => b.TextContent));
-        Assert.Equal("submit", cut.Find(".ht-form-actions button").GetAttribute("type"));
+        Assert.Equal(["Save and create goal", "Save habit", "Cancel"], cut.FindAll(".ht-form-actions .ht-btn").Select(b => b.TextContent));
+        Assert.All(cut.FindAll(".ht-form-actions button"), b => Assert.Equal("submit", b.GetAttribute("type")));
+        Assert.Contains("ht-btn--primary", Button(cut, "Save and create goal").ClassList);
+        Assert.Contains("ht-btn--secondary", Button(cut, "Save habit").ClassList);
         Assert.Equal("/custom-habits", cut.Find(".ht-form-actions a").GetAttribute("href"));
         Assert.Contains("ht-btn--ghost", cut.Find(".ht-form-actions a").ClassList);
         Assert.DoesNotContain("Delete", cut.Markup, StringComparison.Ordinal);
-        Assert.DoesNotContain("Save and create goal", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Suggest", cut.Markup, StringComparison.Ordinal);
         var privacy = cut.Find("aside.ht-card");
         Assert.Equal("Private", privacy.QuerySelector("h2")!.TextContent);
@@ -169,7 +195,7 @@ public sealed class CustomHabitPageTests : BunitContext
         Assert.Equal("true", cut.FindAll(".ht-seg button")[0].GetAttribute("aria-pressed"));
         Assert.Equal("true", cut.Find("button[aria-label=droplet]").GetAttribute("aria-pressed"));
         Assert.Empty(cut.FindAll(".ht-field__help"));
-        Assert.Equal(["Save habit", "Cancel", "Delete"], cut.FindAll(".ht-form-actions .ht-btn").Select(b => b.TextContent));
+        Assert.Equal(["Save and create goal", "Save habit", "Cancel", "Delete"], cut.FindAll(".ht-form-actions .ht-btn").Select(b => b.TextContent));
         Assert.Contains("ht-btn--danger", Button(cut, "Delete").ClassList);
         Assert.NotNull(cut.Find(".ht-form-actions .ht-spacer"));
 
@@ -363,5 +389,86 @@ public sealed class CustomHabitPageTests : BunitContext
         var habit = _store.Add(owner, Definition("Cold shower"));
         await _store.DeleteAsync(owner, habit.Id, CancellationToken.None);
         return habit.Id;
+    }
+
+    [Fact]
+    public void US5_AS6_Save_and_create_goal_creates_the_habit_and_opens_the_New_goal_page_with_it()
+    {
+        var owner = SignInOwner();
+        var cut = RenderNew();
+
+        Fill(cut, "Cold shower");
+        Button(cut, "Save and create goal").Click();
+
+        var habit = Assert.Single(_store.Habits);
+        Assert.Equal(owner, habit.Owner);
+        Assert.Equal("Cold shower", habit.Definition.Name.Value);
+        Assert.EndsWith(NewGoalAddress(habit.Id), Navigation.Uri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void US5_AS6_Save_and_create_goal_saves_an_edited_habit_and_opens_the_New_goal_page_with_it()
+    {
+        var owner = SignInOwner();
+        var habit = _store.Add(owner, Definition("Cold shower", Category.Body));
+        var cut = RenderEdit(habit.Id);
+
+        cut.Find("#custom-habit-name").Change("Cold water");
+        Button(cut, "Save and create goal").Click();
+
+        Assert.Equal("Cold water", _store.Get(habit.Id)!.Definition.Name.Value);
+        Assert.EndsWith(NewGoalAddress(habit.Id), Navigation.Uri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void US5_AS6_a_refused_Save_and_create_goal_stays_on_the_page_with_the_refusal_under_its_field()
+    {
+        SignInOwner();
+        var cut = RenderNew();
+        var address = Navigation.Uri;
+
+        Button(cut, "Save and create goal").Click();
+
+        Assert.Equal(["Enter a name."], Errors(cut));
+        Assert.Empty(_store.Habits);
+        Assert.Equal(address, Navigation.Uri);
+    }
+
+    [Fact]
+    public void HP_007_editing_a_habit_that_a_goal_uses_has_no_Delete()
+    {
+        var owner = SignInOwner();
+        var habit = _store.Add(owner, Definition("Cold shower", Category.Body));
+        GoalOn(owner, habit);
+
+        var cut = RenderEdit(habit.Id);
+
+        Assert.Equal("Edit custom habit", cut.Find("h1").TextContent);
+        Assert.Equal(["Save and create goal", "Save habit", "Cancel"], cut.FindAll(".ht-form-actions .ht-btn").Select(b => b.TextContent));
+        Assert.Empty(cut.FindAll(".ht-btn--danger"));
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+    }
+
+    [Fact]
+    public void FR_035_a_delete_refused_because_a_goal_was_created_meanwhile_shows_the_text_and_removes_Delete()
+    {
+        var owner = SignInOwner();
+        var habit = _store.Add(owner, Definition("Cold shower", Category.Body));
+        var cut = RenderEdit(habit.Id);
+        var address = Navigation.Uri;
+        Button(cut, "Delete").Click();
+        GoalOn(owner, habit);
+
+        cut.Find(".ht-dialog__foot .ht-btn--danger").Click();
+
+        Assert.NotNull(_store.Get(habit.Id));
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        var notice = cut.Find(".ht-notice");
+        Assert.Equal("alert", notice.GetAttribute("role"));
+        Assert.Equal("Goals use this custom habit, so it cannot be deleted.", notice.QuerySelector("span")!.TextContent);
+        Assert.Empty(cut.FindAll(".ht-btn--danger"));
+        Assert.False(cut.Find("form fieldset").HasAttribute("disabled"));
+        Assert.Equal(address, Navigation.Uri);
+        Assert.Equal(0, _notFound);
     }
 }

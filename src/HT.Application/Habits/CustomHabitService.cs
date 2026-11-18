@@ -1,4 +1,5 @@
 using HT.Application.Accounts;
+using HT.Application.Goals;
 using HT.Domain.Accounts;
 using HT.Domain.Habits;
 
@@ -8,16 +9,21 @@ namespace HT.Application.Habits;
 /// Private custom habits for registered users (FR-020 to FR-025). Every use case takes the acting user first,
 /// checks in FR-016's order — signed in, not an administrator, the identifier, the fields, name uniqueness — and
 /// passes the acting user's account as the owner of every store call, so it acts only on that user's own custom
-/// habits (constitution III). Every refusal changes nothing.
+/// habits (constitution III). Every refusal changes nothing. Slice 4 (FR-035): a habit that goals use cannot be
+/// deleted, and reading one gives the number of the user's goals on it; the goal store is asked only with the acting
+/// user as the owner.
 /// </summary>
 public sealed class CustomHabitService
 {
     private readonly ICustomHabitStore _store;
+    private readonly IGoalStore _goals;
 
-    public CustomHabitService(ICustomHabitStore store)
+    public CustomHabitService(ICustomHabitStore store, IGoalStore goals)
     {
         ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(goals);
         _store = store;
+        _goals = goals;
     }
 
     /// <summary>The acting user's custom habits in name order (FR-020).</summary>
@@ -33,7 +39,10 @@ public sealed class CustomHabitService
         return CustomHabitListResult.Found(habits.OrderBy(h => h.Definition.Name, HabitName.Order).Select(View).ToList());
     }
 
-    /// <summary>One of the acting user's custom habits; anything else does not exist (FR-022).</summary>
+    /// <summary>
+    /// One of the acting user's custom habits, with the number of the user's goals on it in
+    /// <see cref="CustomHabitView.GoalCount"/> (FR-035); anything else does not exist (FR-022).
+    /// </summary>
     public async Task<CustomHabitResult> GetAsync(ActingUser actingUser, HabitId id, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actingUser);
@@ -42,9 +51,13 @@ public sealed class CustomHabitService
             return CustomHabitResult.Refused(refusal.As<CustomHabitOutcome>(), refusal.Message);
         }
 
-        return await _store.FindAsync(owner, id, cancellationToken).ConfigureAwait(false) is { } habit
-            ? CustomHabitResult.Found(View(habit))
-            : CustomHabitResult.Refused(CustomHabitOutcome.NotFound, CustomHabitTexts.NotFound);
+        if (await _store.FindAsync(owner, id, cancellationToken).ConfigureAwait(false) is not { } habit)
+        {
+            return CustomHabitResult.Refused(CustomHabitOutcome.NotFound, CustomHabitTexts.NotFound);
+        }
+
+        var goalCount = await _goals.CountUsingCustomHabitAsync(owner, id, cancellationToken).ConfigureAwait(false);
+        return CustomHabitResult.Found(View(habit) with { GoalCount = goalCount });
     }
 
     /// <summary>Creates a custom habit of the acting user (FR-004, FR-005, FR-020).</summary>
@@ -106,7 +119,12 @@ public sealed class CustomHabitService
         };
     }
 
-    /// <summary>Deletes one of the acting user's custom habits for good (FR-020).</summary>
+    /// <summary>
+    /// Deletes one of the acting user's custom habits for good (FR-020), unless a goal uses it: then
+    /// <see cref="CustomHabitDeleteOutcome.UsedByGoals"/> and nothing changes (FR-035). Another user's or an unknown
+    /// habit is <see cref="CustomHabitDeleteOutcome.NotFound"/> first. The store decides both in one transaction
+    /// (research R-08), so a goal created at the same time is never left on a deleted habit.
+    /// </summary>
     public async Task<CustomHabitDeleteResult> DeleteAsync(ActingUser actingUser, HabitId id, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actingUser);
@@ -115,9 +133,12 @@ public sealed class CustomHabitService
             return CustomHabitDeleteResult.Refused(refusal.As<CustomHabitDeleteOutcome>(), refusal.Message);
         }
 
-        return await _store.DeleteAsync(owner, id, cancellationToken).ConfigureAwait(false) == DeleteCustomHabitOutcome.Deleted
-            ? CustomHabitDeleteResult.Deleted
-            : CustomHabitDeleteResult.Refused(CustomHabitDeleteOutcome.NotFound, CustomHabitTexts.NotFound);
+        return await _store.DeleteAsync(owner, id, cancellationToken).ConfigureAwait(false) switch
+        {
+            DeleteCustomHabitOutcome.Deleted => CustomHabitDeleteResult.Deleted,
+            DeleteCustomHabitOutcome.UsedByGoals => CustomHabitDeleteResult.Refused(CustomHabitDeleteOutcome.UsedByGoals, CustomHabitTexts.UsedByGoals),
+            _ => CustomHabitDeleteResult.Refused(CustomHabitDeleteOutcome.NotFound, CustomHabitTexts.NotFound),
+        };
     }
 
     private static CustomHabitView View(CustomHabit habit) => new(

@@ -1,12 +1,19 @@
+using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Domain.Accounts;
+using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Time;
+using HT.IntegrationTests.Goals;
 using Microsoft.Extensions.DependencyInjection;
 using static HT.IntegrationTests.Habits.HabitSamples;
 
 namespace HT.IntegrationTests.Habits;
 
-/// <summary>The custom habit store on SQL Server: owner scoping of every statement, names per owner, edits and deletes.</summary>
+/// <summary>
+/// The custom habit store on SQL Server: owner scoping of every statement, names per owner, edits and deletes, and
+/// the conditional delete of a habit that goals use (FR-035, research R-08).
+/// </summary>
 [Collection(DatabaseCollection.Name)]
 public sealed class CustomHabitStoreTests(DatabaseFixture database)
 {
@@ -115,5 +122,31 @@ public sealed class CustomHabitStoreTests(DatabaseFixture database)
         Assert.Equal(0, await Sql.ScalarAsync(database.ConnectionString, "SELECT COUNT(*) FROM [CustomHabits] WHERE [Id] = @id", ("@id", habit.Value)));
         Assert.Equal(DeleteCustomHabitOutcome.NotFound, await WithStoreAsync(s => s.DeleteAsync(owner, habit, CancellationToken.None)));
         await CreatedAsync(owner, "It-Cu Gone");
+    }
+
+    [Fact]
+    public async Task The_delete_of_a_habit_that_a_goal_uses_writes_nothing_and_gives_used_by_goals()
+    {
+        var owner = await OwnerAsync("it-cu-used@example.com");
+        var other = await OwnerAsync("it-cu-used-other@example.com");
+        var used = await CreatedAsync(owner, "It-Cu Used");
+        var unused = await CreatedAsync(owner, "It-Cu Unused");
+        await using (var scope = database.CreateScope())
+        {
+            var goal = new NewGoal(new GoalHabit(used, HabitKind.Custom), new DateOnly(2026, 11, 18), null, GoalSamples.YesNoOn(DayOfWeek.Monday));
+            var created = await scope.ServiceProvider.GetRequiredService<IGoalStore>()
+                .CreateAsync(owner, goal, NamedTimeZone.Utc, NamedTimeZone.Utc, CancellationToken.None);
+            Assert.Equal(GoalWriteOutcomeKind.Created, created.Kind);
+        }
+
+        Assert.Equal(DeleteCustomHabitOutcome.UsedByGoals, await WithStoreAsync(s => s.DeleteAsync(owner, used, CancellationToken.None)));
+        Assert.Equal(DeleteCustomHabitOutcome.NotFound, await WithStoreAsync(s => s.DeleteAsync(other, used, CancellationToken.None)));
+        Assert.Equal(DeleteCustomHabitOutcome.NotFound, await WithStoreAsync(s => s.DeleteAsync(owner, new HabitId(Guid.NewGuid()), CancellationToken.None)));
+
+        Assert.Equal("It-Cu Used", await RowNameAsync(used));
+        Assert.Equal(1, await Sql.ScalarAsync(database.ConnectionString, "SELECT COUNT(*) FROM [Goals] WHERE [CustomHabitId] = @id", ("@id", used.Value)));
+        Assert.Equal(DeleteCustomHabitOutcome.Deleted, await WithStoreAsync(s => s.DeleteAsync(owner, unused, CancellationToken.None)));
+        Assert.Null(await RowNameAsync(unused));
+        Assert.Equal("It-Cu Used", await RowNameAsync(used));
     }
 }

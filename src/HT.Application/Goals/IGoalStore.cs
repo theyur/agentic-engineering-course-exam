@@ -1,5 +1,6 @@
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
+using HT.Domain.Habits;
 using HT.Domain.Time;
 
 namespace HT.Application.Goals;
@@ -35,4 +36,10 @@ public interface IGoalStore
 
     /// <summary>The owner's goal with this identifier; null when the owner has none with it.</summary>
     Task<StoredGoal?> FindAsync(AccountId owner, GoalId id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// How many of the owner's goals are based on the owner's custom habit <paramref name="habit"/> (FR-035); 0 for
+    /// another owner's habit, a catalog habit or an unknown identifier.
+    /// </summary>
+    Task<int> CountUsingCustomHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken);
 }

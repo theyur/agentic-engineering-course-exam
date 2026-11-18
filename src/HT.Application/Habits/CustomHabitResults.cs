@@ -3,7 +3,14 @@ using HT.Domain.Habits;
 namespace HT.Application.Habits;
 
 /// <summary>A custom habit as its owner reads it. It carries no owner (contract, "View types").</summary>
-public sealed record CustomHabitView(HabitId Id, string Name, string? Description, Category Category, Intent Intent, string Icon);
+public sealed record CustomHabitView(HabitId Id, string Name, string? Description, Category Category, Intent Intent, string Icon)
+{
+    /// <summary>
+    /// How many of the owner's goals use this habit (FR-035), so a page can leave out "Delete". Filled by
+    /// <see cref="CustomHabitService.GetAsync"/>; 0 in the list, and for a habit no goal uses, as in slice 2.
+    /// </summary>
+    public int GoalCount { get; init; }
+}
 
 /// <summary>The outcomes of <see cref="CustomHabitService.ListAsync"/>, in FR-016's check order.</summary>
 public enum CustomHabitListOutcome
@@ -144,6 +151,9 @@ public enum CustomHabitDeleteOutcome
     NotForAdministrators,
     NotFound,
     Deleted,
+
+    /// <summary>At least one of the user's goals uses the habit, so it was not deleted (FR-035). Appended after slice 2's members.</summary>
+    UsedByGoals,
 }
 
 /// <summary>The result of deleting a custom habit for good.</summary>

@@ -1,12 +1,18 @@
+using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Domain.Accounts;
+using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.UnitTests.Domain.Goals;
 using HT.UnitTests.Fakes;
 using static HT.UnitTests.Fakes.HabitSamples;
 
 namespace HT.UnitTests.Application.Habits;
 
-/// <summary>US4 and SC-006: custom habits for their owner only; every other audience is refused and nothing changes.</summary>
+/// <summary>
+/// US4 and SC-006: custom habits for their owner only; every other audience is refused and nothing changes. Slice 4
+/// US5 (FR-035): a habit that goals use cannot be deleted, and reading one gives the number of goals on it.
+/// </summary>
 public sealed class CustomHabitServiceTests
 {
     private static readonly ActingUser UserA = ActingUser.ForAccount(new AccountId(Guid.NewGuid()), Role.RegisteredUser);
@@ -14,7 +20,21 @@ public sealed class CustomHabitServiceTests
     private static readonly ActingUser Admin = ActingUser.ForAccount(new AccountId(Guid.NewGuid()), Role.Administrator);
 
     private readonly FakeCustomHabitStore _store = new();
-    private CustomHabitService Service => new(_store);
+    private readonly FakeGoalStore _goals;
+
+    public CustomHabitServiceTests() => _goals = new FakeGoalStore(new FakeAccountStore(), new FakeCatalogHabitStore(), _store);
+
+    private CustomHabitService Service => new(_store, _goals);
+
+    /// <summary>Stores a yes/no daily goal of <paramref name="user"/> on <paramref name="habit"/> directly, without an account.</summary>
+    private Goal GoalOn(ActingUser user, CustomHabit habit)
+    {
+        var owner = user.AccountId!.Value;
+        var start = new DateOnly(2026, 11, 18);
+        var goal = new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(habit.Id, HabitKind.Custom), start, null, new GoalAttempt(GoalAttempt.First, start),
+            [new GoalSettingsVersion(new GoalSettings(GoalSamples.PerDay(), GoalSamples.Kyiv), start)]);
+        return _goals.Add(owner, goal, new GoalHabitView(habit.Id, HabitKind.Custom, habit.Definition.Name.Value, habit.Definition.Category, null));
+    }
 
     private static HabitInput Input(
         string? name = "Cold shower", Category? category = Category.Body, Intent? intent = Intent.Build, string? icon = "droplet", string? description = null) =>
@@ -214,5 +234,71 @@ public sealed class CustomHabitServiceTests
         Assert.Equal("You are not signed in.", anonymous.Message);
         Assert.Equal("This custom habit does not exist.", other.Message);
         Assert.Equal("Custom habits are for registered users.", admin.Message);
+    }
+
+    [Fact]
+    public async Task US5_AS3_deleting_a_habit_that_a_goal_uses_is_refused_and_changes_nothing()
+    {
+        var habit = Own(UserA, "Cold shower");
+        var goal = GoalOn(UserA, habit);
+
+        var result = await Service.DeleteAsync(UserA, habit.Id, CancellationToken.None);
+
+        Assert.Equal(CustomHabitDeleteOutcome.UsedByGoals, result.Outcome);
+        Assert.Equal("Goals use this custom habit, so it cannot be deleted.", result.Message);
+        Assert.Equal(habit, _store.Get(habit.Id));
+        Assert.Equal(0, _store.WriteCount);
+        Assert.Equal(goal, Assert.Single(_goals.Goals));
+        Assert.Equal(CustomHabitOutcome.Found, (await Service.GetAsync(UserA, habit.Id, CancellationToken.None)).Outcome);
+    }
+
+    [Fact]
+    public async Task US5_AS4_a_habit_that_no_goal_uses_is_deleted_as_in_slice_2()
+    {
+        var used = Own(UserA, "Cold shower");
+        var unused = Own(UserA, "No phone in bed");
+        GoalOn(UserA, used);
+
+        var result = await Service.DeleteAsync(UserA, unused.Id, CancellationToken.None);
+
+        Assert.Equal(CustomHabitDeleteOutcome.Deleted, result.Outcome);
+        Assert.Null(result.Message);
+        Assert.Null(_store.Get(unused.Id));
+        Assert.NotNull(_store.Get(used.Id));
+        Assert.Single(_goals.Goals);
+    }
+
+    [Fact]
+    public async Task US5_another_users_habit_that_a_goal_uses_and_an_unknown_habit_are_not_found_first()
+    {
+        var secret = Own(UserA, "Zq Private used habit");
+        GoalOn(UserA, secret);
+
+        var other = await Service.DeleteAsync(UserB, secret.Id, CancellationToken.None);
+        var unknown = await Service.DeleteAsync(UserA, new HabitId(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.All(new[] { other, unknown }, r =>
+        {
+            Assert.Equal(CustomHabitDeleteOutcome.NotFound, r.Outcome);
+            Assert.Equal("This custom habit does not exist.", r.Message);
+        });
+        Assert.NotNull(_store.Get(secret.Id));
+        Assert.Equal(0, _store.WriteCount);
+    }
+
+    [Fact]
+    public async Task FR_035_GetAsync_gives_the_number_of_the_users_goals_on_the_habit()
+    {
+        var used = Own(UserA, "Cold shower");
+        var unused = Own(UserA, "No phone in bed");
+        GoalOn(UserA, used);
+        GoalOn(UserA, used);
+
+        var usedView = (await Service.GetAsync(UserA, used.Id, CancellationToken.None)).Habit!;
+        var unusedView = (await Service.GetAsync(UserA, unused.Id, CancellationToken.None)).Habit!;
+
+        Assert.Equal(2, usedView.GoalCount);
+        Assert.Equal(0, unusedView.GoalCount);
+        Assert.Equal(new CustomHabitView(unused.Id, "No phone in bed", null, Category.Body, Intent.Build, "droplet"), unusedView);
     }
 }

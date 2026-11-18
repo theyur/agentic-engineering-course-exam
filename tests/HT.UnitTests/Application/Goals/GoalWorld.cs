@@ -87,5 +87,8 @@ public sealed class GoalWorld
 
         public Task<StoredGoal?> FindAsync(AccountId owner, GoalId id, CancellationToken cancellationToken) =>
             inner.FindAsync(owner, id, cancellationToken);
+
+        public Task<int> CountUsingCustomHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken) =>
+            inner.CountUsingCustomHabitAsync(owner, habit, cancellationToken);
     }
 }

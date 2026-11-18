@@ -54,6 +54,10 @@ internal sealed class GoalStore : IGoalStore
         return row is null ? null : GoalMapping.ToStoredGoal(row);
     }
 
+    public Task<int> CountUsingCustomHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken) =>
+        _db.Goals.AsNoTracking()
+            .CountAsync(g => g.OwnerId == owner.Value && g.CustomHabitId == habit.Value, cancellationToken);
+
     /// <summary>Research R-08 steps 2 to 6, in one transaction; nothing is written unless every check passes.</summary>
     private async Task<GoalWriteOutcome> CreateInTransactionAsync(
         AccountId owner, NewGoal goal, NamedTimeZone expectedZone, NamedTimeZone defaultZone, CancellationToken cancellationToken)

@@ -23,7 +23,11 @@ public interface ICustomHabitStore
     /// <summary>Replaces every field of the owner's custom habit.</summary>
     Task<UpdateCustomHabitOutcome> UpdateAsync(AccountId owner, HabitId id, HabitDefinition definition, CancellationToken cancellationToken);
 
-    /// <summary>Deletes the owner's custom habit for good.</summary>
+    /// <summary>
+    /// Deletes the owner's custom habit for good, unless a goal is based on it: then
+    /// <see cref="DeleteCustomHabitOutcome.UsedByGoals"/> and nothing changes (FR-035, research R-08). The check and the
+    /// delete are one statement, so no goal created in between is left on a deleted habit.
+    /// </summary>
     Task<DeleteCustomHabitOutcome> DeleteAsync(AccountId owner, HabitId id, CancellationToken cancellationToken);
 
     /// <summary>True when one of the owner's custom habits other than <paramref name="except"/> has this name key.</summary>
@@ -59,4 +63,7 @@ public enum DeleteCustomHabitOutcome
 {
     Deleted,
     NotFound,
+
+    /// <summary>The owner's habit exists, but at least one goal is based on it, so nothing was deleted (FR-035).</summary>
+    UsedByGoals,
 }

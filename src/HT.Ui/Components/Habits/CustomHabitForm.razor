@@ -1,14 +1,16 @@
 @using HT.Ui.Habits
-@* design/pages/PageCustomHabit, slice 2 (US4-AS13): the habit fields, "Save habit" and Cancel, and the privacy
-   card. No "Save and create goal" (slice 4) and no "Suggest for catalog" (slice 10). One refusal at a time sits
-   under its field; the page decides what Save does and may add an action at the right (Delete). Disabled, the
-   whole form can no longer be saved. *@
+@* design/pages/PageCustomHabit, slice 4 state (HP-007, US4-AS13, US5-AS6): the habit fields, primary "Save and create
+   goal", secondary "Save habit" and ghost Cancel, and the privacy card. No "Suggest for catalog" (slice 10). Both
+   save buttons submit the form; the one that was pressed (Enter presses the first) decides which callback runs, and
+   the page decides what each does. One refusal at a time sits under its field; the page may add an action at the
+   right (Delete). Disabled, the whole form can no longer be saved. *@
 <div class="ht-grid-2">
-    <EditForm Model="Model" OnSubmit="OnSave" class="ht-card" FormName="custom-habit">
+    <EditForm Model="Model" OnSubmit="SubmitAsync" class="ht-card" FormName="custom-habit">
         <fieldset class="ht-fieldset" disabled="@Disabled">
             <HabitFieldsEditor Model="Model" Error="Error" IdPrefix="custom-habit" NameHelp="@NameHelp" />
             <div class="ht-form-actions">
-                <HtButton Type="submit">Save habit</HtButton>
+                <HtButton Type="submit" @onclick="() => _createGoal = true">Save and create goal</HtButton>
+                <HtButton Type="submit" Variant="HtButton.ButtonVariant.Secondary" @onclick="() => _createGoal = false">Save habit</HtButton>
                 <HtButton Variant="HtButton.ButtonVariant.Ghost" Href="/custom-habits">Cancel</HtButton>
                 @if (EndAction is not null)
                 {
@@ -41,10 +43,28 @@
     [Parameter]
     public bool Disabled { get; set; }
 
+    /// <summary>"Save habit".</summary>
     [Parameter]
     public EventCallback OnSave { get; set; }
+
+    /// <summary>"Save and create goal".</summary>
+    [Parameter]
+    public EventCallback OnSaveAndCreateGoal { get; set; }
 
     /// <summary>An action pushed to the right of Save and Cancel, such as "Delete".</summary>
     [Parameter]
     public RenderFragment? EndAction { get; set; }
+
+    /// <summary>
+    /// Which save button submitted the form. A submit that pressed no button, such as Enter in a field, counts as the
+    /// first one, as the browser's implicit submission does.
+    /// </summary>
+    private bool _createGoal = true;
+
+    private Task SubmitAsync()
+    {
+        var createGoal = _createGoal;
+        _createGoal = true;
+        return createGoal ? OnSaveAndCreateGoal.InvokeAsync() : OnSave.InvokeAsync();
+    }
 }

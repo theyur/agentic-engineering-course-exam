@@ -702,36 +702,36 @@ habit (US5-AS1 to AS3).
 
 ### Tests for User Story 5
 
-- [ ] T080 [P] [US5] Create `tests/HT.UnitTests/Application/Goals/GoalOnCustomHabitTests.cs` (depends on T085):
+- [X] T080 [P] [US5] Create `tests/HT.UnitTests/Application/Goals/GoalOnCustomHabitTests.cs` (depends on T085):
   - US5-AS1: the starting values are the custom habit, Build and today, and nothing else;
   - US5-AS2: the name "Cold shower, daily";
   - US5-AS5: after a rename to "Cold water" the name is "Cold water, daily" with the settings unchanged, and a change of the habit's usual intent leaves the goal's Build or Reduce as it was.
-- [ ] T081 [P] [US5] Extend `tests/HT.UnitTests/Application/Habits/CustomHabitServiceTests.cs` (depends on T085):
+- [X] T081 [P] [US5] Extend `tests/HT.UnitTests/Application/Habits/CustomHabitServiceTests.cs` (depends on T085):
   - US5-AS3: deleting a habit that a goal uses gives "Goals use this custom habit, so it cannot be deleted." and changes nothing;
   - US5-AS4: a habit no goal uses is deleted, as in slice 2;
   - another user's or an unknown habit still gives `NotFound` first;
   - `GetAsync` gives `GoalCount`.
-- [ ] T082 [P] [US5] Extend the custom-habit integration tests (depends on T084, T085):
+- [X] T082 [P] [US5] Extend the custom-habit integration tests (depends on T084, T085):
   - in `tests/HT.IntegrationTests/Habits/CustomHabitStoreTests.cs`, the conditional delete: `UsedByGoals` when a goal uses the habit, `NotFound` for none, and a delete when unused;
   - in `CustomHabitRaceTests.cs`, a goal created against a delete, forced with two contexts in both orders. Either the delete wins and creation gives "This custom habit does not exist.", or the goal wins and the delete gives `UsedByGoals`. No goal is ever left on a deleted habit.
 
 ### Implementation for User Story 5
 
-- [ ] T083 [US5] Add `CountUsingCustomHabitAsync(owner, habit, …)` to `IGoalStore`, `GoalStore` and `FakeGoalStore`
-- [ ] T084 [US5] Make the custom-habit delete conditional (research R-08):
+- [X] T083 [US5] Add `CountUsingCustomHabitAsync(owner, habit, …)` to `IGoalStore`, `GoalStore` and `FakeGoalStore`
+- [X] T084 [US5] Make the custom-habit delete conditional (research R-08):
   - append `UsedByGoals` to `DeleteCustomHabitOutcome` in `src/HT.Application/Habits/ICustomHabitStore.cs`;
   - in `src/HT.Persistence/Habits/CustomHabitStore.cs`, `DELETE … WHERE NOT EXISTS` (a goal on the habit, read `WITH (UPDLOCK, HOLDLOCK)`). Zero rows means a re-read, which tells `UsedByGoals` from `NotFound`;
   - `tests/HT.UnitTests/Fakes/FakeCustomHabitStore.cs` gets the same rule through a `FakeGoalStore` reference.
-- [ ] T085 [US5] Extend `src/HT.Application/Habits/CustomHabitService.cs` (FR-035; depends on T083, T084):
+- [X] T085 [US5] Extend `src/HT.Application/Habits/CustomHabitService.cs` (FR-035; depends on T083, T084):
   - its constructor gains `IGoalStore`;
   - `DeleteAsync` gives `UsedByGoals`, appended to `CustomHabitDeleteOutcome`, after `NotFound`;
   - `GetAsync` fills `CustomHabitView.GoalCount`, a new `init` property.
 
   Update the hand-built instances: at least `tests/HT.UnitTests/Application/Habits/CustomHabitServiceTests.cs` (`Service => new(_store)`), plus whatever the grep convention finds.
-- [ ] T086 [US5] Update the custom habit page (HP-007; depends on T085):
+- [X] T086 [US5] Update the custom habit page (HP-007; depends on T085):
   - `src/HT.Ui/Components/Pages/CustomHabit.razor` and `src/HT.Ui/Components/Habits/CustomHabitForm.razor` get "Save and create goal", which saves the habit and navigates to `/goals/new?habit={id}&kind=custom`;
   - "Delete" is shown only when `GoalCount` is 0.
-- [ ] T087 [P] [US5] Update `tests/HT.UiTests/Components/Pages/CustomHabitPageTests.cs`, whose slice 2 HP-007 expectations change: US5-AS6 "Save and create goal", which saves and then navigates to `/goals/new?habit={id}&kind=custom` (bUnit's `NavigationManager`, because the page is Interactive Server and the save never reaches the host as an HTTP redirect), and "Delete" absent with goals and present without. No host test: `CustomHabitHostTests.cs` sees only prerendered GETs (depends on T086)
+- [X] T087 [P] [US5] Update `tests/HT.UiTests/Components/Pages/CustomHabitPageTests.cs`, whose slice 2 HP-007 expectations change: US5-AS6 "Save and create goal", which saves and then navigates to `/goals/new?habit={id}&kind=custom` (bUnit's `NavigationManager`, because the page is Interactive Server and the save never reaches the host as an HTTP redirect), and "Delete" absent with goals and present without. No host test: `CustomHabitHostTests.cs` sees only prerendered GETs (depends on T086)
 
 **Checkpoint**: full suite green. Commit.
 
