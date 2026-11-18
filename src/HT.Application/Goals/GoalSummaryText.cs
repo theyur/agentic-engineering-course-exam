@@ -40,7 +40,8 @@ public sealed record GoalSummary
 /// <summary>
 /// The one formatter of the New goal summary card (HP-002, research R-11; texts of design/pages/PageNewGoal, "Summary
 /// card"). Pure: the result depends only on its arguments, never on a clock or a culture; dates come from
-/// <see cref="DateTexts"/>. The goal page's Settings card uses <see cref="EvaluatedOf"/> for its "Evaluated" row.
+/// <see cref="DateTexts"/>. The goal page's Settings card uses
+/// <see cref="EvaluatedOf(GoalScheduleKind, SchedulePeriod?)"/> for its "Evaluated" row.
 /// </summary>
 public static class GoalSummaryText
 {

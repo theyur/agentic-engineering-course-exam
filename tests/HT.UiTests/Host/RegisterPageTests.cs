@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using HT.Application.Accounts;
 using HT.Domain.Accounts;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace HT.UiTests.Host;
 
 [Collection(HostCollection.Name)]
-public sealed class RegisterPageTests(HostFixture host)
+public sealed partial class RegisterPageTests(HostFixture host)
 {
     private const string CookieName = ".AspNetCore.Identity.Application";
 
@@ -86,7 +87,7 @@ public sealed class RegisterPageTests(HostFixture host)
 
         var form = await browser.GetFormAsync("/register", "register");
 
-        var marked = System.Text.RegularExpressions.Regex.Matches(form.Html, "<input[^>]*data-ht-browser-time-zone[^>]*>").Select(m => m.Value).ToList();
+        var marked = BrowserTimeZoneInput().Matches(form.Html).Select(m => m.Value).ToList();
         Assert.Equal(["<input type=\"hidden\" name=\"TimeZone\" data-ht-browser-time-zone>"], marked);
         Assert.DoesNotContain("<select", form.Html, StringComparison.Ordinal);
         Assert.DoesNotContain("Time zone", form.Html, StringComparison.Ordinal);
@@ -138,7 +139,7 @@ public sealed class RegisterPageTests(HostFixture host)
 
         var (status, home) = await browser.GetPageAsync("/");
         Assert.Equal(HttpStatusCode.OK, status);
-        var heading = System.Text.RegularExpressions.Regex.Match(home, "<h1>(?<text>[^<]*)</h1>").Groups["text"].Value;
+        var heading = HeadingOne().Match(home).Groups["text"].Value;
         Assert.StartsWith("Good ", heading, StringComparison.Ordinal);
         Assert.EndsWith(", zoe Ui-Rg", heading, StringComparison.Ordinal);
         Assert.Matches("id=\"account-menu-button\"[^>]*>Z</button>", home);
@@ -177,4 +178,10 @@ public sealed class RegisterPageTests(HostFixture host)
         new("Input.Password", password),
         new("Input.RepeatPassword", repeat),
     ];
+
+    [GeneratedRegex("<input[^>]*data-ht-browser-time-zone[^>]*>")]
+    private static partial Regex BrowserTimeZoneInput();
+
+    [GeneratedRegex("<h1>(?<text>[^<]*)</h1>")]
+    private static partial Regex HeadingOne();
 }

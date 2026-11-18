@@ -73,6 +73,7 @@ NodaTime is internal to `HT.Domain` (research R-01).
 | `GoalVersionWrite` | `HT.Application.Goals` | `GoalId Goal`, `GoalVersionChange Change`: one write of a time-zone change. |
 | `GoalCreateOutcome` | `HT.Application.Goals` | The use-case outcomes of `GoalService.CreateAsync`, in check order: `NotSignedIn`, `NotForAdministrators`, `HabitMissing`, `NotInCatalog`, `CustomHabitNotFound`, the 12 target outcomes with `GoalProblem`'s names, `ReduceAmountNeedsOneTime`, `StartDateMissing`, `StartDateInPast`, `StartDateTooFar`, `NameTooLong`, `Created`. Each other `GoalService` method has its own outcome enum, as in slice 2. |
 | `GoalCalendarView` | `HT.Application.Goals` | `GoalScheduleKind Kind`, `IReadOnlyList<Commitment> Commitments`, `IReadOnlyList<EvaluationPeriod> Periods`. |
+| `GoalCalendarResult` | `HT.Application.Goals` | `GoalCalendarOutcome Outcome` (`NotSignedIn`, `NotForAdministrators`, `NotFound`, `RangeOutOfBounds`, `Found`), `string? Message`, `GoalCalendarView? Calendar` (only for `Found`). |
 | `GoalOnHabit` | `HT.Application.Habits` | `GoalId Id`, `string Name` (details of a catalog habit, FR-031). |
 | `ProfileView` | `HT.Application.Accounts` | `string? Name`, `string Email`, `string? MemberSince` ("member since November 2026", or null, FR-030). |
 | `HomeHeading` | `HT.Application.Accounts` | `string Greeting`, `string Date` (FR-029). |
@@ -82,9 +83,10 @@ NodaTime is internal to `HT.Domain` (research R-01).
 
 | Type | Members |
 |---|---|
-| `DemoGoal` | `string? CatalogHabitName` or `int? CustomHabitPosition` (the index into the same call's `customHabits`), `IReadOnlySet<CatalogHabitState> AcceptedStates` (catalog only), `GoalTarget Target`, `GoalName? OwnName`, `DateOnly StartDate`. |
+| `DemoGoal` | Sealed class, built only by its two factories: `OnCatalogHabit(string habitName, IEnumerable<CatalogHabitState> acceptedStates, GoalTarget target, GoalName? ownName, DateOnly startDate)` and `OnCustomHabit(int position, GoalTarget target, GoalName? ownName, DateOnly startDate)`. Properties: `string? CatalogHabitName` or `int? CustomHabitPosition` (the index into the same call's `customHabits`), `IReadOnlySet<CatalogHabitState> AcceptedStates` (catalog only; empty for a custom-habit goal), `GoalTarget Target`, `GoalName? OwnName`, `DateOnly StartDate`. |
 | `DemoGoals` | `For(email, DateOnly today) → IReadOnlyList<DemoGoal>` (FR-040), `DisplayNames(email) → IReadOnlyList<string>` for the smoke check. |
 | `DemoAccountProfile` | `string? Name`, `NamedTimeZone TimeZone`, `DateTimeOffset CreatedAt`. |
+| `DemoAccounts` | `const Demo1Name` ("Demo One"), `NameFor(email) → string?` (the account name, null for demo2 and demo3), `ProfileFor(email, NamedTimeZone, DateTimeOffset createdAt) → DemoAccountProfile` (research R-10). |
 | `DemoGoalsResult` | `Outcome` `Added`, `Message` "demo goals added". |
 
 ## Ports

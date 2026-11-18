@@ -191,12 +191,11 @@ public sealed class CatalogPageTests : BunitContext
         }
     }
 
-    private AccountId SignInRegisteredUserWithGoals()
+    private void SignInRegisteredUserWithGoals()
     {
         var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
         StoreGoals(owner, "Reading", 2);
         StoreGoals(new AccountId(Guid.NewGuid()), "Sugar", 1);
-        return owner;
     }
 
     private static List<(string Name, string? Tag, string Actions)> Cards(IRenderedComponent<Catalog> cut) =>

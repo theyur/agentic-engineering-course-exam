@@ -55,7 +55,7 @@ public sealed class GoalDetailPageTests : BunitContext
     private static string Text(AngleSharp.Dom.IElement element) =>
         string.Join(" ", element.TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
-    private static IReadOnlyList<(string Label, string Value)> Rows(IRenderedComponent<GoalDetail> cut) =>
+    private static List<(string Label, string Value)> Rows(IRenderedComponent<GoalDetail> cut) =>
         cut.FindAll("dl.ht-kv dt").Zip(cut.FindAll("dl.ht-kv dd"), (dt, dd) => (Text(dt), Text(dd))).ToList();
 
     private static GoalTargetFields YesNoOnMonWedFri => new()

@@ -45,7 +45,7 @@ public sealed class CustomHabitPageTests : BunitContext
         }, out var target, out _));
         Assert.True(NamedTimeZone.TryParse("UTC", out var zone));
         var goal = new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(habit.Id, HabitKind.Custom), start, null, new GoalAttempt(GoalAttempt.First, start),
-            [new GoalSettingsVersion(new GoalSettings(target!, zone), start)]);
+            [new GoalSettingsVersion(new GoalSettings(target, zone), start)]);
         _goals.Add(owner, goal, new GoalHabitView(habit.Id, HabitKind.Custom, habit.Definition.Name.Value, habit.Definition.Category, null));
     }
 

@@ -403,7 +403,7 @@ public sealed class NewGoalPageTests : BunitContext
         Assert.True(Choice(cut, "Yes / no").HasAttribute("checked"));
         Assert.Equal("Yoga: 3 times a week, starting Tue 17 Nov.", Sentence(cut));
         Assert.Equal("Catalog suggestion: 3 times a week. An example to adjust, not a prescribed target.",
-            cut.FindAll("aside.ht-summary .ht-notice").Last().TextContent);
+            cut.FindAll("aside.ht-summary .ht-notice")[^1].TextContent);
     }
 
     [Theory]

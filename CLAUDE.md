@@ -62,7 +62,7 @@ Two global CLI tools that complement each other: **Roslynator** (Roslyn analyzer
   - `roslynator list-symbols HabitTracker.slnx --projects HT.Application --visibility public --depth member`: the real public API surface. Pass `--projects`, because a solution-wide run crashes (below).
   - `roslynator loc HabitTracker.slnx` / `lloc`: size per project. It counts only `.cs`, so `HT.Ui` shows 394 lines while its `.razor` files hold about 3,200 more.
   - `jb inspectcode HabitTracker.slnx --stdout -f=Text -e=WARNING --caches-home=<scratchpad>/jbcache --no-updates`: about 40 s, and the cache is about 15 MB. Always point `--caches-home` outside the repo. The default severity, `SUGGESTION`, is unusable. `-e=ERROR` isn't a quiet mode here: its only output is the 3 false `xUnit1025` hits below. Scope with `--project=<Name>` or `--include=<glob>`.
-- Baseline 2026-11-14: Roslynator reported 229 diagnostics, 15 of them not from the compiler. `jb -e=WARNING` reported 95. If a run shows far more than that, something changed.
+- Baseline 2026-11-18 (after slice 4): Roslynator reported 333 diagnostics, 37 of them not from the compiler. `jb -e=WARNING` reported 170. If a run shows far more than that, something changed. The rise from 2026-11-14 (229, 15 and 95) comes from slice 4's tests: its bUnit tests add Razor phantoms (compiler diagnostics 214 to 296), and its other test code adds test-only hints (`xUnit1044` on non-serializable `TheoryData`, redundant casts and qualifiers, precondition-only lambdas).
 
 ### Rider MCP (`mcp__rider__*`) and worktrees
 
@@ -78,7 +78,7 @@ Rider's MCP tools work on whatever solution Rider has open, not on this session'
 
 Don't "fix" the code for any of these.
 
-- **The Razor source generator doesn't run** under Roslynator's workspace, so `.razor` components don't exist as symbols. That causes about 210 `CS0246`/`CS0103`/`CS1503`/`CS1061`/… errors in `HT.UiTests` (bUnit tests), plus `Program.cs: CS0246 'App' could not be found`. Cascades from the same cause: `xUnit1025` on `SiteNavTests.cs:170-172` (the constants come from `SiteNav.razor`'s `@code`) and `CA1822` on `CatalogHabitDetailTests.RenderHabit`. `find-symbol --unused` is unreliable for anything a component calls. Confirm each hit with grep.
+- **The Razor source generator doesn't run** under Roslynator's workspace, so `.razor` components don't exist as symbols. That causes about 295 `CS0246`/`CS0103`/`CS1503`/`CS1061`/… errors in `HT.UiTests` (bUnit tests), plus `Program.cs: CS0246 'App' could not be found`. Cascades from the same cause: `xUnit1025` on `SiteNavTests.cs:277-279` (the constants come from `SiteNav.razor`'s `@code`) and `CA1822` on `CatalogHabitDetailTests.RenderHabit`. `find-symbol --unused` is unreliable for anything a component calls. Confirm each hit with grep.
 - The BCL generators (`[GeneratedRegex]`, `[LoggerMessage]`) do run. Their partial methods report nothing.
 - `CA1861` in `src/HT.Persistence/Migrations/*` is in EF-generated migration code. Leave it.
 - `list-symbols` without `--projects` crashes with `InvalidOperationException` in `SymbolDefinitionWriter.WriteAttribute`, triggered by `HT.UnitTests` and `HT.UiTests`. The production projects and the other test projects work.
@@ -89,7 +89,7 @@ Don't "fix" the code for any of these.
 Don't "fix" the code for any of these.
 
 - The `RazorSourceGenerator ... TypeLoadException` banner at the top of the output is harmless. `jb` still inspects `.razor` with its own engine.
-- `xUnit1025` "InlineData duplicate(s)" on `SiteNavTests.cs:170-172` is the same Razor-constant blind spot as in Roslynator. The real build passes.
+- `xUnit1025` "InlineData duplicate(s)" on `SiteNavTests.cs:277-279` is the same Razor-constant blind spot as in Roslynator. The real build passes.
 - "Path '…\wwwroot\catalog' is not found" (16 hits in `SiteNav`, `Footer`, `Home`, `Register`, `SignIn` `.razor`): these `href`s are page routes, not files.
 - "Parameter 'h' is only used for precondition check(s)" (18 hits, all in tests): these are predicate lambdas passed to `Assert.Single` / `Assert.All` and similar.
 

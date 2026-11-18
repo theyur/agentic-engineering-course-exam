@@ -1,7 +1,6 @@
 using System.Globalization;
 using ArchUnitNET.Domain;
 using ArchUnitNET.Domain.Dependencies;
-using ArchUnitNET.Fluent;
 using ArchUnitNET.Fluent.Syntax.Elements.Types;
 using ArchUnitNET.Loader;
 using ArchUnitNET.xUnit;
@@ -95,7 +94,7 @@ public sealed class ClockReadTests
         Assert.False(BclDateTimeZoneRule(Types().That().Are(typeof(BclCanary))).HasNoViolations(canaryArchitecture));
     }
 
-    private static IArchRule BclDateTimeZoneRule(GivenTypesConjunction types) =>
+    private static TypesShouldConjunctionWithDescription BclDateTimeZoneRule(GivenTypesConjunction types) =>
         types.Should().NotDependOnAny(Types(true).That().HaveFullName(BclDateTimeZone))
             .Because("time zones come only from NodaTime's embedded tzdb, never from the machine (research R-01)");
 

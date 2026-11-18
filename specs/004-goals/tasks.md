@@ -1061,15 +1061,15 @@ demo goals (quickstart §3). Commit.
 
 **Purpose**: documentation, the API and analyzer comparisons, the accessibility sweep and the manual quickstart.
 
-- [ ] T132 [P] Update the slice 4 status line of `README.md` ("Status"). Check `CONTEXT.md`: change an entry only if the implementation sharpened one of the terms HP-014 lists, in the same change
-- [ ] T133 Compare the public API of `HT.Application` and `HT.Domain` with T002's baseline (quickstart §1, research R-07). The only differences allowed are:
+- [X] T132 [P] Update the slice 4 status line of `README.md` ("Status"). Check `CONTEXT.md`: change an entry only if the implementation sharpened one of the terms HP-014 lists, in the same change
+- [X] T133 Compare the public API of `HT.Application` and `HT.Domain` with T002's baseline (quickstart §1, research R-07). The only differences allowed are:
   - additions;
   - the documented constructor changes;
   - the port changes of `IAccountStore`, `ICustomHabitStore` and `IDemoDataStore`.
 
   Report any other difference as a defect.
-- [ ] T134 [P] Run `roslynator analyze HabitTracker.slnx --projects HT.Domain HT.Application HT.Persistence`, and `jb inspectcode HabitTracker.slnx --stdout -f=Text -e=WARNING` with its cache in the session scratchpad. Compare both with the `CLAUDE.md` baselines, and fix real findings only; the documented false positives stay. Never point either tool at `tests/HT.AcceptanceTests`
-- [ ] T135 [P] Sweep the new and changed pages for constitution IV and HP-012 (SC-007):
+- [X] T134 [P] Run `roslynator analyze HabitTracker.slnx --projects HT.Domain HT.Application HT.Persistence`, and `jb inspectcode HabitTracker.slnx --stdout -f=Text -e=WARNING` with its cache in the session scratchpad. Compare both with the `CLAUDE.md` baselines, and fix real findings only; the documented false positives stay. Never point either tool at `tests/HT.AcceptanceTests`
+- [X] T135 [P] Sweep the new and changed pages for constitution IV and HP-012 (SC-007):
   - tokens and `ht-` classes only, with no literal colors;
   - visible focus;
   - status never shown by color alone;

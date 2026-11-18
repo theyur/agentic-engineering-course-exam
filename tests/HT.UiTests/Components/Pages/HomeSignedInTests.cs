@@ -57,10 +57,9 @@ public sealed class HomeSignedInTests : BunitContext
     private FakeAccountStore Accounts => (FakeAccountStore)Services.GetRequiredService<IAccountStore>();
 
     /// <summary>Signs in, and stores the account with a name and a time zone when given.</summary>
-    private async Task<Guid> SignInStoredAsync(string role, string? name = null, string? timeZone = null)
+    private async Task SignInStoredAsync(string role, string? name = null, string? timeZone = null)
     {
-        var id = _authorization.SignIn(role);
-        var accountId = new AccountId(id);
+        var accountId = new AccountId(_authorization.SignIn(role));
         Assert.NotNull(Accounts.FindById(accountId));
         if (timeZone is not null)
         {
@@ -72,8 +71,6 @@ public sealed class HomeSignedInTests : BunitContext
             Assert.True(AccountName.TryCreate(name, out var accountName, out _));
             Assert.True(await Accounts.TrySetNameAsync(accountId, accountName, CancellationToken.None));
         }
-
-        return id;
     }
 
     /// <summary>The page head's children as (tag, class, text): the heading-1 greeting, then the muted date.</summary>

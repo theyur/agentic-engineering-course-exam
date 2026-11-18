@@ -36,7 +36,7 @@ public sealed class CatalogGoalInfoTests
     private Task<CatalogHabitDetailsResult> DetailsAsync(ActingUser user, CatalogHabit habit) =>
         Service.GetDetailsAsync(user, habit.Id, CancellationToken.None);
 
-    private static IReadOnlyList<(string Name, int? GoalCount)> Counts(CatalogBrowseResult result) =>
+    private static List<(string Name, int? GoalCount)> Counts(CatalogBrowseResult result) =>
         result.Habits.Select(h => (h.Name, h.GoalCount)).ToList();
 
     /// <summary>Reading (Mind, Build), Running (Body, Build), Screen time (Mind, Reduce), Yoga (Body, Build).</summary>

@@ -38,7 +38,7 @@ public sealed class PreSliceAccountMigrationTests(MigrationDatabaseFixture datab
         await using (var scope = provider.CreateAsyncScope())
         {
             var contextType = typeof(PersistenceAssemblyMarker).Assembly.GetType("HT.Persistence.HtDbContext", throwOnError: true)!;
-            var db = Assert.IsAssignableFrom<DbContext>(scope.ServiceProvider.GetRequiredService(contextType));
+            var db = Assert.IsType<DbContext>(scope.ServiceProvider.GetRequiredService(contextType), exactMatch: false);
             await db.Database.EnsureDeletedAsync();
             await db.GetService<IMigrator>().MigrateAsync(LastMigrationBeforeSlice4);
         }

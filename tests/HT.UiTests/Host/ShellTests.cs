@@ -1,10 +1,11 @@
 using System.Net;
+using System.Text.RegularExpressions;
 
 namespace HT.UiTests.Host;
 
 /// <summary>US5-AS1, AS2, AS6, AS7, AS10, HP-010: every page has the shell; Home and Privacy need no sign-in.</summary>
 [Collection(HostCollection.Name)]
-public sealed class ShellTests(HostFixture host)
+public sealed partial class ShellTests(HostFixture host)
 {
     private const string Password = "walking42";
 
@@ -65,7 +66,7 @@ public sealed class ShellTests(HostFixture host)
         using var response = await browser.GetAsync(new Uri(path, UriKind.Relative));
         var html = await response.Content.ReadAsStringAsync();
 
-        var scripts = System.Text.RegularExpressions.Regex.Matches(html, """<script src="(?<src>[^"]*)"></script>""")
+        var scripts = ScriptSource().Matches(html)
             .Select(m => m.Groups["src"].Value)
             .ToList();
         var timeZone = Assert.Single(scripts, src => src.StartsWith("js/time-zone", StringComparison.Ordinal) && src.EndsWith(".js", StringComparison.Ordinal));
@@ -99,4 +100,7 @@ public sealed class ShellTests(HostFixture host)
         Assert.DoesNotContain("href=\"/register\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Keep the habits you choose", html, StringComparison.Ordinal);
     }
+
+    [GeneratedRegex("""<script src="(?<src>[^"]*)"></script>""")]
+    private static partial Regex ScriptSource();
 }

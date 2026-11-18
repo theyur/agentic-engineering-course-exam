@@ -514,7 +514,9 @@ Accepted by the owner on 2026-11-18 (plan.md, "Spec discrepancies" 1).
     - an own name or none;
     - its `DateOnly StartDate`: `today`, or `today + 7` for Meditation.
 
-    `DemoAccounts.ProfileFor(email)` gives the account name ("Demo One" for demo1).
+    `DemoAccounts.ProfileFor(email, zone, createdAt)` gives the account's `DemoAccountProfile`: its account name
+    (`DemoAccounts.NameFor(email)`: `DemoAccounts.Demo1Name`, "Demo One", for demo1, none for the others), with the
+    zone and creation time that demo loading passes.
   - **"The day of the run"** is `today`: `InstallationTimeZone.Value.DateAt(now)`, computed once in Application
     (critic plan pass 1, MINOR-4). The store computes no date.
   - **The port.** `IDemoDataStore.CreateDemoAccountAsync` gains two parameters:
