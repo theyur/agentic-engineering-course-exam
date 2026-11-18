@@ -42,4 +42,17 @@ public interface IGoalStore
     /// another owner's habit, a catalog habit or an unknown identifier.
     /// </summary>
     Task<int> CountUsingCustomHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// How many of the owner's goals are based on each catalog habit, whatever its state, read in one query (FR-031):
+    /// a catalog habit the owner has no goal on is absent. Custom habits are never included.
+    /// </summary>
+    Task<IReadOnlyDictionary<HabitId, int>> CountByCatalogHabitAsync(AccountId owner, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The owner's goals based on the catalog habit <paramref name="habit"/>, in creation order, each with its habit's
+    /// current name, category and state, as <see cref="ListAsync"/> reads them (FR-031); empty for another owner's goals,
+    /// a custom habit or an unknown identifier.
+    /// </summary>
+    Task<IReadOnlyList<StoredGoal>> ListOnCatalogHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken);
 }

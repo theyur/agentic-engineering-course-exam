@@ -14,7 +14,11 @@
    every audience. Filters and the search live in the address (q, category, intent) and apply at once; the search
    waits 300 ms after the last keystroke (research R-11, R-15). A registered user also gets "+ Create custom
    habit" and the Tabs to My custom habits (HP-002, US4-AS12); an administrator gets neither, and no register
-   Notice. Every use case runs in its own scope. *@
+   Notice. Every use case runs in its own scope.
+   Slice 4 (HP-005): when browsing as the acting user gives goal information (a registered user), the cards carry
+   the user's goal counts and goal actions, the FilterPanel adds "Show: Only habits I track" (tracked=true in the
+   address) and the count adds "· you track N". Visitors and administrators keep slice 2's page through the slice 2
+   BrowseAsync, and their page ignores tracked=true (contracts/host.md). *@
 <PageTitle>Habit catalog · Habit Tracker</PageTitle>
 
 <div class="ht-container">
@@ -41,7 +45,8 @@
         }
         <div class="ht-sidebar-layout">
             <FilterPanel Id="catalog-filters" Categories="_categories" Category="_category" CategoryChanged="OnCategoryChangedAsync"
-                         Build="_build" Reduce="_reduce" IntentChanged="OnIntentChangedAsync" />
+                         Build="_build" Reduce="_reduce" IntentChanged="OnIntentChangedAsync"
+                         ShowTracked="_tracksGoals" Tracked="_tracked" TrackedChanged="OnTrackedChangedAsync" />
             <div>
                 <div class="ht-results-bar">
                     <span>@CountText</span>
@@ -64,7 +69,9 @@
                                        Intent="@habit.Intent.ToString()" Description="@habit.Description"
                                        SuggestedStartingGoal="@habit.MarkedSuggestedStartingGoal?.Text"
                                        Variant="@(_actingUser.IsAnonymous ? HabitCard.HabitCardVariant.Visitor : HabitCard.HabitCardVariant.SignedIn)"
-                                       Href="@($"/catalog/{habit.Id.Value}")" />
+                                       Href="@($"/catalog/{habit.Id.Value}")"
+                                       NewGoalHref="@(habit.GoalCount is null ? null : CatalogGoalLinks.NewGoal(habit.Id))"
+                                       GoalsText="@(habit.GoalCount is { } goals && goals >= 1 ? CatalogGoalLinks.GoalsText(goals) : null)" />
                         }
                     </div>
                 }
@@ -86,6 +93,9 @@
     private bool _loaded;
     private int _publicCount;
     private int? _customCount;
+    private bool _tracksGoals;
+    private bool _tracked;
+    private int? _trackedCount;
     private int _request;
     private CancellationTokenSource? _pendingSearch;
 
@@ -98,7 +108,11 @@
     [SupplyParameterFromQuery(Name = "intent")]
     public string? IntentValue { get; set; }
 
-    private string CountText => _habits.Count == 1 ? "1 habit" : $"{_habits.Count} habits";
+    [SupplyParameterFromQuery(Name = "tracked")]
+    public string? TrackedValue { get; set; }
+
+    private string CountText =>
+        (_habits.Count == 1 ? "1 habit" : $"{_habits.Count} habits") + (_trackedCount is { } tracked ? $" · you track {tracked}" : string.Empty);
 
     protected override async Task OnInitializedAsync()
     {
@@ -121,10 +135,12 @@
             return;
         }
 
+        // Browsing as the acting user says whether this user gets goal information (HP-005, FR-032).
         var published = await UseCases.RunAsync<CatalogService, CatalogBrowseResult>(
-            (service, token) => service.BrowseAsync(new CatalogFilter(), token), CancellationToken.None);
+            (service, token) => service.BrowseAsync(actingUser, new CatalogFilter(), false, token), CancellationToken.None);
         _publicCount = published.Count;
         _customCount = custom.Habits.Count;
+        _tracksGoals = published.TrackedCount is not null;
     }
 
     protected override async Task OnParametersSetAsync()
@@ -135,7 +151,8 @@
         var category = ParseCategory(CategoryValue);
         var (build, reduce) = ParseIntent(IntentValue);
         var intent = build ? Intent.Build : reduce ? Intent.Reduce : (Intent?)null;
-        if (_loaded && SearchKey(search) == SearchKey(_search) && category == _category && intent == SelectedIntent)
+        var tracked = _tracksGoals && ParseTracked(TrackedValue);
+        if (_loaded && SearchKey(search) == SearchKey(_search) && category == _category && intent == SelectedIntent && tracked == _tracked)
         {
             return;
         }
@@ -146,6 +163,7 @@
         }
 
         _category = category;
+        _tracked = tracked;
         if (intent != SelectedIntent)
         {
             (_build, _reduce) = (build, reduce);
@@ -158,14 +176,20 @@
     {
         var request = ++_request;
         var filter = new CatalogFilter { Category = _category, Intent = SelectedIntent, Search = _search };
-        var result = await UseCases.RunAsync<CatalogService, CatalogBrowseResult>(
-            (service, token) => service.BrowseAsync(filter, token), CancellationToken.None);
+        var actingUser = _actingUser;
+        var onlyTracked = _tracked;
+        var result = _tracksGoals
+            ? await UseCases.RunAsync<CatalogService, CatalogBrowseResult>(
+                (service, token) => service.BrowseAsync(actingUser, filter, onlyTracked, token), CancellationToken.None)
+            : await UseCases.RunAsync<CatalogService, CatalogBrowseResult>(
+                (service, token) => service.BrowseAsync(filter, token), CancellationToken.None);
         if (request != _request)
         {
             return;
         }
 
         _habits = result.Habits;
+        _trackedCount = result.TrackedCount;
         _loaded = true;
     }
 
@@ -183,6 +207,12 @@
     private async Task OnIntentChangedAsync((bool Build, bool Reduce) intent)
     {
         (_build, _reduce) = intent;
+        await ApplyAsync();
+    }
+
+    private async Task OnTrackedChangedAsync(bool tracked)
+    {
+        _tracked = tracked;
         await ApplyAsync();
     }
 
@@ -218,6 +248,7 @@
         _category = null;
         _build = false;
         _reduce = false;
+        _tracked = false;
         await ApplyAsync();
     }
 
@@ -230,8 +261,12 @@
             ["q"] = string.IsNullOrWhiteSpace(_search) ? null : _search,
             ["category"] = _category?.ToString().ToLowerInvariant(),
             ["intent"] = SelectedIntent?.ToString().ToLowerInvariant(),
+            ["tracked"] = _tracked ? "true" : null,
         }), replace: true);
     }
+
+    /// <summary><c>true</c> checks "Only habits I track"; anything else leaves it unchecked.</summary>
+    internal static bool ParseTracked(string? value) => string.Equals(value, "true", StringComparison.Ordinal);
 
     /// <summary>The lower-case name of a category; anything else is ignored.</summary>
     internal static Category? ParseCategory(string? value) =>

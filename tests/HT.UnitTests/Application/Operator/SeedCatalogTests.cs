@@ -140,7 +140,7 @@ public sealed class SeedCatalogTests
             world.CatalogHabits.Add(new CatalogHabit(new HabitId(Guid.NewGuid()), seed.Definition, seed.SuggestedStartingGoals, seed.State));
         }
 
-        var browsed = (await new CatalogService(world.CatalogHabits).BrowseAsync(new CatalogFilter(), CancellationToken.None)).Habits;
+        var browsed = (await new CatalogService(world.CatalogHabits, world.Goals).BrowseAsync(new CatalogFilter(), CancellationToken.None)).Habits;
         Assert.Equal(Published.Count, browsed.Count);
         Assert.DoesNotContain(browsed, h => h.Name is "Music practice" or "Coffee");
         var user = GoalInputs.RegisteredUser(world.Accounts);

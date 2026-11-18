@@ -35,6 +35,13 @@ public sealed class FakeGoalStore : IGoalStore
         customHabits.Goals = this;
     }
 
+    /// <summary>
+    /// A goal store with no goals over <paramref name="catalogHabits"/> and new, empty account and custom-habit fakes:
+    /// for catalog tests that need a <c>CatalogService</c> and no goal.
+    /// </summary>
+    public static FakeGoalStore Over(FakeCatalogHabitStore catalogHabits) =>
+        new(new FakeAccountStore(), catalogHabits, new FakeCustomHabitStore());
+
     /// <summary>Calls of <see cref="CreateAsync"/>, refused ones included.</summary>
     public int CreateCount { get; private set; }
 
@@ -172,6 +179,28 @@ public sealed class FakeGoalStore : IGoalStore
         lock (_gate)
         {
             return Task.FromResult(_goals.Count(g => g.Goal.Owner == owner && g.Goal.Habit == onHabit));
+        }
+    }
+
+    public Task<IReadOnlyDictionary<HabitId, int>> CountByCatalogHabitAsync(AccountId owner, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            IReadOnlyDictionary<HabitId, int> counts = _goals
+                .Where(g => g.Goal.Owner == owner && g.Goal.Habit.Kind == HabitKind.Catalog)
+                .GroupBy(g => g.Goal.Habit.Id)
+                .ToDictionary(group => group.Key, group => group.Count());
+            return Task.FromResult(counts);
+        }
+    }
+
+    public Task<IReadOnlyList<StoredGoal>> ListOnCatalogHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken)
+    {
+        var onHabit = new GoalHabit(habit, HabitKind.Catalog);
+        lock (_gate)
+        {
+            return Task.FromResult<IReadOnlyList<StoredGoal>>(
+                _goals.Where(g => g.Goal.Owner == owner && g.Goal.Habit == onHabit).Select(Current).ToList());
         }
     }
 

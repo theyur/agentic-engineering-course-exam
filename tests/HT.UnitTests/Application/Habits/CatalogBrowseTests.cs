@@ -9,7 +9,7 @@ namespace HT.UnitTests.Application.Habits;
 public sealed class CatalogBrowseTests
 {
     private readonly FakeCatalogHabitStore _store = new();
-    private CatalogService Service => new(_store);
+    private CatalogService Service => new(_store, FakeGoalStore.Over(_store));
 
     private async Task<IReadOnlyList<string>> NamesAsync(CatalogFilter? filter = null) =>
         (await Service.BrowseAsync(filter ?? new CatalogFilter(), CancellationToken.None)).Habits.Select(h => h.Name).ToList();

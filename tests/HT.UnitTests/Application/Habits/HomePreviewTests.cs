@@ -9,7 +9,7 @@ namespace HT.UnitTests.Application.Habits;
 public sealed class HomePreviewTests
 {
     private readonly FakeCatalogHabitStore _store = new();
-    private CatalogService Service => new(_store);
+    private CatalogService Service => new(_store, FakeGoalStore.Over(_store));
 
     /// <summary>Adds Published habits with the given names, plus a Draft and an Unpublished one that sort first.</summary>
     private void Arrange(params string[] publishedNames)

@@ -7,7 +7,7 @@ using static HT.Ui.Components.Shared.HabitCard;
 
 namespace HT.UiTests.Components.Shared;
 
-/// <summary>The slice-2 shared components against their design files (constitution IV).</summary>
+/// <summary>The slice-2 shared components, with their slice-4 states, against their design files (constitution IV).</summary>
 public sealed class HabitComponentTests : BunitContext
 {
     private IRenderedComponent<HabitCard> Card(HabitCardVariant variant, string? start = "20 pages, 3 times a week", string? description = "Books.") =>
@@ -39,13 +39,76 @@ public sealed class HabitComponentTests : BunitContext
     }
 
     [Fact]
-    public void The_signed_in_card_has_Details_only()
+    public void The_signed_in_card_without_goal_information_has_Details_only()
     {
+        // An administrator's card keeps slice 2's state (HP-005).
         var cut = Card(HabitCardVariant.SignedIn);
 
         Assert.Equal(["Details"], cut.FindAll(".ht-habit__actions a").Select(a => a.TextContent));
         Assert.DoesNotContain("Use this habit", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("goal", cut.Find(".ht-habit__actions").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll(".ht-habit__head .ht-chip"));
+    }
+
+    private const string NewGoalHref = "/goals/new?habit=1&kind=catalog";
+
+    private IRenderedComponent<HabitCard> RegisteredCard(string? goalsText) =>
+        Render<HabitCard>(p => p
+            .Add(x => x.Icon, "book-open")
+            .Add(x => x.Name, "Reading")
+            .Add(x => x.Category, "Mind")
+            .Add(x => x.Intent, "Build")
+            .Add(x => x.Variant, HabitCardVariant.SignedIn)
+            .Add(x => x.Href, "/catalog/1")
+            .Add(x => x.NewGoalHref, NewGoalHref)
+            .Add(x => x.GoalsText, goalsText));
+
+    [Fact]
+    public void US6_AS5_a_tracked_card_has_the_strong_goal_Tag_Add_another_goal_and_Details()
+    {
+        var cut = RegisteredCard("2 goals");
+
+        var tag = cut.Find(".ht-habit__head .ht-chip");
+        Assert.Equal("2 goals", tag.TextContent);
+        Assert.Contains("ht-chip--strong", tag.ClassList);
+        Assert.Equal(["Mind", "Build"], cut.FindAll(".ht-habit__tags .ht-chip").Select(c => c.TextContent));
+        var actions = cut.FindAll(".ht-habit__actions a");
+        Assert.Equal(["Add another goal", "Details"], actions.Select(a => a.TextContent));
+        Assert.Equal([NewGoalHref, "/catalog/1"], actions.Select(a => a.GetAttribute("href")));
+        Assert.Contains("ht-btn--secondary", actions[0].ClassList);
+        Assert.Contains("ht-btn--ghost", actions[1].ClassList);
+    }
+
+    [Fact]
+    public void US6_AS5_an_untracked_card_has_Use_this_habit_and_Details_and_no_goal_Tag()
+    {
+        var cut = RegisteredCard(null);
+
+        Assert.Empty(cut.FindAll(".ht-habit__head .ht-chip"));
+        var actions = cut.FindAll(".ht-habit__actions a");
+        Assert.Equal(["Use this habit", "Details"], actions.Select(a => a.TextContent));
+        Assert.Equal(NewGoalHref, actions[0].GetAttribute("href"));
+        Assert.Contains("ht-btn--primary", actions[0].ClassList);
+    }
+
+    [Fact]
+    public void The_visitor_and_custom_habit_cards_ignore_goal_parameters()
+    {
+        foreach (var variant in new[] { HabitCardVariant.Visitor, HabitCardVariant.CustomHabit })
+        {
+            var cut = Render<HabitCard>(p => p
+                .Add(x => x.Icon, "book-open")
+                .Add(x => x.Name, "Reading")
+                .Add(x => x.Category, "Mind")
+                .Add(x => x.Intent, "Build")
+                .Add(x => x.Variant, variant)
+                .Add(x => x.Href, "/catalog/1")
+                .Add(x => x.NewGoalHref, NewGoalHref)
+                .Add(x => x.GoalsText, "2 goals"));
+
+            Assert.Single(cut.FindAll(".ht-habit__actions a"));
+            Assert.DoesNotContain("goal", cut.Markup, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -156,6 +219,28 @@ public sealed class HabitComponentTests : BunitContext
         Assert.Null(category);
         cut.FindAll("input[type=checkbox]")[1].Change(true);
         Assert.Equal((true, true), intent);
+    }
+
+    [Fact]
+    public void US6_AS5_FilterPanel_with_ShowTracked_adds_Show_with_Only_habits_I_track()
+    {
+        bool? tracked = null;
+        var cut = Render<FilterPanel>(p => p
+            .Add(x => x.Id, "f")
+            .Add(x => x.Categories, [new FilterPanel.CategoryOption(null, "All")])
+            .Add(x => x.ShowTracked, true)
+            .Add(x => x.Tracked, true)
+            .Add(x => x.TrackedChanged, (bool t) => tracked = t));
+
+        Assert.Equal(["Category", "Intent", "Show"], cut.FindAll(".ht-filter__title").Select(t => t.TextContent));
+        var show = cut.FindAll("[role=group]")[1];
+        Assert.Equal("f-show-title", show.GetAttribute("aria-labelledby"));
+        Assert.Equal("Only habits I track", show.QuerySelector("label")!.TextContent.Trim());
+        var box = show.QuerySelector("input[type=checkbox]")!;
+        Assert.True(box.HasAttribute("checked"));
+
+        cut.FindAll("input[type=checkbox]")[2].Change(false);
+        Assert.False(tracked);
     }
 
     /// <summary>Wednesday 18 November 2026, the list's today in the GoalItem tests.</summary>

@@ -13,7 +13,7 @@ public sealed class CatalogHabitStateTests
     private CatalogAdministrationService Service => new(_store);
 
     private async Task<bool> BrowsedAsync(HabitId id) =>
-        (await new CatalogService(_store).BrowseAsync(new CatalogFilter(), CancellationToken.None)).Habits.Any(h => h.Id == id);
+        (await new CatalogService(_store, FakeGoalStore.Over(_store)).BrowseAsync(new CatalogFilter(), CancellationToken.None)).Habits.Any(h => h.Id == id);
 
     [Fact]
     public async Task US3_AS2_publishing_a_Draft_makes_it_Published_and_browsed()
@@ -39,7 +39,7 @@ public sealed class CatalogHabitStateTests
         Assert.Null(result.Message);
         Assert.Equal(CatalogHabitState.Unpublished, _store.Get(habit.Id)!.State);
         Assert.False(await BrowsedAsync(habit.Id));
-        var details = await new CatalogService(_store).GetDetailsAsync(habit.Id, CancellationToken.None);
+        var details = await new CatalogService(_store, FakeGoalStore.Over(_store)).GetDetailsAsync(habit.Id, CancellationToken.None);
         Assert.Equal("This habit is not in the catalog.", details.Message);
     }
 

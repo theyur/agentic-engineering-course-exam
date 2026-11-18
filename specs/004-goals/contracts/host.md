@@ -65,6 +65,11 @@ refreshes the cookie.
   - "You track this · N goals".
   - "Start with this" on each suggested starting goal.
   - "Your goals on this habit".
+  - Visitors and administrators keep slice 2's pages. Their catalog page has no "Show" option (HP-005), ignores a
+    `tracked=true` in the address and lists slice 2's habits, unfiltered by it, through the slice 2
+    `BrowseAsync(CatalogFilter)`. The use case's refusal of "Only habits I track" (US6-AS4) is for direct calls;
+    the page never asks for it for them. The details page reads `GetDetailsAsync(ActingUser, HabitId)` for every
+    audience; without goal information it renders slice 2's state.
 - **Custom habit** (HP-007):
   - "Save and create goal" goes to `/goals/new?habit={id}&kind=custom`.
   - "Delete" is shown only when `GoalCount` is 0.

@@ -58,6 +58,23 @@ internal sealed class GoalStore : IGoalStore
         _db.Goals.AsNoTracking()
             .CountAsync(g => g.OwnerId == owner.Value && g.CustomHabitId == habit.Value, cancellationToken);
 
+    public async Task<IReadOnlyDictionary<HabitId, int>> CountByCatalogHabitAsync(AccountId owner, CancellationToken cancellationToken)
+    {
+        var counts = await _db.Goals.AsNoTracking()
+            .Where(g => g.OwnerId == owner.Value && g.CatalogHabitId != null)
+            .GroupBy(g => g.CatalogHabitId!.Value)
+            .Select(group => new { Habit = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return counts.ToDictionary(c => new HabitId(c.Habit), c => c.Count);
+    }
+
+    public async Task<IReadOnlyList<StoredGoal>> ListOnCatalogHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken)
+    {
+        var rows = await Read(owner).Where(r => r.Goal.CatalogHabitId == habit.Value).ToListAsync(cancellationToken).ConfigureAwait(false);
+        return rows.Select(GoalMapping.ToStoredGoal).ToList();
+    }
+
     /// <summary>Research R-08 steps 2 to 6, in one transaction; nothing is written unless every check passes.</summary>
     private async Task<GoalWriteOutcome> CreateInTransactionAsync(
         AccountId owner, NewGoal goal, NamedTimeZone expectedZone, NamedTimeZone defaultZone, CancellationToken cancellationToken)

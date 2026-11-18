@@ -9,7 +9,7 @@ namespace HT.UnitTests.Application.Habits;
 public sealed class CatalogDetailsTests
 {
     private readonly FakeCatalogHabitStore _store = new();
-    private CatalogService Service => new(_store);
+    private CatalogService Service => new(_store, FakeGoalStore.Over(_store));
 
     [Fact]
     public async Task US2_AS1_all_suggested_starting_goals_in_order_with_fields_mark_texts_and_kinds()

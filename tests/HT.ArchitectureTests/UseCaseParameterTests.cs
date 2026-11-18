@@ -8,7 +8,8 @@ namespace HT.ArchitectureTests;
 
 /// <summary>
 /// Research R-12, constitution III: the parameters of the habit use cases and ports, checked by reflection. The
-/// public catalog takes no acting user; use cases for signed-in users take the acting user first and never an
+/// public catalog takes no acting user, or the acting user first for its goal information (slice 4 research R-09);
+/// use cases for signed-in users take the acting user first and never an
 /// account identifier; the custom-habit port and the goal port take the owner first.
 /// </summary>
 public sealed class UseCaseParameterTests
@@ -67,15 +68,31 @@ public sealed class UseCaseParameterTests
     }
 
     [Fact]
-    public void No_public_method_of_CatalogService_takes_an_acting_user_or_an_account_identifier()
+    public void Every_public_method_of_CatalogService_takes_no_acting_user_or_the_acting_user_first_and_no_account_identifier()
     {
+        // Slice 4 research R-09: the slice 2 overloads take no acting user (every audience, FR-019); the overloads with
+        // the user's own goal information take the acting user first (FR-031, FR-032).
         var methods = PublicMethods(typeof(CatalogService)).ToList();
         Assert.NotEmpty(methods);
 
         var offenders = methods
-            .Where(m => Takes(m, typeof(ActingUser)) || Takes(m, typeof(AccountId)))
+            .Where(m => Takes(m, typeof(AccountId))
+                || (Takes(m, typeof(ActingUser)) && (m.GetParameters() is not [{ } first, ..] || first.ParameterType != typeof(ActingUser))))
             .Select(m => m.Name)
             .ToList();
         Assert.Empty(offenders);
+    }
+
+    [Fact]
+    public void CatalogService_has_both_kinds_of_browsing_and_details()
+    {
+        var methods = PublicMethods(typeof(CatalogService)).ToList();
+
+        foreach (var name in new[] { nameof(CatalogService.BrowseAsync), nameof(CatalogService.GetDetailsAsync) })
+        {
+            var overloads = methods.Where(m => m.Name == name).ToList();
+            Assert.Contains(overloads, m => !Takes(m, typeof(ActingUser)));
+            Assert.Contains(overloads, m => m.GetParameters() is [{ } first, ..] && first.ParameterType == typeof(ActingUser));
+        }
     }
 }

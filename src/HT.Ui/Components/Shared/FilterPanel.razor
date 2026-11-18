@@ -1,7 +1,7 @@
 @using HT.Domain.Habits
 @* design/components/FilterPanel: Category as a radio group, Intent as the two checkboxes Build and Reduce, native
-   inputs inside label.ht-check. Every change is reported at once; there is no Apply button. "Only habits I track"
-   is slice 4's and absent. *@
+   inputs inside label.ht-check. Every change is reported at once; there is no Apply button. Slice 4 (HP-005): with
+   ShowTracked, the group "Show" with the checkbox "Only habits I track", for registered users only. *@
 <aside class="ht-card" aria-label="Filters">
     <div class="ht-filter__group" role="radiogroup" aria-labelledby="@($"{Id}-category-title")">
         <div class="ht-filter__title" id="@($"{Id}-category-title")">Category</div>
@@ -24,6 +24,15 @@
             <input type="checkbox" checked="@Reduce" @onchange="e => OnIntentAsync(Build, IsChecked(e))" /> Reduce
         </label>
     </div>
+    @if (ShowTracked)
+    {
+        <div class="ht-filter__group" role="group" aria-labelledby="@($"{Id}-show-title")">
+            <div class="ht-filter__title" id="@($"{Id}-show-title")">Show</div>
+            <label class="ht-check">
+                <input type="checkbox" checked="@Tracked" @onchange="e => TrackedChanged.InvokeAsync(IsChecked(e))" /> Only habits I track
+            </label>
+        </div>
+    }
 </aside>
 
 @code {
@@ -51,6 +60,17 @@
     /// <summary>Called with both boxes' new states when either changes.</summary>
     [Parameter]
     public EventCallback<(bool Build, bool Reduce)> IntentChanged { get; set; }
+
+    /// <summary>Shows "Show: Only habits I track" (HP-005); false keeps slice 2's panel.</summary>
+    [Parameter]
+    public bool ShowTracked { get; set; }
+
+    /// <summary>"Only habits I track" is checked.</summary>
+    [Parameter]
+    public bool Tracked { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> TrackedChanged { get; set; }
 
     private Task OnIntentAsync(bool build, bool reduce) => IntentChanged.InvokeAsync((build, reduce));
 

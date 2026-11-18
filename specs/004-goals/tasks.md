@@ -747,19 +747,19 @@ AS2).
 
 ### Tests for User Story 6
 
-- [ ] T088 [P] [US6] Create `tests/HT.UnitTests/Application/Habits/CatalogGoalInfoTests.cs` (depends on T091):
+- [X] T088 [P] [US6] Create `tests/HT.UnitTests/Application/Habits/CatalogGoalInfoTests.cs` (depends on T091):
   - US6-AS1: the counts 2 and 0, and `TrackedCount`;
   - US6-AS2: `onlyTracked` together with category, intent and search;
   - US6-AS3: the details give `GoalCount` 2 and `Goals` (identifier and derived name) in name order, then creation order;
   - US6-AS4: the visitor and the administrator get the slice 2 content with null goal information, and `onlyTracked` gives "You are not signed in." or "Goals are for registered users.";
   - US3-AS6: user B's count for "Reading" is 0, and nothing of A's goals is returned;
   - FR-019: the old `BrowseAsync(CatalogFilter)` and `GetDetailsAsync(HabitId)` give results equal to slice 2's.
-- [ ] T089 [P] [US6] Create `tests/HT.IntegrationTests/Habits/CatalogGoalInfoTests.cs` on `HT-IT`: two registered users with goals on shared catalog habits, checked by inclusion over SQL (depends on T091)
+- [X] T089 [P] [US6] Create `tests/HT.IntegrationTests/Habits/CatalogGoalInfoTests.cs` on `HT-IT`: two registered users with goals on shared catalog habits, checked by inclusion over SQL (depends on T091)
 
 ### Implementation for User Story 6
 
-- [ ] T090 [US6] Add `CountByCatalogHabitAsync(owner, …) → IReadOnlyDictionary<HabitId, int>` and `ListOnCatalogHabitAsync(owner, habit, …)` to `IGoalStore`, `GoalStore` and `FakeGoalStore`
-- [ ] T091 [US6] Extend `src/HT.Application/Habits/CatalogService.cs` (FR-031, FR-032, research R-09; depends on T090, T068):
+- [X] T090 [US6] Add `CountByCatalogHabitAsync(owner, …) → IReadOnlyDictionary<HabitId, int>` and `ListOnCatalogHabitAsync(owner, habit, …)` to `IGoalStore`, `GoalStore` and `FakeGoalStore`
+- [X] T091 [US6] Extend `src/HT.Application/Habits/CatalogService.cs` (FR-031, FR-032, research R-09; depends on T090, T068):
   - its constructor gains `IGoalStore`;
   - the new overloads `BrowseAsync(ActingUser, CatalogFilter, bool onlyTracked, …)` and `GetDetailsAsync(ActingUser, HabitId, …)`;
   - the `init` properties `CatalogHabitSummary.GoalCount`, `CatalogBrowseResult.TrackedCount`, `CatalogHabitDetails.GoalCount` and `Goals` in `CatalogViews.cs` and `CatalogResults.cs`;
@@ -768,7 +768,7 @@ AS2).
   - the old overloads unchanged.
 
   In `UseCaseParameterTests.cs`, each `CatalogService` overload takes either no acting user or the acting user first. Update the hand-built instances: the target-typed `Service => new(_store)` in `tests/HT.UnitTests/Application/Habits/CatalogBrowseTests.cs`, `CatalogDetailsTests.cs` and `HomePreviewTests.cs`, and `Browse => new(_store)` in `CatalogHabitFieldTests.cs`, the two `new CatalogService(_store)` in `CatalogHabitStateTests.cs`, plus whatever the grep convention finds.
-- [ ] T092 [US6] Update the catalog pages for registered users (HP-005, HP-006; depends on T091):
+- [X] T092 [US6] Update the catalog pages for registered users (HP-005, HP-006; depends on T091):
   - `src/HT.Ui/Components/Pages/Catalog.razor`: "Show: Only habits I track", kept in the address as `tracked=true`, and "· you track N" after the count;
   - `src/HT.Ui/Components/Shared/FilterPanel.razor`: the "Show" option;
   - `src/HT.Ui/Components/Shared/HabitCard.razor`: the "N goals" Tag and "Add another goal", or "Use this habit", linking to `/goals/new?habit={id}&kind=catalog`;
@@ -779,7 +779,7 @@ AS2).
     - "Your goals on this habit", each name linking to its goal page.
 
   Visitors and administrators keep slice 2's pages. They have no "Show" option (HP-005), so their catalog page ignores a `tracked=true` in the address and shows slice 2's list through the old `BrowseAsync(CatalogFilter)`. The use case's refusal of `onlyTracked` (US6-AS4) is for direct calls; the page never passes it for them. contracts/host.md does not say this; record it there in the same task.
-- [ ] T093 [P] [US6] Update `tests/HT.UiTests/Components/Pages/CatalogPageTests.cs`, `CatalogHabitDetailTests.cs` and `tests/HT.UiTests/Components/Shared/HabitComponentTests.cs`, whose slice 2 HP-002 and HP-005 expectations change, for US6-AS5. Extend `tests/HT.UiTests/Host/CatalogHostTests.cs`: `tracked=true` for a registered user shows only tracked habits, and for a visitor gives 200 with slice 2's list, unfiltered, and no "Show" option (depends on T092)
+- [X] T093 [P] [US6] Update `tests/HT.UiTests/Components/Pages/CatalogPageTests.cs`, `CatalogHabitDetailTests.cs` and `tests/HT.UiTests/Components/Shared/HabitComponentTests.cs`, whose slice 2 HP-002 and HP-005 expectations change, for US6-AS5. Extend `tests/HT.UiTests/Host/CatalogHostTests.cs`: `tracked=true` for a registered user shows only tracked habits, and for a visitor gives 200 with slice 2's list, unfiltered, and no "Show" option (depends on T092)
 
 **Checkpoint**: full suite green. SC-001: from a habit's details, "Start with this" and then "Create goal" create a
 goal with two actions. Commit.

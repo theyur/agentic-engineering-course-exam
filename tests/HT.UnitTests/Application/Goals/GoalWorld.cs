@@ -90,5 +90,11 @@ public sealed class GoalWorld
 
         public Task<int> CountUsingCustomHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken) =>
             inner.CountUsingCustomHabitAsync(owner, habit, cancellationToken);
+
+        public Task<IReadOnlyDictionary<HabitId, int>> CountByCatalogHabitAsync(AccountId owner, CancellationToken cancellationToken) =>
+            inner.CountByCatalogHabitAsync(owner, cancellationToken);
+
+        public Task<IReadOnlyList<StoredGoal>> ListOnCatalogHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken) =>
+            inner.ListOnCatalogHabitAsync(owner, habit, cancellationToken);
     }
 }

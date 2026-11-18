@@ -11,7 +11,7 @@ public sealed class CatalogHabitFieldTests
 {
     private readonly FakeCatalogHabitStore _store = new();
     private CatalogAdministrationService Service => new(_store);
-    private CatalogService Browse => new(_store);
+    private CatalogService Browse => new(_store, FakeGoalStore.Over(_store));
 
     private static readonly SuggestedStartingGoalFields Valid = Count(20, "pages", 3, SchedulePeriod.Week);
 
