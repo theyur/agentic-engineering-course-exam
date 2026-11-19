@@ -31,15 +31,24 @@ public static class StartupTasksHarness
 
     /// <summary>Drops <c>HT-UI-MIGRATE</c>, then runs the startup tasks and returns the operator log.</summary>
     public static async Task<IReadOnlyList<LogEntry>> RunAsync(
-        string environmentName, IDictionary<string, string?> operatorValues, string? connectionString = null)
+        string environmentName,
+        IDictionary<string, string?> operatorValues,
+        string? connectionString = null,
+        Action<IServiceCollection>? configure = null)
     {
         await DropDatabaseAsync();
-        return await RunWithoutDropAsync(environmentName, operatorValues, connectionString);
+        return await RunWithoutDropAsync(environmentName, operatorValues, connectionString, configure);
     }
 
-    /// <summary>Runs the startup tasks on the database as it is (for a second start).</summary>
+    /// <summary>
+    /// Runs the startup tasks on the database as it is (for a second start). <paramref name="configure"/>, when given,
+    /// changes the registrations after the application's, for example to put a faulting port in place.
+    /// </summary>
     public static async Task<IReadOnlyList<LogEntry>> RunWithoutDropAsync(
-        string environmentName, IDictionary<string, string?> operatorValues, string? connectionString = null)
+        string environmentName,
+        IDictionary<string, string?> operatorValues,
+        string? connectionString = null,
+        Action<IServiceCollection>? configure = null)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(operatorValues).Build();
         var services = new ServiceCollection()
@@ -47,6 +56,7 @@ public static class StartupTasksHarness
             .AddHtApplication()
             .AddHtPersistence(connectionString ?? ConnectionString)
             .AddSingleton<IConfiguration>(configuration);
+        configure?.Invoke(services);
 
         await using var provider = services.BuildServiceProvider();
         var logger = new ListLogger(StartupTasks.LoggerCategory);

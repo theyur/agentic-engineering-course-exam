@@ -1,0 +1,31 @@
+@* design/components/StatusChip (slice-5 state, HP-004): the evaluation state of one commitment or period, always as a
+   word with its colour, never the colour alone. The word comes from RecordingText.State; the classes are the design's
+   ht-chip ht-status ht-status--{met|failed|missed|pending|due}, and no other. Upcoming has no chip in this slice. *@
+@using HT.Application.Records
+@using HT.Domain.Evaluation
+@using HT.Domain.Goals
+@using HT.Domain.Habits
+<span class="ht-chip ht-status @Modifier">@RecordingText.State(State, ScheduleKind, Period)</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public EvaluationState State { get; set; }
+
+    /// <summary>Commitment-based or period-based; with <see cref="Period"/> it tells "Due today" from "Due this week".</summary>
+    [Parameter, EditorRequired]
+    public GoalScheduleKind ScheduleKind { get; set; }
+
+    /// <summary>The length of a period-based goal's period (day or week); null for a commitment-based goal.</summary>
+    [Parameter]
+    public SchedulePeriod? Period { get; set; }
+
+    private string Modifier => State switch
+    {
+        EvaluationState.Met => "ht-status--met",
+        EvaluationState.Failed => "ht-status--failed",
+        EvaluationState.Missed => "ht-status--missed",
+        EvaluationState.Pending => "ht-status--pending",
+        EvaluationState.Due => "ht-status--due",
+        _ => throw new InvalidOperationException("The state has no chip in this slice."),
+    };
+}

@@ -1,0 +1,7 @@
+{
+  "group": "features",
+  "feature": "specs/005-recording-and-evaluation",
+  "files": {
+    "tests/HT.AcceptanceTests/Features/F005/recording-and-evaluation.feature": "6c43fd32cd7194b1254a3b8997ee1eea74cdf1032a169116ecb066db31591d02"
+  }
+}

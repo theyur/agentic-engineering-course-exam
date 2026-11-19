@@ -1,0 +1,131 @@
+@using HT.Application.Records
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@* design/components/NoteDialog, slice 5 state (HP-003, US4-AS7, contracts/host.md "Dialogs"): the private note of one
+   History row, opened from the row's "Add note" (the field starts empty) or from its note (the field starts with that
+   note, so saving without a change keeps it). The title is "Add note · {goal name}", with or without a note; the sub
+   line is the row's date and its state word as the StatusChip writes it ("Tue 27 Oct · Missed", "27 Jul – 2 Aug ·
+   Failed"); then the TextArea "Note" with the help "Notes are private. They do not change the result.", and "Save note"
+   and "Cancel". The 500-character limit is the use case's: a longer note gives its refusal under the field and changes
+   nothing. Saving it empty, or with only spaces, removes the note. The dialog reads no clock and decides nothing: "Save
+   note" calls SaveNoteAsync for the row's first date (a week's Monday, which names the week) in a scope of its own and
+   raises OnSaved with the entry after the write. Focus moves to the TextArea on open; Esc and × close the dialog, and
+   focus returns to the opener. *@
+<HtDialog Open="Open" OnClose="OnClose" ReturnFocus="ReturnFocus" FocusOnOpen="FocusNoteAsync" FocusOnClose="FocusOnClose">
+    <Title>@TitlePrefix@GoalName</Title>
+    <Subtitle>@SubLine</Subtitle>
+    <ChildContent>
+        <TextArea @ref="_field" Id="@_id" Label="Note" Help="Notes are private. They do not change the result." Error="@_error"
+                  Value="@_note" ValueChanged="v => _note = v" />
+    </ChildContent>
+    <Footer>
+        <HtButton @onclick="SaveAsync" disabled="@_saving">Save note</HtButton>
+        <HtButton Variant="HtButton.ButtonVariant.Secondary" @onclick="() => OnClose.InvokeAsync()">Cancel</HtButton>
+    </Footer>
+</HtDialog>
+
+@code {
+    /// <summary>The design's only title: "Add note · " and the goal's name, with or without a note.</summary>
+    private const string TitlePrefix = "Add note · ";
+
+    private const string Separator = " · ";
+
+    private readonly string _id = $"note-dialog-{Guid.NewGuid():N}";
+    private TextArea? _field;
+    private string? _note;
+    private string? _error;
+    private bool _saving;
+    private bool _wasOpen;
+
+    /// <summary>Whether the dialog is shown; the page owns this value.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Esc, × or Cancel: the page should close the dialog.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>The button that opened the dialog; it gets the focus back when the dialog closes.</summary>
+    [Parameter]
+    public ElementReference? ReturnFocus { get; set; }
+
+    /// <summary>
+    /// Gives the focus back when the dialog closes, in place of <see cref="ReturnFocus"/>: for a History row, whose
+    /// button the closing render may have replaced ("Add note" becomes the note).
+    /// </summary>
+    [Parameter]
+    public Func<ValueTask>? FocusOnClose { get; set; }
+
+    /// <summary>The goal the note is for.</summary>
+    [Parameter, EditorRequired]
+    public GoalId GoalId { get; set; }
+
+    /// <summary>The goal's name, for the title.</summary>
+    [Parameter, EditorRequired]
+    public string GoalName { get; set; } = string.Empty;
+
+    /// <summary>The history the row came from (GetHistoryAsync); its schedule kind and period word the row's state.</summary>
+    [Parameter, EditorRequired]
+    public GoalHistory History { get; set; } = default!;
+
+    /// <summary>The History row the dialog was opened from; its note, if any, fills the field.</summary>
+    [Parameter, EditorRequired]
+    public HistoryEntry Row { get; set; } = default!;
+
+    /// <summary>The acting user the page read.</summary>
+    [Parameter, EditorRequired]
+    public ActingUser ActingUser { get; set; } = ActingUser.Anonymous;
+
+    /// <summary>The note was saved or removed: the entry as it is after the write.</summary>
+    [Parameter]
+    public EventCallback<HistoryEntry> OnSaved { get; set; }
+
+    /// <summary>The row's date and its state word: "Tue 27 Oct · Missed".</summary>
+    private string SubLine =>
+        RecordingText.EntryDate(Row) + Separator + RecordingText.State(Row.State, History.GoalScheduleKind, History.Period);
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !_wasOpen)
+        {
+            _note = Row.Note;
+            _error = null;
+            _saving = false;
+        }
+
+        _wasOpen = Open;
+    }
+
+    private ValueTask FocusNoteAsync() => _field?.FocusAsync() ?? ValueTask.CompletedTask;
+
+    private async Task SaveAsync()
+    {
+        if (_saving)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var date = Row.FirstDate;
+            var note = _note;
+            var result = await UseCases.RunAsync<RecordingService, NoteSaveResult>(
+                (service, token) => service.SaveNoteAsync(ActingUser, GoalId, date, note, token), CancellationToken.None);
+            if (result.Entry is { } saved)
+            {
+                _error = null;
+                await OnSaved.InvokeAsync(saved);
+                return;
+            }
+
+            _error = result.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

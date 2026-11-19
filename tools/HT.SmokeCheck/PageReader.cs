@@ -5,9 +5,9 @@ namespace HT.SmokeCheck;
 
 /// <summary>
 /// Reads what the smoke check needs from a server-rendered page (contracts/smoke-check.md): the antiforgery token
-/// and handler names of a form, the first heading, the names on habit cards and goal items, and the linked stylesheets
-/// and scripts.
-/// Every value is HTML-decoded. Names are compared in memory and never printed.
+/// and handler names of a form, the first heading, the names on habit cards and goal items, the goal items' links, the
+/// text of a card, and the linked stylesheets and scripts.
+/// Every value is HTML-decoded. Names and texts are compared in memory and never printed.
 /// </summary>
 public static partial class PageReader
 {
@@ -58,6 +58,49 @@ public static partial class PageReader
     {
         ArgumentNullException.ThrowIfNull(html);
         return [.. GoalNamePattern().Matches(html).Select(m => Text(m.Groups["inner"].Value))];
+    }
+
+    /// <summary>
+    /// Every goal item on the Goals page with its link, in document order: the name of each
+    /// <c>&lt;a class="ht-goalitem__name"&gt;</c>, as <see cref="ReadGoalNames"/> reads it, paired with its decoded
+    /// <c>href</c>, or null when the anchor has none (smoke check 6, slice 5 research R-10).
+    /// </summary>
+    public static IReadOnlyList<GoalLink> ReadGoalLinks(string html)
+    {
+        ArgumentNullException.ThrowIfNull(html);
+        return [.. GoalNamePattern().Matches(html).Select(m => new GoalLink(Text(m.Groups["inner"].Value), Attribute(m.Groups["attributes"].Value, "href")))];
+    }
+
+    /// <summary>
+    /// The text of the first card <c>&lt;section class="ht-card"&gt;</c> whose first
+    /// <c>&lt;h2 class="ht-card__title"&gt;</c> is <paramref name="title"/> (ordinal), up to that section's
+    /// <c>&lt;/section&gt;</c>: tags removed, entities decoded and every run of white space made one space. Null when no
+    /// such card is on the page, or when a card has no <c>&lt;/section&gt;</c>. Another card's words are never part of it
+    /// (smoke check 6, slice 5 research R-10).
+    /// </summary>
+    public static string? ReadCardText(string html, string title)
+    {
+        ArgumentNullException.ThrowIfNull(html);
+        ArgumentNullException.ThrowIfNull(title);
+        foreach (Match section in CardSectionPattern().Matches(html))
+        {
+            var start = section.Index + section.Length;
+            var end = html.IndexOf("</section", start, StringComparison.OrdinalIgnoreCase);
+            if (end < 0)
+            {
+                return null;
+            }
+
+            var body = html[start..end];
+            var heading = CardTitlePattern().Match(body);
+            if (heading.Success && string.Equals(Text(heading.Groups["inner"].Value), title, StringComparison.Ordinal))
+            {
+                var text = WebUtility.HtmlDecode(InnerTagPattern().Replace(body, string.Empty));
+                return WhiteSpacePattern().Replace(text, " ").Trim();
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -129,8 +172,17 @@ public static partial class PageReader
     [GeneratedRegex("""<h3\b[^>]*\bclass="(?:[^"]*\s)?ht-habit__name(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</h3\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex HabitNamePattern();
 
-    [GeneratedRegex("""<a\b[^>]*\bclass="(?:[^"]*\s)?ht-goalitem__name(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</a\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    [GeneratedRegex("""<a\b(?<attributes>[^>]*\bclass="(?:[^"]*\s)?ht-goalitem__name(?:\s[^"]*)?"[^>]*)>(?<inner>.*?)</a\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex GoalNamePattern();
+
+    [GeneratedRegex("""<section\b[^>]*\bclass="(?:[^"]*\s)?ht-card(?:\s[^"]*)?"[^>]*>""", RegexOptions.IgnoreCase)]
+    private static partial Regex CardSectionPattern();
+
+    [GeneratedRegex("""<h2\b[^>]*\bclass="(?:[^"]*\s)?ht-card__title(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</h2\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex CardTitlePattern();
+
+    [GeneratedRegex("""\s+""")]
+    private static partial Regex WhiteSpacePattern();
 
     [GeneratedRegex("""<(?<name>link|script)\b(?<attributes>[^>]*)>""", RegexOptions.IgnoreCase)]
     private static partial Regex AssetTagPattern();
@@ -141,3 +193,8 @@ public static partial class PageReader
     [GeneratedRegex("<[^>]*>")]
     private static partial Regex InnerTagPattern();
 }
+
+/// <summary>A goal item of the Goals page: its visible name and its link (smoke check 6).</summary>
+/// <param name="Name">The goal's visible name.</param>
+/// <param name="Href">The anchor's decoded <c>href</c> as written on the page, or null when it has none.</param>
+public sealed record GoalLink(string Name, string? Href);

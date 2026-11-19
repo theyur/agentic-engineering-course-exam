@@ -1,0 +1,44 @@
+@using HT.Application.Accounts
+@using HT.Application.Records
+@using HT.Domain.Goals
+@using HT.Domain.Habits
+@* design/pages/PageGoalDetail, slice 5 state (HP-001, US4-AS6, AS7, contracts/host.md "Recent notes card"): the goal
+   page's Recent notes card in the right column, after Settings. The title "Recent notes", then the notes of
+   GetRecentNotesAsync (at most 5, newest first) as ht-goal items: the note in quotes and its StatusChip on the top line
+   (ht-spacer before the chip), and its date under it ("Thu 12 Nov", or a week's "27 Jul – 2 Aug" by DateTexts.WeekRange).
+   A RecentNote carries no schedule kind, so the page passes the goal's from its history; the goal's schedule is the same
+   for every note in this slice (FR-015). The card is not rendered while the goal has no note. *@
+@if (Notes.Count > 0)
+{
+    <HtCard Title="Recent notes">
+        @foreach (var note in Notes)
+        {
+            <div class="ht-goal" @key="note.FirstDate">
+                <div class="ht-goal__top">
+                    <span>"@note.Note"</span>
+                    <span class="ht-spacer"></span>
+                    <StatusChip State="note.State" ScheduleKind="ScheduleKind" Period="Period" />
+                </div>
+                <div class="ht-goal__meta">@DateOf(note)</div>
+            </div>
+        }
+    </HtCard>
+}
+
+@code {
+    /// <summary>The goal's recent notes from <c>GetRecentNotesAsync</c>, newest first.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<RecentNote> Notes { get; set; } = [];
+
+    /// <summary>The goal's schedule kind, from its history; with <see cref="Period"/> it words a Due note's chip.</summary>
+    [Parameter, EditorRequired]
+    public GoalScheduleKind ScheduleKind { get; set; }
+
+    /// <summary>The length of a period-based goal's period (day or week), from its history; null for a commitment-based goal.</summary>
+    [Parameter]
+    public SchedulePeriod? Period { get; set; }
+
+    /// <summary>"Thu 12 Nov" for a commitment or a day, "27 Jul – 2 Aug" for a week.</summary>
+    private static string DateOf(RecentNote note) =>
+        note.FirstDate == note.LastDate ? DateTexts.ShortDate(note.FirstDate) : DateTexts.WeekRange(note.FirstDate, note.LastDate);
+}

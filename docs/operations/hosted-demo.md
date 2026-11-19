@@ -21,6 +21,8 @@ This page states no secret value and no administrator email. Keep it that way.
 - GitHub holds no secret. The environment `demo` has non-secret variables only; the workflow reads the secret
   values from the web app at run time and masks them.
 - `Deployment__Commit`, an app setting, holds the full SHA of the deployed commit.
+- The workflow **Deploy demo** also refreshes the demo every day at 00:20 UTC until 2027-01-31
+  ([ADR 0018](../adr/0018-evaluation-on-read-and-demo-history.md); see "The daily refresh").
 
 ## Provision
 
@@ -96,7 +98,8 @@ error `AADSTS700213` in step 1.2 means the two differ: run `provision.ps1` again
 ## Run the workflow
 
 GitHub → Actions → **Deploy demo** → **Run workflow**, with "Use workflow from" set to `master`. The workflow can
-run only after the PR that adds `.github/workflows/deploy-demo.yml` is merged. A merge or push never starts it.
+run only after the PR that adds `.github/workflows/deploy-demo.yml` is merged. A merge or push never starts it;
+only you or its daily schedule do (see "The daily refresh").
 
 | `mode` | What it does | `commit` |
 |---|---|---|
@@ -106,11 +109,40 @@ run only after the PR that adds `.github/workflows/deploy-demo.yml` is merged. A
 
 - `deploy` takes about 10 minutes, at most 15. The hosted demo is unavailable meanwhile.
 - After `deploy` and `refresh`, every registered account and every reviewer change is gone; the startup tasks
-  create the administrator, the demo accounts with their custom habits and the seed catalog again.
+  create the administrator, the demo accounts with their custom habits and the seed catalog again, and
+  `demo4@example.com` with its results and notes relative to the start's UTC date (slice 5).
 - A second run waits until the first one ends.
 - A failed run is recovered by the next run: start it again once the cause is fixed. After a failure at
   `7.1 Deploy the web app`, `Deployment__Commit` is empty and only a `deploy` run repairs it; `refresh` and
   `check` fail at `2.2` with "no deployed commit; run deploy".
+- Every run starts with the job **Gate** (step `0.1 Check the trigger and the demo end date`). It has no
+  environment and no Azure sign-in; it only sets the mode. The deployment job is then named
+  `Demo (<mode>)`.
+
+### The daily refresh
+
+The workflow also runs `refresh` every day at 00:20 UTC (ADR 0018, slice 5 HP-009), so `demo4@example.com`
+shows Met, Failed, Missed, Pending and Due results relative to the current date. Its run is named
+`Demo (refresh)` and needs nothing from you.
+
+- **After 2027-01-31** a scheduled run ends in **Gate** with the summary "Demo refresh: skipped after
+  2027-01-31" and succeeds with `Demo (refresh)` skipped: it never enters the environment `demo` and changes
+  nothing. A run you start by hand is never skipped.
+- **A late run.** GitHub may start a scheduled run late, or drop it under load. Until it runs, the demo keeps
+  the data of the last refresh: every day since then adds an unrecorded day at the top of each daily goal's
+  History, Pending first and then Missed. demo4's Failed row of "Reading" leaves the first 10 History rows
+  after about 4 days, and the smoke check of a `check` run then fails `demo history demo4@example.com`.
+- **A failed run** leaves the hosted demo as the step it failed at says ("Read the result"); a failure before
+  `5.2 Delete the database` leaves the previous day's data. The next day's run, or a run by hand, recovers it.
+- **A refresh by hand.** Run the workflow with `mode` `refresh` (see the table above). Do this after a failed
+  or missing scheduled run, or when the demo must be current now. It waits for a running scheduled refresh.
+- **Check the schedule when you review the demo.** On the workflow's page in the Actions tab, filter by event
+  `schedule`: the last scheduled run should be from today or yesterday.
+- **GitHub's 60-day rule.** GitHub turns off the scheduled workflows of a public repository after 60 days with
+  no repository activity. For the schedule to last until 2027-01-31, the repository needs activity on or after
+  2026-12-02. A turned off workflow comes back only by hand: **Enable workflow** on its page in the Actions tab,
+  or `gh workflow enable deploy-demo.yml`. A push alone does not turn it on again. Until then, a refresh by hand
+  keeps the demo current.
 
 ## Read the result
 
@@ -143,6 +175,7 @@ PASS administrator
 PASS demo demo1@example.com (<found> of <expected>)
 PASS demo demo2@example.com (<found> of <expected>)
 PASS demo demo3@example.com (<found> of <expected>)
+PASS demo history demo4@example.com (11 of 11)
 TIMING first <ms> ms, later <ms> ms (<n> requests)
 RESULT PASS
 ```
@@ -151,10 +184,16 @@ A failing check reads `FAIL <name>: <reason>`. `first <ms> ms (retried)` means t
 the visitor Home; `later n/a` means no demo account signed in. Exit code 1 means a check failed, 2 a broken
 invocation. The lines never contain a password, the administrator email or a habit name.
 
+`demo history demo4@example.com` (slice 5) checks demo4's 3 goal names on Goals and 8 texts in the History cards
+of two of its goals. Its reasons name a goal page only by its number (1 "Reading", 3 "Yoga"), never by a name,
+a note, an amount or a path (`specs/003-demo-hosting/contracts/smoke-check.md`). After a late or missing daily
+refresh it is the first check to fail (see "The daily refresh").
+
 ## Read the operator log
 
-The operator log is the web app's console output: administrator creation, demo loading and faults. It needs
-an Azure sign-in, and it contains the administrator email, so never paste it into a public place.
+The operator log is the web app's console output: administrator creation, demo loading, demo history loading
+(`Demo history loading: …`, `Demo account demo4@example.com: …`, `Demo goals …`, `Demo records …`) and faults. It
+needs an Azure sign-in, and it contains the administrator email, so never paste it into a public place.
 
 - Live: `az webapp log tail --name <app> --resource-group <rg>`, or the portal's Log stream.
 - Stored, 30 days: the web app's Kudu site `https://<app>.scm.azurewebsites.net`, folder `LogFiles` (or its
@@ -227,6 +266,14 @@ After a change under `tools/hosting/`, run `pwsh -NoProfile -File tools/hosting/
 `PASSED`. It runs offline and calls neither Azure nor GitHub.
 
 ## Teardown after 2027-01-31
+
+First remove the daily refresh: delete the `schedule:` trigger (its `cron: '20 0 * * *'` entry) from
+`.github/workflows/deploy-demo.yml` through a PR to `master`, or at least turn the workflow off with **Disable
+workflow** on its page in the Actions tab (`gh workflow disable deploy-demo.yml`). Scheduled runs after
+2027-01-31 already end in **Gate** without touching Azure, but they would keep appearing in the run history,
+and after the teardown nothing is left to refresh.
+
+Then delete the Azure resources:
 
 ```powershell
 pwsh -NoProfile -File tools/hosting/teardown.ps1 -Subscription <id or name> -ResourceGroup <rg> `

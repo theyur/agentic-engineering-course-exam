@@ -336,7 +336,9 @@ a demo refresh, and sign in to that account again with the original demo passwor
   hosted demo unavailable or incomplete until the next successful one.
 - **HP-018**: A restart of the hosted app that is not a deployment or demo refresh, such as waking up after
   idling, MUST NOT end any session. Sessions still end as slice 1 defines (HP-004 browser close without "Keep
-  me signed in", HP-006 sign-out, HP-007 password change) and at every deployment or refresh.
+  me signed in", HP-006 sign-out, HP-007 password change) and at every deployment or refresh. Note (slice 5,
+  ADR 0018): the hosting workflow's daily schedule also starts a refresh until 2027-01-31, so sessions end at
+  least once a day.
 
 ### Key Entities
 
@@ -353,7 +355,8 @@ a demo refresh, and sign in to that account again with the original demo passwor
   are the only secret values.
 - **Demo refresh**: bringing the hosted demo's data back to the state of a freshly deployed empty database;
   happens as part of every deployment, and on its own, without a new commit, whenever the Operator starts a
-  refresh; it has a result like a deployment (HP-017).
+  refresh; it has a result like a deployment (HP-017). Note (slice 5, ADR 0018): a refresh is also started
+  once a day, shortly after midnight UTC, by the hosting workflow's schedule until 2027-01-31.
 - **Operator log**: the hosted app's log of startup tasks and faults, readable only by the Operator.
 
 ## Success Criteria *(mandatory)*
@@ -373,7 +376,8 @@ a demo refresh, and sign in to that account again with the original demo passwor
   account with the demo password and finds every shipped slice's demo data, and finds the full seed catalog.
 - **SC-006**: The smoke check passes (it reaches the hosted demo and finds what SC-005 checks) on 2026-12-14
   and on each weekly check from the first deployment until 2027-01-31, apart from the minutes of an
-  Operator-started deployment or refresh.
+  Operator-started deployment or refresh. Note (slice 5, ADR 0018): the minutes of the daily scheduled
+  refresh are excluded too.
 - **SC-007**: The monthly hosting cost stays at or under USD 25, the budget of ADR 0015.
 - **SC-008**: The hosted demo, with every slice shipped by then, is reachable before the exam on 2026-11-23.
 

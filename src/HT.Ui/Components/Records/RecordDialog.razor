@@ -1,0 +1,354 @@
+@using System.Globalization
+@using HT.Application.Accounts
+@using HT.Application.Records
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Domain.Records
+@using EntryProgress = HT.Domain.Evaluation.Progress
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@* design/components/RecordDialog and RecordForms, slice 5 state (HP-002, contracts/host.md "Dialogs"). The title
+   "Record · {goal name}" and the target in the sub line; then "For", in one of three modes:
+   - opened from the goal page's "Record": a select of what can be recorded now (FR-011), newest first, and for a week a
+     second select "Date" of that week's dates up to the goal's current date, newest first; focus moves to "For";
+   - opened from a History row's "Add record" (Row): "For" fixed to that row and shown as text, and for a week the "Date"
+     select of its dates up to the goal's current date; focus moves to the first field ("Date" for a week, otherwise the
+     value);
+   - "Edit" of one record (Row and Editing): "For" fixed to the record's date, the value filled, and "Delete record";
+     focus moves to the value.
+   Then the field of the goal's measurement with the live progress line and bar, the partial-progress sentence or the
+   Reduce help; "Note (optional)", empty, whose help says that an empty field keeps the existing note; "Save record" and
+   "Cancel", and no "Excuse instead" (slice 7). Every text comes from RecordingText and DateTexts, and the live progress
+   is RecordPreview's (in "Edit" with that record as the one replaced), so the dialog counts and evaluates nothing
+   itself; "N h left" is formatted at the instant the use case read the clock, so it reads no clock. The result's
+   message sits under the field it is about, one at a time: a value refusal under the field, "note too long" under the
+   note, any other under "For". Esc and × close the dialog and focus returns to the opener. "Save record" calls
+   RecordAsync (or ChangeRecordAsync in "Edit"), and "Delete record" DeleteRecordAsync, each in a scope of its own, and
+   raises OnSaved with the entry after the write. *@
+<HtDialog Open="Open" OnClose="OnClose" ReturnFocus="ReturnFocus" FocusOnOpen="FocusFirstFieldAsync" FocusOnClose="FocusOnClose">
+    <Title>@RecordingText.Title(GoalName)</Title>
+    <Subtitle>@RecordingText.TargetLine(Recordable)</Subtitle>
+    <ChildContent>
+        @if (_entry is { } entry)
+        {
+            @if (Editing is { } editing)
+            {
+                @FixedFor(DateTexts.ShortDate(editing.Date))
+            }
+            else if (IsWeek(entry))
+            {
+                <div class="ht-field-pair">
+                    @if (Row is null)
+                    {
+                        @ForField(entry)
+                    }
+                    else
+                    {
+                        @FixedFor(RecordingText.EntryDate(entry))
+                    }
+                    <label class="ht-field">
+                        <span class="ht-field__label">Date</span>
+                        <select class="ht-input" @ref="_dateSelect" @onchange="ChooseDate">
+                            @foreach (var date in DatesOf(entry))
+                            {
+                                <option value="@Key(date)" selected="@(date == _date)">@DateTexts.ShortDate(date)</option>
+                            }
+                        </select>
+                    </label>
+                </div>
+            }
+            else if (Row is null)
+            {
+                @ForField(entry)
+            }
+            else
+            {
+                @FixedFor(RecordingText.EntryDate(entry))
+            }
+            <RecordFields @ref="_fields" Measurement="Recordable.Measurement" Label="@RecordingText.FieldLabel(Recordable)" Unit="@Recordable.CountUnit"
+                          Answer="_answer" AnswerChanged="v => _answer = v" Amount="_amount" AmountChanged="v => _amount = v"
+                          Error="@ErrorOf(RecordFieldKind.Value)">
+                @if (Preview(entry) is { } progress && RecordingText.Progress(Recordable, progress) is { } progressText)
+                {
+                    <div class="ht-target">
+                        <span class="ht-progress" aria-hidden="true"><span style="@Width(progress)"></span></span>@progressText
+                    </div>
+                }
+                @if (RecordingText.PartialNote(Recordable) is { } partial)
+                {
+                    <span class="ht-field__help">@partial</span>
+                }
+                @if (RecordingText.ReduceHelp(Recordable) is { } reduceHelp)
+                {
+                    <span class="ht-field__help">@reduceHelp</span>
+                }
+            </RecordFields>
+            <TextArea Id="@NoteId" Label="Note" Optional="true" Placeholder="What happened? Only you can see notes."
+                      Help="An empty field keeps the existing note." Error="@ErrorOf(RecordFieldKind.Note)"
+                      Value="@_note" ValueChanged="v => _note = v" />
+        }
+    </ChildContent>
+    <Footer>
+        <HtButton @onclick="SaveAsync" disabled="@_saving">Save record</HtButton>
+        <HtButton Variant="HtButton.ButtonVariant.Secondary" @onclick="() => OnClose.InvokeAsync()">Cancel</HtButton>
+        @if (Editing is not null)
+        {
+            <span class="ht-spacer"></span>
+            <HtButton Variant="HtButton.ButtonVariant.Ghost" @onclick="DeleteAsync" disabled="@_saving">Delete record</HtButton>
+        }
+    </Footer>
+</HtDialog>
+
+@code {
+    private readonly string _id = $"record-dialog-{Guid.NewGuid():N}";
+    private ElementReference _forSelect;
+    private ElementReference _dateSelect;
+    private RecordFields? _fields;
+    private HistoryEntry? _entry;
+    private DateOnly _date;
+    private YesNoAnswer? _answer;
+    private int? _amount;
+    private string? _note;
+    private string? _error;
+    private RecordFieldKind _errorField;
+    private bool _saving;
+    private bool _wasOpen;
+
+    /// <summary>Whether the dialog is shown; the page owns this value.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Esc, × or Cancel: the page should close the dialog.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>The button that opened the dialog; it gets the focus back when the dialog closes.</summary>
+    [Parameter]
+    public ElementReference? ReturnFocus { get; set; }
+
+    /// <summary>
+    /// Gives the focus back when the dialog closes, in place of <see cref="ReturnFocus"/>: for a History row, whose
+    /// button the closing render may have replaced.
+    /// </summary>
+    [Parameter]
+    public Func<ValueTask>? FocusOnClose { get; set; }
+
+    /// <summary>The goal recorded for.</summary>
+    [Parameter, EditorRequired]
+    public GoalId GoalId { get; set; }
+
+    /// <summary>The goal's name, for the title.</summary>
+    [Parameter, EditorRequired]
+    public string GoalName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The goal's settings and current date, and for the page head's "Record" what can be recorded now
+    /// (GetRecordableAsync): at least one entry, newest first. Opened from a History row, the history the row came from
+    /// (GetHistoryAsync); its entries are not listed then.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public GoalHistory Recordable { get; set; } = default!;
+
+    /// <summary>The History row the dialog was opened from; null when it was opened from the page head's "Record".</summary>
+    [Parameter]
+    public HistoryEntry? Row { get; set; }
+
+    /// <summary>The record of <see cref="Row"/> that "Edit" opened; null for a new record.</summary>
+    [Parameter]
+    public RecordView? Editing { get; set; }
+
+    /// <summary>The acting user the page read.</summary>
+    [Parameter, EditorRequired]
+    public ActingUser ActingUser { get; set; } = ActingUser.Anonymous;
+
+    /// <summary>A record was saved or deleted: the entry as it is after the write.</summary>
+    [Parameter]
+    public EventCallback<HistoryEntry> OnSaved { get; set; }
+
+    private string NoteId => _id + "-note";
+
+    private string ForErrorId => _id + "-for-error";
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !_wasOpen)
+        {
+            Reset(Row ?? (Recordable.Entries.Count > 0 ? Recordable.Entries[0] : null));
+        }
+
+        _wasOpen = Open;
+    }
+
+    private RenderFragment ForField(HistoryEntry entry) =>
+        @<label class="ht-field">
+            <span class="ht-field__label">For</span>
+            <select class="ht-input" @ref="_forSelect" @onchange="ChooseEntry"
+                    aria-describedby="@(ErrorOf(RecordFieldKind.For) is null ? null : ForErrorId)"
+                    aria-invalid="@(ErrorOf(RecordFieldKind.For) is null ? null : "true")">
+                @foreach (var option in Recordable.Entries)
+                {
+                    <option value="@Key(option.FirstDate)" selected="@(option.FirstDate == entry.FirstDate)">@ForLabel(option)</option>
+                }
+            </select>
+            @ForError
+        </label>;
+
+    /// <summary>"For" fixed to a row or a record, shown as text (design/components/RecordDialog.md, "For").</summary>
+    private RenderFragment FixedFor(string text) =>
+        @<div class="ht-field">
+            <span class="ht-field__label">For</span>
+            <span>@text</span>
+            @ForError
+        </div>;
+
+    private RenderFragment ForError =>
+        @<text>
+            @if (ErrorOf(RecordFieldKind.For) is { } error)
+            {
+                <span class="ht-field__error" id="@ForErrorId">@error</span>
+            }
+        </text>;
+
+    private void Reset(HistoryEntry? entry)
+    {
+        _entry = entry;
+        _date = Editing?.Date ?? (entry is null ? default : DatesOf(entry)[0]);
+        _answer = Editing?.Answer;
+        _amount = Editing?.Amount;
+        _note = null;
+        _error = null;
+        _saving = false;
+    }
+
+    private string ForLabel(HistoryEntry entry) =>
+        RecordingText.ForLabel(entry, Recordable.CurrentDate ?? entry.LastDate, Recordable.ReadAt);
+
+    private static bool IsWeek(HistoryEntry entry) => entry.FirstDate != entry.LastDate;
+
+    /// <summary>The dates a record can take: a week's dates up to the goal's current date, newest first; or the one date.</summary>
+    private List<DateOnly> DatesOf(HistoryEntry entry)
+    {
+        var last = Recordable.CurrentDate is { } current && current < entry.LastDate ? current : entry.LastDate;
+        var dates = new List<DateOnly>();
+        for (var date = last; date >= entry.FirstDate; date = date.AddDays(-1))
+        {
+            dates.Add(date);
+        }
+
+        return dates;
+    }
+
+    private EntryProgress Preview(HistoryEntry entry) => RecordPreview.Progress(Recordable, entry, Editing?.Id, _answer, _amount);
+
+    private static string Width(EntryProgress progress) =>
+        "width:" + RecordingText.ProgressFill(progress).ToString(CultureInfo.InvariantCulture) + "%";
+
+    private static string Key(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private static DateOnly? Parse(object? value) =>
+        DateOnly.TryParseExact(value?.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null;
+
+    private void ChooseEntry(ChangeEventArgs e)
+    {
+        if (Parse(e.Value) is { } key && Recordable.Entries.FirstOrDefault(entry => entry.FirstDate == key) is { } chosen)
+        {
+            _entry = chosen;
+            _date = DatesOf(chosen)[0];
+            _error = null;
+        }
+    }
+
+    private void ChooseDate(ChangeEventArgs e)
+    {
+        if (Parse(e.Value) is { } date)
+        {
+            _date = date;
+        }
+    }
+
+    private string? ErrorOf(RecordFieldKind field) => _error is not null && _errorField == field ? _error : null;
+
+    /// <summary>"For" from the page head; from a row the first field: a week's "Date", otherwise the value.</summary>
+    private ValueTask FocusFirstFieldAsync()
+    {
+        if (Row is null)
+        {
+            return _forSelect.FocusAsync();
+        }
+
+        if (Editing is null && _entry is { } entry && IsWeek(entry))
+        {
+            return _dateSelect.FocusAsync();
+        }
+
+        return _fields?.FocusAsync() ?? ValueTask.CompletedTask;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_entry is null || _saving)
+        {
+            return;
+        }
+
+        var input = new RecordInput { Answer = _answer, Amount = _amount, Note = _note };
+        if (Editing is { } editing)
+        {
+            var record = editing.Id;
+            await WriteAsync((service, token) => service.ChangeRecordAsync(ActingUser, GoalId, record, input, token));
+        }
+        else
+        {
+            var date = _date;
+            await WriteAsync((service, token) => service.RecordAsync(ActingUser, GoalId, date, input, token));
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (Editing is not { } editing || _saving)
+        {
+            return;
+        }
+
+        var record = editing.Id;
+        await WriteAsync((service, token) => service.DeleteRecordAsync(ActingUser, GoalId, record, token));
+    }
+
+    private async Task WriteAsync(Func<RecordingService, CancellationToken, Task<RecordWriteResult>> write)
+    {
+        _saving = true;
+        try
+        {
+            var result = await UseCases.RunAsync(write, CancellationToken.None);
+            if (result.Entry is { } saved)
+            {
+                _error = null;
+                await OnSaved.InvokeAsync(saved);
+                return;
+            }
+
+            _error = result.Message;
+            _errorField = FieldOf(result.Outcome);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    /// <summary>Which field a refusal is about: the value, the note, or else "For" (the date, the limit, the record).</summary>
+    private static RecordFieldKind FieldOf(RecordWriteOutcome outcome) => outcome switch
+    {
+        RecordWriteOutcome.AnswerMissing or RecordWriteOutcome.CountOutOfRange or RecordWriteOutcome.DurationOutOfRange => RecordFieldKind.Value,
+        RecordWriteOutcome.NoteTooLong => RecordFieldKind.Note,
+        _ => RecordFieldKind.For,
+    };
+
+    private enum RecordFieldKind
+    {
+        For,
+        Value,
+        Note,
+    }
+}

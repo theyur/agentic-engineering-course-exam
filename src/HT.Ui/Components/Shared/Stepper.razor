@@ -1,9 +1,10 @@
 @* design/components/Stepper: a native number input between − and + buttons ("Less", "More"), and the unit after
-   it in ht-unit. The bounds come from the caller: a Build target from 1, a Reduce target from 0, up to 999. *@
+   it in ht-unit. The bounds come from the caller: a Build target from 1, a Reduce target from 0, up to 999. A dialog
+   whose first field it is can move the focus to the number (FocusAsync). *@
 <span class="ht-inline">
     <span class="ht-stepper">
         <button type="button" aria-label="Less" @onclick="LessAsync">−</button>
-        <input type="number" id="@Id" min="@Min" max="@Max" step="@Step" value="@Value" aria-label="@Label"
+        <input type="number" id="@Id" @ref="_input" min="@Min" max="@Max" step="@Step" value="@Value" aria-label="@Label"
                aria-describedby="@DescribedBy" aria-invalid="@(Invalid ? "true" : null)" @onchange="OnChangeAsync" />
         <button type="button" aria-label="More" @onclick="MoreAsync">+</button>
     </span>
@@ -14,6 +15,8 @@
 </span>
 
 @code {
+    private ElementReference _input;
+
     [Parameter]
     public string? Id { get; set; }
 
@@ -46,6 +49,9 @@
 
     [Parameter]
     public bool Invalid { get; set; }
+
+    /// <summary>Moves the focus to the number, for a dialog whose first field it is.</summary>
+    public ValueTask FocusAsync() => _input.FocusAsync();
 
     private Task LessAsync() => ValueChanged.InvokeAsync(Math.Clamp((Value ?? Min) - Step, Min, Max));
 

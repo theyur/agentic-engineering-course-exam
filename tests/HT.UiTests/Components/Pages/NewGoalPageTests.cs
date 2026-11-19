@@ -190,7 +190,11 @@ public sealed class NewGoalPageTests : BunitContext
         Assert.Equal(["Create goal", "Cancel"], cut.FindAll(".ht-form-actions .ht-btn").Select(b => b.TextContent));
         Assert.Equal("submit", cut.Find(".ht-form-actions button").GetAttribute("type"));
         Assert.Contains("ht-btn--secondary", cut.Find(".ht-form-actions a").ClassList);
-        Assert.DoesNotContain("partial", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        var measure = cut.Find("#new-goal-measure").ParentElement!;
+        Assert.Equal(
+            "You can record partial amounts; the target decides the result.",
+            measure.QuerySelector(".ht-form-section__help")!.TextContent);
+        Assert.Equal("ht-form-section__help", cut.Find("#new-goal-measure").NextElementSibling!.ClassName);
         Assert.DoesNotContain("excuse", cut.Markup, StringComparison.OrdinalIgnoreCase);
 
         Assert.Equal("Reading: at least 15 min, 5 days a week, starting Tue 17 Nov.", Sentence(cut));

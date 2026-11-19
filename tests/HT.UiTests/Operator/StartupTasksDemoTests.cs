@@ -1,5 +1,8 @@
 using HT.Application.Operator;
+using HT.Domain.Accounts;
 using HT.UiTests.Fakes;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace HT.UiTests.Operator;
@@ -8,15 +11,30 @@ namespace HT.UiTests.Operator;
 /// Slice 1 HP-021: demo loading runs at every start, right after administrator creation, and never logs the password.
 /// Slice 2 HP-017: its custom-habit and catalog results are logged too, never with a custom-habit name. Slice 4
 /// HP-013: the catalog line comes first, and each created account's goal line follows its custom-habit line; no line
-/// holds a goal, habit or account name.
+/// holds a goal, habit or account name. Slice 5 HP-007, research R-09: demo history loading runs right after demo
+/// loading, whose lines stay exactly as they are; its lines for <c>demo4@example.com</c> follow them, and none holds a
+/// goal, habit, note, unit or amount (HP-006).
 /// </summary>
 [Collection(StartupTasksCollection.Name)]
 public sealed class StartupTasksDemoTests
 {
     private const string DemoPassword = "startup-demo-7";
     private const string AdministratorLine = "Administrator creation:";
+    private const string Demo4 = "demo4@example.com";
 
     private static readonly string[] Emails = ["demo1@example.com", "demo2@example.com", "demo3@example.com"];
+
+    /// <summary>Demo loading's lines of a first start, exactly as slice 4 logs them.</summary>
+    private static readonly string[] DemoLoadingCreatedLines =
+    [
+        "Demo catalog: seed catalog loaded",
+        .. Emails.SelectMany(email => new[]
+        {
+            $"Demo account {email}: created",
+            $"Demo custom habits {email}: demo custom habits added",
+            $"Demo goals {email}: demo goals added",
+        }),
+    ];
 
     [Fact]
     public async Task A_demo_password_logs_created_for_each_demo_email_after_administrator_creation()
@@ -24,16 +42,14 @@ public sealed class StartupTasksDemoTests
         var log = await StartupTasksHarness.RunAsync("Development", Configured(DemoPassword));
 
         // Slice 4 HP-013: the catalog line once, first; then each account line, its custom-habit line and its goal line.
+        // Slice 5 HP-007: then demo4's account line, its goal line and its record line; no custom-habit line.
         AssertDemoLines(
             log,
             [
-                "Demo catalog: seed catalog loaded",
-                .. Emails.SelectMany(email => new[]
-                {
-                    $"Demo account {email}: created",
-                    $"Demo custom habits {email}: demo custom habits added",
-                    $"Demo goals {email}: demo goals added",
-                }),
+                .. DemoLoadingCreatedLines,
+                $"Demo account {Demo4}: created",
+                $"Demo goals {Demo4}: demo goals added",
+                $"Demo records {Demo4}: demo records added",
             ]);
     }
 
@@ -44,10 +60,25 @@ public sealed class StartupTasksDemoTests
 
         var log = await StartupTasksHarness.RunWithoutDropAsync("Development", Configured(DemoPassword));
 
-        // An existing account has no custom-habit line and no goal line; the catalog is not empty any more and comes first.
+        // An existing account has no custom-habit line, no goal line and no record line; the catalog is not empty any
+        // more and comes first; demo4's account line comes last.
         AssertDemoLines(
             log,
-            ["Demo catalog: catalog not empty", .. Emails.Select(email => $"Demo account {email}: already exists")]);
+            [
+                "Demo catalog: catalog not empty",
+                .. Emails.Select(email => $"Demo account {email}: already exists"),
+                $"Demo account {Demo4}: already exists",
+            ]);
+    }
+
+    [Fact]
+    public async Task Every_demo_records_line_holds_the_demo_email_and_the_result_text_only()
+    {
+        var log = await StartupTasksHarness.RunAsync("Development", Configured(DemoPassword));
+
+        var lines = log.Where(e => e.Message.StartsWith("Demo records ", StringComparison.Ordinal)).Select(e => e.Message).ToList();
+        Assert.Equal([$"Demo records {Demo4}: {OperatorTexts.DemoRecordsAdded}"], lines);
+        Assert.DoesNotContain(log, e => e.Message.StartsWith($"Demo custom habits {Demo4}", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -57,8 +88,11 @@ public sealed class StartupTasksDemoTests
         var second = await StartupTasksHarness.RunWithoutDropAsync("Development", Configured(DemoPassword));
 
         // "Reading" alone is left out: framework messages may contain the word; the goal names that hold it are in.
+        // Slice 5 (HP-006): demo history loading's goal names and the four demo notes of FR-030 too.
         var names = Emails.SelectMany(DemoCustomHabits.For).Select(h => h.Name.Value)
             .Concat(Emails.SelectMany(DemoGoals.DisplayNames))
+            .Concat(DemoHistory.GoalNames)
+            .Concat([DemoHistory.ReadingNote, "Away for the weekend.", "Birthday cake at work.", "Knee was sore."])
             .Concat(["Yoga", "Meditation", "Sugar", "Coffee", DemoAccounts.Demo1Name, "sweet", "cups"])
             .ToList();
 
@@ -72,7 +106,7 @@ public sealed class StartupTasksDemoTests
         var log = await StartupTasksHarness.RunAsync("Development", Configured(DemoPassword));
 
         var lines = log.Where(e => e.Message.StartsWith("Demo goals ", StringComparison.Ordinal)).Select(e => e.Message).ToList();
-        Assert.Equal([.. Emails.Select(email => $"Demo goals {email}: {OperatorTexts.DemoGoalsAdded}")], lines);
+        Assert.Equal([.. Emails.Append(Demo4).Select(email => $"Demo goals {email}: {OperatorTexts.DemoGoalsAdded}")], lines);
     }
 
     [Fact]
@@ -80,9 +114,12 @@ public sealed class StartupTasksDemoTests
     {
         var log = await StartupTasksHarness.RunAsync("Development", new Dictionary<string, string?>());
 
-        var line = Assert.Single(log, e => e.Message.StartsWith("Demo ", StringComparison.Ordinal));
-        Assert.Equal(LogLevel.Information, line.Level);
-        Assert.Equal("Demo loading: no demo password configured", line.Message);
+        // Demo loading's one line, then demo history loading's one line.
+        var lines = log.Where(e => e.Message.StartsWith("Demo ", StringComparison.Ordinal)).ToList();
+        Assert.Equal(
+            ["Demo loading: no demo password configured", "Demo history loading: no demo password configured"],
+            lines.Select(e => e.Message));
+        Assert.All(lines, line => Assert.Equal(LogLevel.Information, line.Level));
     }
 
     [Fact]
@@ -91,11 +128,14 @@ public sealed class StartupTasksDemoTests
         var log = await StartupTasksHarness.RunAsync("Development", Configured("startup-demo"));
 
         Assert.Contains(log, e => e.Message == "Demo loading: demo password does not meet the password rule");
+        Assert.Single(log, e => e.Message.StartsWith("Demo history loading", StringComparison.Ordinal));
+        Assert.Contains(log, e => e.Message == "Demo history loading: demo password does not meet the password rule");
         Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo account ", StringComparison.Ordinal));
         Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo custom habits ", StringComparison.Ordinal));
         Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo goals ", StringComparison.Ordinal));
+        Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo records ", StringComparison.Ordinal));
         Assert.DoesNotContain(log, e => e.Message.StartsWith("Demo catalog", StringComparison.Ordinal));
-        foreach (var email in Emails)
+        foreach (var email in Emails.Append(Demo4))
         {
             Assert.Equal(0, await Host.HostClient.CountUsersAsync(StartupTasksHarness.ConnectionString, email));
         }
@@ -131,18 +171,59 @@ public sealed class StartupTasksDemoTests
         Assert.Equal(LogLevel.Error, error.Level);
         Assert.NotNull(error.Exception);
         Assert.All(log, e => Assert.DoesNotContain(DemoPassword, e.Message + e.Exception, StringComparison.Ordinal));
+
+        // Slice 5 HP-007: demo history loading still runs, after it, and meets the same database.
+        var historyError = Assert.Single(log, e => e.Message == "Demo history loading failed; the app starts without it");
+        Assert.Equal(LogLevel.Error, historyError.Level);
+        Assert.True(IndexOf(log, error) < IndexOf(log, historyError));
     }
 
-    private static void AssertDemoLines(IReadOnlyList<LogEntry> log, IReadOnlyList<string> expected)
+    [Fact]
+    public async Task A_fault_in_demo_history_loading_is_logged_as_an_error_after_demo_loadings_lines_and_the_start_goes_on()
+    {
+        var log = await StartupTasksHarness.RunAsync(
+            "Development",
+            Configured(DemoPassword),
+            configure: services => services.Replace(ServiceDescriptor.Scoped<IDemoHistoryStore, FaultingDemoHistoryStore>()));
+
+        // Demo loading's lines are unchanged, and the fault's line is the last demo line: the start went on past it.
+        AssertDemoLines(log, DemoLoadingCreatedLines, allInformation: false);
+        var error = Assert.Single(log, e => e.Message == "Demo history loading failed; the app starts without it");
+        Assert.Equal(LogLevel.Error, error.Level);
+        Assert.IsType<InvalidOperationException>(error.Exception);
+        Assert.Equal(error, log.Last(e => e.Message.StartsWith("Demo ", StringComparison.Ordinal)));
+        Assert.DoesNotContain(log, e => e.Message.StartsWith($"Demo account {Demo4}", StringComparison.Ordinal));
+        Assert.All(log, e => Assert.DoesNotContain(DemoPassword, e.Message + e.Exception, StringComparison.Ordinal));
+        Assert.Equal(0, await Host.HostClient.CountUsersAsync(StartupTasksHarness.ConnectionString, Demo4));
+    }
+
+    private static int IndexOf(IReadOnlyList<LogEntry> log, LogEntry entry) =>
+        log.Select((e, i) => (e, i)).First(pair => ReferenceEquals(pair.e, entry)).i;
+
+    /// <summary>
+    /// The demo lines after administrator creation are <paramref name="expected"/>, in order, all at Information level;
+    /// with <paramref name="allInformation"/> false, they start with <paramref name="expected"/> and may go on with an
+    /// error line.
+    /// </summary>
+    private static void AssertDemoLines(IReadOnlyList<LogEntry> log, IReadOnlyList<string> expected, bool allInformation = true)
     {
         var messages = log.Select(e => e.Message).ToList();
         var administrator = messages.FindIndex(m => m.StartsWith(AdministratorLine, StringComparison.Ordinal));
         Assert.True(administrator >= 0, "No administrator creation line.");
 
         var demoLines = log.Skip(administrator + 1).Where(e => e.Message.StartsWith("Demo ", StringComparison.Ordinal)).ToList();
-        Assert.Equal(expected, demoLines.Select(e => e.Message));
-        Assert.All(demoLines, e => Assert.Equal(LogLevel.Information, e.Level));
+        var information = allInformation ? demoLines : [.. demoLines.Where(e => e.Level == LogLevel.Information)];
+        Assert.Equal(expected, information.Select(e => e.Message));
+        Assert.All(information, e => Assert.Equal(LogLevel.Information, e.Level));
         Assert.DoesNotContain(log.Take(administrator), e => e.Message.StartsWith("Demo ", StringComparison.Ordinal));
+    }
+
+    /// <summary>A demo history port that fails, as an unreachable or broken database would (ADR 0006: no mocking library).</summary>
+    private sealed class FaultingDemoHistoryStore : IDemoHistoryStore
+    {
+        public Task<CreateDemoAccountOutcome> CreateDemoHistoryAccountAsync(
+            Email email, string password, DemoAccountProfile profile, IReadOnlyList<DemoHistoryGoal> goals, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("The demo history store failed.");
     }
 
     private static Dictionary<string, string?> Configured(string demoPassword) => new()

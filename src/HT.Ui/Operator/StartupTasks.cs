@@ -48,6 +48,7 @@ internal static partial class StartupTasks
 
         await RunStepAsync("Administrator creation", logger, () => CreateAdministratorAsync(services, logger));
         await RunStepAsync("Demo loading", logger, () => LoadDemoDataAsync(services, logger));
+        await RunStepAsync("Demo history loading", logger, () => LoadDemoHistoryAsync(services, logger));
     }
 
     // HP-021, HP-017: at every start, right after administrator creation. The demo password is passed on and never logged.
@@ -84,6 +85,39 @@ internal static partial class StartupTasks
             if (account.Goals is { } goals)
             {
                 LogDemoGoals(logger, account.Email, goals.Message);
+            }
+        }
+    }
+
+    // HP-007: at every start, right after demo loading (ADR 0018). The demo password is passed on and never logged.
+    private static async Task LoadDemoHistoryAsync(IServiceProvider services, ILogger logger)
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+
+        await using var scope = services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<DemoHistoryService>()
+            .LoadAsync(configuration[DemoPasswordKey], CancellationToken.None);
+
+        if (result.Outcome != DemoHistoryLoadingOutcome.Loaded)
+        {
+            LogDemoHistoryLoading(logger, result.Message);
+            return;
+        }
+
+        // Slice 5 contracts/host.md: the account line, with demo loading's template, then for a created account its goal
+        // line and its record line; no custom-habit line. The results name the demo email and a result text only, never
+        // a goal, habit, note, unit or amount (HP-006).
+        foreach (var account in result.Accounts)
+        {
+            LogDemoAccount(logger, account.Email, account.Message);
+            if (account.Goals is { } goals)
+            {
+                LogDemoGoals(logger, account.Email, goals.Message);
+            }
+
+            if (account.Records is { } records)
+            {
+                LogDemoRecords(logger, account.Email, records.Message);
             }
         }
     }
@@ -147,6 +181,12 @@ internal static partial class StartupTasks
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Demo catalog: {Result}")]
     private static partial void LogDemoCatalog(ILogger logger, string result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo history loading: {Result}")]
+    private static partial void LogDemoHistoryLoading(ILogger logger, string? result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo records {Email}: {Result}")]
+    private static partial void LogDemoRecords(ILogger logger, string email, string result);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "{Step} failed; the app starts without it")]
     private static partial void LogStepFailed(ILogger logger, Exception exception, string step);

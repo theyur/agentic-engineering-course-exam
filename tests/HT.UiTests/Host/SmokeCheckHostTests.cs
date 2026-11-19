@@ -8,10 +8,10 @@ namespace HT.UiTests.Host;
 /// <summary>
 /// HP-017, SC-005 (research R-11): the smoke check in process against a real host on database <c>HT-UI-SMOKE</c>,
 /// reset before each case, with check 2 skipped (no HTTP front end). A freshly seeded host passes every check; a
-/// demo password that fails the password rule (no demo accounts, no seed catalog) fails <c>catalog</c> and every
-/// <c>demo</c> check; a demo account that lost a custom habit or a goal fails that account's check only. The output
-/// never contains a password, the administrator email, a demo custom-habit name, a demo goal name or demo1's account
-/// name (slice 4 HP-018).
+/// demo password that fails the password rule (no demo accounts, no seed catalog) fails <c>catalog</c>, every
+/// <c>demo</c> check and <c>demo history</c>; a demo account that lost a custom habit or a goal fails that account's check
+/// only. The output never contains a password, the administrator email, a demo custom-habit name, a demo goal name,
+/// demo1's account name (slice 4 HP-018), or demo4's goal names, notes and amounts (slice 5 HP-008).
 /// </summary>
 [Collection(DerivedDatabaseHostCollection.Name)]
 public sealed partial class SmokeCheckHostTests
@@ -33,13 +33,16 @@ public sealed partial class SmokeCheckHostTests
         Assert.All(result.CheckLines, line => Assert.True(
             line.StartsWith("PASS ", StringComparison.Ordinal) || line == "SKIP https-redirect", line));
         Assert.Equal(
-            ["home", "https-redirect", "catalog", "administrator", .. DemoDataService.DemoEmails.Select(e => "demo " + e)],
+            ["home", "https-redirect", "catalog", "administrator", .. DemoDataService.DemoEmails.Select(e => "demo " + e), "demo history " + DemoHistoryService.DemoEmail],
             result.CheckLines.Select(CheckName));
 
         // Slice 4 HP-018: each demo line counts its custom habits, its goal names and, for demo1, its account name.
         Assert.Equal("PASS demo demo1@example.com (5 of 5)", Line(result, "demo demo1@example.com"));
         Assert.Equal("PASS demo demo2@example.com (4 of 4)", Line(result, "demo demo2@example.com"));
         Assert.Equal("PASS demo demo3@example.com (5 of 5)", Line(result, "demo demo3@example.com"));
+
+        // Slice 5 HP-008, SC-005: demo4's 3 goal names, 6 texts on Reading's History card and 2 on Yoga's.
+        Assert.Equal("PASS demo history demo4@example.com (11 of 11)", Line(result, "demo history " + DemoHistoryService.DemoEmail));
         Assert.Matches(LaterTiming(), result.TimingLine);
         Assert.True(result.LaterRequests >= 1);
     }
@@ -66,6 +69,7 @@ public sealed partial class SmokeCheckHostTests
         Assert.Equal("PASS administrator", Line(result, "administrator"));
         Assert.All(DemoDataService.DemoEmails, email =>
             Assert.StartsWith($"FAIL demo {email}: ", Line(result, "demo " + email), StringComparison.Ordinal));
+        Assert.StartsWith("FAIL demo history demo4@example.com: ", Line(result, "demo history " + DemoHistoryService.DemoEmail), StringComparison.Ordinal);
         Assert.EndsWith(", later n/a", result.TimingLine, StringComparison.Ordinal);
     }
 
@@ -121,6 +125,16 @@ public sealed partial class SmokeCheckHostTests
             .. DemoDataService.DemoEmails.SelectMany(DemoCustomHabits.For).Select(h => h.Name.Value),
             .. DemoDataService.DemoEmails.SelectMany(DemoGoals.DisplayNames),
             DemoAccounts.Demo1Name,
+
+            // Slice 5 HP-008: demo4's goal names, the four demo notes of FR-030 and the amounts its History cards show.
+            .. DemoHistory.GoalNames,
+            "Fell asleep early.",
+            "Away for the weekend.",
+            "Birthday cake at work.",
+            "Knee was sore.",
+            "12 min",
+            "25 min",
+            "3 sweet",
         ];
         Assert.All(forbidden, value => Assert.DoesNotContain(value, text, StringComparison.OrdinalIgnoreCase));
         return (result, text);

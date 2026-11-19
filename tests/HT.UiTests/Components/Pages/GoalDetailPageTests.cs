@@ -1,19 +1,22 @@
 using Bunit;
 using Bunit.TestDoubles;
 using HT.Application.Goals;
+using HT.Application.Records;
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Time;
 using HT.Ui.Components.Pages;
 using HT.UnitTests.Fakes;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
 namespace HT.UiTests.Components.Pages;
 
 /// <summary>
-/// HP-004, US2-AS7, US7-AS8, FR-020: the goal page over the real GoalService and the fakes. Today is Tuesday 17 November
+/// HP-004, US2-AS7, US7-AS8, FR-020, and slice 5 HP-001 and US1-AS9: the goal page over the real GoalService,
+/// RecordingService and the fakes, with "Record" when something can be recorded now. Today is Tuesday 17 November
 /// 2026 in UTC, the zone of the signed-in user (no stored zone, the UTC default), as in the design's preview.
 /// </summary>
 public sealed class GoalDetailPageTests : BunitContext
@@ -27,6 +30,7 @@ public sealed class GoalDetailPageTests : BunitContext
     private readonly FakeCatalogHabitStore _catalog;
     private readonly FakeCustomHabitStore _customHabits;
     private readonly FakeGoalStore _goals;
+    private readonly FakeRecordStore _records;
     private int _notFound;
 
     public GoalDetailPageTests()
@@ -35,6 +39,7 @@ public sealed class GoalDetailPageTests : BunitContext
         _catalog = this.AddCatalog();
         _customHabits = this.AddCustomHabits();
         _goals = this.AddGoals();
+        _records = (FakeRecordStore)Services.GetRequiredService<IRecordStore>();
         ((FakeTimeProvider)Services.GetRequiredService<TimeProvider>()).SetUtcNow(new DateTimeOffset(2026, 11, 17, 10, 0, 0, TimeSpan.Zero));
         Services.GetRequiredService<BunitNavigationManager>().OnNotFound += (_, _) => _notFound++;
     }
@@ -57,6 +62,12 @@ public sealed class GoalDetailPageTests : BunitContext
 
     private static List<(string Label, string Value)> Rows(IRenderedComponent<GoalDetail> cut) =>
         cut.FindAll("dl.ht-kv dt").Zip(cut.FindAll("dl.ht-kv dd"), (dt, dd) => (Text(dt), Text(dd))).ToList();
+
+    private static GoalTargetFields Reading20MinDaily => new()
+    {
+        BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 20, DurationUnit = DurationUnit.Minutes,
+        ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+    };
 
     private static GoalTargetFields YesNoOnMonWedFri => new()
     {
@@ -85,16 +96,21 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Equal("Yoga, 3 days a week", cut.Find(".ht-page-head h1").TextContent);
         Assert.Equal(["Body", "Build", "Commitment-based"], cut.FindAll(".ht-head-tags .ht-chip").Select(c => c.TextContent));
         Assert.Equal("Attempt 1 · started 14 Jul", cut.Find(".ht-head-tags .ht-attempt").TextContent);
-        Assert.Equal("Settings", cut.Find(".ht-grid-2 .ht-card .ht-card__title").TextContent);
+        // Slice 5 (T055): the History card in the left column, the Settings card in the right one.
+        Assert.Equal(
+            ["History", "Settings"],
+            cut.FindAll(".ht-grid-2 > .ht-stack").Select(column => column.QuerySelector(".ht-card .ht-card__title")!.TextContent));
         Assert.Equal(
             [
                 ("Habit", "Yoga · catalog"), ("Build or reduce", "Build"), ("Measure", "Yes / no"), ("Target", "3 days a week"),
                 ("Schedule", "Mon · Wed · Fri"), ("Evaluated", "Each scheduled day"), ("Started", "14 Jul 2026"),
             ],
             Rows(cut));
-        Assert.Equal(Sentence, cut.Find(".ht-card .ht-card__sub").TextContent);
+        Assert.Equal(Sentence, cut.Find(".ht-grid-2 > .ht-stack:last-child .ht-card .ht-card__sub").TextContent);
         Assert.Empty(cut.FindAll(".ht-notice"));
-        foreach (var absent in new[] { "Edit settings", "Pause", "End goal", "Record", "Consistency", "streak", "History", "Notes", "Earlier attempts" })
+        // Tuesday 17 November is not scheduled, but Monday 16 is Pending: "Record" is the page head's one action (HP-001).
+        Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        foreach (var absent in new[] { "Edit settings", "Pause", "End goal", "Consistency", "streak", "Earlier attempts", "Excuse" })
         {
             Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
         }
@@ -123,6 +139,184 @@ public sealed class GoalDetailPageTests : BunitContext
             Rows(cut));
         Assert.Equal(Sentence, cut.Find(".ht-card__sub").TextContent);
         Assert.Empty(cut.FindAll(".ht-notice"));
+        Assert.Empty(cut.FindAll(".ht-page-head button"));
+        Assert.DoesNotContain(">Record<", cut.Markup, StringComparison.Ordinal);
+        // Slice 5 (T055): no current date, so no History card; the Settings card stands alone in ht-grid-2.
+        Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Single(cut.FindAll(".ht-grid-2 > section.ht-card"));
+        Assert.Empty(cut.FindAll(".ht-grid-2 > .ht-stack"));
+    }
+
+    [Fact]
+    public async Task HP_001_a_goal_with_a_Due_commitment_has_the_primary_action_Record_and_no_other_action()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, Today);
+
+        var cut = RenderGoal(id);
+
+        var actions = cut.FindAll(".ht-page-head button");
+        var record = Assert.Single(actions);
+        Assert.Equal("Record", record.TextContent);
+        Assert.Equal(["ht-btn", "ht-btn--primary"], record.ClassList.ToArray());
+        Assert.Equal("dialog", record.GetAttribute("aria-haspopup"));
+        Assert.Equal("ht-spacer", record.PreviousElementSibling!.ClassName);
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+    }
+
+    [Fact]
+    public async Task HP_001_a_per_week_goal_in_its_first_partial_week_has_no_Record()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        // Tuesday 17 November: the first week starts on Monday 23, so nothing can be recorded yet.
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), new GoalTargetFields
+        {
+            BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.YesNo, ScheduleKind = ScheduleKind.Times, Times = 3, Period = SchedulePeriod.Week,
+        }, Today);
+
+        var cut = RenderGoal(id);
+
+        Assert.Equal("Attempt 1 · started 17 Nov", cut.Find(".ht-attempt").TextContent);
+        Assert.Empty(cut.FindAll(".ht-page-head button"));
+        // T055: a current date but no begun entry, so no History card; the Settings card stands alone in ht-grid-2.
+        Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Empty(cut.FindAll(".ht-grid-2 > .ht-stack"));
+    }
+
+    [Fact]
+    public async Task US1_AS9_Record_opens_the_RecordDialog_and_a_save_records_today_and_closes_it()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, Today);
+        var cut = RenderGoal(id);
+        Assert.Equal("—", Text(cut.Find("table[aria-label=History] tbody tr").QuerySelectorAll("td")[1]));
+
+        cut.Find(".ht-page-head button").Click();
+
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Equal("Record · Reading, 20 min daily", dialog.QuerySelector("h2")!.TextContent);
+        Assert.Equal("Build · at least 20 min · every day", dialog.QuerySelector(".ht-dialog__sub")!.TextContent);
+        Assert.Equal(["Today, Tue 17 Nov"], dialog.QuerySelectorAll("select option").Select(o => o.TextContent));
+        Assert.Equal("Time spent", dialog.QuerySelector(".ht-stepper input")!.GetAttribute("aria-label"));
+
+        cut.Find(".ht-stepper input").Change("12");
+        Assert.Equal("12 of 20 min", Text(cut.Find(".ht-target")));
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        var record = Assert.Single(_records.RecordsOfGoal(id));
+        Assert.Equal((Today, 12), (record.Date, record.Value.Amount!.Value));
+        Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        // T055: after a save the history is read again.
+        var row = Assert.Single(cut.FindAll("table[aria-label=History] tbody tr"));
+        Assert.Equal(["Tue 17 Nov", "12 min", "Due today"], row.QuerySelectorAll("td").Take(3).Select(Text));
+    }
+
+    [Fact]
+    public async Task US3_a_Missed_rows_Add_record_and_then_Edit_open_the_RecordDialog_for_that_row_and_give_the_focus_back_to_it()
+    {
+        // Reading, 20 min daily, from Tuesday 10 November in UTC; at 10:00 on Tuesday 17 November Saturday 14's grace
+        // period ended at 00:00 that day, so it is Missed.
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 10);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        var cut = RenderGoal(goal.Id);
+        AngleSharp.Dom.IElement Row() =>
+            cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov");
+        Assert.Equal(["Sat 14 Nov", "—", "Missed"], Row().QuerySelectorAll("td").Take(3).Select(Text));
+        var button = Row().QuerySelector("td.ht-actions > button")!;
+        // The row keeps its one action button, so the focus goes back to the same element after each save.
+        var buttonId = button.GetAttribute("blazor:elementReference");
+        Assert.False(string.IsNullOrEmpty(buttonId));
+        Assert.Equal("Add record for Sat 14 Nov", button.GetAttribute("aria-label"));
+
+        await button.ClickAsync(new MouseEventArgs());
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Equal("Sat 14 Nov", Text(dialog.QuerySelector(".ht-field > span:not(.ht-field__label)")!));
+        Assert.Empty(dialog.QuerySelectorAll("select"));
+        cut.Find(".ht-stepper input").Change("20");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal(["Sat 14 Nov", "20 min", "Met"], Row().QuerySelectorAll("td").Take(3).Select(Text));
+        var edit = Row().QuerySelector("td.ht-actions > button")!;
+        Assert.Equal(("Edit", "Edit record of Sat 14 Nov"), (edit.TextContent, edit.GetAttribute("aria-label")));
+        var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
+        Assert.Equal(buttonId, focused[1]);
+
+        await edit.ClickAsync(new MouseEventArgs());
+        Assert.Equal("20", cut.Find(".ht-stepper input").GetAttribute("value"));
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[2].ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal(["Sat 14 Nov", "—", "Missed"], Row().QuerySelectorAll("td").Take(3).Select(Text));
+        Assert.Equal("Add record", Row().QuerySelector("td.ht-actions > button")!.TextContent);
+        Assert.Empty(_records.RecordsOfGoal(goal.Id));
+        var refocused = JSInterop.VerifyFocusAsyncInvoke(4).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
+        Assert.Equal(buttonId, refocused[3]);
+    }
+
+    [Fact]
+    public async Task US4_a_Missed_rows_Add_note_opens_the_NoteDialog_and_a_save_shows_the_note_in_the_row_and_in_Recent_notes()
+    {
+        // Reading, 20 min daily, from Tuesday 10 November in UTC; at 10:00 on Tuesday 17 November Saturday 14's grace
+        // period ended at 00:00 that day, so it is Missed.
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 10);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        var cut = RenderGoal(goal.Id);
+        AngleSharp.Dom.IElement NoteButton() =>
+            cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov")
+                .QuerySelectorAll("td")[3].QuerySelector("button")!;
+        // No note yet: no Recent notes card, and the right column holds the Settings card alone.
+        Assert.Equal(["History", "Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Equal(("Add note", "Add note for Sat 14 Nov"), (NoteButton().TextContent, NoteButton().GetAttribute("aria-label")));
+        // The row keeps its one Note button, so the focus goes back to the same element after the save.
+        var buttonId = NoteButton().GetAttribute("blazor:elementReference");
+        Assert.False(string.IsNullOrEmpty(buttonId));
+
+        await NoteButton().ClickAsync(new MouseEventArgs());
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Equal("Add note · Reading, 20 min daily", dialog.QuerySelector("h2")!.TextContent);
+        Assert.Equal("Sat 14 Nov · Missed", dialog.QuerySelector(".ht-dialog__sub")!.TextContent);
+        cut.Find("textarea").Input("Away for the weekend.");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal(
+            ("Away for the weekend.", "Away for the weekend., edit note of Sat 14 Nov"),
+            (NoteButton().TextContent, NoteButton().GetAttribute("aria-label")));
+        Assert.Equal("Missed", Text(cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov").QuerySelectorAll("td")[2]));
+        var right = cut.FindAll(".ht-grid-2 > .ht-stack")[1];
+        Assert.Equal(["Settings", "Recent notes"], right.QuerySelectorAll(".ht-card__title").Select(Text));
+        var item = Assert.Single(right.QuerySelectorAll("div.ht-goal"));
+        Assert.Equal(["\"Away for the weekend.\"", "Missed"], item.QuerySelectorAll("div.ht-goal__top > span:not(.ht-spacer)").Select(Text));
+        Assert.Equal("Sat 14 Nov", Text(item.QuerySelector("div.ht-goal__meta")!));
+        // Focus: the TextArea on open, then the row's Note button, now the note, on close.
+        var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
+        Assert.Equal(buttonId, focused[1]);
+
+        await NoteButton().ClickAsync(new MouseEventArgs());
+        Assert.Equal("Away for the weekend.", cut.Find("textarea").GetAttribute("value") ?? cut.Find("textarea").TextContent);
+        cut.Find("textarea").Input("   ");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("Add note", NoteButton().TextContent);
+        Assert.Equal(["History", "Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Empty(_records.NotesOfGoal(goal.Id));
     }
 
     [Fact]

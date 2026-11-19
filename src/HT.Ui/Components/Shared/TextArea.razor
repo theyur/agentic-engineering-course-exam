@@ -1,12 +1,13 @@
 @* design/components/TextArea: a labelled multi-line input (textarea.ht-input.ht-textarea) with its help or error
-   text under the field, as TextField has it. The error comes from the use case. *@
+   text under the field, as TextField has it. The error comes from the use case. A dialog moves the focus to it with
+   FocusAsync. *@
 <label class="ht-field">
     <span class="ht-field__label">@Label@(Optional ? " " : null)@if (Optional)
         {
             <span class="ht-muted">(optional)</span>
         }</span>
     <textarea id="@Id" class="ht-input ht-textarea" placeholder="@Placeholder" aria-describedby="@DescribedBy"
-              aria-invalid="@(Error is null ? null : "true")" @bind="CurrentValue" @bind:event="oninput"></textarea>
+              aria-invalid="@(Error is null ? null : "true")" @ref="_textarea" @bind="CurrentValue" @bind:event="oninput"></textarea>
     @if (Error is not null)
     {
         <span class="ht-field__error" id="@ErrorId">@Error</span>
@@ -18,6 +19,8 @@
 </label>
 
 @code {
+    private ElementReference _textarea;
+
     /// <summary>The textarea's id; the help and error texts get ids derived from it.</summary>
     [Parameter, EditorRequired]
     public string Id { get; set; } = string.Empty;
@@ -54,6 +57,9 @@
             ValueChanged.InvokeAsync(value);
         }
     }
+
+    /// <summary>Moves the focus to the textarea, for a dialog whose first field it is (design/components/Dialog).</summary>
+    public ValueTask FocusAsync() => _textarea.FocusAsync();
 
     private string HelpId => Id + "-help";
 

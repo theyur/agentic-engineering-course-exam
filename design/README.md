@@ -14,14 +14,14 @@ This folder is the single source of truth for the UI of `HT.Ui` (Blazor).
 
 All `.html` files open directly in a browser (they link `../css/*.css`). They are references with demo data, not production code.
 
-Many previews end with "Slice N state" blocks after the full design: what slice N builds of that page or component (ADR 0008). Build from the latest slice block that exists, and keep the full design as the target of later slices. [pages.md](pages.md) sums up each slice; slice 4 (goals) adds the states of New goal, Goals, the goal page, the signed-in catalog, the habit details, the custom habit page, Admin, the signed-in Home, Profile, Register, TopNav, MobileNav, HabitCard and GoalListItem.
+Many previews end with "Slice N state" blocks after the full design: what slice N builds of that page or component (ADR 0008). Build from the latest slice block that exists, and keep the full design as the target of later slices. [pages.md](pages.md) sums up each slice; slice 4 (goals) adds the states of New goal, Goals, the goal page, the signed-in catalog, the habit details, the custom habit page, Admin, the signed-in Home, Profile, Register, TopNav, MobileNav, HabitCard and GoalListItem; slice 5 (recording and evaluation) adds the states of the goal page (Record, History and Recent notes), RecordDialog, RecordForms, NoteDialog and StatusChip.
 
 ## Rules for implementation
 
 - Copy `css/tokens.css` and `css/ht-components.css` to `src/HT.Ui/wwwroot/css/` and link them in `App.razor` (tokens first). Remove the template Bootstrap leftovers from `app.css`.
 - Use only `var(--…)` tokens and `ht-` classes. No hard-coded colors, sizes or shadows; no Bootstrap; no new colors.
 - Build each component once as a Razor component (`HtButton`, `StatusChip`, `HabitCard`, `CommitmentRow`, `HtDialog`, …) that renders the markup from its preview, and reuse it.
-- Match page structure and wording of the page previews. Use the SPEC words exactly: Pending, Met, Failed, Missed, Excused, Paused; consistency as "90% (18 of 20)", "N/A" when there is no data.
+- Match page structure and wording of the page previews. Use the SPEC words exactly: Pending, Met, Failed, Missed, Excused, Paused (a Reduce goal's Met is "Met" too); consistency as "90% (18 of 20)", "N/A" when there is no data.
 - A status is never shown by color alone: always a word (StatusChip) or a shape (ConsistencyStrip).
 - A catalog habit's marked suggested starting goal is labelled "Suggested starting goal: …" on its HabitCard, never "Suggested start"; the detail page lists all of them under "Examples to adjust, not prescribed targets.".
 - Keep text contrast at least 4.5:1 and the 2px `--accent` focus ring on every focusable element.
@@ -41,7 +41,7 @@ Many previews end with "Slice N state" blocks after the full design: what slice 
 - `PageCatalogVisitor` — The catalog for visitors: search, a register Notice, FilterPanel on the left and a grid of HabitCards. ([notes](pages/PageCatalogVisitor.md), [preview](pages/PageCatalogVisitor.html))
 - `PageCommunity` — The full Community page: participation status, Consistency Bands with names, rules, and catalog habit performance. ([notes](pages/PageCommunity.md), [preview](pages/PageCommunity.html))
 - `PageCustomHabit` — Create or edit a private custom habit. ([notes](pages/PageCustomHabit.md), [preview](pages/PageCustomHabit.html))
-- `PageGoalDetail` — The goal page: everything about one attempt of one goal — stats, trend, history with corrections, settings, pauses, notes and earlier attempts. ([notes](pages/PageGoalDetail.md), [preview](pages/PageGoalDetail.html))
+- `PageGoalDetail` — The goal page: everything about one attempt of one goal — stats, trend, history with corrections, settings, pauses, notes and earlier attempts. Slice 4 builds the head and the Settings card; slice 5 adds "Record", the History card and the Recent notes card. ([notes](pages/PageGoalDetail.md), [preview](pages/PageGoalDetail.html))
 - `PageGoals` — The Goals list: Tabs Active · Paused · Ended, and one GoalListItem per goal. Built first in slice 4, without Tabs. ([notes](pages/PageGoals.md), [preview](pages/PageGoals.html))
 - `PageHabitDetail` — The catalog habit page, opened from "See details" / "Details" on a HabitCard. ([notes](pages/PageHabitDetail.md), [preview](pages/PageHabitDetail.html))
 - `PageHomeSignedIn` — The signed-in Home (Today): greeting, four StatTiles, the Today list and active goals. ([notes](pages/PageHomeSignedIn.md), [preview](pages/PageHomeSignedIn.html))
@@ -75,7 +75,7 @@ Many previews end with "Slice N state" blocks after the full design: what slice 
 - `Button` — Buttons start an action; one primary button per card or page area, for the thing that area is for. ([guide](components/Button.md), [preview](components/Button.html))
 
 **Status**
-- `StatusChip` — A status chip shows the evaluation state of one commitment or period, always as a word plus a coloured dot. ([guide](components/StatusChip.md), [preview](components/StatusChip.html))
+- `StatusChip` — A status chip shows the evaluation state of one commitment or period, always as a word plus a coloured dot. Slice 5 uses Met, Failed, Missed, Pending, Due today and Due this week. ([guide](components/StatusChip.md), [preview](components/StatusChip.html))
 - `Tag` — A tag is a small neutral label for categories, Build / Reduce intent and admin states. ([guide](components/Tag.md), [preview](components/Tag.html))
 
 **Tracking**
@@ -110,9 +110,9 @@ Many previews end with "Slice N state" blocks after the full design: what slice 
 - `Dialog` — A modal window for short tasks that belong to the current page: Record, Add note, Excuse, Pause, End goal. ([guide](components/Dialog.md), [preview](components/Dialog.html))
 - `EndGoalDialog` — Ends the current attempt of a goal and records its outcome. ([guide](components/EndGoalDialog.md), [preview](components/EndGoalDialog.html))
 - `FeedbackDialog` — Lets a signed-in user send feedback to the admins; opened from "Send feedback" in the Footer and the mobile menu. ([guide](components/FeedbackDialog.md), [preview](components/FeedbackDialog.html))
-- `NoteDialog` — A dialog to add or edit a private note on one commitment or period, for example to explain a Missed or partial result. ([guide](components/NoteDialog.md), [preview](components/NoteDialog.html))
+- `NoteDialog` — A dialog to add or edit a private note on one commitment or period, for example to explain a Missed or partial result. Built in slice 5, opened from the goal page's History rows. ([guide](components/NoteDialog.md), [preview](components/NoteDialog.html))
 - `PauseDialog` — Pauses a goal (commitment-based or period-based) for a date range. ([guide](components/PauseDialog.md), [preview](components/PauseDialog.html))
-- `RecordDialog` — The form to record what happened for one commitment or period; the field depends on the goal's measure. ([guide](components/RecordDialog.md), [preview](components/RecordDialog.html))
+- `RecordDialog` — The form to record what happened for one commitment or period; the field depends on the goal's measure. Built in slice 5, without "Excuse instead". ([guide](components/RecordDialog.md), [preview](components/RecordDialog.html))
 - `RecordForms` — The yes/no and count variants of RecordDialog, shown without the backdrop. ([guide](components/RecordForms.md), [preview](components/RecordForms.html))
 - `SuggestDialog` — Sends a custom habit to the admins as a catalog suggestion. ([guide](components/SuggestDialog.md), [preview](components/SuggestDialog.html))
 

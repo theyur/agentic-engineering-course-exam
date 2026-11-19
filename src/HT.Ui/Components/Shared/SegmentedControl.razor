@@ -1,15 +1,20 @@
 @typeparam TValue where TValue : struct
 @* design/components/SegmentedControl: 2-3 mutually exclusive options side by side, div.ht-seg[role=group] with
-   button[aria-pressed]; exactly one pressed, or none until the user chooses. *@
+   button[aria-pressed]; exactly one pressed, or none until the user chooses. A dialog whose first field it is can move
+   the focus to it (FocusAsync). *@
 <div class="ht-seg" role="group" aria-label="@Label" aria-describedby="@DescribedBy">
-    @foreach (var option in Options)
+    @for (var i = 0; i < Options.Count; i++)
     {
-        <button type="button" aria-pressed="@(Equals(option.Value, Value) ? "true" : "false")"
+        var index = i;
+        var option = Options[i];
+        <button type="button" aria-pressed="@(Equals(option.Value, Value) ? "true" : "false")" @ref="_buttons[index]"
                 @onclick="() => ValueChanged.InvokeAsync(option.Value)">@option.Label</button>
     }
 </div>
 
 @code {
+    private ElementReference[] _buttons = [];
+
     /// <summary>The options in order, each with its words.</summary>
     [Parameter, EditorRequired]
     public IReadOnlyList<(TValue Value, string Label)> Options { get; set; } = [];
@@ -28,4 +33,26 @@
     /// <summary>The id of an error text about this control.</summary>
     [Parameter]
     public string? DescribedBy { get; set; }
+
+    /// <summary>Moves the focus to the chosen option, or to the first one while none is chosen.</summary>
+    public ValueTask FocusAsync()
+    {
+        for (var i = 0; i < _buttons.Length && i < Options.Count; i++)
+        {
+            if (Equals(Options[i].Value, Value))
+            {
+                return _buttons[i].FocusAsync();
+            }
+        }
+
+        return _buttons.Length > 0 ? _buttons[0].FocusAsync() : ValueTask.CompletedTask;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (_buttons.Length != Options.Count)
+        {
+            _buttons = new ElementReference[Options.Count];
+        }
+    }
 }

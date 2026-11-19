@@ -45,6 +45,13 @@ public static class DateTexts
     /// <summary>A month and its year: "November 2026" ("member since", FR-030).</summary>
     public static string MonthYear(DateOnly date) => Months[date.Month - 1] + " " + Year(date);
 
+    /// <summary>
+    /// A week's dates, with an en dash between spaces (slice 5, a per-week entry): "10 – 16 Aug" within a month,
+    /// "28 Sep – 4 Oct" across a month end and "28 Dec – 3 Jan" across a year end. No year is written.
+    /// </summary>
+    public static string WeekRange(DateOnly first, DateOnly last) =>
+        (first.Year == last.Year && first.Month == last.Month ? Day(first) : DayMonth(first)) + " – " + DayMonth(last);
+
     private static string Day(DateOnly date) => date.Day.ToString(CultureInfo.InvariantCulture);
 
     private static string Year(DateOnly date) => date.Year.ToString("D4", CultureInfo.InvariantCulture);

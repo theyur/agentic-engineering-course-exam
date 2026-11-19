@@ -1,6 +1,6 @@
 namespace HT.Application.Operator;
 
-/// <summary>The texts of administrator creation and demo loading, worded as in the specs (ADR 0005).</summary>
+/// <summary>The texts of administrator creation, demo loading and demo history loading, worded as in the specs (ADR 0005).</summary>
 public static class OperatorTexts
 {
     public const string AdministratorNotConfigured = "no administrator configured";
@@ -17,4 +17,5 @@ public static class OperatorTexts
     public const string CatalogNotEmpty = "catalog not empty";
     public const string DemoCustomHabitsAdded = "demo custom habits added";
     public const string DemoGoalsAdded = "demo goals added";
+    public const string DemoRecordsAdded = "demo records added";
 }

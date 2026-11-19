@@ -47,15 +47,26 @@ public sealed class ApplicationDependencyTests
     }
 
     [Fact]
-    public void OnlyTheGoalTypesTheThreeHabitServicesAndTheProfileServiceMayDependOnTheGoalStorePort()
+    public void OnlyTheOperatorTypesOfApplicationMayDependOnTheDemoHistoryStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Application)
+            .And().DoNotResideInNamespaceMatching(@"^HT\.Application\.Operator(\..*)?$")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IDemoHistoryStore)))
+            .Because("the demo history port writes private records and notes without an acting user; only demo history loading may use it (ADR 0013, slice 5 research R-13)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
+    public void OnlyTheGoalTypesTheThreeHabitServicesTheProfileServiceAndTheRecordingServiceMayDependOnTheGoalStorePort()
     {
         // Nested types (async state machines, closures) belong to their service, so the names allow a nested suffix.
         Types().That().ResideInAssembly(ArchitectureModel.Application)
             .And().DoNotResideInNamespaceMatching(@"^HT\.Application\.Goals(\..*)?$")
             .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Habits\.(CatalogService|CatalogAdministrationService|CustomHabitService)([+/].*)?$")
             .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Accounts\.ProfileService([+/].*)?$")
+            .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Records\.RecordingService([+/].*)?$")
             .Should().NotDependOnAny(Types(true).That().Are(typeof(IGoalStore)))
-            .Because("goals are private and reached only through owner-scoped use cases; the habit services need counts and the delete rule, the profile service the time-zone change (constitution III, slice 4 research R-13)")
+            .Because("goals are private and reached only through owner-scoped use cases; the habit services need counts and the delete rule, the profile service the time-zone change, the recording service the owner's goal (constitution III, slice 4 research R-13, slice 5 research R-13)")
             .Check(ArchitectureModel.Architecture);
     }
 

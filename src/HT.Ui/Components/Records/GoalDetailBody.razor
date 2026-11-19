@@ -1,0 +1,205 @@
+@rendermode InteractiveServer
+@using System.Globalization
+@using HT.Application.Accounts
+@using HT.Application.Goals
+@using HT.Application.Records
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Ui.Account
+@using HT.Ui.Components.Goals
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageGoalDetail, slice 5 state (HP-001, research R-12, contracts/host.md "Goal page"): the interactive
+   part of the goal page, prerendered, with the goal identifier as its only parameter. Slice 4's head ("← Goals", the
+   name, the tags and the attempt line), with the primary action "Record" when something can be recorded now (FR-011)
+   and no other action; slice 4's Notice for a habit no longer in the catalog; then the page's two columns: the History
+   card on the left and the Settings card, then the Recent notes card (US4), on the right. The history is read after
+   what can be recorded now, from 365 days before that result's current date D to D. A goal with no current date, or
+   with no begun entry, shows no History card and has the design's layout for that case: the Settings card alone in
+   ht-grid-2. A goal with no current date shows no "Record". "Record" opens the RecordDialog with what can be recorded
+   now; a History row's "Add record", "Edit" or record button opens it for that row or record, with the history's
+   settings (US3, HP-001). A History row's "Add note" or note opens the NoteDialog for that row (US4, HP-003). The recent
+   notes are read after the history, and only for a goal with a current date. After a save or a delete, what can be
+   recorded, the history and the recent notes are read again before the dialog closes, so the closing render already
+   has the new rows and notes, and the focus goes back to the head's "Record" or to the row's control as the card now
+   shows it. Every use case runs in its own scope. *@
+@if (_goal is { } goal)
+{
+    <BackLink Href="/goals" Text="Goals" />
+    <div class="ht-page-head ht-detail-head">
+        <div>
+            <h1>@goal.Name</h1>
+            <div class="ht-inline ht-head-tags">
+                <Tag Text="@goal.Habit.Category.ToString()" />
+                <Tag Text="@goal.BuildOrReduce.ToString()" />
+                <Tag Text="@(goal.GoalScheduleKind == GoalScheduleKind.CommitmentBased ? "Commitment-based" : "Period-based")" />
+                <span class="ht-attempt">@AttemptLine(goal)</span>
+            </div>
+        </div>
+        @if (CanRecord)
+        {
+            <span class="ht-spacer"></span>
+            <button type="button" class="ht-btn ht-btn--primary" aria-haspopup="dialog" @ref="_recordButton" @onclick="OpenRecord">Record</button>
+        }
+    </div>
+    @if (goal.Habit.IsInCatalog == false)
+    {
+        <Notice Neutral="true">This habit is no longer in the public catalog. Your goal keeps working.</Notice>
+    }
+    @if (HistoryCard.HasRows(_history))
+    {
+        <div class="ht-grid-2">
+            <div class="ht-stack">
+                <HistoryCard @ref="_historyCard" History="_history!" OnAction="OpenRow" OnNote="OpenNote" />
+            </div>
+            <div class="ht-stack">
+                <GoalSettingsCard Details="goal" />
+                <RecentNotesCard Notes="_recentNotes" ScheduleKind="_history!.GoalScheduleKind" Period="_history.Period" />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="ht-grid-2">
+            <GoalSettingsCard Details="goal" />
+        </div>
+    }
+    @if (DialogHistory is { } dialogHistory)
+    {
+        <RecordDialog Open="_recordOpen" OnClose="CloseRecord" ReturnFocus="_recordButton" FocusOnClose="@(_row is null ? null : FocusRowAsync)"
+                      GoalId="goal.Id" GoalName="@goal.Name" Recordable="dialogHistory" Row="_row" Editing="_editing"
+                      ActingUser="_actingUser" OnSaved="SavedAsync" />
+    }
+    @if (_noteRow is { } noteRow && _history is { } history)
+    {
+        <NoteDialog Open="_noteOpen" OnClose="CloseNote" FocusOnClose="FocusNoteRowAsync" GoalId="goal.Id" GoalName="@goal.Name"
+                    History="history" Row="noteRow" ActingUser="_actingUser" OnSaved="NoteSavedAsync" />
+    }
+}
+
+@code {
+    /// <summary>How many days, up to the goal's current date, the History card covers (HP-001).</summary>
+    private const int HistoryDays = 366;
+
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private GoalDetails? _goal;
+    private GoalHistory? _recordable;
+    private GoalHistory? _history;
+    private bool _recordOpen;
+    private ElementReference _recordButton;
+    private HistoryCard? _historyCard;
+    private IReadOnlyList<RecentNote> _recentNotes = [];
+    private bool _noteOpen;
+
+    /// <summary>The History row the NoteDialog was opened for; kept after it closes, so the focus can go back to it.</summary>
+    private HistoryEntry? _noteRow;
+
+    /// <summary>The History row the RecordDialog was opened from; null when "Record" opened it.</summary>
+    private HistoryEntry? _row;
+
+    /// <summary>The record of <see cref="_row"/> that "Edit" opened; null for "Add record" and for "Record".</summary>
+    private RecordView? _editing;
+
+    /// <summary>The goal's identifier; the page shell has already found it among the acting user's goals.</summary>
+    [Parameter]
+    public Guid Id { get; set; }
+
+    /// <summary>"Record" is offered only when something can be recorded now (FR-011, HP-002).</summary>
+    private bool CanRecord => _recordable is { Entries.Count: > 0 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _actingUser = await ActingUsers.GetAsync();
+        var read = await UseCases.RunAsync<GoalService, GoalReadResult>(
+            (service, token) => service.GetAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        if (read.Goal is not { } goal)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        _goal = goal;
+        await ReadRecordsAsync();
+    }
+
+    /// <summary>
+    /// What can be recorded now, then, with its current date D, the history of D − 365 to D (366 days; research R-12),
+    /// then the recent notes (FR-008). A goal with no current date has no history and no notes to show.
+    /// </summary>
+    private async Task ReadRecordsAsync()
+    {
+        var recordable = await UseCases.RunAsync<RecordingService, RecordableResult>(
+            (service, token) => service.GetRecordableAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        _recordable = recordable.History;
+        if (_recordable?.CurrentDate is not { } current)
+        {
+            _history = null;
+            _recentNotes = [];
+            return;
+        }
+
+        var history = await UseCases.RunAsync<RecordingService, HistoryResult>(
+            (service, token) => service.GetHistoryAsync(_actingUser, new GoalId(Id), current.AddDays(-HistoryDays + 1), current, token),
+            CancellationToken.None);
+        _history = history.History;
+        var notes = await UseCases.RunAsync<RecordingService, RecentNotesResult>(
+            (service, token) => service.GetRecentNotesAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        _recentNotes = notes.Notes;
+    }
+
+    /// <summary>
+    /// The settings and entries the RecordDialog works with: what can be recorded now when "Record" opened it, the
+    /// history when a History row did; none while neither is there to open it.
+    /// </summary>
+    private GoalHistory? DialogHistory => _row is null ? (CanRecord ? _recordable : null) : _history;
+
+    private void OpenRecord()
+    {
+        _row = null;
+        _editing = null;
+        _recordOpen = true;
+    }
+
+    private void OpenRow(HistoryCard.RowAction action)
+    {
+        _row = action.Entry;
+        _editing = action.Record;
+        _recordOpen = true;
+    }
+
+    private void CloseRecord() => _recordOpen = false;
+
+    /// <summary>Reads again first, so the render that closes the dialog has the new rows to give the focus back to.</summary>
+    private async Task SavedAsync(HistoryEntry entry)
+    {
+        await ReadRecordsAsync();
+        _recordOpen = false;
+    }
+
+    private void OpenNote(HistoryEntry row)
+    {
+        _noteRow = row;
+        _noteOpen = true;
+    }
+
+    private void CloseNote() => _noteOpen = false;
+
+    /// <summary>Reads again first, so the render that closes the dialog has the row's new note and the new Recent notes.</summary>
+    private async Task NoteSavedAsync(HistoryEntry entry)
+    {
+        await ReadRecordsAsync();
+        _noteOpen = false;
+    }
+
+    private ValueTask FocusNoteRowAsync() =>
+        _noteRow is { } row && _historyCard is { } card ? card.FocusNoteAsync(row.FirstDate) : ValueTask.CompletedTask;
+
+    private ValueTask FocusRowAsync() =>
+        _row is { } row && _historyCard is { } card ? card.FocusAsync(row.FirstDate, _editing?.Id) : ValueTask.CompletedTask;
+
+    /// <summary>"Attempt 1 · started 14 Jul" once the goal has started, "Attempt 1 · starts 23 Nov" before (slice 4 HP-004).</summary>
+    private static string AttemptLine(GoalDetails goal) =>
+        "Attempt " + goal.AttemptNumber.ToString(CultureInfo.InvariantCulture) + " · " + (goal.HasStarted ? "started " : "starts ") + DateTexts.DayMonth(goal.AttemptStartDate);
+}

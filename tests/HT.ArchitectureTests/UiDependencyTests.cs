@@ -3,6 +3,7 @@ using HT.Application.Accounts;
 using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Application.Operator;
+using HT.Application.Records;
 using Xunit;
 
 using static ArchUnitNET.Fluent.ArchRuleDefinition;
@@ -73,6 +74,15 @@ public sealed class UiDependencyTests
     }
 
     [Fact]
+    public void NoUiTypeMayDependOnTheRecordStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IRecordStore)))
+            .Because("records and notes are private; pages reach them only through RecordingService, which scopes every call to the acting user and the goal (constitution III, slice 5 research R-13)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
     public void NoUiTypeMayDependOnTheDemoDataStorePort()
     {
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
@@ -82,12 +92,21 @@ public sealed class UiDependencyTests
     }
 
     [Fact]
+    public void NoUiTypeMayDependOnTheDemoHistoryStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IDemoHistoryStore)))
+            .Because("the port writes private demo records and notes without an acting user; the host reaches it only through DemoHistoryService (ADR 0010, ADR 0013, slice 5 research R-13)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
     public void OnlyTheHostsOperatorTypesMayDependOnTheOperatorServices()
     {
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
             .And().DoNotResideInNamespaceMatching(@"^HT\.Ui\.Operator(\..*)?$")
-            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService), typeof(DemoDataService)))
-            .Because("no page offers administrator creation or demo loading; only the startup tasks run them (FR-014, FR-016, research R-13)")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService), typeof(DemoDataService), typeof(DemoHistoryService)))
+            .Because("no page offers administrator creation, demo loading or demo history loading; only the startup tasks run them (FR-014, FR-016, research R-13, slice 5 research R-13)")
             .Check(ArchitectureModel.Architecture);
     }
 }

@@ -55,7 +55,7 @@ Every page follows layout A: TopNav, a page head, content centered at `container
 4. Catalog habit performance table: band and contributors, or "Insufficient community data" below 5 contributors.
 
 ## Dialogs (on Today and Goal detail)
-- RecordDialog: "For" (today or a Pending date), the measure field (Yes/No, count Stepper, minutes Stepper with progress), optional note, Save record / Cancel, "Excuse instead" for commitment-based goals.
+- RecordDialog: "For" (every Due and every Pending commitment or period), the measure field (Yes/No, count Stepper, minutes Stepper with progress), optional note, Save record / Cancel, "Excuse instead" for commitment-based goals.
 - NoteDialog: a private note on one date; it does not change the result.
 - Excuse, Pause and End goal use the same Dialog and explain the effect before the confirm button.
 
@@ -138,3 +138,18 @@ What slice 4 builds of the pages above, on top of slices 1 and 2. A page shows o
 - Home, visitor (`PageHomeVisitor`): unchanged.
 - Profile (`PageProfile`): the header with the name, the email and "member since November 2026" (each only when known); the Account tab adds the "Name" form ("Your name is changed.") and the "Time zone" form ("Your time zone is changed. Your goals use it from their next day or week; earlier days keep their time zone.").
 - Register (`PageRegister`): the optional "Name" field, and the browser's time zone sent in a hidden input, with no visible field.
+
+## Slice 5 (recording and evaluation)
+
+What slice 5 builds of the pages and dialogs above, on top of slices 1, 2 and 4. A page shows only the sections and links whose slice has shipped (ADR 0008); the full previews stay as they are, and each preview's "Slice 5 state" block shows the built state. Texts that disagreed with the spec were replaced in the full previews too: a Reduce goal's Met is "Met", with no word of its own (the Reduce row of the Today card on the signed-in Home and in CommitmentRow, a day still running, says "Due today"), the RecordDialog's Reduce rule is no longer provisional, and its "For" rule is FR-011's (every Due and every Pending commitment or period).
+
+- Goal page (`PageGoalDetail`, `/goals/{id}`):
+  1. Slice 4's "← Goals", name, tags, attempt line and Notice, with the primary action "Record" on the right of the page head (absent when nothing can be recorded now). No Edit settings, Pause or End goal.
+  2. Left column: the History card. Its head has the title "History" and the muted sentence "Corrections are evaluated with the rules of that date.". Then a DataTable with Date, Recorded, Result (StatusChip), Note and an actions column: the commitments or periods that have begun in the last 366 days up to the goal's current date, newest first, the first 10, then "Show all N →". Rows: "Add record" on a commitment without a record, "Edit" on one with a record, "Add record" on a period with fewer than 50 records, each period record as its own button, and "Add note" or the note as a button; final rows included.
+  3. Right column: slice 4's Settings card, then the Recent notes card (at most 5, newest first, each with its date and StatusChip; absent without notes).
+  4. No "Record", History card or Recent notes card while the goal has no begun entry. No GoalStats, strip, trend, pauses or earlier attempts.
+- RecordDialog (`components/RecordDialog`, `RecordForms`): the title "Record · {goal name}"; the sub line with Build or Reduce and the target; "For" with every Due and every Pending entry ("Today, Fri 30 Oct", "Wed 28 Oct · Pending, 22 h left", a week as "26 Oct – 1 Nov" with a "Date" select of its dates), or fixed to the History row it was opened from; the field "Did you do it?", "Amount" or "Time spent"; the live progress line; the partial-progress sentence (Build count and duration goals) or the Reduce help; "Note (optional)", empty, with "An empty field keeps the existing note."; "Save record" and "Cancel"; "Edit" of one record adds "Delete record". No "Excuse instead".
+- NoteDialog (`components/NoteDialog`): opened from a History row's "Add note" or its note; the title "Add note · {goal name}", the sub line with the date and the state ("Tue 27 Oct · Missed"), the help "Notes are private. They do not change the result.", "Save note" and "Cancel"; saving it empty removes the note.
+- StatusChip (`components/StatusChip`): "Met", "Failed", "Missed", "Pending", "Due today" (a commitment or a day) and "Due this week" (a week), always with their word. No Upcoming chip, Excused or Paused.
+- New goal (`PageNewGoal`): "How do you measure it?" gains its help line "You can record partial amounts; the target decides the result.".
+- Home, signed in (`PageHomeSignedIn`), Goals (`PageGoals`) and the other pages: unchanged in slice 5.
