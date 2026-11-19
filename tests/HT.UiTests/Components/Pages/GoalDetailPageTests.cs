@@ -265,6 +265,61 @@ public sealed class GoalDetailPageTests : BunitContext
     }
 
     [Fact]
+    public async Task US4_a_Missed_rows_Add_note_opens_the_NoteDialog_and_a_save_shows_the_note_in_the_row_and_in_Recent_notes()
+    {
+        // Reading, 20 min daily, from Tuesday 10 November in UTC; at 10:00 on Tuesday 17 November Saturday 14's grace
+        // period ended at 00:00 that day, so it is Missed.
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 10);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        var cut = RenderGoal(goal.Id);
+        AngleSharp.Dom.IElement NoteButton() =>
+            cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov")
+                .QuerySelectorAll("td")[3].QuerySelector("button")!;
+        // No note yet: no Recent notes card, and the right column holds the Settings card alone.
+        Assert.Equal(["History", "Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Equal(("Add note", "Add note for Sat 14 Nov"), (NoteButton().TextContent, NoteButton().GetAttribute("aria-label")));
+        // The row keeps its one Note button, so the focus goes back to the same element after the save.
+        var buttonId = NoteButton().GetAttribute("blazor:elementReference");
+        Assert.False(string.IsNullOrEmpty(buttonId));
+
+        await NoteButton().ClickAsync(new MouseEventArgs());
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Equal("Add note · Reading, 20 min daily", dialog.QuerySelector("h2")!.TextContent);
+        Assert.Equal("Sat 14 Nov · Missed", dialog.QuerySelector(".ht-dialog__sub")!.TextContent);
+        cut.Find("textarea").Input("Away for the weekend.");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal(
+            ("Away for the weekend.", "Away for the weekend., edit note of Sat 14 Nov"),
+            (NoteButton().TextContent, NoteButton().GetAttribute("aria-label")));
+        Assert.Equal("Missed", Text(cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov").QuerySelectorAll("td")[2]));
+        var right = cut.FindAll(".ht-grid-2 > .ht-stack")[1];
+        Assert.Equal(["Settings", "Recent notes"], right.QuerySelectorAll(".ht-card__title").Select(Text));
+        var item = Assert.Single(right.QuerySelectorAll("div.ht-goal"));
+        Assert.Equal(["\"Away for the weekend.\"", "Missed"], item.QuerySelectorAll("div.ht-goal__top > span:not(.ht-spacer)").Select(Text));
+        Assert.Equal("Sat 14 Nov", Text(item.QuerySelector("div.ht-goal__meta")!));
+        // Focus: the TextArea on open, then the row's Note button, now the note, on close.
+        var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
+        Assert.Equal(buttonId, focused[1]);
+
+        await NoteButton().ClickAsync(new MouseEventArgs());
+        Assert.Equal("Away for the weekend.", cut.Find("textarea").GetAttribute("value") ?? cut.Find("textarea").TextContent);
+        cut.Find("textarea").Input("   ");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("Add note", NoteButton().TextContent);
+        Assert.Equal(["History", "Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Empty(_records.NotesOfGoal(goal.Id));
+    }
+
+    [Fact]
     public async Task US7_AS8_a_goal_on_an_Unpublished_habit_shows_the_Notice_under_the_head()
     {
         var user = SignInUser();

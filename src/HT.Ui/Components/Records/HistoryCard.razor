@@ -9,12 +9,13 @@
    empty-headed actions column. The rows are the history's begun entries (Upcoming ones are not listed), newest first:
    the first 10, then "Show all N →", which shows the rest in place. Date and Recorded come from RecordingText (a
    commitment's record as text; a period's records side by side, ht-inline, each a button that opens "Edit" of that
-   record; "—" without a record), Result is the StatusChip, and Note is the note's text (its actions come with notes,
-   US4). The row actions, whatever the row's state, final included: "Add record" on a commitment without a record,
-   "Edit" on one with a record, and "Add record" on a period with fewer than 50 records. Every row control is a ghost
-   small button with aria-haspopup="dialog" and an accessible name that starts with its visible text and names its row.
-   The card raises OnAction; the page opens the RecordDialog and, when it closes, gives the focus back through
-   FocusAsync. With no begun entry the card is not rendered. *@
+   record; "—" without a record), Result is the StatusChip, and Note is the ghost button "Add note" without a note, or
+   the note itself as a ghost button (US4, HP-003). The row actions, whatever the row's state, final included: "Add
+   record" on a commitment without a record, "Edit" on one with a record, and "Add record" on a period with fewer than 50
+   records. Every row control is a ghost small button with aria-haspopup="dialog" and an accessible name that starts
+   with its visible text and names its row. The card raises OnAction for a record and OnNote for a note; the page opens
+   the RecordDialog or the NoteDialog and, when it closes, gives the focus back through FocusAsync or FocusNoteAsync.
+   With no begun entry the card is not rendered. *@
 @if (_rows.Count > 0)
 {
     <section class="ht-card">
@@ -54,7 +55,12 @@
                         }
                     </td>
                     <td><StatusChip State="entry.State" ScheduleKind="History.GoalScheduleKind" Period="History.Period" /></td>
-                    <td>@entry.Note</td>
+                    <td>
+                        <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog"
+                                aria-label="@(entry.Note is { } note ? note + ", edit note of " + date : AddNote + " for " + date)"
+                                @ref="_noteButtons[entry.FirstDate]"
+                                @onclick="() => OnNote.InvokeAsync(entry)">@(entry.Note ?? AddNote)</button>
+                    </td>
                     <td class="ht-actions">
                         @if (IsCommitment)
                         {
@@ -90,10 +96,13 @@
 
     private const string AddRecord = "Add record";
 
+    private const string AddNote = "Add note";
+
     private static readonly IReadOnlyList<string> Columns = ["Date", "Recorded", "Result", "Note", string.Empty];
 
     private readonly Dictionary<DateOnly, ElementReference> _actionButtons = [];
     private readonly Dictionary<RecordId, ElementReference> _recordButtons = [];
+    private readonly Dictionary<DateOnly, ElementReference> _noteButtons = [];
     private List<HistoryEntry> _rows = [];
     private bool _expanded;
 
@@ -104,6 +113,10 @@
     /// <summary>A row action or a period's record was chosen: the row, and the record for "Edit" (null for "Add record").</summary>
     [Parameter]
     public EventCallback<RowAction> OnAction { get; set; }
+
+    /// <summary>A row's "Add note" or note was chosen: the row whose note the NoteDialog opens for.</summary>
+    [Parameter]
+    public EventCallback<HistoryEntry> OnNote { get; set; }
 
     /// <summary>Whether the card is rendered for <paramref name="history"/>: it has at least one begun entry.</summary>
     public static bool HasRows(GoalHistory? history) => history is not null && RowsOf(history).Any();
@@ -129,6 +142,15 @@
             ? action.FocusAsync()
             : ValueTask.CompletedTask;
     }
+
+    /// <summary>
+    /// Gives the focus back to the Note cell's button of <paramref name="row"/>, as the card shows it now ("Add note" or
+    /// the note, which a save may have swapped); nothing when the row is not shown (constitution IV).
+    /// </summary>
+    public ValueTask FocusNoteAsync(DateOnly row) =>
+        ShownRows.Any(entry => entry.FirstDate == row) && _noteButtons.TryGetValue(row, out var button)
+            ? button.FocusAsync()
+            : ValueTask.CompletedTask;
 
     protected override void OnParametersSet() => _rows = RowsOf(History).ToList();
 

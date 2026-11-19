@@ -24,6 +24,9 @@ public sealed class RecordingService
     /// </summary>
     private const int RecordableWindowDays = 9;
 
+    /// <summary>How many notes the recent notes give at most (FR-008).</summary>
+    private const int RecentNotesCount = 5;
+
     private readonly IRecordStore _records;
     private readonly IGoalStore _goals;
     private readonly IAccountStore _accounts;
@@ -211,6 +214,93 @@ public sealed class RecordingService
     }
 
     /// <summary>
+    /// Saves the note of the entry of <paramref name="date"/> on its own, for one of the acting user's goals (FR-007),
+    /// checking in contracts/application-api.md's order: access; the date belongs to a commitment or period of the goal
+    /// (<see cref="NoteSaveOutcome.NothingScheduled"/>); its day has begun (<see cref="NoteSaveOutcome.DayNotBegun"/>);
+    /// then the note (<see cref="NoteSaveOutcome.NoteTooLong"/>). Any begun date of a week names that week. A note with
+    /// text adds or replaces the entry's note, and one that is empty after trimming removes it, whatever the entry's
+    /// state, final included. The note never changes the state. <see cref="NoteSaveOutcome.Saved"/> carries the entry
+    /// after the write.
+    /// </summary>
+    public async Task<NoteSaveResult> SaveNoteAsync(
+        ActingUser actingUser, GoalId goal, DateOnly date, string? note, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await CheckAccessAsync(actingUser, goal, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return NoteSaveResult.Refused(NoteOutcomeOf(refusal), access.Message!);
+        }
+
+        var now = _clock.GetUtcNow();
+        var found = access.Goal!;
+        if (GoalTimeline.EntryOf(found, date) is not { } entry)
+        {
+            return NoteSaveResult.Refused(NoteSaveOutcome.NothingScheduled, RecordTexts.NothingScheduled);
+        }
+
+        if (!GoalTimeline.HasBegun(found, date, now))
+        {
+            return NoteSaveResult.Refused(NoteSaveOutcome.DayNotBegun, RecordTexts.DayNotBegun);
+        }
+
+        if (!NoteText.TryCreate(note, out var text, out _))
+        {
+            return NoteSaveResult.Refused(NoteSaveOutcome.NoteTooLong, RecordTexts.NoteTooLong);
+        }
+
+        var write = await _records.SaveNoteAsync(access.Owner, goal, SpanOf(entry), text, cancellationToken).ConfigureAwait(false);
+        switch (write.Outcome)
+        {
+            case RecordStoreWriteOutcome.Written:
+                return NoteSaveResult.Saved(EntryView(found, entry, write.Entry!.Records, write.Entry.Note, now));
+            case RecordStoreWriteOutcome.GoalNotFound:
+                // The goal was removed between the lookup and the write.
+                return NoteSaveResult.Refused(NoteSaveOutcome.NotFound, GoalTexts.NotFound);
+            default:
+                throw new InvalidOperationException("The record store gave an outcome that saving a note does not have.");
+        }
+    }
+
+    /// <summary>
+    /// The recent notes of one of the acting user's goals (FR-008; research R-04): the notes of the
+    /// <see cref="RecentNotesCount"/> entries with the latest first dates (a per-week period: its Monday), newest first,
+    /// each with its entry's first and last date, the note and the entry's state at the supplied time. The store gives the
+    /// latest note keys; then one read per key, over that entry's dates only, gives its records and note, so the call
+    /// makes at most 6 store reads and none spans the dates between two notes. A note removed between the two reads is
+    /// left out.
+    /// </summary>
+    public async Task<RecentNotesResult> GetRecentNotesAsync(ActingUser actingUser, GoalId goal, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await CheckAccessAsync(actingUser, goal, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return RecentNotesResult.Refused(RecentNotesOutcomeOf(refusal), access.Message!);
+        }
+
+        var now = _clock.GetUtcNow();
+        var found = access.Goal!;
+        var keys = await _records.ReadRecentNoteKeysAsync(access.Owner, goal, RecentNotesCount, cancellationToken).ConfigureAwait(false);
+        var notes = new List<RecentNote>(keys.Count);
+        foreach (var key in keys)
+        {
+            var entry = NoteEntryOf(found, key);
+            var stored = await _records.ReadAsync(access.Owner, goal, entry.FirstDate, entry.LastDate, cancellationToken)
+                .ConfigureAwait(false);
+            if (stored.Notes.GetValueOrDefault(entry.Key) is not { } note)
+            {
+                continue;
+            }
+
+            var view = EntryView(found, entry, RecordsIn(stored, entry), note, now);
+            notes.Add(new RecentNote { FirstDate = view.FirstDate, LastDate = view.LastDate, Note = note.Value, State = view.State });
+        }
+
+        return RecentNotesResult.Found(notes);
+    }
+
+    /// <summary>
     /// The history of one of the acting user's goals from <paramref name="first"/> to <paramref name="last"/>, both
     /// included (FR-009, FR-010, FR-014; research R-07): every commitment or period of the goal's evaluation calendar in
     /// the range, in date order, each as <c>EntryView</c> gives it at the supplied time. The range is checked after the
@@ -374,6 +464,15 @@ public sealed class RecordingService
         GoalTimeline.EntryOf(goal, date)
         ?? throw new InvalidOperationException("A stored record's date belongs to no commitment or period of its goal.");
 
+    /// <summary>
+    /// The entry of a stored note's key (the commitment's date, the day, or the week's Monday). A note is stored only under
+    /// an entry's key, and while versions differ only in their time zone that key stays one (FR-015); the message names no
+    /// date.
+    /// </summary>
+    private static CalendarEntry NoteEntryOf(Goal goal, DateOnly key) =>
+        GoalTimeline.EntryOf(goal, key)
+        ?? throw new InvalidOperationException("A stored note's key belongs to no commitment or period of its goal.");
+
     /// <summary>The entry as the record store sees it: its note key and its first and last date (research R-05).</summary>
     private static EntrySpan SpanOf(CalendarEntry entry) => new(entry.Key, entry.FirstDate, entry.LastDate);
 
@@ -404,6 +503,20 @@ public sealed class RecordingService
         AccessRefusal.NotSignedIn => HistoryOutcome.NotSignedIn,
         AccessRefusal.NotForAdministrators => HistoryOutcome.NotForAdministrators,
         _ => HistoryOutcome.NotFound,
+    };
+
+    private static NoteSaveOutcome NoteOutcomeOf(AccessRefusal refusal) => refusal switch
+    {
+        AccessRefusal.NotSignedIn => NoteSaveOutcome.NotSignedIn,
+        AccessRefusal.NotForAdministrators => NoteSaveOutcome.NotForAdministrators,
+        _ => NoteSaveOutcome.NotFound,
+    };
+
+    private static RecentNotesOutcome RecentNotesOutcomeOf(AccessRefusal refusal) => refusal switch
+    {
+        AccessRefusal.NotSignedIn => RecentNotesOutcome.NotSignedIn,
+        AccessRefusal.NotForAdministrators => RecentNotesOutcome.NotForAdministrators,
+        _ => RecentNotesOutcome.NotFound,
     };
 
     private static RecordableOutcome RecordableOutcomeOf(AccessRefusal refusal) => refusal switch

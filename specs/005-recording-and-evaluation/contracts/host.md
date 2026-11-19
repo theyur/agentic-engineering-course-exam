@@ -54,8 +54,11 @@ No route is added. `/goals/{Id:guid}` changes:
     | "Add note" | "Add note for {date}" |
     | a note button | the note's text, then ", edit note of {date}" |
   - **Result**: `StatusChip`.
-  - **Note**: the note's text, as plain text, and an empty cell without a note (US5, T054). US4 makes it a button
-    that opens the NoteDialog, and "Add note" without a note.
+  - **Note** (US4, T075): on every row, whatever its state, one ghost `ht-btn--sm` button with
+    `aria-haspopup="dialog"`: "Add note" without a note, or the note's text with one, named as the table above
+    says. Both open the NoteDialog for that row (`HistoryCard.OnNote`). After a save the page reads what can be
+    recorded, the history and the recent notes again before the dialog closes, and the focus goes back to the
+    row's Note button (`HistoryCard.FocusNoteAsync`), which now shows the note or "Add note".
   - **Row actions**, in the empty-headed fifth column: "Add record" on a commitment without a record; "Edit" on a
     commitment with one; "Add record" on a period with fewer than 50 records. They are offered whatever the state,
     final included (US3, T066). A period's records are buttons side by side (`ht-inline`) in the Recorded cell, each
@@ -63,8 +66,13 @@ No route is added. `/goals/{Id:guid}` changes:
     with `aria-haspopup="dialog"`. "Add record" opens the RecordDialog's row mode, "Edit" and a record button its
     "Edit" mode. After a save or a delete the page reads the history again before the dialog closes, and the focus
     goes back to the record's button while the row still shows it, otherwise to the row's action.
-- **Recent notes card** (right column): `GetRecentNotesAsync`, each note with its date and its `StatusChip`. The
-  card is absent when there are none.
+- **Recent notes card** (right column, after Settings; `RecentNotesCard`, T074, T075): `GetRecentNotesAsync`, read
+  after the history and only for a goal with a current date. An `HtCard` titled "Recent notes", then each note,
+  newest first, as an `ht-goal` item: the note in quotes and its `StatusChip` on the top line (`ht-goal__top`,
+  `ht-spacer` before the chip), its date under it (`ht-goal__meta`: `DateTexts.ShortDate`, or for a week
+  `DateTexts.WeekRange`). `RecentNote` carries no schedule kind, so the page passes the history's `GoalScheduleKind`
+  and `Period` to the card, and a Due week's chip reads "Due this week". The card is absent when there are none,
+  and it does not open the NoteDialog.
 - **Absent**: GoalStats, the strip, the trend, pauses and earlier attempts (slices 6 to 8, ADR 0008).
 
 ## Dialogs
@@ -120,9 +128,15 @@ No route is added. `/goals/{Id:guid}` changes:
   - opened from a row's note or "Add note";
   - its title is the design's "Add note · {goal name}", with or without a note (the design has no other title);
   - its sub line is the date and the state ("Tue 27 Oct · Missed");
-  - a TextArea of at most 500 characters, with the design's help "Notes are private. They do not change the
-    result.";
-  - buttons: "Save note" and "Cancel". Saving it empty removes the note.
+  - a TextArea "Note" of at most 500 characters, with the design's help "Notes are private. They do not change the
+    result.". Opened from a row's note it starts with that note, so saving without a change keeps it; from "Add
+    note" it starts empty. The limit is the use case's (there is no `maxlength`, so a note trimmed to 500 characters
+    is never cut short): a longer note gives "The note can have at most 500 characters." under the field, in place
+    of the help, and changes nothing;
+  - buttons: "Save note" and "Cancel". "Save note" calls `SaveNoteAsync` with the row's first date (a week's
+    Monday, which names the week). Saving it empty removes the note;
+  - **Focus**: on open it moves to the TextArea (`TextArea.FocusAsync`); Esc and × close the dialog, and focus
+    returns to the row's Note button (constitution IV).
 
 ## StatusChip (HP-004)
 

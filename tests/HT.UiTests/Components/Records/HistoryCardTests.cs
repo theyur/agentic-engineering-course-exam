@@ -85,8 +85,12 @@ public sealed class HistoryCardTests : BunitContext
     private Task<GoalHistory> PageHistoryAsync(GoalId goal, DateOnly current, DateTimeOffset at) =>
         HistoryAsync(goal, current.AddDays(-365), current, at);
 
-    private IRenderedComponent<HistoryCard> RenderCard(GoalHistory history, Action<HistoryCard.RowAction>? onAction = null) =>
-        Render<HistoryCard>(p => p.Add(x => x.History, history).Add(x => x.OnAction, (HistoryCard.RowAction a) => onAction?.Invoke(a)));
+    private IRenderedComponent<HistoryCard> RenderCard(
+        GoalHistory history, Action<HistoryCard.RowAction>? onAction = null, Action<HistoryEntry>? onNote = null) =>
+        Render<HistoryCard>(p => p
+            .Add(x => x.History, history)
+            .Add(x => x.OnAction, (HistoryCard.RowAction a) => onAction?.Invoke(a))
+            .Add(x => x.OnNote, (HistoryEntry e) => onNote?.Invoke(e)));
 
     private static List<string> Dates(IRenderedComponent<HistoryCard> cut) =>
         cut.FindAll("tbody tr").Select(row => Text(row.QuerySelector("td")!)).ToList();
@@ -98,14 +102,15 @@ public sealed class HistoryCardTests : BunitContext
     /// Reading, 20 min daily, from Monday 2 November 2026, read at 10:00Z on Friday 13 November: 12 begun days, 20 min on
     /// the 2nd (Met), 12 min on the 3rd (Failed) with the note "Fell asleep early.", nothing since.
     /// </summary>
-    private async Task<IRenderedComponent<HistoryCard>> TwelveDaysAsync(Action<HistoryCard.RowAction>? onAction = null)
+    private async Task<IRenderedComponent<HistoryCard>> TwelveDaysAsync(
+        Action<HistoryCard.RowAction>? onAction = null, Action<HistoryEntry>? onNote = null)
     {
         var goal = await GoalAsync(Reading20MinDaily, Mon2Nov);
         _records.Seed(goal, Mon2Nov, RecordValue.FromAmount(20));
         _records.Seed(goal, Tue3Nov, RecordValue.FromAmount(12));
         Assert.True(NoteText.TryCreate("Fell asleep early.", out var note, out _));
         _records.SeedNote(goal, Tue3Nov, note!);
-        return RenderCard(await PageHistoryAsync(goal, Fri13Nov, new DateTimeOffset(2026, 11, 13, 10, 0, 0, TimeSpan.Zero)), onAction);
+        return RenderCard(await PageHistoryAsync(goal, Fri13Nov, new DateTimeOffset(2026, 11, 13, 10, 0, 0, TimeSpan.Zero)), onAction, onNote);
     }
 
     [Fact]
@@ -154,7 +159,7 @@ public sealed class HistoryCardTests : BunitContext
     }
 
     [Fact]
-    public async Task Each_row_has_its_record_its_chip_its_note_text_and_its_action_in_the_actions_cell()
+    public async Task Each_row_has_its_record_its_chip_its_note_and_its_action_in_the_actions_cell()
     {
         var cut = await TwelveDaysAsync();
         cut.Find("section.ht-card > button").Click();
@@ -164,7 +169,7 @@ public sealed class HistoryCardTests : BunitContext
         Assert.Equal("Fell asleep early.", Cell(cut, "Tue 3 Nov", 3));
         Assert.Equal("20 min", Cell(cut, "Mon 2 Nov", 1));
         Assert.Equal("Met", Cell(cut, "Mon 2 Nov", 2));
-        Assert.Equal("", Cell(cut, "Mon 2 Nov", 3));
+        Assert.Equal("Add note", Cell(cut, "Mon 2 Nov", 3));
         Assert.Equal("Due today", Text(cut.Find("tbody tr td span.ht-chip.ht-status.ht-status--due")));
         Assert.All(cut.FindAll("tbody tr"), row =>
         {
@@ -366,6 +371,66 @@ public sealed class HistoryCardTests : BunitContext
 
         var focused = JSInterop.VerifyFocusAsyncInvoke(3).Select(i => Assert.IsType<ElementReference>(i.Arguments[0]).Id);
         Assert.Equal([recordButton, actionButton, actionButton], focused);
+    }
+
+    // ---- US4-AS7: the Note cell's actions (HP-001, HP-003, contracts/host.md "Accessible names") ----
+
+    private static IElement NoteButton(IRenderedComponent<HistoryCard> cut, string date) =>
+        Assert.Single(Row(cut, date).QuerySelectorAll("td")[3].QuerySelectorAll("button"));
+
+    [Fact]
+    public async Task US4_AS7_every_row_offers_Add_note_without_a_note_and_the_note_as_a_button_with_one_whatever_its_state()
+    {
+        var cut = await TwelveDaysAsync();
+        cut.Find("section.ht-card > button").Click();
+
+        AssertRowControl(NoteButton(cut, "Tue 3 Nov"), "Fell asleep early.", "Fell asleep early., edit note of Tue 3 Nov");
+        AssertRowControl(NoteButton(cut, "Mon 2 Nov"), "Add note", "Add note for Mon 2 Nov");
+        AssertRowControl(NoteButton(cut, "Fri 13 Nov"), "Add note", "Add note for Fri 13 Nov");
+        Assert.Equal("Missed", Cell(cut, "Wed 4 Nov", 2));
+        AssertRowControl(NoteButton(cut, "Wed 4 Nov"), "Add note", "Add note for Wed 4 Nov");
+        Assert.All(cut.FindAll("tbody tr"), row => Assert.Single(row.QuerySelectorAll("td")[3].QuerySelectorAll("button")));
+    }
+
+    [Fact]
+    public async Task US4_AS7_a_weeks_Note_cell_names_its_date_range()
+    {
+        var goal = await GoalAsync(YogaThreeTimesAWeek, Mon10Aug);
+        Assert.True(NoteText.TryCreate("Knee was sore.", out var note, out _));
+        _records.SeedNote(goal, Mon10Aug, note!);
+
+        var cut = RenderCard(await PageHistoryAsync(goal, new DateOnly(2026, 8, 18), new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero)));
+
+        AssertRowControl(NoteButton(cut, "10 – 16 Aug"), "Knee was sore.", "Knee was sore., edit note of 10 – 16 Aug");
+        AssertRowControl(NoteButton(cut, "17 – 23 Aug"), "Add note", "Add note for 17 – 23 Aug");
+    }
+
+    [Fact]
+    public async Task The_Note_cells_buttons_raise_their_row()
+    {
+        var rows = new List<HistoryEntry>();
+        var actions = new List<HistoryCard.RowAction>();
+        var cut = await TwelveDaysAsync(actions.Add, rows.Add);
+        cut.Find("section.ht-card > button").Click();
+
+        await NoteButton(cut, "Tue 3 Nov").ClickAsync(new MouseEventArgs());
+        await NoteButton(cut, "Wed 4 Nov").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal([(Tue3Nov, "Fell asleep early."), (new DateOnly(2026, 11, 4), (string?)null)], rows.Select(r => (r.FirstDate, r.Note)));
+        Assert.Empty(actions);
+    }
+
+    [Fact]
+    public async Task FocusNoteAsync_gives_the_focus_to_the_rows_Note_button_and_nothing_for_a_row_not_shown()
+    {
+        var cut = await TwelveDaysAsync();
+        var noteButton = NoteButton(cut, "Fri 13 Nov").GetAttribute("blazor:elementReference");
+
+        await cut.InvokeAsync(() => cut.Instance.FocusNoteAsync(Fri13Nov).AsTask());
+        await cut.InvokeAsync(() => cut.Instance.FocusNoteAsync(Tue3Nov).AsTask());
+
+        var focused = JSInterop.VerifyFocusAsyncInvoke().Arguments[0];
+        Assert.Equal(noteButton, Assert.IsType<ElementReference>(focused).Id);
     }
 
     [Fact]
