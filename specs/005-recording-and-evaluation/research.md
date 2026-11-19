@@ -494,8 +494,8 @@ Each section: **Decision**, **Rationale**, **Alternatives considered**.
     shows slice 4's head, Notice and Settings card, which already say when the goal starts.
   - **The page's two columns** (T046, `design/pages/PageGoalDetail` slice-5 state): head, tags and Notice on top,
     then `ht-grid-2` with the History card in the left `ht-stack` and the Settings card, then the Recent notes card,
-    in the right one. Without a begun entry, and until the History card is built, the Settings card stands alone in
-    `ht-grid-2`, the design's layout for that case.
+    in the right one. Without a current date or a begun entry there is no History card, and the Settings card stands
+    alone in `ht-grid-2`, the design's layout for that case (T054, T055).
   - **The RecordDialog's texts** (T045, settled by the design step T004 and written by `RecordingText`): the title
     "Record · {goal name}"; the sub line `TargetLine` ("Build · at least 20 min · every day", "Reduce · at most 2
     cups a day"); the "For" labels of `ForLabel` and, for a week, the "Date" select of its dates up to the current
@@ -503,9 +503,13 @@ Each section: **Decision**, **Rationale**, **Alternatives considered**.
     line and bar (`Progress`, `ProgressFill`); the partial-progress sentence (`PartialNote`) or the Reduce help
     (`ReduceHelp`); and "Note (optional)" with the help "An empty field keeps the existing note.".
   - **History card**: the begun entries of the last 366 days up to the goal's current date, newest first, the
-    first 10 with "Show all N →", which expands the card in place (plan "Resolved in the spec" 7). The columns are
-    Date, Recorded, Result (StatusChip) and Note, with the row actions of HP-001. Under the table: "Corrections
-    are evaluated with the rules of that date.".
+    first 10 with "Show all N →", which expands the card in place (plan "Resolved in the spec" 7). Upcoming entries
+    have no row, and with no begun entry the card is not rendered. As `design/pages/PageGoalDetail.html` has it
+    (T054), the card head (`ht-card__head`) holds the title "History" and, beside it, the muted sentence
+    "Corrections are evaluated with the rules of that date."; a plain `section.ht-card`, since `HtCard`'s `Title`
+    cannot render that head. The columns are Date, Recorded, Result (StatusChip), Note and an empty-headed fifth
+    column for the row actions of HP-001. The Note cell holds the note's text as plain text until US4 makes it a
+    button; the actions cells stay empty until US3 and US4 add "Add record", "Edit" and "Add note".
   - **Recent notes card**: `GetRecentNotesAsync`, each note with its date (a week: its first and last date) and its
     StatusChip.
   - **Components**: 7 new ones (critic plan pass 1, MINOR-8). Each design component becomes one Razor component

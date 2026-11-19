@@ -18,6 +18,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The unit tests' hand-written fakes, so a use case is read over the fake and the real record store alike (ADR 0006). -->
+    <Compile Include="..\HT.UnitTests\Fakes\FakeAccountStore.cs" Link="Fakes\FakeAccountStore.cs" />
+    <Compile Include="..\HT.UnitTests\Fakes\FakeCatalogHabitStore.cs" Link="Fakes\FakeCatalogHabitStore.cs" />
+    <Compile Include="..\HT.UnitTests\Fakes\HabitSamples.cs" Link="Fakes\HabitSamples.cs" />
+    <Compile Include="..\HT.UnitTests\Fakes\FakeCustomHabitStore.cs" Link="Fakes\FakeCustomHabitStore.cs" />
+    <Compile Include="..\HT.UnitTests\Fakes\FakeGoalStore.cs" Link="Fakes\FakeGoalStore.cs" />
+    <Compile Include="..\HT.UnitTests\Fakes\FakeRecordStore.cs" Link="Fakes\FakeRecordStore.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\HT.Domain\HT.Domain.csproj" />
     <ProjectReference Include="..\..\src\HT.Application\HT.Application.csproj" />
     <ProjectReference Include="..\..\src\HT.Persistence\HT.Persistence.csproj" />

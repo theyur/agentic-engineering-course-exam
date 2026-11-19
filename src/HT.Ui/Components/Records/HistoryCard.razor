@@ -1,0 +1,86 @@
+@using System.Globalization
+@using HT.Application.Records
+@using HT.Domain.Evaluation
+@using HT.Domain.Goals
+@* design/pages/PageGoalDetail, slice 5 state (HP-001, US5-AS5, contracts/host.md "History card"): the goal page's
+   History card. Its head (ht-card__head) has the title "History", ht-spacer and the muted sentence "Corrections are
+   evaluated with the rules of that date." beside it; then a DataTable with Date, Recorded, Result, Note and the
+   empty-headed actions column. The rows are the history's begun entries (Upcoming ones are not listed), newest first:
+   the first 10, then "Show all N →", which shows the rest in place. Date and Recorded come from RecordingText (a
+   commitment's record as text; a period's records side by side, ht-inline; "—" without a record), Result is the
+   StatusChip, and Note is the note's text. The row actions and the note button come with corrections and notes (US3,
+   US4), so the actions cells are empty. With no begun entry the card is not rendered. *@
+@if (_rows.Count > 0)
+{
+    <section class="ht-card">
+        <div class="ht-card__head">
+            <h2 class="ht-card__title">History</h2>
+            <span class="ht-spacer"></span>
+            <p class="ht-card__sub">Corrections are evaluated with the rules of that date.</p>
+        </div>
+        <DataTable Columns="Columns" Label="History">
+            @foreach (var entry in _expanded ? _rows : _rows.Take(FirstRows))
+            {
+                <tr>
+                    <td><b>@RecordingText.EntryDate(entry)</b></td>
+                    <td>
+                        @if (entry.Records.Count == 0)
+                        {
+                            @NoRecord
+                        }
+                        else if (History.GoalScheduleKind == GoalScheduleKind.CommitmentBased)
+                        {
+                            @RecordingText.Recorded(History, entry.Records[0])
+                        }
+                        else
+                        {
+                            <span class="ht-inline">
+                                @foreach (var record in entry.Records)
+                                {
+                                    <span>@RecordingText.Recorded(History, record)</span>
+                                }
+                            </span>
+                        }
+                    </td>
+                    <td><StatusChip State="entry.State" ScheduleKind="History.GoalScheduleKind" Period="History.Period" /></td>
+                    <td>@entry.Note</td>
+                    <td class="ht-actions"></td>
+                </tr>
+            }
+        </DataTable>
+        @if (!_expanded && _rows.Count > FirstRows)
+        {
+            <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-expanded="false" @onclick="ShowAll">Show all @_rows.Count.ToString(CultureInfo.InvariantCulture) →</button>
+        }
+    </section>
+}
+
+@code {
+    /// <summary>How many rows the card shows before "Show all N →" (HP-001).</summary>
+    private const int FirstRows = 10;
+
+    /// <summary>The Recorded cell of an entry without a record.</summary>
+    private const string NoRecord = "—";
+
+    private static readonly IReadOnlyList<string> Columns = ["Date", "Recorded", "Result", "Note", string.Empty];
+
+    private List<HistoryEntry> _rows = [];
+    private bool _expanded;
+
+    /// <summary>The goal's history from <c>GetHistoryAsync</c>, its entries in date order.</summary>
+    [Parameter, EditorRequired]
+    public GoalHistory History { get; set; } = default!;
+
+    /// <summary>Whether the card is rendered for <paramref name="history"/>: it has at least one begun entry.</summary>
+    public static bool HasRows(GoalHistory? history) => history is not null && RowsOf(history).Any();
+
+    protected override void OnParametersSet() => _rows = RowsOf(History).ToList();
+
+    /// <summary>The begun entries, newest first; Upcoming ones have no row.</summary>
+    private static IEnumerable<HistoryEntry> RowsOf(GoalHistory history) =>
+        history.Entries
+            .Where(entry => entry.State != EvaluationState.Upcoming)
+            .OrderByDescending(entry => entry.FirstDate);
+
+    private void ShowAll() => _expanded = true;
+}

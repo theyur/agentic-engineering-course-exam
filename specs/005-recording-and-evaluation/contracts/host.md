@@ -25,15 +25,20 @@ No route is added. `/goals/{Id:guid}` changes:
   - left (`ht-stack`): the History card;
   - right (`ht-stack`): slice 4's Settings card, then the Recent notes card.
 
-  A goal with no begun entry has the design's single-card layout: the Settings card alone in `ht-grid-2`, as in
-  slice 4. That is also the layout until the History card is built (US1 builds only the head, "Record" and the
-  RecordDialog).
+  A goal with no current date, or with no begun entry, has no History card and the design's single-card layout:
+  the Settings card alone in `ht-grid-2`, as in slice 4 (T054, T055).
 - **Reads**: `GetRecordableAsync` first, then `GetHistoryAsync(D − 365, D)` with that result's `CurrentDate` D
   (research R-12), and `GetRecentNotesAsync`. A goal with no current date (not started) shows no "Record", no
   History card and no Recent notes card, only slice 4's content.
-- **History card**: a DataTable with Date, Recorded, Result and Note.
-  - The begun entries of the last 366 days up to the goal's current date, newest first, the first 10, then "Show
-    all N →", which expands the card in place (plan "Resolved in the spec" 7).
+- **History card** (`HistoryCard`, T054): a `section.ht-card` whose head (`ht-card__head`) has the title
+  `h2.ht-card__title` "History", `ht-spacer` and the muted sentence "Corrections are evaluated with the rules of
+  that date." (`p.ht-card__sub`) beside it, as `design/pages/PageGoalDetail.html` has it (not `HtCard`'s `Title`,
+  which cannot render that head). Then a DataTable (`aria-label="History"`) with Date, Recorded, Result, Note and an
+  empty-headed actions column (`td.ht-actions`).
+  - The begun entries of the last 366 days up to the goal's current date, newest first; Upcoming entries have no
+    row. The first 10, then the ghost button "Show all N →" (`aria-expanded="false"`, N counts all the rows), which
+    shows the rest in place and is then gone (plan "Resolved in the spec" 7).
+  - With no begun entry the card is not rendered (`design/pages/PageGoalDetail`, slice-5 state).
   - **Date**: "Tue 17 Nov" for a commitment or a day (`DateTexts.ShortDate`), and the design's "10 – 16 Aug" for a
     week, or "28 Sep – 4 Oct" across a month end (the new `DateTexts.WeekRange`).
   - **Recorded**: each record by `RecordingText`, for example "12 min", "Yes" or "3 sweet" (the unit as stored). A period's records sit
@@ -49,10 +54,12 @@ No route is added. `/goals/{Id:guid}` changes:
     | "Add note" | "Add note for {date}" |
     | a note button | the note's text, then ", edit note of {date}" |
   - **Result**: `StatusChip`.
-  - **Note**: the note, as a button that opens the NoteDialog, or "Add note".
-  - **Row actions**: "Add record" on a commitment without a record; "Edit" on a commitment with one; "Add record"
-    on a period with fewer than 50 records. They are offered whatever the state, final included.
-  - Under the table: "Corrections are evaluated with the rules of that date.".
+  - **Note**: the note's text, as plain text, and an empty cell without a note (US5, T054). US4 makes it a button
+    that opens the NoteDialog, and "Add note" without a note.
+  - **Row actions**, in the empty-headed fifth column: "Add record" on a commitment without a record; "Edit" on a
+    commitment with one; "Add record" on a period with fewer than 50 records. They are offered whatever the state,
+    final included. Until US3 adds them, the column's cells are empty; until then a period's records are plain text
+    side by side (`ht-inline`), not buttons.
 - **Recent notes card** (right column): `GetRecentNotesAsync`, each note with its date and its `StatusChip`. The
   card is absent when there are none.
 - **Absent**: GoalStats, the strip, the trend, pauses and earlier attempts (slices 6 to 8, ADR 0008).

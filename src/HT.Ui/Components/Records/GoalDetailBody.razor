@@ -15,10 +15,11 @@
    part of the goal page, prerendered, with the goal identifier as its only parameter. Slice 4's head ("← Goals", the
    name, the tags and the attempt line), with the primary action "Record" when something can be recorded now (FR-011)
    and no other action; slice 4's Notice for a habit no longer in the catalog; then the page's two columns: the History
-   card on the left (US5) and the Settings card, then the Recent notes card (US4), on the right. Until the History card
-   exists the page has the design's layout for a goal with no begun entry: the Settings card alone in ht-grid-2. A goal
-   with no current date shows no "Record". "Record" opens the RecordDialog; after a save, what can be recorded is read
-   again. Every use case runs in its own scope. *@
+   card on the left and the Settings card, then the Recent notes card (US4), on the right. The history is read after
+   what can be recorded now, from 365 days before that result's current date D to D. A goal with no current date, or
+   with no begun entry, shows no History card and has the design's layout for that case: the Settings card alone in
+   ht-grid-2. A goal with no current date shows no "Record". "Record" opens the RecordDialog; after a save, what can be
+   recorded and the history are read again. Every use case runs in its own scope. *@
 @if (_goal is { } goal)
 {
     <BackLink Href="/goals" Text="Goals" />
@@ -42,9 +43,23 @@
     {
         <Notice Neutral="true">This habit is no longer in the public catalog. Your goal keeps working.</Notice>
     }
-    <div class="ht-grid-2">
-        <GoalSettingsCard Details="goal" />
-    </div>
+    @if (HistoryCard.HasRows(_history))
+    {
+        <div class="ht-grid-2">
+            <div class="ht-stack">
+                <HistoryCard History="_history!" />
+            </div>
+            <div class="ht-stack">
+                <GoalSettingsCard Details="goal" />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="ht-grid-2">
+            <GoalSettingsCard Details="goal" />
+        </div>
+    }
     @if (CanRecord)
     {
         <RecordDialog Open="_recordOpen" OnClose="CloseRecord" ReturnFocus="_recordButton" GoalId="goal.Id" GoalName="@goal.Name"
@@ -53,9 +68,13 @@
 }
 
 @code {
+    /// <summary>How many days, up to the goal's current date, the History card covers (HP-001).</summary>
+    private const int HistoryDays = 366;
+
     private ActingUser _actingUser = ActingUser.Anonymous;
     private GoalDetails? _goal;
     private GoalHistory? _recordable;
+    private GoalHistory? _history;
     private bool _recordOpen;
     private ElementReference _recordButton;
 
@@ -78,14 +97,28 @@
         }
 
         _goal = goal;
-        await ReadRecordableAsync();
+        await ReadRecordsAsync();
     }
 
-    private async Task ReadRecordableAsync()
+    /// <summary>
+    /// What can be recorded now, then, with its current date D, the history of D − 365 to D (366 days; research R-12).
+    /// A goal with no current date has no history to show.
+    /// </summary>
+    private async Task ReadRecordsAsync()
     {
         var recordable = await UseCases.RunAsync<RecordingService, RecordableResult>(
             (service, token) => service.GetRecordableAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
         _recordable = recordable.History;
+        if (_recordable?.CurrentDate is not { } current)
+        {
+            _history = null;
+            return;
+        }
+
+        var history = await UseCases.RunAsync<RecordingService, HistoryResult>(
+            (service, token) => service.GetHistoryAsync(_actingUser, new GoalId(Id), current.AddDays(-HistoryDays + 1), current, token),
+            CancellationToken.None);
+        _history = history.History;
     }
 
     private void OpenRecord() => _recordOpen = true;
@@ -95,7 +128,7 @@
     private async Task SavedAsync(HistoryEntry entry)
     {
         _recordOpen = false;
-        await ReadRecordableAsync();
+        await ReadRecordsAsync();
     }
 
     /// <summary>"Attempt 1 · started 14 Jul" once the goal has started, "Attempt 1 · starts 23 Nov" before (slice 4 HP-004).</summary>

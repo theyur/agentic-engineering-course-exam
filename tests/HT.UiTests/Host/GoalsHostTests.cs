@@ -1,6 +1,9 @@
 using System.Net;
+using HT.Application.Accounts;
 using HT.Application.Goals;
+using HT.Application.Records;
 using HT.Domain.Accounts;
+using HT.Domain.Records;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Time;
@@ -178,6 +181,50 @@ public sealed class GoalsHostTests(HostFixture host)
             Assert.Contains("Page not found", html, StringComparison.Ordinal);
             Assert.DoesNotContain(name, html, StringComparison.Ordinal);
             Assert.DoesNotContain(">Record</button>", html, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Slice_5_the_owners_prerendered_goal_page_has_the_History_card_with_its_first_rows_and_StatusChips()
+    {
+        // The goal starts 4 days before today (UTC, at the host's clock), every day, with 15 min recorded on its first
+        // day: that day is final and Met (its grace period ended at 00:00 yesterday), today is Due, and the days between
+        // are Pending or Missed. Plan "Risks": the prerendered HTML is what the smoke check and the first paint see.
+        var name = $"Ui-Go History {Guid.NewGuid():N}"[..30];
+        var habit = await host.ArrangeCatalogHabitAsync(Definition(name));
+        var (browser, account) = await host.SignedInAccountAsync(Email("history-owner"), Role.RegisteredUser);
+        using (browser)
+        {
+            DateOnly first;
+            GoalId goal;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                first = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow()).AddDays(-4);
+                Assert.True(GoalTarget.TryCreate(new GoalTargetFields
+                {
+                    BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 15, DurationUnit = DurationUnit.Minutes,
+                    ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+                }, out var target, out _));
+                var created = await services.GetRequiredService<IGoalStore>().CreateAsync(
+                    account, new NewGoal(new GoalHabit(habit, HabitKind.Catalog), first, null, target), NamedTimeZone.Utc, NamedTimeZone.Utc, CancellationToken.None);
+                Assert.Equal(GoalWriteOutcomeKind.Created, created.Kind);
+                goal = created.Id!.Value;
+                var written = await services.GetRequiredService<IRecordStore>().AddAsync(
+                    account, goal, new EntrySpan(first, first, first), true, first, RecordValue.FromAmount(15), null, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None);
+                Assert.Equal(RecordStoreWriteOutcome.Written, written.Outcome);
+            }
+
+            var (status, html) = await browser.GetPageAsync($"{GoalsAddress}/{goal.Value}");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            Assert.Contains("<h2 class=\"ht-card__title\">History</h2>", html, StringComparison.Ordinal);
+            Assert.Contains("Corrections are evaluated with the rules of that date.", html, StringComparison.Ordinal);
+            Assert.Contains($"<td><b>{DateTexts.ShortDate(first)}</b></td>", html, StringComparison.Ordinal);
+            Assert.Contains($"<td><b>{DateTexts.ShortDate(first.AddDays(1))}</b></td>", html, StringComparison.Ordinal);
+            Assert.Contains("<td>15 min</td>", html, StringComparison.Ordinal);
+            Assert.Contains("<span class=\"ht-chip ht-status ht-status--met\">Met</span>", html, StringComparison.Ordinal);
+            Assert.Contains("<span class=\"ht-chip ht-status ht-status--due\">Due today</span>", html, StringComparison.Ordinal);
         }
     }
 

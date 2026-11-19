@@ -96,14 +96,17 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Equal("Yoga, 3 days a week", cut.Find(".ht-page-head h1").TextContent);
         Assert.Equal(["Body", "Build", "Commitment-based"], cut.FindAll(".ht-head-tags .ht-chip").Select(c => c.TextContent));
         Assert.Equal("Attempt 1 · started 14 Jul", cut.Find(".ht-head-tags .ht-attempt").TextContent);
-        Assert.Equal("Settings", cut.Find(".ht-grid-2 .ht-card .ht-card__title").TextContent);
+        // Slice 5 (T055): the History card in the left column, the Settings card in the right one.
+        Assert.Equal(
+            ["History", "Settings"],
+            cut.FindAll(".ht-grid-2 > .ht-stack").Select(column => column.QuerySelector(".ht-card .ht-card__title")!.TextContent));
         Assert.Equal(
             [
                 ("Habit", "Yoga · catalog"), ("Build or reduce", "Build"), ("Measure", "Yes / no"), ("Target", "3 days a week"),
                 ("Schedule", "Mon · Wed · Fri"), ("Evaluated", "Each scheduled day"), ("Started", "14 Jul 2026"),
             ],
             Rows(cut));
-        Assert.Equal(Sentence, cut.Find(".ht-card .ht-card__sub").TextContent);
+        Assert.Equal(Sentence, cut.Find(".ht-grid-2 > .ht-stack:last-child .ht-card .ht-card__sub").TextContent);
         Assert.Empty(cut.FindAll(".ht-notice"));
         // Tuesday 17 November is not scheduled, but Monday 16 is Pending: "Record" is the page head's one action (HP-001).
         Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
@@ -138,6 +141,10 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Empty(cut.FindAll(".ht-notice"));
         Assert.Empty(cut.FindAll(".ht-page-head button"));
         Assert.DoesNotContain(">Record<", cut.Markup, StringComparison.Ordinal);
+        // Slice 5 (T055): no current date, so no History card; the Settings card stands alone in ht-grid-2.
+        Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Single(cut.FindAll(".ht-grid-2 > section.ht-card"));
+        Assert.Empty(cut.FindAll(".ht-grid-2 > .ht-stack"));
     }
 
     [Fact]
@@ -173,6 +180,9 @@ public sealed class GoalDetailPageTests : BunitContext
 
         Assert.Equal("Attempt 1 · started 17 Nov", cut.Find(".ht-attempt").TextContent);
         Assert.Empty(cut.FindAll(".ht-page-head button"));
+        // T055: a current date but no begun entry, so no History card; the Settings card stands alone in ht-grid-2.
+        Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Empty(cut.FindAll(".ht-grid-2 > .ht-stack"));
     }
 
     [Fact]
@@ -182,6 +192,7 @@ public sealed class GoalDetailPageTests : BunitContext
         var reading = _catalog.Add(HabitSamples.Reading());
         var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, Today);
         var cut = RenderGoal(id);
+        Assert.Equal("—", Text(cut.Find("table[aria-label=History] tbody tr").QuerySelectorAll("td")[1]));
 
         cut.Find(".ht-page-head button").Click();
 
@@ -199,6 +210,9 @@ public sealed class GoalDetailPageTests : BunitContext
         var record = Assert.Single(_records.RecordsOfGoal(id));
         Assert.Equal((Today, 12), (record.Date, record.Value.Amount!.Value));
         Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        // T055: after a save the history is read again.
+        var row = Assert.Single(cut.FindAll("table[aria-label=History] tbody tr"));
+        Assert.Equal(["Tue 17 Nov", "12 min", "Due today"], row.QuerySelectorAll("td").Take(3).Select(Text));
     }
 
     [Fact]

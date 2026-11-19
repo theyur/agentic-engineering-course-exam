@@ -111,6 +111,47 @@ public sealed class RecordingService
     }
 
     /// <summary>
+    /// The history of one of the acting user's goals from <paramref name="first"/> to <paramref name="last"/>, both
+    /// included (FR-009, FR-010, FR-014; research R-07): every commitment or period of the goal's evaluation calendar in
+    /// the range, in date order, each as <c>EntryView</c> gives it at the supplied time. The range is checked after the
+    /// goal (FR-018): 1 to 366 days, otherwise <see cref="HistoryOutcome.RangeOutOfBounds"/>. A per-week period that
+    /// overlaps the range is given whole, with all its records, also those dated outside the range, so one store read
+    /// covers the first entry's first date to the last entry's last date. A range with no entry (unscheduled days only,
+    /// days before the start date, or a per-week goal's days before its first week) gives no entries, and then no
+    /// record is read. <see cref="GoalHistory.CurrentDate"/> is the goal's current date at the supplied time.
+    /// </summary>
+    public async Task<HistoryResult> GetHistoryAsync(
+        ActingUser actingUser, GoalId goal, DateOnly first, DateOnly last, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await CheckAccessAsync(actingUser, goal, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return HistoryResult.Refused(HistoryOutcomeOf(refusal), access.Message!);
+        }
+
+        var found = access.Goal!;
+        if (!GoalTimeline.TryEntries(found, first, last, out var entries))
+        {
+            return HistoryResult.Refused(HistoryOutcome.RangeOutOfBounds, GoalTexts.RangeOutOfBounds);
+        }
+
+        var now = _clock.GetUtcNow();
+        var current = GoalTimeline.CurrentDate(found, now);
+        if (entries.Count == 0)
+        {
+            return HistoryResult.Found(HistoryOf(found, current, [], now));
+        }
+
+        var stored = await _records.ReadAsync(access.Owner, goal, entries[0].FirstDate, entries[^1].LastDate, cancellationToken)
+            .ConfigureAwait(false);
+        var views = entries
+            .Select(entry => EntryView(found, entry, RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), now))
+            .ToList();
+        return HistoryResult.Found(HistoryOf(found, current, views, now));
+    }
+
+    /// <summary>
     /// What can be recorded now for one of the acting user's goals (FR-011, research R-04): the entries of the goal's
     /// calendar from 9 days before its current date to the current date that are Due or Pending at the supplied time,
     /// newest first by first date, each as the history gives it. A goal with no current date, or with no entry in that
@@ -248,6 +289,13 @@ public sealed class RecordingService
         AccessRefusal.NotSignedIn => RecordWriteOutcome.NotSignedIn,
         AccessRefusal.NotForAdministrators => RecordWriteOutcome.NotForAdministrators,
         _ => RecordWriteOutcome.NotFound,
+    };
+
+    private static HistoryOutcome HistoryOutcomeOf(AccessRefusal refusal) => refusal switch
+    {
+        AccessRefusal.NotSignedIn => HistoryOutcome.NotSignedIn,
+        AccessRefusal.NotForAdministrators => HistoryOutcome.NotForAdministrators,
+        _ => HistoryOutcome.NotFound,
     };
 
     private static RecordableOutcome RecordableOutcomeOf(AccessRefusal refusal) => refusal switch
