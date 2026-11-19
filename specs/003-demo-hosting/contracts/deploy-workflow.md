@@ -30,7 +30,8 @@ numbering; the ADR, the research and the plan use them.
   | `mode` | `deploy`, `refresh`, `check` | `deploy` | `deploy` rolls out `commit`; `refresh` empties the database and restarts the deployed commit (HP-011); `check` changes nothing and runs only the smoke check (SC-006) |
   | `commit` | a full or short SHA, or `master` | `master` | the commit to deploy; ignored in `refresh` and `check` |
 
-- The job `demo`: `environment: demo`; `permissions: id-token: write, contents: read`;
+- The job `demo`: `environment: demo`; `permissions: id-token: write, contents: read`, set on the job, while the
+  workflow level has `permissions: {}` (Sonar S8233);
   `concurrency: { group: deploy-demo, cancel-in-progress: false }` at workflow level: a second run waits for the
   first, so a scheduled refresh waits for a running manual deployment.
 

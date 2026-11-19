@@ -43,9 +43,8 @@ on:
   schedule:
     - cron: '20 0 * * *'
 
-permissions:
-  id-token: write
-  contents: read
+# No permission at workflow level: each job states its own (job `gate` none, job `demo` the Azure sign-in).
+permissions: {}
 
 concurrency:
   group: deploy-demo
@@ -97,6 +96,10 @@ jobs:
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     environment: demo
+    # The OIDC token for the Azure sign-in, and read access for the checkout (contracts/deploy-workflow.md).
+    permissions:
+      id-token: write
+      contents: read
     # Expected about 10 minutes, at most 15 (SC-003); the limit only stops a hung run, and step 13 still runs.
     timeout-minutes: 45
     defaults:
