@@ -71,6 +71,31 @@ Answered by the owner after critic pass 1 of this spec; the technical rows are r
   or period? → A: It stays. A note given with a record adds or replaces the note only when it has text; a note
   is removed only by saving it empty on its own (FR-007).
 
+### Session 2026-11-18 (plan)
+
+Details the spec's words left open, found by `/speckit-plan` and accepted by the owner as proposed (plan.md
+"Resolved in the spec"). None changes a locked acceptance criterion.
+
+- Q: Does changing a record check its date again? → A: No: its date never changes and, while versions differ
+  only in their time zone, always passes FR-002; deleting checks the acting user, the goal and the record only
+  (FR-005).
+- Q: What happens when only a value of the wrong kind is given (an amount on a yes/no goal, "Yes" on a count
+  goal)? → A: There is no value, and the measurement's message is given; with both kinds, the one that belongs is
+  kept (FR-004).
+- Q: Does re-recording a commitment create a new record? → A: No: the record keeps its identifier and its place in
+  the stored order, as a changed record does (FR-003).
+- Q: Which records does a per-week period give when the history range covers it only in part? → A: All of them,
+  so its progress and state never depend on the range (FR-009).
+- Q: What does "newest first" order by in what can be recorded now? → A: The first date, descending (FR-011).
+- Q: Which date orders a per-week period's note among the recent notes? → A: Its first date, the Monday (FR-008).
+- Q: How far back does the goal page's History card go? → A: The last 366 days up to the goal's current date;
+  "Show all N →" shows the rest of those (HP-001, Assumptions).
+- Q: How is "Pending, N h left" rounded? → A: The whole hours to the grace end, rounded up (HP-002).
+- Q: Which ports does the smoke check's coverage rule cover? → A: Both demo data ports, demo loading's and demo
+  history loading's (HP-008).
+- Q: What is the progress of a commitment without a record, and of a yes/no commitment? → A: No value while it has
+  no record; for yes/no, "Yes" counts 1 and "No" 0, against 1 (FR-014).
+
 ## Decisions this slice cites
 
 Recorded in earlier slices and not decided again here:
@@ -126,6 +151,9 @@ Restated here, unchanged, so that this spec alone gives the rules and texts its 
   "Goals are for registered users."; a goal identifier that is not one of the acting user's goals gives "This
   goal does not exist.", the same as one that belongs to nothing. A range of dates is 1 to 366 days, otherwise
   "Choose a range of 1 to 366 days.".
+- **Passwords** (slice 1 FR-002): every password the system sets, demo passwords included, has at least 8
+  characters and at least one digit; a demo password that does not is "demo password does not meet the password
+  rule".
 - **Demo loading** (slice 1 FR-016, slice 2 FR-030, slice 4 FR-040): with a valid demo password it loads the seed
   catalog into an empty catalog first, then creates `demo1@example.com` to `demo3@example.com` with their demo
   custom habits and demo goals; every slice-4 demo goal starts on the day of the run or later, so it has no past
@@ -409,7 +437,8 @@ as the demo account with history and read its goals' histories.
   the day are Met, one "Yes" Failed.
 - Deleting the only record of a commitment that is still Due or Pending makes it unrecorded again; that is not a
   correction.
-- A goal whose catalog habit is Unpublished (slice 4 FR-034) keeps being recorded and evaluated as usual.
+- A goal whose catalog habit is Unpublished (slice 4 FR-034) keeps being recorded and evaluated as usual. An
+  administrator unpublishes a catalog habit that goals are based on only with confirmation (slice 4 FR-033).
 - A period that reaches the record limit (FR-005) takes no further record, but its records can still be changed
   or deleted.
 
@@ -430,12 +459,15 @@ as the demo account with history and read its goals' histories.
   cannot record a day that has not begun.". There is no earliest date: any date from the start date on can be
   recorded or corrected.
 - **FR-003**: A commitment MUST have at most one record: recording for a commitment that has one replaces its
-  value. An evaluation period MUST hold any number of records, up to 50, each on a date of the period; recording
+  value; the record keeps its identifier and its place in the stored order, as does a record whose value is
+  changed. An evaluation period MUST hold any number of records, up to 50, each on a date of the period; recording
   for a period adds a record. Every record has an identifier, by which its owner changes its value or deletes it;
   the date of a record never changes.
 - **FR-004**: Records MUST keep the amount as entered, below, at or above the target (partial progress is
   preserved, SPEC §5.2); a record never stores a value that does not belong to the goal's measurement (an amount
-  with "Yes", "Yes" with an amount): such values are not refused and not stored.
+  with "Yes", "Yes" with an amount): such values are not refused and not stored. When both kinds are given, the
+  one that belongs is kept and the other is dropped; when only the one that does not belong is given, there is no
+  value, and step (5) of FR-005 gives that measurement's message.
 - **FR-005**: Recording or changing a record MUST give one result, checking in this order: (1) an anonymous visitor
   "You are not signed in."; (2) an administrator "Goals are for registered users."; (3) the goal "This goal does
   not exist." (slice 4 FR-020), and for a change or deletion the record "This record does not exist." (a record
@@ -443,7 +475,9 @@ as the demo account with history and read its goals' histories.
   "Yes" nor "No" "Choose Yes or No."; a count missing or not a whole number from 0 to 9999 "Enter a whole number
   from 0 to 9999."; a duration missing or not a whole number from 0 to 1440 "Enter a whole number of minutes from
   0 to 1440."; (6) the note (FR-007); (7) a period that already has 50 records "This evaluation period already
-  has 50 records." (adding only).
+  has 50 records." (adding only). Changing a record skips step (4): its date never changes (FR-003), and while
+  settings versions differ only in their time zone (FR-015), its date always passes FR-002 again. Deleting a
+  record checks steps (1) to (3) only.
 - **FR-006**: Recording, changing and deleting MUST return the state of the commitment or period after the change
   (FR-010) and whether the change was a *correction*: a change to a commitment or period whose result was final
   at the supplied time. A correction keeps no history of earlier values; the result is always computed from the
@@ -462,15 +496,16 @@ as the demo account with history and read its goals' histories.
   period, including after it is final; for a per-week period, any such date of the week names the period. A note
   never changes the state.
 - **FR-008**: Reading a goal's recent notes MUST return at most 5 notes, those of the commitments or periods with
-  the latest dates, newest first, each with its date (a per-week period: its first and last date), the note and
+  the latest first dates (a per-week period: its Monday), newest first, each with its date (a per-week period: its first and last date), the note and
   the state at the supplied time.
 
 **Reading the history**
 
 - **FR-009**: Reading a goal's history for a range of dates (first and last date included, 1 to 366 days,
   otherwise "Choose a range of 1 to 366 days.") MUST return, in date order, each commitment or evaluation period
-  of the goal's evaluation calendar in that range (slice 4 FR-013) with: its date (a per-week period: its first
-  and last date); its start and end instants; its state at the supplied time (FR-010); while it is Due or
+  of the goal's evaluation calendar in that range (slice 4 FR-013) (a per-week period that overlaps the range is
+  given whole, with all its records, also those dated outside the range, so its progress and state never depend
+  on the range) with: its date (a per-week period: its first and last date); its start and end instants; its state at the supplied time (FR-010); while it is Due or
   Pending, the instant its grace period ends (FR-016); its records (identifier, date and value), in date order and
   then in the order they were stored; its progress (FR-014); its note; and whether a change now would be a
   correction.
@@ -485,7 +520,7 @@ as the demo account with history and read its goals' histories.
   supplied time; it changes from Pending to final without any action by the user or an operator.
 - **FR-011**: Reading what can be recorded now MUST return every Due commitment or period of the goal (none on an
   unscheduled day of a fixed-days goal; two only while the old and new days overlap after a move east, slice 4
-  FR-027) and every Pending one, newest first, each as FR-009 gives it. It is what the record form offers in its
+  FR-027) and every Pending one, newest first (by first date, descending), each as FR-009 gives it. It is what the record form offers in its
   "For" choice.
 
 **Evaluation**
@@ -500,10 +535,10 @@ as the demo account with history and read its goals' histories.
   never treated as success.
 - **FR-014**: A final commitment or period with at least one record MUST be Met when it meets the target of the
   goal settings version in effect for its date (slice 4 FR-004, restated in "What the target means" above), and
-  Failed otherwise. Progress is given at any state: a commitment's recorded value against the target; a Build
-  period's number of records that reach the amount against N; a Reduce yes/no period's number of "Yes" records
-  against N; a Reduce count or duration period's total against the amount. A duration goal in hours compares
-  minutes with the amount times 60.
+  Failed otherwise. Progress is given at any state: a commitment's recorded value against the target (no value
+  while it has no record; for yes/no, "Yes" counts 1 and "No" 0, against 1); a Build period's number of records
+  that reach the amount against N; a Reduce yes/no period's number of "Yes" records against N; a Reduce count or
+  duration period's total against the amount. A duration goal in hours compares minutes with the amount times 60.
 - **FR-015**: Each commitment or period MUST be evaluated with the settings version in effect for its date (slice
   4 FR-005, FR-011), whenever it is recorded, corrected or read; a later version never changes an earlier
   commitment's target, time zone or instants. In this slice versions differ only in their time zone (slice 4
@@ -536,7 +571,8 @@ as the demo account with history and read its goals' histories.
 
 - **FR-030**: *Demo history loading*, a new operator capability that runs after demo loading (ADR 0018), MUST
   take the demo password as demo loading does: without one (absent, empty or only spaces) its result is "no demo
-  password configured", with one that fails slice 1 FR-002 "demo password does not meet the password rule", and
+  password configured", with one that fails slice 1 FR-002 (at least 8 characters and at least one digit, see
+  "Passwords" above) "demo password does not meet the password rule", and
   in both cases it creates nothing. With a valid one it creates `demo4@example.com`, a registered user with the
   demo password (result "created"), or leaves an existing account of that email unchanged (result "already
   exists", ignoring case as slice 1 FR-003; no goal or record result, and none of its private data is read or
@@ -576,7 +612,8 @@ as the demo account with history and read its goals' histories.
 - **HP-001**: The goal page (`/goals/{id}`, `design/pages/PageGoalDetail`) MUST add, for this slice only (ADR
   0008): the primary action "Record" in the page head (the other actions are slices 7 and 8); the History card,
   a DataTable with Date, Recorded, Result (StatusChip) and Note, listing the commitments or periods that have
-  begun, newest first, the first 10 with "Show all N →"; the sentence "Corrections are evaluated with the rules of
+  begun in the last 366 days up to the goal's current date (FR-009's limit), newest first, the first 10 with
+  "Show all N →", which shows the rest of them; the sentence "Corrections are evaluated with the rules of
   that date."; and the Recent notes card in the right column, each note with its date and state (FR-008). No
   GoalStats, strip or trend (slice 6). Row actions, whatever the row's state:
   - a commitment row: "Add record" without a record, "Edit" with one (it opens that one record);
@@ -584,7 +621,8 @@ as the demo account with history and read its goals' histories.
     opens with "Edit"; so a final period takes a missing record as a correction (US3-AS4);
   - every row: "Add note" without a note, the note itself with one (HP-003).
 - **HP-002**: The RecordDialog (`design/components/RecordDialog`, `RecordForms`) MUST follow the design. Opened
-  from the page head, its "For" select lists FR-011's entries ("Pending, N h left" on Pending ones), and the
+  from the page head, its "For" select lists FR-011's entries ("Pending, N h left" on Pending ones, N being the whole hours from the supplied time to
+  the grace end, rounded up), and the
   dialog is not offered when FR-011 returns none; for a per-week entry it lists that week's dates up to the
   goal's current date. Opened from a History row ("Add record"), "For" is fixed to that row (for a period, its
   dates up to the current date). Then: the field for the measurement ("Did you do it?" Yes | No with nothing
@@ -617,8 +655,8 @@ as the demo account with history and read its goals' histories.
 - **HP-008**: The hosted demo's smoke check (`tools/HT.SmokeCheck`) MUST also sign in as `demo4@example.com` and
   find the name of each of its demo goals on its Goals page, the words "Met", "Failed" and "Pending" on the page
   of "Reading, 20 min daily", and "Failed" and "Missed" on the page of "Yoga, 3 times a week" (its weeks 2 and 3
-  are among the first 10 History rows whatever the weekday); every new data parameter of the demo data port gets
-  its `SmokeCheckCoverage` entry (slice 3 "Coverage rule").
+  are among the first 10 History rows whatever the weekday); every data parameter of the demo data ports, demo
+  loading's and demo history loading's, gets its `SmokeCheckCoverage` entry (slice 3 "Coverage rule").
 - **HP-009**: The hosted demo MUST show demo4's Met, Failed, Missed, Pending and Due results, relative to the
   current day, on every day until 2027-01-31, not only on the day of a deployment: the hosting workflow
   (`.github/workflows/deploy-demo.yml`) gains a daily `schedule` trigger shortly after midnight UTC that runs
@@ -771,5 +809,6 @@ The roadmap places these decisions in this slice. Each is answered by the owner 
 - Duration records are in whole minutes for goals in minutes and in hours alike; no seconds and no fractions.
 - No account is deactivated yet (slice 11); no rule for a deactivated owner's records.
 - Demo data stays visibly synthetic (`example.com`, constitution VI); demo notes are short invented sentences.
+- Entries older than 366 days are not listed on the goal page in this slice; no demo goal is that old.
 - A local database keeps `demo4`'s history relative to the day it was first created and drifts from then on,
   until the database is recreated (ADR 0013, ADR 0018); only the hosted demo is refreshed daily.

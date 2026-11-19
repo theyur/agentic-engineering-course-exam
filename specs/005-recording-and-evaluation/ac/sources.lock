@@ -1,0 +1,11 @@
+{
+  "group": "sources",
+  "feature": "specs/005-recording-and-evaluation",
+  "files": {
+    "specs/005-recording-and-evaluation/acceptance.md": "dc05f60b4aa2a1470fcf90f46bd76b00086d481208cc82e74d4b2a866e911b61"
+  },
+  "spec": {
+    "path": "specs/005-recording-and-evaluation/spec.md",
+    "sha256": "9b12232e72acae0f2b278c5bb14026072e9c357adc609ff183521975ae1eebd6"
+  }
+}

@@ -19,14 +19,14 @@ The second part of the preview shows the page as slice 4 builds it (HP-001, HP-0
 - Habit: the habit's glyph, its name, the category Tag (a custom habit adds the strong "Private" Tag) and ghost "Change" (accessible name "Change habit"). With no habit: "Choose the habit this goal is for." and secondary "Choose a habit". Both buttons open the habit chooser.
 - Habit chooser: a Dialog "Choose a habit" with the sub line "Catalog habits and your custom habits", a SearchField "Search habits", then the list "Catalog" (the Published catalog habits) and the list "Your custom habits" (only when the user has one), each in name order. Each row is a button with the glyph, the name and "category · intent" ("Mind · Build"). The search matches names as the catalog search does; with no match the Dialog says "No habit matches your search.". Choosing a row closes the Dialog and starts the form again from that habit's starting values (FR-007), as if the page had been opened with it. Cancel, × and Esc close it with no change. Focus moves to the SearchField on open and returns to the button that opened it.
 - "Do you want to build or reduce it?" with its help line and the SegmentedControl Build | Reduce, whose group label is "Build or reduce" (never "intent", `CONTEXT.md`). A catalog habit's starting values choose it; with no habit or a custom habit, the habit's intent chooses it.
-- "How do you measure it?": ChoiceCards Yes / no ("Did it or not"), Count ("Times, pages, cups") and Duration ("Minutes or hours").
+- "How do you measure it?" with its help line "You can record partial amounts; the target decides the result." (added by slice 5, HP-005, as the full preview shows it): ChoiceCards Yes / no ("Did it or not"), Count ("Times, pages, cups") and Duration ("Minutes or hours").
 - Target, for Count and Duration only: "At least" (Build) or "At most" (Reduce), the Stepper (Build 1 to 999, Reduce 0 to 999), then the unit: a text input for Count, or the SegmentedControl Minutes | Hours for Duration. Yes / no has no Target section.
 - "When?": ChoiceCards "On fixed days" ("For example Mon to Fri") and "A number of times" ("For example 5 times a week").
   - Fixed days: the DayPicker, then "Each selected day is one commitment.".
   - A number of times: the Stepper (1 to 20), "time" for 1 or "times", the SegmentedControl Per day | Per week, then "Each day is evaluated as a whole." or "Each week, Monday to Sunday, is evaluated as a whole.".
 - Start date (a date input, today at first) and "Name (optional)", side by side (`ht-field-pair`, one column on phones).
 - Actions: primary "Create goal" and secondary "Cancel". "Create goal" asks for no confirmation and opens the new goal's page (`/goals/{id}`).
-- No "You can record partial amounts" and no "You can excuse a single day later": recording comes in slice 5, excusals in slice 7.
+- No "You can excuse a single day later": excusals come in slice 7.
 
 ### Summary card
 

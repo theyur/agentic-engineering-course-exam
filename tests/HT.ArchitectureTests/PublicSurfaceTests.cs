@@ -25,6 +25,28 @@ public sealed class PublicSurfaceTests
         Assert.Empty(assembly.GetExportedTypes().SelectMany(Violations));
     }
 
+    /// <summary>
+    /// Slice 5 (research R-13): the new public types of <c>HT.Domain.Records</c>, <c>HT.Domain.Evaluation</c> and
+    /// <c>HT.Application.Records</c> are in the surface checked above and have no NodaTime type in a signature. The
+    /// namespaces must be exported and hold the named types, so moving them cannot make the rule pass on nothing.
+    /// </summary>
+    [Theory]
+    [InlineData("HT.Domain.Records", "RecordValue")]
+    [InlineData("HT.Domain.Evaluation", "Evaluator")]
+    [InlineData("HT.Application.Records", "RecordingText")]
+    [InlineData("HT.Application.Records", "IRecordStore")]
+    [InlineData("HT.Application.Records", "RecordPreview")]
+    public void TheNewRecordingTypesHaveNoNodaTimeTypeInTheirSignatures(string ns, string typeName)
+    {
+        var types = new[] { ArchitectureModel.Domain, ArchitectureModel.Application }
+            .SelectMany(a => a.GetExportedTypes())
+            .Where(t => t.Namespace == ns)
+            .ToList();
+
+        Assert.Contains(types, t => t.Name == typeName);
+        Assert.Empty(types.SelectMany(Violations));
+    }
+
     /// <summary>The check sees every kind of signature, so a gap in it cannot pass silently.</summary>
     [Fact]
     public void TheCheckRecognisesEveryKindOfSignature()

@@ -98,6 +98,44 @@ public static class GoalTimeline
     }
 
     /// <summary>
+    /// The commitment or evaluation period that <paramref name="date"/> belongs to (slice 5 FR-002, research R-03),
+    /// from <see cref="TryCalendar"/>: the commitment of <paramref name="date"/>, its day, or the week that contains
+    /// it. Null for an unscheduled day of a commitment-based goal, a date before the start date, or a date before a
+    /// per-week goal's first week.
+    /// </summary>
+    public static CalendarEntry? EntryOf(Goal goal, DateOnly date) =>
+        TryEntries(goal, date, date, out var entries)
+            ? entries.FirstOrDefault(entry => entry.FirstDate <= date && date <= entry.LastDate)
+            : null;
+
+    /// <summary>
+    /// Whether the day of <paramref name="date"/> has begun on the goal's timeline at <paramref name="instant"/>
+    /// (slice 5 FR-002, FR-007): the goal has a current date and <paramref name="date"/> is on or before it. For a
+    /// per-week goal the date itself must have begun, not only its week.
+    /// </summary>
+    public static bool HasBegun(Goal goal, DateOnly date, DateTimeOffset instant) =>
+        CurrentDate(goal, instant) is { } current && date <= current;
+
+    /// <summary>
+    /// The commitments or evaluation periods of <see cref="TryCalendar"/> from <paramref name="first"/> to
+    /// <paramref name="last"/> as entries, in date order (slice 5 research R-03), with the same range rule: false when
+    /// <paramref name="last"/> is before <paramref name="first"/> or the range has more than 366 days.
+    /// </summary>
+    public static bool TryEntries(Goal goal, DateOnly first, DateOnly last, [NotNullWhen(true)] out IReadOnlyList<CalendarEntry>? entries)
+    {
+        entries = null;
+        if (!TryCalendar(goal, first, last, out var calendar))
+        {
+            return false;
+        }
+
+        entries = calendar.Kind == GoalScheduleKind.CommitmentBased
+            ? calendar.Commitments.Select(c => new CalendarEntry(c.Date, c.Date, c.Starts, c.Ends)).ToArray()
+            : calendar.Periods.Select(p => new CalendarEntry(p.FirstDate, p.LastDate, p.Starts, p.Ends)).ToArray();
+        return true;
+    }
+
+    /// <summary>
     /// The date of a commitment-based goal's next commitment at <paramref name="instant"/> (FR-014): the first
     /// scheduled day on or after the start date whose end, by its own instants, is after the instant. For a goal
     /// that has not started, its first scheduled day. Null for a period-based goal.

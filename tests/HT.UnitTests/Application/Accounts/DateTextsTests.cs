@@ -84,6 +84,30 @@ public sealed class DateTextsTests
         Assert.Equal("member since January 2027", AccountTexts.MemberSince(2027, 1));
     }
 
+    [Theory]
+    [InlineData("ar-SA")]
+    [InlineData("uk-UA")]
+    [InlineData("th-TH")]
+    public void A_week_range_names_the_month_once_within_a_month_and_both_months_across_a_month_or_year_end(string cultureName)
+    {
+        using var culture = new CultureScope(cultureName);
+
+        Assert.Equal("10 – 16 Aug", DateTexts.WeekRange(new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 16)));
+        Assert.Equal("28 Sep – 4 Oct", DateTexts.WeekRange(new DateOnly(2026, 9, 28), new DateOnly(2026, 10, 4)));
+        Assert.Equal("28 Dec – 3 Jan", DateTexts.WeekRange(new DateOnly(2026, 12, 28), new DateOnly(2027, 1, 3)));
+    }
+
+    [Fact]
+    public void A_week_range_has_an_en_dash_between_spaces_and_no_leading_zero()
+    {
+        using var culture = new CultureScope("ar-SA");
+
+        var text = DateTexts.WeekRange(new DateOnly(2026, 10, 26), new DateOnly(2026, 11, 1));
+
+        Assert.Equal("26 Oct – 1 Nov", text);
+        Assert.Equal("1 – 7 Feb", DateTexts.WeekRange(new DateOnly(2027, 2, 1), new DateOnly(2027, 2, 7)));
+    }
+
     [Fact]
     public void A_single_digit_day_has_no_leading_zero()
     {

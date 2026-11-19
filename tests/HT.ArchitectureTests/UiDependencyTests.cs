@@ -3,6 +3,7 @@ using HT.Application.Accounts;
 using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Application.Operator;
+using HT.Application.Records;
 using Xunit;
 
 using static ArchUnitNET.Fluent.ArchRuleDefinition;
@@ -69,6 +70,15 @@ public sealed class UiDependencyTests
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
             .Should().NotDependOnAny(Types(true).That().Are(typeof(IGoalStore)))
             .Because("goals are private; pages reach them only through the use cases, which scope every call to the acting user (constitution III, slice 4 research R-13)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
+    public void NoUiTypeMayDependOnTheRecordStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IRecordStore)))
+            .Because("records and notes are private; pages reach them only through RecordingService, which scopes every call to the acting user and the goal (constitution III, slice 5 research R-13)")
             .Check(ArchitectureModel.Architecture);
     }
 

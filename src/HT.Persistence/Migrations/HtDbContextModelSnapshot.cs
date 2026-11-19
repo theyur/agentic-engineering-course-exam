@@ -342,6 +342,59 @@ namespace HT.Persistence.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("HT.Persistence.Records.GoalNoteRow", b =>
+                {
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("EntryDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("GoalId", "EntryDate");
+
+                    b.ToTable("GoalNotes", (string)null);
+                });
+
+            modelBuilder.Entity("HT.Persistence.Records.GoalRecordRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Amount")
+                        .HasColumnType("int");
+
+                    b.Property<byte?>("Answer")
+                        .HasColumnType("tinyint");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Sequence")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Sequence"));
+
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"), false);
+
+                    b.HasIndex("GoalId", "Date", "Sequence")
+                        .HasDatabaseName("IX_GoalRecords_GoalId_Date_Sequence");
+
+                    SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("GoalId", "Date", "Sequence"));
+
+                    b.ToTable("GoalRecords", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -517,6 +570,24 @@ namespace HT.Persistence.Migrations
                     b.HasOne("HT.Persistence.Identity.HtUser", null)
                         .WithMany()
                         .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HT.Persistence.Records.GoalNoteRow", b =>
+                {
+                    b.HasOne("HT.Persistence.Goals.GoalRow", null)
+                        .WithMany()
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HT.Persistence.Records.GoalRecordRow", b =>
+                {
+                    b.HasOne("HT.Persistence.Goals.GoalRow", null)
+                        .WithMany()
+                        .HasForeignKey("GoalId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

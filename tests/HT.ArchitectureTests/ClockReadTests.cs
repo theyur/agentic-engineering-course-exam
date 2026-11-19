@@ -59,6 +59,32 @@ public sealed class ClockReadTests
         Assert.Empty(violations);
     }
 
+    /// <summary>
+    /// Slice 5 research R-13: <c>HT.Domain.Records</c> and <c>HT.Domain.Evaluation</c> exist, call no forbidden member,
+    /// and use no clock, time zone or culture type at all: time enters only as <see cref="DateTimeOffset"/> parameters.
+    /// </summary>
+    [Fact]
+    public void RecordsAndEvaluationReadNoClockTimeZoneOrCulture()
+    {
+        foreach (var ns in DomainDependencyTests.RecordsAndEvaluation)
+        {
+            var violations = DomainDependencyTests.TypesIn(ns)
+                .SelectMany(t => Calls(t).Select(call => $"{t.FullName} calls {call}"))
+                .Where(line => ForbiddenMembers.Any(line.Contains))
+                .Distinct()
+                .ToList();
+            Assert.Empty(violations);
+
+            Types().That().ResideInNamespaceMatching($"^{System.Text.RegularExpressions.Regex.Escape(ns)}$")
+                .Should().NotDependOnAny(Types(true).That().ResideInNamespaceMatching(@"^(NodaTime|HT\.Domain\.Time)(\..*)?$")
+                    .Or().HaveFullName("System.TimeProvider")
+                    .Or().HaveFullName("System.TimeZoneInfo")
+                    .Or().HaveFullName("System.Globalization.CultureInfo"))
+                .Because("records and evaluation get the time as an instant parameter and read no time zone or culture (research R-13)")
+                .Check(ArchitectureModel.Architecture);
+        }
+    }
+
     /// <summary>Each forbidden member name matches a real call, so a misspelt entry cannot pass silently.</summary>
     [Fact]
     public void EveryForbiddenMemberIsRecognisedInACall()

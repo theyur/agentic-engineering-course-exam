@@ -1,9 +1,11 @@
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Records;
 using HT.Persistence.Goals;
 using HT.Persistence.Habits;
 using HT.Persistence.Identity;
+using HT.Persistence.Records;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -11,7 +13,8 @@ using Microsoft.EntityFrameworkCore.Metadata;
 namespace HT.Persistence;
 
 /// <summary>
-/// Identity's user tables (no role tables, research R-02), the habit tables of slice 2 and the goal tables of slice 4.
+/// Identity's user tables (no role tables, research R-02), the habit tables of slice 2, the goal tables of slice 4 and
+/// the record and note tables of slice 5.
 /// </summary>
 internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
     : IdentityUserContext<HtUser, Guid>(options)
@@ -31,6 +34,10 @@ internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
     public DbSet<GoalSettingsVersionRow> GoalSettingsVersions => Set<GoalSettingsVersionRow>();
 
     public DbSet<GoalAttemptRow> GoalAttempts => Set<GoalAttemptRow>();
+
+    public DbSet<GoalRecordRow> GoalRecords => Set<GoalRecordRow>();
+
+    public DbSet<GoalNoteRow> GoalNotes => Set<GoalNoteRow>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -145,6 +152,30 @@ internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
             attempt.ToTable("GoalAttempts");
             attempt.HasKey(a => new { a.GoalId, a.Number });
             attempt.Property(a => a.Number).ValueGeneratedNever();
+        });
+
+        // Slice 5 (data-model.md "Tables"): no check constraints; the mapping keeps the value rule (research R-06).
+        builder.Entity<GoalRecordRow>(record =>
+        {
+            record.ToTable("GoalRecords");
+            record.HasKey(r => r.Id).IsClustered(false);
+            record.Property(r => r.Id).ValueGeneratedNever();
+            record.HasOne<GoalRow>().WithMany().HasForeignKey(r => r.GoalId).OnDelete(DeleteBehavior.Cascade);
+            record.Property(r => r.Date).HasColumnType("date");
+            record.Property(r => r.Answer).HasColumnType("tinyint");
+            record.Property(r => r.Sequence).UseIdentityColumn();
+            record.HasIndex(r => new { r.GoalId, r.Date, r.Sequence })
+                .IsClustered()
+                .HasDatabaseName("IX_GoalRecords_GoalId_Date_Sequence");
+        });
+
+        builder.Entity<GoalNoteRow>(note =>
+        {
+            note.ToTable("GoalNotes");
+            note.HasKey(n => new { n.GoalId, n.EntryDate });
+            note.HasOne<GoalRow>().WithMany().HasForeignKey(n => n.GoalId).OnDelete(DeleteBehavior.Cascade);
+            note.Property(n => n.EntryDate).HasColumnType("date");
+            note.Property(n => n.Text).HasMaxLength(RecordLimits.MaxNoteLength).IsRequired();
         });
     }
 }

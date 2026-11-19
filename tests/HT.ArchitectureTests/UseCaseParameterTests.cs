@@ -2,7 +2,9 @@ using System.Reflection;
 using HT.Application.Accounts;
 using HT.Application.Goals;
 using HT.Application.Habits;
+using HT.Application.Records;
 using HT.Domain.Accounts;
+using HT.Domain.Goals;
 using Xunit;
 
 namespace HT.ArchitectureTests;
@@ -11,7 +13,8 @@ namespace HT.ArchitectureTests;
 /// Research R-12, constitution III: the parameters of the habit use cases and ports, checked by reflection. The
 /// public catalog takes no acting user, or the acting user first for its goal information (slice 4 research R-09);
 /// use cases for signed-in users take the acting user first and never an
-/// account identifier; the custom-habit port and the goal port take the owner first.
+/// account identifier; the custom-habit port and the goal port take the owner first, and the record port the owner
+/// and then the goal (slice 5 research R-13).
 /// </summary>
 public sealed class UseCaseParameterTests
 {
@@ -50,6 +53,21 @@ public sealed class UseCaseParameterTests
         var offenders = methods
             .Where(m => m.Name != CountAcrossOwners)
             .Where(m => m.GetParameters() is not [{ } first, ..] || first.ParameterType != typeof(AccountId))
+            .Select(m => m.Name)
+            .ToList();
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
+    public void Every_method_of_the_record_port_takes_the_owner_first_and_the_goal_second_with_no_exception()
+    {
+        var methods = typeof(IRecordStore).GetMethods();
+        Assert.NotEmpty(methods);
+
+        var offenders = methods
+            .Where(m => m.GetParameters() is not [{ } first, { } second, ..]
+                || first.ParameterType != typeof(AccountId)
+                || second.ParameterType != typeof(GoalId))
             .Select(m => m.Name)
             .ToList();
         Assert.Empty(offenders);

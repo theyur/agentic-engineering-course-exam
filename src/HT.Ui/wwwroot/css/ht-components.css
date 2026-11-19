@@ -456,3 +456,15 @@ a.ht-tab { display:inline-block; text-decoration:none; }
 button.ht-select-row { font:inherit; width:100%; border:0; background:transparent; color:var(--ink); text-align:left; }
 .ht-select-row:hover { background:var(--surface-2); }
 .ht-select-row .ht-row__name, .ht-select-row .ht-row__meta { display:block; }
+
+/* ---------- slice 5: recording and evaluation ---------- */
+/* a card head's muted sentence beside its title (the goal page's History card) */
+.ht-card__head .ht-card__sub { margin:0; }
+/* a DataTable inside a Card: the card is the frame (the goal page's History card) */
+.ht-card .ht-table-wrap { border:0; border-radius:0; box-shadow:none; }
+/* the button under a table that shows the rest of its rows ("Show all N →") */
+.ht-table-wrap + .ht-btn { margin-top:var(--space-2); }
+/* buttons inside a table's data cells (a note, a period's records) wrap like text */
+.ht-table td:not(.ht-actions) .ht-btn { white-space:normal; text-align:left; }
+/* the RecordDialog's progress bar beside its progress text */
+.ht-target > .ht-progress { flex:1; margin:0; max-width:none; }

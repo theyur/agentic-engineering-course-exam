@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-11-18"
+updated_at: "2026-11-19"
 ---
 
 # Roadmap — Habit Tracker
@@ -31,7 +31,7 @@ in its idea brief, which assumed the catalog also carried the account foundation
 | 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | — | shipped | [002](../specs/002-habit-catalog/spec.md) |
 | 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | — | shipped | [003](../specs/003-demo-hosting/spec.md) |
 | 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | — | shipped | [004](../specs/004-goals/spec.md) |
-| 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Now | clarified | [005](../specs/005-recording-and-evaluation/spec.md) |
+| 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Now | implementing | [005](../specs/005-recording-and-evaluation/spec.md) |
 | 6 | `personal-reports` | A user sees how consistent they are: a dashboard of upcoming, due and overdue commitments and Missed results, consistency with its count, strict streaks with their unit, trends. | §6 | 5 | — | Next | not started | — |
 | 7 | `excusals-and-pauses` | Excused commitments and paused expectations are left out of consistency and neither extend nor break the streak. | §5.3 | 5, 6 | — | Next | not started | — |
 | 8 | `goal-changes` | A user changes a goal from the next evaluation boundary, ends it with an outcome, and restarts it as a new attempt, with earlier attempts kept in history. | §5.4 | 5, 6 | 7 | Later | not started | — |
