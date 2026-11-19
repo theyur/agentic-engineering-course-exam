@@ -115,6 +115,80 @@ public sealed class PageReaderTests
     }
 
     [Fact]
+    public void ReadGoalLinks_pairs_each_goal_item_name_with_its_decoded_href()
+    {
+        const string html = """
+            <div class="ht-goalitem"><div><a class="ht-goalitem__name" href="/goals/7?from=a&amp;b">Read &amp; reflect</a></div></div>
+            <a href="/goals/8" class="ht-link ht-goalitem__name"><span>Morning</span> <em>yoga</em></a>
+            <a class="ht-goalitem__name">No link</a>
+            <a class="ht-goalitem__name-extra" href="/goals/9">Not a goal name</a>
+            <a href="/goals/new">New goal</a>
+            """;
+
+        Assert.Equal(
+            [new GoalLink("Read & reflect", "/goals/7?from=a&b"), new GoalLink("Morning yoga", "/goals/8"), new GoalLink("No link", null)],
+            PageReader.ReadGoalLinks(html));
+    }
+
+    [Fact]
+    public void ReadGoalLinks_is_empty_without_a_goal_item()
+    {
+        Assert.Empty(PageReader.ReadGoalLinks("<h1>Goals</h1><p>No goals yet.</p>"));
+    }
+
+    [Fact]
+    public void ReadCardText_reads_only_the_card_with_that_title_and_not_the_settings_card()
+    {
+        const string html = """
+            <section class="ht-card"><div class="ht-card__head"><h2 class="ht-card__title">Settings</h2></div>
+                <p>Met Failed Missed Pending Due today 12 min</p></section>
+            <section class="ht-card ht-card--wide"><div class="ht-card__head"><h2 class="ht-card__title">History</h2>
+                <span class="ht-spacer"></span><p class="ht-card__sub">Corrections are evaluated with the rules of that date.</p></div>
+                <table><tr>
+                    <td><b>Sat 7</b></td>
+                    <td>20 min</td>
+                    <td><span class="ht-chip ht-status">Met</span></td>
+                    <td><button aria-label="Don&#x27;t stop, edit note of Sat 7">Don&#x27;t
+                        stop</button></td>
+                </tr></table>
+            </section>
+            <section class="ht-card"><h2 class="ht-card__title">History</h2><p>A second card</p></section>
+            <p>After the card: Missed</p>
+            """;
+
+        var text = PageReader.ReadCardText(html, "History");
+
+        Assert.NotNull(text);
+        Assert.StartsWith("History Corrections are evaluated with the rules of that date.", text, StringComparison.Ordinal);
+        Assert.Contains("Sat 7 20 min Met Don't stop", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Failed", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Missed", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("12 min", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("A second card", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-label", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReadCardText_reads_a_title_with_nested_markup()
+    {
+        const string html = """<section class="ht-card"><h2 class="ht-card__title"><span>His</span>tory &amp; more</h2> <p>Met</p></section>""";
+
+        Assert.Equal("History & more Met", PageReader.ReadCardText(html, "History & more"));
+        Assert.Null(PageReader.ReadCardText(html, "History"));
+    }
+
+    [Theory]
+    [InlineData("""<h1>Goal</h1><section class="ht-card"><h2 class="ht-card__title">Settings</h2><p>Met</p></section>""")]
+    [InlineData("""<div class="ht-card"><h2 class="ht-card__title">History</h2><p>Met</p></div>""")]
+    [InlineData("""<section class="ht-card-extra"><h2 class="ht-card__title">History</h2><p>Met</p></section>""")]
+    [InlineData("""<section class="ht-card"><h2>History</h2><p>Met</p></section>""")]
+    [InlineData("""<section class="ht-card"><h2 class="ht-card__title">History</h2><p>Met</p>""")]
+    public void ReadCardText_is_null_without_a_closed_card_section_of_that_title(string html)
+    {
+        Assert.Null(PageReader.ReadCardText(html, "History"));
+    }
+
+    [Fact]
     public void ReadAssetUrls_returns_stylesheets_and_scripts_in_document_order_without_inline_scripts()
     {
         const string html = """

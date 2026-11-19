@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
 using HT.Application.Operator;
@@ -11,7 +12,8 @@ namespace HT.UiTests.SmokeChecks;
 /// T008, T024, T025: the smoke check against a scripted site (<see cref="ScriptedHandler"/>), through
 /// <see cref="SmokeCheckCommand.RunAsync"/> with no network: check 1 <c>home</c>, check 2 <c>https-redirect</c>,
 /// check 3 <c>catalog</c>, check 4 <c>administrator</c>, check 5 <c>demo &lt;email&gt;</c> (with slice 4's goal names and
-/// account name, HP-018), the <c>TIMING</c> line and the result.
+/// account name, HP-018), check 6 <c>demo history demo4@example.com</c> (slice 5 HP-008, research R-10), the
+/// <c>TIMING</c> line and the result.
 /// </summary>
 public sealed class RunnerBehaviourTests
 {
@@ -62,11 +64,30 @@ public sealed class RunnerBehaviourTests
     private static readonly IReadOnlyList<string> DemoGoalNames =
         [.. DemoDataService.DemoEmails.SelectMany(DemoGoals.DisplayNames)];
 
+    /// <summary>The names of demo4's goals: what check 6 expects on Goals (slice 5 research R-10).</summary>
+    private static readonly IReadOnlyList<string> HistoryGoalNames = DemoHistory.GoalNames;
+
+    /// <summary>What check 6 expects in the History card of "Reading": Met, Failed, Pending, Due today, the partial amount and the note.</summary>
+    private static readonly IReadOnlyList<string> ReadingTexts =
+        ["Met", "Failed", "Pending", "Due today", "12 min", DemoHistory.ReadingNote];
+
+    /// <summary>What check 6 expects in the History card of "Yoga".</summary>
+    private static readonly IReadOnlyList<string> YogaTexts = ["Failed", "Missed"];
+
+    /// <summary>The good site's Goals page: every demo goal of checks 5 and 6, then a reviewer's goal.</summary>
+    private static readonly IReadOnlyList<string> AllGoalNames = [.. DemoGoalNames, .. HistoryGoalNames, "A reviewer's goal"];
+
+    /// <summary>The goal page paths of "Reading" and "Yoga" on the good site, as <see cref="GoalsPage"/> links them.</summary>
+    private static readonly string ReadingPath = GoalPath(DemoGoalNames.Count);
+
+    private static readonly string YogaPath = GoalPath(DemoGoalNames.Count + 2);
+
     /// <summary>
     /// The good site: the visitor Home, the redirect, the catalog with every Published seed habit, the sign-in form
     /// (every sign-in is accepted), the admin page, a custom-habits page with every demo custom habit that links one
-    /// stylesheet and one script, a Goals page with every demo goal and a reviewer's goal, and a Profile page whose
-    /// first heading is "Demo One".
+    /// stylesheet and one script, a Goals page with every demo goal, demo4's included, and a reviewer's goal, a Profile
+    /// page whose first heading is "Demo One", and the goal pages of "Reading" and "Yoga" with their History cards after
+    /// a Settings card.
     /// </summary>
     private static ScriptedHandler GoodSite() => new ScriptedHandler()
         .On(HttpMethod.Get, Https, ScriptedHandler.Html(VisitorHome))
@@ -76,8 +97,10 @@ public sealed class RunnerBehaviourTests
         .On(HttpMethod.Post, Https + "sign-in", ScriptedHandler.Redirect(HttpStatusCode.Found, "/"))
         .On(HttpMethod.Get, Https + "admin", ScriptedHandler.Html("<!DOCTYPE html><html><body><h1>Admin</h1></body></html>"))
         .On(HttpMethod.Get, Https + "custom-habits", ScriptedHandler.Html(CardsPage(DemoHabitNames)))
-        .On(HttpMethod.Get, Https + "goals", ScriptedHandler.Html(GoalsPage([.. DemoGoalNames, "A reviewer's goal"])))
+        .On(HttpMethod.Get, Https + "goals", ScriptedHandler.Html(GoalsPage(AllGoalNames)))
         .On(HttpMethod.Get, Https + "profile", ScriptedHandler.Html(ProfilePage("Demo One")))
+        .On(HttpMethod.Get, Https + ReadingPath[1..], ScriptedHandler.Html(GoalPage(["Sat 7", "20 min", .. ReadingTexts, "Show all 28 →"])))
+        .On(HttpMethod.Get, Https + YogaPath[1..], ScriptedHandler.Html(GoalPage(["Mon 2", "Yes", .. YogaTexts])))
         .On(HttpMethod.Get, Stylesheet, ScriptedHandler.Html("body {}"))
         .On(HttpMethod.Get, Script, ScriptedHandler.Html("// script"));
 
@@ -100,18 +123,128 @@ public sealed class RunnerBehaviourTests
                 "PASS demo demo1@example.com (5 of 5)",
                 "PASS demo demo2@example.com (4 of 4)",
                 "PASS demo demo3@example.com (5 of 5)",
+
+                // Slice 5 HP-008, SC-005: 3 goal names, 6 texts on Reading's page and 2 on Yoga's.
+                "PASS demo history demo4@example.com (11 of 11)",
             ],
-            lines.Take(7));
-        Assert.Matches(FirstTiming, lines[7]);
-        Assert.Equal("RESULT PASS", lines[8]);
-        Assert.Equal(9, lines.Count);
+            lines.Take(8));
+        Assert.Matches(FirstTiming, lines[8]);
+        Assert.Equal("RESULT PASS", lines[9]);
+        Assert.Equal(10, lines.Count);
         Assert.Single(site.Requests, r => r == "GET " + Stylesheet);
         Assert.Single(site.Requests, r => r == "GET " + Script);
-        Assert.Equal(3, site.Requests.Count(r => r == "GET " + Https + "goals"));
+        Assert.Equal(4, site.Requests.Count(r => r == "GET " + Https + "goals"));
         Assert.Equal(1, site.Requests.Count(r => r == "GET " + Https + "profile"));
+        Assert.Single(site.Requests, r => r == "GET " + Https + ReadingPath[1..]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + YogaPath[1..]);
         Assert.All(
             DemoHabitNames.Concat(PublishedNames).Concat(DemoGoalNames).Append("Demo One"),
             name => Assert.DoesNotContain(name, string.Join('\n', lines), StringComparison.Ordinal));
+        AssertNoDemoHistoryContent(lines);
+    }
+
+    [Fact]
+    public async Task Demo_history_fails_when_its_sign_in_is_refused_and_the_other_checks_pass()
+    {
+        // The administrator and demo1 to demo3 sign in; demo4, the last sign-in, goes back to Sign in.
+        var accepted = ScriptedHandler.Redirect(HttpStatusCode.Found, "/");
+        var site = GoodSite().On(HttpMethod.Post, Https + "sign-in",
+            accepted, accepted, accepted, accepted, ScriptedHandler.Redirect(HttpStatusCode.Found, "/sign-in"));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("PASS demo demo3@example.com (5 of 5)", lines[6]);
+        Assert.Equal("FAIL demo history demo4@example.com: the sign-in was refused", lines[7]);
+        Assert.Matches(FirstTiming, lines[8]);
+        Assert.Equal("RESULT FAIL", lines[^1]);
+    }
+
+    [Fact]
+    public async Task Demo_history_fails_with_the_status_when_its_goals_page_is_not_shown()
+    {
+        // Goals is one page on this site, so checks 5 fail too; check 6 names the status, not a goal.
+        var site = GoodSite().On(HttpMethod.Get, Https + "goals", ScriptedHandler.Status(HttpStatusCode.InternalServerError));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("FAIL demo history demo4@example.com: GET /goals gave status 500", lines[7]);
+        Assert.DoesNotContain(site.Requests, r => r == "GET " + Https + ReadingPath[1..]);
+        AssertNoDemoHistoryContent(lines);
+    }
+
+    [Fact]
+    public async Task Demo_history_fails_when_its_goals_page_misses_a_goal_name_and_still_reads_both_goal_pages()
+    {
+        var site = GoodSite().On(HttpMethod.Get, Https + "goals",
+            ScriptedHandler.Html(GoalsPage([.. AllGoalNames.Select(n => n == HistoryGoalNames[1] ? "Another goal" : n)])));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("FAIL demo history demo4@example.com: 2 of 3 goal names shown", lines[7]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + ReadingPath[1..]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + YogaPath[1..]);
+        AssertNoDemoHistoryContent(lines);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("https://elsewhere.example.net/goals/1")]
+    [InlineData("//elsewhere.example.net/goals/1")]
+    public async Task Demo_history_fails_when_a_goal_page_has_no_link_on_its_own_site(string href)
+    {
+        var yogaAnchor = $" href=\"{YogaPath}\"";
+        var goals = GoalsPage(AllGoalNames).Replace(yogaAnchor, href == "none" ? string.Empty : $" href=\"{href}\"", StringComparison.Ordinal);
+        var site = GoodSite().On(HttpMethod.Get, Https + "goals", ScriptedHandler.Html(goals));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("FAIL demo history demo4@example.com: no link for goal page 3", lines[7]);
+        Assert.DoesNotContain(site.Requests, r => r.Contains("elsewhere", StringComparison.Ordinal));
+        AssertNoDemoHistoryContent(lines);
+    }
+
+    [Fact]
+    public async Task Demo_history_fails_with_the_status_of_a_goal_page_that_is_not_shown()
+    {
+        var site = GoodSite().On(HttpMethod.Get, Https + ReadingPath[1..], ScriptedHandler.Status(HttpStatusCode.NotFound));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("FAIL demo history demo4@example.com: GET goal page 1 gave status 404", lines[7]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + YogaPath[1..]);
+        AssertNoDemoHistoryContent(lines);
+    }
+
+    [Fact]
+    public async Task Demo_history_fails_when_the_history_card_misses_the_note()
+    {
+        var site = GoodSite().On(HttpMethod.Get, Https + ReadingPath[1..],
+            ScriptedHandler.Html(GoalPage([.. ReadingTexts.Where(t => t != DemoHistory.ReadingNote)])));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("FAIL demo history demo4@example.com: 5 of 6 texts on goal page 1 shown", lines[7]);
+        AssertNoDemoHistoryContent(lines);
+    }
+
+    [Fact]
+    public async Task Demo_history_does_not_count_texts_outside_the_history_card()
+    {
+        // Yoga's states only in the Settings card and after the History card: none of them counts.
+        var site = GoodSite().On(HttpMethod.Get, Https + YogaPath[1..],
+            ScriptedHandler.Html(GoalPage(["Mon 2", "Yes"], settings: YogaTexts, after: YogaTexts)));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("FAIL demo history demo4@example.com: 0 of 2 texts on goal page 3 shown", lines[7]);
+        AssertNoDemoHistoryContent(lines);
     }
 
     [Fact]
@@ -154,7 +287,7 @@ public sealed class RunnerBehaviourTests
         Assert.Equal(1, exitCode);
         Assert.Equal("FAIL demo demo1@example.com: 0 of 2 custom habits shown", lines[4]);
         Assert.Equal("FAIL demo demo2@example.com: 0 of 2 custom habits shown", lines[5]);
-        Assert.Equal(3, site.Requests.Count(r => r == "GET " + Https + "goals"));
+        Assert.Equal(4, site.Requests.Count(r => r == "GET " + Https + "goals"));
         Assert.Equal(1, site.Requests.Count(r => r == "GET " + Https + "profile"));
     }
 
@@ -208,9 +341,12 @@ public sealed class RunnerBehaviourTests
         Assert.Equal(1, exitCode);
         Assert.Equal("PASS administrator", lines[3]);
         Assert.Equal(
-            [.. DemoDataService.DemoEmails.Select(e => $"FAIL demo {e}: the sign-in was refused")],
-            lines.Skip(4).Take(3));
-        Assert.Matches(NoLaterTiming, lines[7]);
+            [
+                .. DemoDataService.DemoEmails.Select(e => $"FAIL demo {e}: the sign-in was refused"),
+                "FAIL demo history demo4@example.com: the sign-in was refused",
+            ],
+            lines.Skip(4).Take(4));
+        Assert.Matches(NoLaterTiming, lines[8]);
         Assert.Equal("RESULT FAIL", lines[^1]);
     }
 
@@ -326,13 +462,46 @@ public sealed class RunnerBehaviourTests
          </body></html>
          """;
 
-    /// <summary>A Goals page with one goal item per name, as <c>GoalItem</c> renders it.</summary>
+    /// <summary>A Goals page with one goal item per name, as <c>GoalItem</c> renders it, the i-th linking <see cref="GoalPath"/>(i).</summary>
     private static string GoalsPage(IEnumerable<string> names) =>
         $"""
          <!DOCTYPE html><html><body><h1>Goals</h1>
-         {string.Concat(names.Select((n, i) => $"<div class=\"ht-goalitem ht-goalitem--reduced\"><div><a class=\"ht-goalitem__name\" href=\"/goals/{i}\">{WebUtility.HtmlEncode(n)}</a><div class=\"ht-goalitem__meta\"><span>Every day</span></div></div></div>"))}
+         {string.Concat(names.Select((n, i) => $"<div class=\"ht-goalitem ht-goalitem--reduced\"><div><a class=\"ht-goalitem__name\" href=\"{GoalPath(i)}\">{WebUtility.HtmlEncode(n)}</a><div class=\"ht-goalitem__meta\"><span>Every day</span></div></div></div>"))}
          </body></html>
          """;
+
+    private static string GoalPath(int index) => string.Create(CultureInfo.InvariantCulture, $"/goals/{index}");
+
+    /// <summary>
+    /// A goal page as <c>GoalDetail</c> renders it: a Settings card with <paramref name="settings"/>, then the History card
+    /// (<c>HistoryCard</c>), one cell per text of <paramref name="history"/>, then <paramref name="after"/> outside every card.
+    /// </summary>
+    private static string GoalPage(IEnumerable<string> history, IEnumerable<string>? settings = null, IEnumerable<string>? after = null) =>
+        $"""
+         <!DOCTYPE html><html><body><h1>Goal</h1>
+         <section class="ht-card"><div class="ht-card__head"><h2 class="ht-card__title">Settings</h2></div>
+         {Cells(settings ?? ["Changes apply from the next commitment."])}
+         </section>
+         <section class="ht-card">
+           <div class="ht-card__head"><h2 class="ht-card__title">History</h2><span class="ht-spacer"></span>
+           <p class="ht-card__sub">Corrections are evaluated with the rules of that date.</p></div>
+           <table><tr>{Cells(history)}</tr></table>
+         </section>
+         {Cells(after ?? [])}
+         </body></html>
+         """;
+
+    private static string Cells(IEnumerable<string> texts) =>
+        string.Concat(texts.Select(t => $"<td><span class=\"ht-chip\">{WebUtility.HtmlEncode(t)}</span></td>\n"));
+
+    /// <summary>No line holds a demo4 goal name, note, amount or goal path (slice 5 HP-008, research R-10).</summary>
+    private static void AssertNoDemoHistoryContent(IReadOnlyList<string> lines)
+    {
+        var text = string.Join('\n', lines);
+        Assert.All(
+            [.. HistoryGoalNames, DemoHistory.ReadingNote, "12 min", "20 min", ReadingPath, YogaPath, "Settings", "Show all"],
+            value => Assert.DoesNotContain(value, text, StringComparison.Ordinal));
+    }
 
     /// <summary>A Profile page whose header's <c>h1</c> is <paramref name="heading"/>, as <c>Profile</c> renders it.</summary>
     private static string ProfilePage(string heading) =>

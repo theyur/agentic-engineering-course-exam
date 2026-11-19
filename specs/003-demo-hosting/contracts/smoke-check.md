@@ -3,6 +3,12 @@
 Research R-06. Decides whether a deployment or refresh succeeded (HP-017, SC-005) and is the check of SC-006
 (workflow mode `check`).
 
+> **Slice 5 (ADR 0018).** [ADR 0018](../../../docs/adr/0018-evaluation-on-read-and-demo-history.md) adds demo
+> history loading (`demo4@example.com`) and the daily scheduled refresh. This contract gains check 6
+> `demo history demo4@example.com`, the second demo data port `IDemoHistoryStore` in the coverage rule, and a
+> `Port` member in `CoverageEntry` (slice 5 HP-008, SC-005, research R-10,
+> `specs/005-recording-and-evaluation/contracts/host.md` "Smoke check"). Checks 1 to 5 are unchanged.
+
 ## Invocation
 
 ```text
@@ -33,12 +39,29 @@ with its own cookies on every call.
 | 3 | `catalog` | `GET /catalog` shows the name of every Published habit of `SeedCatalog.Habits` |
 | 4 | `administrator` | the configured administrator signs in and `GET /admin` returns 200 |
 | 5 | `demo <email>`, one per `DemoDataService.DemoEmails` | the account signs in with the demo password, `GET /custom-habits` shows the name of every habit of `DemoCustomHabits.For(<email>)`, `GET /goals` shows every name of `DemoGoals.DisplayNames(<email>)` (slice 4 HP-018), and for an account with a name (`DemoAccounts.NameFor(<email>)`: demo1, "Demo One") `GET /profile` has that name as its first `h1` |
+| 6 | `demo history demo4@example.com` (slice 5) | `DemoHistoryService.DemoEmail` signs in with the demo password, `GET /goals` shows the 3 names of `DemoHistory.GoalNames`, the History card of "Reading, 20 min daily" contains "Met", "Failed", "Pending", "Due today", "12 min" and "Fell asleep early.", and the History card of "Yoga, 3 times a week" contains "Failed" and "Missed": 11 expected texts |
 
 - Sign-in: `GET /sign-in`, read the antiforgery token and the `sign-in` handler, `POST /sign-in` with
   `Input.Email` and `Input.Password`, and expect a redirect that is not back to `/sign-in`.
 - "Shows every": the check passes when all expected names are on the page, whatever else is there. Data that
   reviewers add does not fail it (SC-005, SC-006); missing demo data does. Names are compared in memory after
   HTML decoding and never printed.
+- Check 6 (slice 5 research R-10):
+  - Its expected texts all come from `HT.Application`: the goal names from `DemoHistory.GoalNames`, the state
+    words from `RecordingText.State`, "12 min" from `RecordingText.Amount(Measurement.Duration, null,
+    DemoHistory.PartialMinutes)` and the note from `DemoHistory.ReadingNote`. None is typed in the tool.
+  - The goal page links come from `PageReader.ReadGoalLinks` on the same `GET /goals`: the `a.ht-goalitem__name`
+    anchors with their `href`. A goal page is reached through the first anchor with the goal's name, and only
+    when its `href` is a path on the same site (`/goals/…`), never an absolute or protocol-relative address.
+  - The texts are matched only in the History card: `PageReader.ReadCardText(html, "History")` takes the first
+    `section.ht-card` whose `h2.ht-card__title` is "History", up to that section's `</section>`, with tags
+    removed, entities decoded and white space runs made one space. Each expected text must be an ordinal
+    substring of it, so the Settings card's words cannot satisfy them.
+  - On any weekday the texts lie in the History card's first 10 rows, so the check needs no "Show all":
+    "Reading" shows Due today (R), Pending (R − 1, R − 2), Met (R − 3) and Failed with 12 minutes and the note
+    (R − 6); "Yoga" shows Failed (week 2) and Missed (week 3).
+  - A goal page is named by its position n in `DemoHistory.GoalNames` ("Reading" is 1, "Yoga" is 3), never by its
+    name or its path, which holds an identifier read from the page.
 - Timings, reported for SC-001 and never failing a check (one sample is not SC-001's 9 of 10):
   - `first`: the duration of the first request of check 1, from sending to the full response, whether it
     succeeded or not; when it did not succeed and a retry was needed, the line says `first <ms> ms (retried)`
@@ -48,33 +71,38 @@ with its own cookies on every call.
     every stylesheet and script the page links (`<link rel="stylesheet" href>`, `<script src>`), fetched one
     after another with that account's cookie, as a signed-in browser without a cache does (slice 1 research
     R-09: no-store, one security-stamp lookup per request). It does not include opening the interactive
-    circuit.
+    circuit. Check 6 does not measure it.
 
 ## Coverage rule
 
-All demo data is written through the demo data port `IDemoDataStore` (ADR 0013, slice 2 research R-09). Every
-data parameter of every method of that port (all parameters but the `CancellationToken`) has an entry in the
-smoke check's public coverage map `SmokeCheckCoverage`, keyed by method name, parameter name and parameter
-type, with the check that verifies it:
+All demo data is written through the demo data ports `IDemoDataStore` (ADR 0013, slice 2 research R-09) and
+`IDemoHistoryStore` (slice 5, ADR 0018). Every data parameter of every method of each port (all parameters but
+the `CancellationToken`) has an entry in the smoke check's public coverage map `SmokeCheckCoverage`, keyed by
+port, method name, parameter name and parameter type, with the check that verifies it:
 
-| Port method | Parameter | Check |
-|---|---|---|
-| `CreateDemoAccountAsync` | `email` (`Email`), `password` (`string`) | 5, the sign-in |
-| `CreateDemoAccountAsync` | `customHabits` (`IReadOnlyList<HabitDefinition>`) | 5, the custom habit names |
-| `CreateDemoAccountAsync` | `profile` (`DemoAccountProfile`) | 5, the account name on Profile (slice 4 HP-018) |
-| `CreateDemoAccountAsync` | `goals` (`IReadOnlyList<DemoGoal>`) | 5, the goal names on Goals (slice 4 HP-018) |
-| `TryCreateSeedCatalogAsync` | `habits` (`IReadOnlyList<SeedCatalogHabit>`) | 3 |
+| Port | Method | Parameter | Type | Check |
+|---|---|---|---|---|
+| `IDemoDataStore` | `CreateDemoAccountAsync` | `email` | `Email` | 5, the sign-in |
+| `IDemoDataStore` | `CreateDemoAccountAsync` | `password` | `string` | 5, the sign-in |
+| `IDemoDataStore` | `CreateDemoAccountAsync` | `customHabits` | `IReadOnlyList<HabitDefinition>` | 5, the custom habit names |
+| `IDemoDataStore` | `CreateDemoAccountAsync` | `profile` | `DemoAccountProfile` | 5, the account name on Profile (slice 4 HP-018) |
+| `IDemoDataStore` | `CreateDemoAccountAsync` | `goals` | `IReadOnlyList<DemoGoal>` | 5, the goal names on Goals (slice 4 HP-018) |
+| `IDemoDataStore` | `TryCreateSeedCatalogAsync` | `habits` | `IReadOnlyList<SeedCatalogHabit>` | 3 |
+| `IDemoHistoryStore` | `CreateDemoHistoryAccountAsync` | `email` | `Email` | 6 demo history: the sign-in |
+| `IDemoHistoryStore` | `CreateDemoHistoryAccountAsync` | `password` | `string` | 6 demo history: the sign-in |
+| `IDemoHistoryStore` | `CreateDemoHistoryAccountAsync` | `profile` | `DemoAccountProfile` | 6 demo history: the sign-in |
+| `IDemoHistoryStore` | `CreateDemoHistoryAccountAsync` | `goals` | `IReadOnlyList<DemoHistoryGoal>` | 6 demo history: the goal names, and the states, partial amount and note on the goal pages |
 
-A test (research R-11) reflects over `IDemoDataStore` and fails when a method or a data parameter has no
-entry, or an entry no longer matches. A slice that adds demo data adds a method or a parameter to the port, or
-changes a parameter's type, so its build of this test fails until it extends the check. A slice that ships
-before this slice is implemented is covered by the tasks gate instead (plan, Gates): the test does not exist
-yet then.
+A test (research R-11) reflects over both ports and fails when a method or a data parameter has no entry, or an
+entry no longer matches a parameter of its port. A slice that adds demo data adds a method or a parameter to a
+port, adds a port, or changes a parameter's type, so its build of this test fails until it extends the check (a
+new port is also added to the test's list of ports). A slice that ships before this slice is implemented is
+covered by the tasks gate instead (plan, Gates): the test does not exist yet then.
 
 ## Output
 
 One line per check, in order. Every check runs, also after an earlier one failed (a failed `home` does not stop
-checks 2–5):
+checks 2–6):
 
 - a check with a list of expected names (`catalog`, `demo <email>`): `PASS <name> (<found> of <expected>)` or
   `FAIL <name>: <reason>`, where `<found>` counts the expected names present on the page, not the cards shown;
@@ -85,13 +113,24 @@ checks 2–5):
   the first part that misses, in this order: `<n> of <m> custom habits shown`, `<n> of <m> goals shown`, or
   `account name not shown` (a page that does not return 200 gives `GET <path> gave status <code>` for its part).
   No name is printed;
+- `demo history demo4@example.com` (slice 5), in check 5's form: `PASS demo history demo4@example.com (11 of 11)`
+  when every expected text is found, otherwise `FAIL demo history demo4@example.com: <reason>`. Every page that
+  can be reached is still read; the reason is the first failing part's, in this order:
+  - `the sign-in was refused`, as in check 5;
+  - `GET /goals gave status <code>`;
+  - `<found> of 3 goal names shown`;
+  - then for goal page 1 ("Reading"), and after it goal page 3 ("Yoga"): `no link for goal page <n>`,
+    `GET goal page <n> gave status <code>`, or `<found> of <expected> texts on goal page <n> shown`.
+
+  No goal name, note, amount, goal path or other page content is printed;
 - a check without a list (`home`, `https-redirect`, `administrator`): `PASS <name>` or `FAIL <name>: <reason>`;
-- check 2 with `--skip-http-redirect`: `SKIP https-redirect`.
+- check 2 with `--skip-http-redirect`: `SKIP https-redirect`;
+- a check that signs in and gets no response fails with `no response (<error>)` or `no response in time`.
 
 Then `TIMING first <ms> ms[ (retried)], later <ms> ms (<n> requests)`, or `TIMING first <ms> ms[ (retried)], later n/a`
 when no demo account signed in, then `RESULT PASS` or `RESULT FAIL`. "Every check line" means the lines before
 `TIMING`. `<name>` contains a demo email or the word `administrator`, never the administrator email. No
-password, habit name, goal name, account name, note or page content is printed.
+password, habit name, goal name, account name, note, recorded amount, goal path or page content is printed.
 
 ## Exit codes
 
@@ -117,7 +156,9 @@ starting a process:
 - `SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOptions options, TextWriter output)` with
   `RunAsync()`, which writes the output lines and returns a `SmokeCheckResult` (the check lines, the `TIMING`
   line, the timings and `Passed`);
-- `PageReader`;
-- `SmokeCheckCoverage`, whose `Entries` are `CoverageEntry` records (method, parameter, parameter type, check).
+- `PageReader`, with `ReadGoalLinks(html)`, which returns `GoalLink` records (name, `href` or null), and
+  `ReadCardText(html, title)` (slice 5);
+- `SmokeCheckCoverage`, whose `Entries` are `CoverageEntry` records (port type, method, parameter, parameter
+  type, check).
 
 The tool's `Program` stays internal.

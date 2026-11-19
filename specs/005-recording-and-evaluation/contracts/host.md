@@ -193,6 +193,8 @@ Output, in check 5's form:
 
 - `PASS demo history demo4@example.com (11 of 11)`;
 - or `FAIL demo history demo4@example.com: <reason>`, where the reason is one of:
+  - `the sign-in was refused`, as check 5 words a refused sign-in (added in T090: step 1 can fail too, for
+    example when demo history loading refused the demo password);
   - `GET /goals gave <status>`;
   - `GET goal page <n> gave <status>`;
   - `no link for goal page <n>`;
@@ -203,7 +205,10 @@ Output, in check 5's form:
 
 No goal name, note, amount, goal path or other page content is ever printed (slice 3 smoke-check contract).
 
-`SmokeCheckCoverage.CoverageEntry` gains the port type as its first member. Its entries cover both demo ports. The
+`CoverageEntry` gains the port type as its first member. (Corrected in T090: `CoverageEntry` is a top-level record
+in `SmokeCheckCoverage.cs`, not a type nested in `SmokeCheckCoverage`; it is now
+`CoverageEntry(Type Port, string Method, string Parameter, Type Type, string Check)`.) `SmokeCheckCoverage.Entries`
+covers both demo ports. The
 coverage table in `specs/003-demo-hosting/contracts/smoke-check.md` ("Coverage rule") gains the same rows:
 
 | Port | Method | Parameter | Type | Check |

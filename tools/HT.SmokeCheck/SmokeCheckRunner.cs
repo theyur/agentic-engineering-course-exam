@@ -2,6 +2,9 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using HT.Application.Operator;
+using HT.Application.Records;
+using HT.Domain.Evaluation;
+using HT.Domain.Goals;
 using HT.Domain.Habits;
 
 namespace HT.SmokeCheck;
@@ -27,6 +30,33 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     private const string CustomHabitsPath = "/custom-habits";
     private const string GoalsPath = "/goals";
     private const string ProfilePath = "/profile";
+
+    /// <summary>The title of the goal page's History card (<c>HistoryCard.razor</c>), whose text check 6 reads.</summary>
+    private const string HistoryTitle = "History";
+
+    /// <summary>
+    /// The goal pages of check 6 and their expected texts, all from <c>HT.Application</c> (slice 5 research R-10): the
+    /// History card of "Reading" (<see cref="DemoHistory.GoalNames"/>[0], a daily commitment) holds Met, Failed, Pending,
+    /// Due today, the partial amount and the note; the one of "Yoga" ([2], a per-week period) holds Failed and Missed.
+    /// On any weekday these lie in the card's first 10 rows.
+    /// </summary>
+    private static readonly IReadOnlyList<HistoryPage> HistoryPages =
+    [
+        new(0,
+        [
+            RecordingText.State(EvaluationState.Met, GoalScheduleKind.CommitmentBased, null),
+            RecordingText.State(EvaluationState.Failed, GoalScheduleKind.CommitmentBased, null),
+            RecordingText.State(EvaluationState.Pending, GoalScheduleKind.CommitmentBased, null),
+            RecordingText.State(EvaluationState.Due, GoalScheduleKind.CommitmentBased, null),
+            RecordingText.Amount(Measurement.Duration, null, DemoHistory.PartialMinutes),
+            DemoHistory.ReadingNote,
+        ]),
+        new(2,
+        [
+            RecordingText.State(EvaluationState.Failed, GoalScheduleKind.PeriodBased, SchedulePeriod.Week),
+            RecordingText.State(EvaluationState.Missed, GoalScheduleKind.PeriodBased, SchedulePeriod.Week),
+        ]),
+    ];
 
     /// <summary>The pause between two tries of check 1, shortened to the warm-up time that is left.</summary>
     private static readonly TimeSpan RetryPause = TimeSpan.FromSeconds(5);
@@ -63,6 +93,8 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
             await WriteCheckAsync(lines, demo.Line).ConfigureAwait(false);
             later ??= demo.Later;
         }
+
+        await WriteCheckAsync(lines, await CheckDemoHistoryAsync().ConfigureAwait(false)).ConfigureAwait(false);
 
         var laterMilliseconds = later?.Milliseconds;
         var laterRequests = later?.Requests ?? 0;
@@ -300,6 +332,74 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
         return (line, later);
     }
 
+    /// <summary>
+    /// Check 6 <c>demo history &lt;email&gt;</c> (slice 5 HP-008, SC-005, research R-10): <see cref="DemoHistoryService.DemoEmail"/>
+    /// signs in on a new client with the demo password, <c>GET /goals</c> shows the 3 names of
+    /// <see cref="DemoHistory.GoalNames"/>, and the History card of each goal page of <see cref="HistoryPages"/>, reached
+    /// through the goal's link on Goals, contains its expected texts as ordinal substrings: 11 expected texts in all.
+    /// Every page is read; a <c>FAIL</c> names the first part that misses, in that order. A goal page is named by its
+    /// position in <see cref="DemoHistory.GoalNames"/>, never by its name or its path, which holds an identifier read
+    /// from the page; no name, note or amount is printed.
+    /// </summary>
+    private async Task<string> CheckDemoHistoryAsync()
+    {
+        var name = $"demo history {DemoHistoryService.DemoEmail}";
+        return await GuardAsync(name, async () =>
+        {
+            using var client = _createClient();
+            if (!await SignInAsync(client, DemoHistoryService.DemoEmail, _options.DemoPassword).ConfigureAwait(false))
+            {
+                return $"{FailPrefix}{name}: the sign-in was refused";
+            }
+
+            var (goalsStatus, goalsHtml) = await GetPageAsync(client, GoalsPath).ConfigureAwait(false);
+            IReadOnlyList<GoalLink> links = goalsStatus == HttpStatusCode.OK ? PageReader.ReadGoalLinks(goalsHtml) : [];
+            List<NamesPart> parts =
+            [
+                NamesPart.Of(GoalsPath, goalsStatus, [.. links.Select(link => link.Name)], DemoHistory.GoalNames, "goal names"),
+            ];
+
+            foreach (var page in HistoryPages)
+            {
+                parts.Add(await CheckHistoryPageAsync(client, links, page).ConfigureAwait(false));
+            }
+
+            return PartsLine(name, parts);
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// One goal page of check 6: its link on Goals (the first goal item with the goal's name, whose <c>href</c> is a path
+    /// on this site), then its History card's text (<see cref="PageReader.ReadCardText"/>) holding each expected text.
+    /// </summary>
+    private static async Task<NamesPart> CheckHistoryPageAsync(HttpClient client, IReadOnlyList<GoalLink> links, HistoryPage page)
+    {
+        var goalName = DemoHistory.GoalNames[page.Index];
+        var position = (page.Index + 1).ToString(CultureInfo.InvariantCulture);
+        var expected = page.Texts.Count;
+        var href = links.FirstOrDefault(link => string.Equals(link.Name, goalName, StringComparison.Ordinal))?.Href;
+        if (href is null || !IsSitePath(href))
+        {
+            return new NamesPart(0, expected, $"no link for goal page {position}");
+        }
+
+        var (status, html) = await GetPageAsync(client, href).ConfigureAwait(false);
+        if (status != HttpStatusCode.OK)
+        {
+            return new NamesPart(0, expected, $"GET goal page {position} gave {StatusText(status)}");
+        }
+
+        var card = PageReader.ReadCardText(html, HistoryTitle) ?? string.Empty;
+        var found = page.Texts.Count(text => card.Contains(text, StringComparison.Ordinal));
+        return found == expected
+            ? new NamesPart(found, expected, null)
+            : new NamesPart(found, expected, string.Create(CultureInfo.InvariantCulture, $"{found} of {expected} texts on goal page {position} shown"));
+    }
+
+    /// <summary>True for a path on this site (<c>/goals/7</c>), never an absolute or protocol-relative address.</summary>
+    private static bool IsSitePath(string href) =>
+        href.StartsWith('/') && !href.StartsWith("//", StringComparison.Ordinal) && !href.StartsWith("/\\", StringComparison.Ordinal);
+
     /// <summary>A page's status and its HTML; the HTML of a status other than 200 is not read for names.</summary>
     private static async Task<(HttpStatusCode Status, string Html)> GetPageAsync(HttpClient client, string path)
     {
@@ -389,7 +489,7 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     /// <summary>
     /// Signs in through the sign-in page as a browser does: <c>GET /sign-in</c>, its antiforgery token and the
     /// <c>sign-in</c> form handler, then <c>POST /sign-in</c>. True when the answer is a redirect that does not go back
-    /// to <c>/sign-in</c>; the client then holds the session cookie. Used by checks 4 and 5.
+    /// to <c>/sign-in</c>; the client then holds the session cookie. Used by checks 4, 5 and 6.
     /// </summary>
     private static async Task<bool> SignInAsync(HttpClient client, string email, string password)
     {
@@ -439,6 +539,9 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
 
     /// <summary>The <c>later</c> timing: its duration and how many requests it covers.</summary>
     private readonly record struct LaterTiming(long Milliseconds, int Requests);
+
+    /// <summary>A goal page of check 6: the goal's index in <see cref="DemoHistory.GoalNames"/> and its History card's expected texts.</summary>
+    private sealed record HistoryPage(int Index, IReadOnlyList<string> Texts);
 
     /// <summary>
     /// One page of check 5: how many of its expected names it shows, how many it should, and the reason it misses, or
