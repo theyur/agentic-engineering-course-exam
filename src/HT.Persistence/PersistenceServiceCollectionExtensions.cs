@@ -21,7 +21,8 @@ public static class PersistenceServiceCollectionExtensions
     /// <summary>
     /// Registers the database context on SQL Server, Identity's user services with options no stricter than the
     /// domain rules (research R-03), the account store, the habit stores, the demo data store (research R-09) and the
-    /// goal store (slice 4 research R-08) and the record store (slice 5 research R-05).
+    /// goal store (slice 4 research R-08), the record store (slice 5 research R-05) and the demo history store (slice 5
+    /// research R-08).
     /// Adds no token providers, roles or sign-in manager (research R-02). EF Core never logs a database error text:
     /// such a text can carry a custom habit's name (HP-015, research R-14); the stores' own exceptions carry no field
     /// value. Sensitive-data logging stays off.
@@ -61,6 +62,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<ICatalogHabitStore, CatalogHabitStore>();
         services.AddScoped<ICustomHabitStore, CustomHabitStore>();
         services.AddScoped<IDemoDataStore, DemoDataStore>();
+        services.AddScoped<IDemoHistoryStore, DemoHistoryStore>();
         services.AddScoped<IGoalStore, GoalStore>();
         services.AddScoped<IRecordStore, RecordStore>();
         return services;

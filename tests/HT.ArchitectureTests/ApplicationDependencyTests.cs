@@ -47,6 +47,16 @@ public sealed class ApplicationDependencyTests
     }
 
     [Fact]
+    public void OnlyTheOperatorTypesOfApplicationMayDependOnTheDemoHistoryStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Application)
+            .And().DoNotResideInNamespaceMatching(@"^HT\.Application\.Operator(\..*)?$")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IDemoHistoryStore)))
+            .Because("the demo history port writes private records and notes without an acting user; only demo history loading may use it (ADR 0013, slice 5 research R-13)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
     public void OnlyTheGoalTypesTheThreeHabitServicesTheProfileServiceAndTheRecordingServiceMayDependOnTheGoalStorePort()
     {
         // Nested types (async state machines, closures) belong to their service, so the names allow a nested suffix.

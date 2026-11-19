@@ -22,6 +22,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<AccountService>();
         services.AddScoped<OperatorService>();
         services.AddScoped<DemoDataService>();
+        services.AddScoped<DemoHistoryService>();
         services.AddScoped<CatalogService>();
         services.AddScoped<CatalogAdministrationService>();
         services.AddScoped<CustomHabitService>();

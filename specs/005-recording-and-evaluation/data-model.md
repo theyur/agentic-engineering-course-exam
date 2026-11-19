@@ -112,7 +112,7 @@ candidate when `RecordValue.TryCreate` accepts it for `history.Measurement`, and
 |---|---|
 | `DemoHistoryService` | `LoadAsync(string? demoPassword, CancellationToken)` gives `DemoHistoryLoadingResult` (research R-08). `DemoEmail = "demo4@example.com"`. |
 | `DemoHistory` | static: `For(DateOnly runDate)` gives the three `DemoHistoryGoal`s of FR-030. For smoke check 6 (research R-10): `GoalNames`, the three display names in creation order; `PartialMinutes = 12`; `ReadingNote = "Fell asleep early."`. |
-| `DemoHistoryGoal` | `Goal` (`DemoGoal`, start date R − 28, accepted state Published), `Records` (`IReadOnlyList<DemoRecord>`, date order), `Notes` (`IReadOnlyList<DemoNote>`). |
+| `DemoHistoryGoal` | `Goal` (`DemoGoal`, start date R − 28, accepted state Published), `Records` (`IReadOnlyList<DemoRecord>`, date order), `Notes` (`IReadOnlyList<DemoNote>`). Public constructor `DemoHistoryGoal(DemoGoal goal, IEnumerable<DemoRecord> records, IEnumerable<DemoNote> notes)` (T085), which copies both lists and refuses with `ArgumentException` a goal on a custom habit and a null record or note, so the store handles catalog-habit goals only. |
 | `DemoRecord` | `sealed record (DateOnly Date, RecordValue Value)`. |
 | `DemoNote` | `sealed record (DateOnly EntryDate, NoteText Text)`. `EntryDate` is the entry key: the day, or a week's Monday. |
 | `DemoHistoryLoadingOutcome` | `NoPassword`, `PasswordRuleNotMet`, `Loaded`. |
