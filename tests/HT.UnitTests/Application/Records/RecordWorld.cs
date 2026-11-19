@@ -110,6 +110,22 @@ public sealed class RecordWorld
     public Task<RecordWriteResult> RecordAsync(GoalId goal, DateOnly date, RecordInput input, ActingUser? user = null) =>
         Service.RecordAsync(user ?? User, goal, date, input, CancellationToken.None);
 
+    /// <summary>Changes a record for <see cref="User"/> at the clock's time.</summary>
+    public Task<RecordWriteResult> ChangeAsync(GoalId goal, RecordId record, RecordInput input, ActingUser? user = null) =>
+        Service.ChangeRecordAsync(user ?? User, goal, record, input, CancellationToken.None);
+
+    /// <summary>Deletes a record for <see cref="User"/> at the clock's time.</summary>
+    public Task<RecordWriteResult> DeleteAsync(GoalId goal, RecordId record, ActingUser? user = null) =>
+        Service.DeleteRecordAsync(user ?? User, goal, record, CancellationToken.None);
+
+    /// <summary>The history of <see cref="User"/>'s goal from <paramref name="first"/> to <paramref name="last"/>, at the clock's time.</summary>
+    public async Task<IReadOnlyList<HistoryEntry>> HistoryAsync(GoalId goal, DateOnly first, DateOnly last, ActingUser? user = null)
+    {
+        var result = await Service.GetHistoryAsync(user ?? User, goal, first, last, CancellationToken.None);
+        Assert.Equal(HistoryOutcome.Found, result.Outcome);
+        return result.History!.Entries;
+    }
+
     /// <summary>What <see cref="User"/> can record now, at the clock's time.</summary>
     public Task<RecordableResult> RecordableAsync(GoalId goal, ActingUser? user = null) =>
         Service.GetRecordableAsync(user ?? User, goal, CancellationToken.None);

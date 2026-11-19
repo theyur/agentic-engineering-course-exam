@@ -2,14 +2,19 @@
 @using HT.Application.Records
 @using HT.Domain.Evaluation
 @using HT.Domain.Goals
-@* design/pages/PageGoalDetail, slice 5 state (HP-001, US5-AS5, contracts/host.md "History card"): the goal page's
-   History card. Its head (ht-card__head) has the title "History", ht-spacer and the muted sentence "Corrections are
-   evaluated with the rules of that date." beside it; then a DataTable with Date, Recorded, Result, Note and the
+@using HT.Domain.Records
+@* design/pages/PageGoalDetail, slice 5 state (HP-001, US3-AS8, US5-AS5, contracts/host.md "History card"): the goal
+   page's History card. Its head (ht-card__head) has the title "History", ht-spacer and the muted sentence "Corrections
+   are evaluated with the rules of that date." beside it; then a DataTable with Date, Recorded, Result, Note and the
    empty-headed actions column. The rows are the history's begun entries (Upcoming ones are not listed), newest first:
    the first 10, then "Show all N →", which shows the rest in place. Date and Recorded come from RecordingText (a
-   commitment's record as text; a period's records side by side, ht-inline; "—" without a record), Result is the
-   StatusChip, and Note is the note's text. The row actions and the note button come with corrections and notes (US3,
-   US4), so the actions cells are empty. With no begun entry the card is not rendered. *@
+   commitment's record as text; a period's records side by side, ht-inline, each a button that opens "Edit" of that
+   record; "—" without a record), Result is the StatusChip, and Note is the note's text (its actions come with notes,
+   US4). The row actions, whatever the row's state, final included: "Add record" on a commitment without a record,
+   "Edit" on one with a record, and "Add record" on a period with fewer than 50 records. Every row control is a ghost
+   small button with aria-haspopup="dialog" and an accessible name that starts with its visible text and names its row.
+   The card raises OnAction; the page opens the RecordDialog and, when it closes, gives the focus back through
+   FocusAsync. With no begun entry the card is not rendered. *@
 @if (_rows.Count > 0)
 {
     <section class="ht-card">
@@ -19,32 +24,53 @@
             <p class="ht-card__sub">Corrections are evaluated with the rules of that date.</p>
         </div>
         <DataTable Columns="Columns" Label="History">
-            @foreach (var entry in _expanded ? _rows : _rows.Take(FirstRows))
+            @foreach (var entry in ShownRows)
             {
-                <tr>
-                    <td><b>@RecordingText.EntryDate(entry)</b></td>
+                var date = RecordingText.EntryDate(entry);
+                <tr @key="entry.FirstDate">
+                    <td><b>@date</b></td>
                     <td>
                         @if (entry.Records.Count == 0)
                         {
                             @NoRecord
                         }
-                        else if (History.GoalScheduleKind == GoalScheduleKind.CommitmentBased)
+                        else if (IsCommitment)
                         {
                             @RecordingText.Recorded(History, entry.Records[0])
                         }
                         else
                         {
                             <span class="ht-inline">
-                                @foreach (var record in entry.Records)
+                                @for (var i = 0; i < entry.Records.Count; i++)
                                 {
-                                    <span>@RecordingText.Recorded(History, record)</span>
+                                    var record = entry.Records[i];
+                                    var text = RecordingText.Recorded(History, record);
+                                    var name = text + ", edit record " + (i + 1).ToString(CultureInfo.InvariantCulture) + " of " + date;
+                                    <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog" aria-label="@name"
+                                            @key="record.Id" @ref="_recordButtons[record.Id]"
+                                            @onclick="() => OnAction.InvokeAsync(new RowAction(entry, record))">@text</button>
                                 }
                             </span>
                         }
                     </td>
                     <td><StatusChip State="entry.State" ScheduleKind="History.GoalScheduleKind" Period="History.Period" /></td>
                     <td>@entry.Note</td>
-                    <td class="ht-actions"></td>
+                    <td class="ht-actions">
+                        @if (IsCommitment)
+                        {
+                            var record = entry.Records.Count == 0 ? null : entry.Records[0];
+                            <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog"
+                                    aria-label="@(record is null ? AddRecord + " for " + date : "Edit record of " + date)"
+                                    @ref="_actionButtons[entry.FirstDate]"
+                                    @onclick="() => OnAction.InvokeAsync(new RowAction(entry, record))">@(record is null ? AddRecord : "Edit")</button>
+                        }
+                        else if (TakesRecord(entry))
+                        {
+                            <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog" aria-label="@(AddRecord + " for " + date)"
+                                    @ref="_actionButtons[entry.FirstDate]"
+                                    @onclick="() => OnAction.InvokeAsync(new RowAction(entry, null))">@AddRecord</button>
+                        }
+                    </td>
                 </tr>
             }
         </DataTable>
@@ -62,8 +88,12 @@
     /// <summary>The Recorded cell of an entry without a record.</summary>
     private const string NoRecord = "—";
 
+    private const string AddRecord = "Add record";
+
     private static readonly IReadOnlyList<string> Columns = ["Date", "Recorded", "Result", "Note", string.Empty];
 
+    private readonly Dictionary<DateOnly, ElementReference> _actionButtons = [];
+    private readonly Dictionary<RecordId, ElementReference> _recordButtons = [];
     private List<HistoryEntry> _rows = [];
     private bool _expanded;
 
@@ -71,10 +101,43 @@
     [Parameter, EditorRequired]
     public GoalHistory History { get; set; } = default!;
 
+    /// <summary>A row action or a period's record was chosen: the row, and the record for "Edit" (null for "Add record").</summary>
+    [Parameter]
+    public EventCallback<RowAction> OnAction { get; set; }
+
     /// <summary>Whether the card is rendered for <paramref name="history"/>: it has at least one begun entry.</summary>
     public static bool HasRows(GoalHistory? history) => history is not null && RowsOf(history).Any();
 
+    /// <summary>
+    /// Gives the focus back to the control that opened a dialog for <paramref name="row"/>, as the card shows it now:
+    /// the button of <paramref name="record"/> while the row still shows it, otherwise the row's action; nothing when the
+    /// row shows neither (constitution IV).
+    /// </summary>
+    public ValueTask FocusAsync(DateOnly row, RecordId? record)
+    {
+        if (ShownRows.FirstOrDefault(entry => entry.FirstDate == row) is not { } entry)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        if (!IsCommitment && record is { } id && entry.Records.Any(r => r.Id == id) && _recordButtons.TryGetValue(id, out var recordButton))
+        {
+            return recordButton.FocusAsync();
+        }
+
+        return (IsCommitment || TakesRecord(entry)) && _actionButtons.TryGetValue(row, out var action)
+            ? action.FocusAsync()
+            : ValueTask.CompletedTask;
+    }
+
     protected override void OnParametersSet() => _rows = RowsOf(History).ToList();
+
+    private bool IsCommitment => History.GoalScheduleKind == GoalScheduleKind.CommitmentBased;
+
+    private IEnumerable<HistoryEntry> ShownRows => _expanded ? _rows : _rows.Take(FirstRows);
+
+    /// <summary>A period takes another record while it has fewer than 50 (HP-001, FR-005).</summary>
+    private static bool TakesRecord(HistoryEntry entry) => entry.Records.Count < RecordLimits.MaxRecordsPerPeriod;
 
     /// <summary>The begun entries, newest first; Upcoming ones have no row.</summary>
     private static IEnumerable<HistoryEntry> RowsOf(GoalHistory history) =>
@@ -83,4 +146,7 @@
             .OrderByDescending(entry => entry.FirstDate);
 
     private void ShowAll() => _expanded = true;
+
+    /// <summary>What a row control asks for: "Add record" for <see cref="Entry"/>, or "Edit" of <see cref="Record"/>.</summary>
+    public sealed record RowAction(HistoryEntry Entry, RecordView? Record);
 }

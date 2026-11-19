@@ -18,8 +18,11 @@
    card on the left and the Settings card, then the Recent notes card (US4), on the right. The history is read after
    what can be recorded now, from 365 days before that result's current date D to D. A goal with no current date, or
    with no begun entry, shows no History card and has the design's layout for that case: the Settings card alone in
-   ht-grid-2. A goal with no current date shows no "Record". "Record" opens the RecordDialog; after a save, what can be
-   recorded and the history are read again. Every use case runs in its own scope. *@
+   ht-grid-2. A goal with no current date shows no "Record". "Record" opens the RecordDialog with what can be recorded
+   now; a History row's "Add record", "Edit" or record button opens it for that row or record, with the history's
+   settings (US3, HP-001). After a save or a delete, what can be recorded and the history are read again before the
+   dialog closes, so the closing render already has the new rows, and the focus goes back to the head's "Record" or to
+   the row's control as the card now shows it. Every use case runs in its own scope. *@
 @if (_goal is { } goal)
 {
     <BackLink Href="/goals" Text="Goals" />
@@ -47,7 +50,7 @@
     {
         <div class="ht-grid-2">
             <div class="ht-stack">
-                <HistoryCard History="_history!" />
+                <HistoryCard @ref="_historyCard" History="_history!" OnAction="OpenRow" />
             </div>
             <div class="ht-stack">
                 <GoalSettingsCard Details="goal" />
@@ -60,10 +63,11 @@
             <GoalSettingsCard Details="goal" />
         </div>
     }
-    @if (CanRecord)
+    @if (DialogHistory is { } dialogHistory)
     {
-        <RecordDialog Open="_recordOpen" OnClose="CloseRecord" ReturnFocus="_recordButton" GoalId="goal.Id" GoalName="@goal.Name"
-                      Recordable="_recordable!" ActingUser="_actingUser" OnSaved="SavedAsync" />
+        <RecordDialog Open="_recordOpen" OnClose="CloseRecord" ReturnFocus="_recordButton" FocusOnClose="@(_row is null ? null : FocusRowAsync)"
+                      GoalId="goal.Id" GoalName="@goal.Name" Recordable="dialogHistory" Row="_row" Editing="_editing"
+                      ActingUser="_actingUser" OnSaved="SavedAsync" />
     }
 }
 
@@ -77,6 +81,13 @@
     private GoalHistory? _history;
     private bool _recordOpen;
     private ElementReference _recordButton;
+    private HistoryCard? _historyCard;
+
+    /// <summary>The History row the RecordDialog was opened from; null when "Record" opened it.</summary>
+    private HistoryEntry? _row;
+
+    /// <summary>The record of <see cref="_row"/> that "Edit" opened; null for "Add record" and for "Record".</summary>
+    private RecordView? _editing;
 
     /// <summary>The goal's identifier; the page shell has already found it among the acting user's goals.</summary>
     [Parameter]
@@ -121,15 +132,37 @@
         _history = history.History;
     }
 
-    private void OpenRecord() => _recordOpen = true;
+    /// <summary>
+    /// The settings and entries the RecordDialog works with: what can be recorded now when "Record" opened it, the
+    /// history when a History row did; none while neither is there to open it.
+    /// </summary>
+    private GoalHistory? DialogHistory => _row is null ? (CanRecord ? _recordable : null) : _history;
+
+    private void OpenRecord()
+    {
+        _row = null;
+        _editing = null;
+        _recordOpen = true;
+    }
+
+    private void OpenRow(HistoryCard.RowAction action)
+    {
+        _row = action.Entry;
+        _editing = action.Record;
+        _recordOpen = true;
+    }
 
     private void CloseRecord() => _recordOpen = false;
 
+    /// <summary>Reads again first, so the render that closes the dialog has the new rows to give the focus back to.</summary>
     private async Task SavedAsync(HistoryEntry entry)
     {
-        _recordOpen = false;
         await ReadRecordsAsync();
+        _recordOpen = false;
     }
+
+    private ValueTask FocusRowAsync() =>
+        _row is { } row && _historyCard is { } card ? card.FocusAsync(row.FirstDate, _editing?.Id) : ValueTask.CompletedTask;
 
     /// <summary>"Attempt 1 · started 14 Jul" once the goal has started, "Attempt 1 · starts 23 Nov" before (slice 4 HP-004).</summary>
     private static string AttemptLine(GoalDetails goal) =>

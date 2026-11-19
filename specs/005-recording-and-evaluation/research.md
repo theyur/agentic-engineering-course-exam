@@ -509,7 +509,13 @@ Each section: **Decision**, **Rationale**, **Alternatives considered**.
     "Corrections are evaluated with the rules of that date."; a plain `section.ht-card`, since `HtCard`'s `Title`
     cannot render that head. The columns are Date, Recorded, Result (StatusChip), Note and an empty-headed fifth
     column for the row actions of HP-001. The Note cell holds the note's text as plain text until US4 makes it a
-    button; the actions cells stay empty until US3 and US4 add "Add record", "Edit" and "Add note".
+    button and adds "Add note". US3 (T066) put the row actions in the fifth column: "Add record" on a commitment
+    without a record, "Edit" on one with a record (one button per commitment row, whose text and name change with
+    the record), "Add record" on a period with fewer than 50 records, and each of a period's records as a button in
+    the Recorded cell that opens "Edit". The card raises the row and record chosen (`HistoryCard.RowAction`); the
+    page opens the RecordDialog in its row mode or "Edit" (T063), reads the history again before it closes the
+    dialog, and gives the focus back through `HistoryCard.FocusAsync`: the record's button while the row still shows
+    it, otherwise the row's action (constitution IV).
   - **Recent notes card**: `GetRecentNotesAsync`, each note with its date (a week: its first and last date) and its
     StatusChip.
   - **Components**: 7 new ones (critic plan pass 1, MINOR-8). Each design component becomes one Razor component

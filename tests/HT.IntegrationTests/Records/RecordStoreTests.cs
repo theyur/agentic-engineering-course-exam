@@ -147,6 +147,106 @@ public sealed class RecordStoreTests(DatabaseFixture database)
     }
 
     [Fact]
+    public async Task A_change_gives_the_record_its_new_value_and_keeps_its_identifier_date_and_sequence()
+    {
+        var suffix = Suffix();
+        var owner = await OwnerAsync(database, "change", suffix);
+        var goal = await GoalAsync(database, owner, "Change", suffix, Pages20ThreeTimesAWeek(), Mon16);
+        var week = Week(Mon16);
+        var first = await AddAsync(owner, goal, week, false, Wed18, RecordValue.FromAmount(10));
+        var second = await AddAsync(owner, goal, week, false, Wed18, RecordValue.FromAmount(20));
+        var third = await AddAsync(owner, goal, week, false, Wed18, RecordValue.FromAmount(30));
+        var before = await RecordRowsAsync(database.ConnectionString, goal);
+
+        var changed = await WithStoreAsync(s => s.ChangeAsync(owner, goal, second.RecordId!.Value, week, RecordValue.FromAmount(5), null, None));
+
+        Assert.Equal(RecordStoreWriteOutcome.Written, changed.Outcome);
+        Assert.Equal(second.RecordId, changed.RecordId);
+        Assert.Equal(
+            [
+                new GoalRecord(first.RecordId!.Value, Wed18, RecordValue.FromAmount(10)),
+                new GoalRecord(second.RecordId!.Value, Wed18, RecordValue.FromAmount(5)),
+                new GoalRecord(third.RecordId!.Value, Wed18, RecordValue.FromAmount(30)),
+            ],
+            changed.Entry!.Records);
+        var after = await RecordRowsAsync(database.ConnectionString, goal);
+        Assert.Equal(before.Select(r => (r["Id"], r["Date"], r["Sequence"])), after.Select(r => (r["Id"], r["Date"], r["Sequence"])));
+        Assert.Equal([10, 5, 30], after.Select(r => (int)r["Amount"]!));
+    }
+
+    [Fact]
+    public async Task A_change_with_a_note_with_text_replaces_the_entrys_note_and_one_without_or_with_only_spaces_leaves_it()
+    {
+        var suffix = Suffix();
+        var owner = await OwnerAsync(database, "change-note", suffix);
+        var goal = await GoalAsync(database, owner, "Change note", suffix, Reading20MinDaily());
+        var record = (await AddAsync(owner, goal, Day(Wed18), true, Wed18, Minutes(12), Note("Back was tired."))).RecordId!.Value;
+        Assert.True(NoteText.TryCreate("   ", out var spaces, out _));
+
+        var withoutNote = await WithStoreAsync(s => s.ChangeAsync(owner, goal, record, Day(Wed18), Minutes(15), null, None));
+        var withSpaces = await WithStoreAsync(s => s.ChangeAsync(owner, goal, record, Day(Wed18), Minutes(18), spaces, None));
+        var keptRows = await NoteRowsAsync(database.ConnectionString, goal);
+        var withNote = await WithStoreAsync(s => s.ChangeAsync(owner, goal, record, Day(Wed18), Minutes(20), Note("Better today."), None));
+
+        Assert.Null(spaces);
+        Assert.Equal(Note("Back was tired."), withoutNote.Entry!.Note);
+        Assert.Equal(Note("Back was tired."), withSpaces.Entry!.Note);
+        Assert.Equal("Back was tired.", Assert.Single(keptRows)["Text"]);
+        Assert.Equal(Note("Better today."), withNote.Entry!.Note);
+        var row = Assert.Single(await NoteRowsAsync(database.ConnectionString, goal));
+        Assert.Equal("Better today.", row["Text"]);
+        Assert.Equal(Wed18.ToDateTime(TimeOnly.MinValue), row["EntryDate"]);
+        Assert.Equal(20, Assert.Single(await RecordRowsAsync(database.ConnectionString, goal))["Amount"]);
+    }
+
+    [Fact]
+    public async Task A_delete_removes_only_that_record_and_leaves_the_note()
+    {
+        var suffix = Suffix();
+        var owner = await OwnerAsync(database, "delete", suffix);
+        var goal = await GoalAsync(database, owner, "Delete", suffix, Pages20ThreeTimesAWeek(), Mon16);
+        var week = Week(Mon16);
+        var first = await AddAsync(owner, goal, week, false, Wed18, RecordValue.FromAmount(10), Note("Knee was sore."));
+        var second = await AddAsync(owner, goal, week, false, Thu19, RecordValue.FromAmount(20));
+        var third = await AddAsync(owner, goal, week, false, Wed18, RecordValue.FromAmount(30));
+
+        var deleted = await WithStoreAsync(s => s.DeleteAsync(owner, goal, first.RecordId!.Value, week, None));
+
+        Assert.Equal(RecordStoreWriteOutcome.Written, deleted.Outcome);
+        Assert.Null(deleted.RecordId);
+        Assert.Equal([third.RecordId!.Value, second.RecordId!.Value], deleted.Entry!.Records.Select(r => r.Id));
+        Assert.Equal(Note("Knee was sore."), deleted.Entry.Note);
+        var rows = await RecordRowsAsync(database.ConnectionString, goal);
+        Assert.Equal([third.RecordId!.Value.Value, second.RecordId!.Value.Value], rows.Select(r => (Guid)r["Id"]!));
+        Assert.Single(await NoteRowsAsync(database.ConnectionString, goal));
+    }
+
+    [Fact]
+    public async Task A_change_and_a_delete_of_a_record_of_another_goal_of_the_same_owner_give_RecordNotFound_and_write_nothing()
+    {
+        var suffix = Suffix();
+        var owner = await OwnerAsync(database, "other-goal", suffix);
+        var goal = await GoalAsync(database, owner, "Other goal A", suffix, Reading20MinDaily());
+        var otherGoal = await GoalAsync(database, owner, "Other goal B", suffix, Reading20MinDaily());
+        await AddAsync(owner, goal, Day(Wed18), true, Wed18, Minutes(12));
+        var ofOtherGoal = (await AddAsync(owner, otherGoal, Day(Wed18), true, Wed18, Minutes(25))).RecordId!.Value;
+        var before = await RecordRowsAsync(database.ConnectionString, otherGoal);
+
+        var changed = await WithStoreAsync(s => s.ChangeAsync(owner, goal, ofOtherGoal, Day(Wed18), Minutes(5), Note("Wrong goal."), None));
+        var deleted = await WithStoreAsync(s => s.DeleteAsync(owner, goal, ofOtherGoal, Day(Wed18), None));
+
+        Assert.Equal(RecordStoreWriteOutcome.RecordNotFound, changed.Outcome);
+        Assert.Null(changed.Entry);
+        Assert.Equal(RecordStoreWriteOutcome.RecordNotFound, deleted.Outcome);
+        Assert.Null(deleted.Entry);
+        var after = await RecordRowsAsync(database.ConnectionString, otherGoal);
+        Assert.Equal(before.Select(r => (r["Id"], r["Amount"], r["Sequence"])), after.Select(r => (r["Id"], r["Amount"], r["Sequence"])));
+        Assert.Equal(12, Assert.Single(await RecordRowsAsync(database.ConnectionString, goal))["Amount"]);
+        Assert.Empty(await NoteRowsAsync(database.ConnectionString, goal));
+        Assert.Empty(await NoteRowsAsync(database.ConnectionString, otherGoal));
+    }
+
+    [Fact]
     public async Task Edge_case_a_goal_whose_catalog_habit_is_then_Unpublished_still_records_and_reads_its_states_as_before()
     {
         var suffix = Suffix();

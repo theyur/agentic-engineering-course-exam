@@ -5,17 +5,18 @@
    user chooses. Count: the Stepper (from 0, step 1) with the goal's unit as stored after it. Duration: the Stepper of
    whole minutes (from 0, step 5) with "minutes" after it. The Stepper's input has the label as its accessible name. A
    refusal about the value sits under the control; what the dialog passes as ChildContent (the progress line and the
-   help) follows it. A typed value is passed on as it is: the use case decides the refusal. *@
+   help) follows it. A typed value is passed on as it is: the use case decides the refusal. The dialog can move the
+   focus to the control when it is its first field (FocusAsync). *@
 <div class="ht-field">
     <span class="ht-field__label">@Label</span>
     @if (Measurement == Measurement.YesNo)
     {
-        <SegmentedControl TValue="YesNoAnswer" Options="Answers" Label="@Label" Value="Answer" ValueChanged="AnswerChanged"
+        <SegmentedControl @ref="_answers" TValue="YesNoAnswer" Options="Answers" Label="@Label" Value="Answer" ValueChanged="AnswerChanged"
                           DescribedBy="@(Error is null ? null : ErrorId)" />
     }
     else
     {
-        <Stepper Id="@InputId" Label="@Label" Value="Amount" ValueChanged="AmountChanged" Min="0"
+        <Stepper @ref="_stepper" Id="@InputId" Label="@Label" Value="Amount" ValueChanged="AmountChanged" Min="0"
                  Max="@(Measurement == Measurement.Duration ? RecordLimits.MaxMinutes : RecordLimits.MaxCount)"
                  Step="@(Measurement == Measurement.Duration ? 5 : 1)"
                  Unit="@(Measurement == Measurement.Duration ? "minutes" : Unit)"
@@ -33,6 +34,8 @@
         [(YesNoAnswer.Yes, "Yes"), (YesNoAnswer.No, "No")];
 
     private readonly string _id = $"record-field-{Guid.NewGuid():N}";
+    private SegmentedControl<YesNoAnswer>? _answers;
+    private Stepper? _stepper;
 
     /// <summary>The goal's measurement, which decides the control.</summary>
     [Parameter, EditorRequired]
@@ -72,4 +75,10 @@
     public string InputId => _id + "-input";
 
     private string ErrorId => _id + "-error";
+
+    /// <summary>Moves the focus to the control: the chosen answer (or Yes while none is chosen), or the Stepper's number.</summary>
+    public ValueTask FocusAsync() =>
+        Measurement == Measurement.YesNo
+            ? _answers?.FocusAsync() ?? ValueTask.CompletedTask
+            : _stepper?.FocusAsync() ?? ValueTask.CompletedTask;
 }

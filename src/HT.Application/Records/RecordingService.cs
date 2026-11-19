@@ -111,6 +111,106 @@ public sealed class RecordingService
     }
 
     /// <summary>
+    /// Changes the value of one record of one of the acting user's goals (FR-003 to FR-007), at any time, also after the
+    /// entry is final (US3), checking in contracts/application-api.md's order: access; the record among that goal's
+    /// records (<see cref="RecordWriteOutcome.RecordNotFound"/> for a record of another goal, of another account or of
+    /// nothing); the value for the measurement of the version in effect for the record's entry (FR-004, FR-015); then
+    /// the note (FR-007). There is no date step: the record's date never changes (FR-003), and while versions differ
+    /// only in their time zone it always passes FR-002 again (plan "Resolved in the spec" 1). The record keeps its
+    /// identifier, date and place in the stored order. A note with text adds or replaces the entry's note; none leaves
+    /// it unchanged. <see cref="RecordWriteOutcome.Changed"/> carries the record's identifier, the entry after the write
+    /// and whether the change was a correction (FR-006).
+    /// </summary>
+    public async Task<RecordWriteResult> ChangeRecordAsync(
+        ActingUser actingUser, GoalId goal, RecordId record, RecordInput input, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        ArgumentNullException.ThrowIfNull(input);
+        var access = await CheckAccessAsync(actingUser, goal, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return RecordWriteResult.Refused(WriteOutcomeOf(refusal), access.Message!);
+        }
+
+        var now = _clock.GetUtcNow();
+        var found = access.Goal!;
+        if (await _records.FindRecordDateAsync(access.Owner, goal, record, cancellationToken).ConfigureAwait(false) is not { } date)
+        {
+            return RecordWriteResult.Refused(RecordWriteOutcome.RecordNotFound, RecordTexts.RecordNotFound);
+        }
+
+        var entry = StoredEntryOf(found, date);
+        var target = TargetOf(found, entry);
+        if (!RecordValue.TryCreate(target.Measurement, input.Answer, input.Amount, out var value, out var problem))
+        {
+            return ValueRefused(problem);
+        }
+
+        if (!NoteText.TryCreate(input.Note, out var note, out _))
+        {
+            return RecordWriteResult.Refused(RecordWriteOutcome.NoteTooLong, RecordTexts.NoteTooLong);
+        }
+
+        var write = await _records.ChangeAsync(access.Owner, goal, record, SpanOf(entry), value, note, cancellationToken)
+            .ConfigureAwait(false);
+        switch (write.Outcome)
+        {
+            case RecordStoreWriteOutcome.Written:
+                var view = EntryView(found, entry, write.Entry!.Records, write.Entry.Note, now);
+                return RecordWriteResult.Changed(write.RecordId!.Value, view, view.IsCorrection);
+            case RecordStoreWriteOutcome.RecordNotFound:
+                // The record was deleted between the lookup and the write.
+                return RecordWriteResult.Refused(RecordWriteOutcome.RecordNotFound, RecordTexts.RecordNotFound);
+            case RecordStoreWriteOutcome.GoalNotFound:
+                // The goal was removed between the lookup and the write.
+                return RecordWriteResult.Refused(RecordWriteOutcome.NotFound, GoalTexts.NotFound);
+            default:
+                throw new InvalidOperationException("The record store gave an outcome that changing a record does not have.");
+        }
+    }
+
+    /// <summary>
+    /// Deletes one record of one of the acting user's goals (FR-003, FR-006), at any time, also after the entry is final
+    /// (US3-AS3), checking in contracts/application-api.md's order: access, then the record among that goal's records
+    /// (<see cref="RecordWriteOutcome.RecordNotFound"/>); nothing after the record. Deleting the only record of a final
+    /// entry makes it Missed. <see cref="RecordWriteOutcome.Deleted"/> carries the entry after the write and whether the
+    /// deletion was a correction (FR-006): deleting the only record of a Due or Pending entry is not one.
+    /// </summary>
+    public async Task<RecordWriteResult> DeleteRecordAsync(ActingUser actingUser, GoalId goal, RecordId record, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await CheckAccessAsync(actingUser, goal, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return RecordWriteResult.Refused(WriteOutcomeOf(refusal), access.Message!);
+        }
+
+        var now = _clock.GetUtcNow();
+        var found = access.Goal!;
+        if (await _records.FindRecordDateAsync(access.Owner, goal, record, cancellationToken).ConfigureAwait(false) is not { } date)
+        {
+            return RecordWriteResult.Refused(RecordWriteOutcome.RecordNotFound, RecordTexts.RecordNotFound);
+        }
+
+        var entry = StoredEntryOf(found, date);
+        var write = await _records.DeleteAsync(access.Owner, goal, record, SpanOf(entry), cancellationToken).ConfigureAwait(false);
+        switch (write.Outcome)
+        {
+            case RecordStoreWriteOutcome.Written:
+                var view = EntryView(found, entry, write.Entry!.Records, write.Entry.Note, now);
+                return RecordWriteResult.Deleted(view, view.IsCorrection);
+            case RecordStoreWriteOutcome.RecordNotFound:
+                // The record was deleted between the lookup and the write.
+                return RecordWriteResult.Refused(RecordWriteOutcome.RecordNotFound, RecordTexts.RecordNotFound);
+            case RecordStoreWriteOutcome.GoalNotFound:
+                // The goal was removed between the lookup and the write.
+                return RecordWriteResult.Refused(RecordWriteOutcome.NotFound, GoalTexts.NotFound);
+            default:
+                throw new InvalidOperationException("The record store gave an outcome that deleting a record does not have.");
+        }
+    }
+
+    /// <summary>
     /// The history of one of the acting user's goals from <paramref name="first"/> to <paramref name="last"/>, both
     /// included (FR-009, FR-010, FR-014; research R-07): every commitment or period of the goal's evaluation calendar in
     /// the range, in date order, each as <c>EntryView</c> gives it at the supplied time. The range is checked after the
@@ -265,6 +365,14 @@ public sealed class RecordingService
             Entries = entries,
         };
     }
+
+    /// <summary>
+    /// The entry of a stored record's date. A record is stored only for a date of an entry, and while versions differ
+    /// only in their time zone that date stays one (FR-015, plan "Resolved in the spec" 1); the message names no date.
+    /// </summary>
+    private static CalendarEntry StoredEntryOf(Goal goal, DateOnly date) =>
+        GoalTimeline.EntryOf(goal, date)
+        ?? throw new InvalidOperationException("A stored record's date belongs to no commitment or period of its goal.");
 
     /// <summary>The entry as the record store sees it: its note key and its first and last date (research R-05).</summary>
     private static EntrySpan SpanOf(CalendarEntry entry) => new(entry.Key, entry.FirstDate, entry.LastDate);

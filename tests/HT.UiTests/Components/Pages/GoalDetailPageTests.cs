@@ -216,6 +216,55 @@ public sealed class GoalDetailPageTests : BunitContext
     }
 
     [Fact]
+    public async Task US3_a_Missed_rows_Add_record_and_then_Edit_open_the_RecordDialog_for_that_row_and_give_the_focus_back_to_it()
+    {
+        // Reading, 20 min daily, from Tuesday 10 November in UTC; at 10:00 on Tuesday 17 November Saturday 14's grace
+        // period ended at 00:00 that day, so it is Missed.
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 10);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        var cut = RenderGoal(goal.Id);
+        AngleSharp.Dom.IElement Row() =>
+            cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov");
+        Assert.Equal(["Sat 14 Nov", "—", "Missed"], Row().QuerySelectorAll("td").Take(3).Select(Text));
+        var button = Row().QuerySelector("td.ht-actions > button")!;
+        // The row keeps its one action button, so the focus goes back to the same element after each save.
+        var buttonId = button.GetAttribute("blazor:elementReference");
+        Assert.False(string.IsNullOrEmpty(buttonId));
+        Assert.Equal("Add record for Sat 14 Nov", button.GetAttribute("aria-label"));
+
+        await button.ClickAsync(new MouseEventArgs());
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Equal("Sat 14 Nov", Text(dialog.QuerySelector(".ht-field > span:not(.ht-field__label)")!));
+        Assert.Empty(dialog.QuerySelectorAll("select"));
+        cut.Find(".ht-stepper input").Change("20");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal(["Sat 14 Nov", "20 min", "Met"], Row().QuerySelectorAll("td").Take(3).Select(Text));
+        var edit = Row().QuerySelector("td.ht-actions > button")!;
+        Assert.Equal(("Edit", "Edit record of Sat 14 Nov"), (edit.TextContent, edit.GetAttribute("aria-label")));
+        var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
+        Assert.Equal(buttonId, focused[1]);
+
+        await edit.ClickAsync(new MouseEventArgs());
+        Assert.Equal("20", cut.Find(".ht-stepper input").GetAttribute("value"));
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[2].ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal(["Sat 14 Nov", "—", "Missed"], Row().QuerySelectorAll("td").Take(3).Select(Text));
+        Assert.Equal("Add record", Row().QuerySelector("td.ht-actions > button")!.TextContent);
+        Assert.Empty(_records.RecordsOfGoal(goal.Id));
+        var refocused = JSInterop.VerifyFocusAsyncInvoke(4).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
+        Assert.Equal(buttonId, refocused[3]);
+    }
+
+    [Fact]
     public async Task US7_AS8_a_goal_on_an_Unpublished_habit_shows_the_Notice_under_the_head()
     {
         var user = SignInUser();

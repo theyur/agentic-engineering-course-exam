@@ -58,8 +58,11 @@ No route is added. `/goals/{Id:guid}` changes:
     that opens the NoteDialog, and "Add note" without a note.
   - **Row actions**, in the empty-headed fifth column: "Add record" on a commitment without a record; "Edit" on a
     commitment with one; "Add record" on a period with fewer than 50 records. They are offered whatever the state,
-    final included. Until US3 adds them, the column's cells are empty; until then a period's records are plain text
-    side by side (`ht-inline`), not buttons.
+    final included (US3, T066). A period's records are buttons side by side (`ht-inline`) in the Recorded cell, each
+    opening "Edit" of that record; a commitment's record is text. Every row control is a ghost `ht-btn--sm` button
+    with `aria-haspopup="dialog"`. "Add record" opens the RecordDialog's row mode, "Edit" and a record button its
+    "Edit" mode. After a save or a delete the page reads the history again before the dialog closes, and the focus
+    goes back to the record's button while the row still shows it, otherwise to the row's action.
 - **Recent notes card** (right column): `GetRecentNotesAsync`, each note with its date and its `StatusChip`. The
   card is absent when there are none.
 - **Absent**: GoalStats, the strip, the trend, pauses and earlier attempts (slices 6 to 8, ADR 0008).
@@ -77,8 +80,13 @@ No route is added. `/goals/{Id:guid}` changes:
     shows them (`RecordingText.ForLabel`: "Today, Fri 30 Oct", "Wed 28 Oct · Pending, 22 h left", a week's "26 Oct –
     1 Nov"). For a per-week entry, a second select "Date" (`ht-field-pair`) lists that week's dates up to the goal's
     current date, newest first, the first one chosen. Focus moves to "For" on open.
-  - **Opened from a row's "Add record"**: "For" is fixed to that row, and for a period it lists the row's dates up
-    to the current date.
+  - **Opened from a row's "Add record"**: "For" is fixed to that row, shown as text (`RecordingText.EntryDate`: "Wed
+    28 Oct", "12 – 18 Oct"), and for a week the "Date" select lists the row's dates up to the current date, newest
+    first. "Save record" calls `RecordAsync` as from the head (T063).
+  - **"Edit"** (a commitment row's "Edit" or a period's record button): "For" is fixed to the record's date, shown as
+    text ("Wed 28 Oct"), with no "Date" select; the field holds the record's value; the progress is
+    `RecordPreview.Progress` with that record as `replacing`. "Save record" calls `ChangeRecordAsync`, "Delete record"
+    `DeleteRecordAsync`; "This record does not exist." sits under "For" (T063).
   - **Field**, by measurement, labelled by `RecordingText.FieldLabel` (`RecordFields`):
     - yes/no: "Did you do it?", with Yes and No in a `SegmentedControl` and nothing selected;
     - count: "Amount", a `Stepper` (from 0, step 1) with the unit as stored after it;
@@ -103,9 +111,11 @@ No route is added. `/goals/{Id:guid}` changes:
   - **Buttons**: "Save record" and "Cancel". "Edit" opens the same dialog for one record, with its date fixed and
     its value filled, and adds "Delete record". There is no "Excuse instead" (slice 7).
   - **Refusals**: the result's `Message`, under the field it is about, one at a time: a value refusal under the
-    field, "The note can have at most 500 characters." under the note, and the date and limit refusals under "For".
-  - **Focus**: on open it moves to the first field. Esc and × close the dialog, and focus returns to the opener
-    (constitution IV).
+    field, "The note can have at most 500 characters." under the note, and the date, limit and record refusals under
+    "For".
+  - **Focus**: on open it moves to the first field: "For" from the head; from a row, the week's "Date" select or else
+    the value (the chosen Yes or No, or Yes while none is chosen; the Stepper's number). Esc and × close the dialog,
+    and focus returns to the opener (constitution IV).
 - **NoteDialog** (HP-003):
   - opened from a row's note or "Add note";
   - its title is the design's "Add note · {goal name}", with or without a note (the design has no other title);

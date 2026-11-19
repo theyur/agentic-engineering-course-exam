@@ -2,8 +2,10 @@ using Bunit;
 using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Domain.Accounts;
+using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Records;
 using HT.Ui.Components.Records;
 using HT.UiTests.Components.Pages;
 using HT.UnitTests.Fakes;
@@ -326,6 +328,212 @@ public sealed class RecordDialogTests : BunitContext
         cut.FindAll(".ht-dialog__foot .ht-btn")[1].Click();
 
         Assert.Equal(3, _closed);
+        Assert.Empty(_saved);
+    }
+
+    // ---- US3-AS8: opened from a History row ("Add record") and as "Edit" of one record (HP-002, T063) ----
+
+    /// <summary>The history from <paramref name="first"/> to <paramref name="last"/> at the clock's time, as the goal page reads it.</summary>
+    private async Task<GoalHistory> HistoryAsync(GoalId goal, DateOnly first, DateOnly last)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<RecordingService>().GetHistoryAsync(_user, goal, first, last, CancellationToken.None);
+        Assert.Equal(HistoryOutcome.Found, result.Outcome);
+        return result.History!;
+    }
+
+    /// <summary>
+    /// Creates the goal, moves the clock to <paramref name="at"/> after <paramref name="arrange"/> has seeded its records,
+    /// and renders the open dialog for the row whose first date is <paramref name="row"/>; with <paramref name="editing"/>,
+    /// as "Edit" of the row's record at that index.
+    /// </summary>
+    private async Task<(IRenderedComponent<RecordDialog> Cut, GoalId Goal, HistoryEntry Row)> OpenRowAsync(
+        GoalTargetFields target, DateTimeOffset at, DateOnly row, int? editing = null, Action<GoalId>? arrange = null, string name = "Reading, 20 min daily")
+    {
+        var goal = await GoalAsync(target);
+        arrange?.Invoke(goal);
+        _clock.SetUtcNow(at);
+        var history = await HistoryAsync(goal, Mon16, new DateOnly(at.Year, at.Month, at.Day));
+        var entry = history.Entries.Single(e => e.FirstDate == row);
+        var cut = Render<RecordDialog>(p => p
+            .Add(x => x.Open, true)
+            .Add(x => x.GoalId, goal)
+            .Add(x => x.GoalName, name)
+            .Add(x => x.Recordable, history)
+            .Add(x => x.Row, entry)
+            .Add(x => x.Editing, editing is { } index ? entry.Records[index] : null)
+            .Add(x => x.ActingUser, _user)
+            .Add(x => x.OnClose, () => _closed++)
+            .Add(x => x.OnSaved, (HistoryEntry saved) => _saved.Add(saved)));
+        return (cut, goal, entry);
+    }
+
+    private static string? FocusedId(BunitJSInterop js) =>
+        Assert.IsType<ElementReference>(js.VerifyFocusAsyncInvoke().Arguments[0]).Id;
+
+    [Fact]
+    public async Task US3_AS8_from_a_Missed_commitments_Add_record_For_is_fixed_to_that_row_and_focus_moves_to_the_value()
+    {
+        // At 10:00 on Friday 20 November, Monday 16's grace period ended at 00:00 on Thursday 19: it is Missed.
+        var (cut, goal, row) = await OpenRowAsync(Reading20MinDaily, Utc(20, 10), Mon16);
+        Assert.Equal(EvaluationState.Missed, row.State);
+
+        Assert.Equal(["For", "Time spent", "Note (optional)"], cut.FindAll(".ht-field__label").Select(Text));
+        var forField = Field(cut, "For");
+        Assert.Equal("DIV", forField.TagName);
+        Assert.Equal("Mon 16 Nov", Text(forField.QuerySelector("span:not(.ht-field__label)")!));
+        Assert.Empty(cut.FindAll("select"));
+        Assert.Equal(["Save record", "Cancel"], cut.FindAll(".ht-dialog__foot .ht-btn").Select(b => b.TextContent));
+        Assert.Equal(cut.Find(".ht-stepper input").GetAttribute("blazor:elementReference"), FocusedId(JSInterop));
+
+        cut.Find(".ht-stepper input").Change("20");
+        Assert.Equal("20 of 20 min", Text(cut.Find(".ht-target")));
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        var saved = Assert.Single(_saved);
+        Assert.Equal(EvaluationState.Met, saved.State);
+        Assert.True(saved.IsCorrection);
+        var record = Assert.Single(_records.RecordsOfGoal(goal));
+        Assert.Equal((Mon16, 20), (record.Date, record.Value.Amount!.Value));
+    }
+
+    [Fact]
+    public async Task US3_AS8_from_a_final_weeks_Add_record_For_is_its_date_range_and_Date_lists_all_its_dates_with_the_focus()
+    {
+        // At 10:00 on Thursday 26 November the week of 16 November ended at 00:00 on Monday 23 and is final.
+        var (cut, goal, _) = await OpenRowAsync(YogaThreeTimesAWeek, Utc(26, 10), Mon16, name: "Yoga, 3 times a week");
+
+        var pair = cut.Find(".ht-field-pair");
+        Assert.Equal(["For", "Date"], pair.QuerySelectorAll(".ht-field__label").Select(l => l.TextContent));
+        Assert.Equal("16 – 22 Nov", Text(pair.QuerySelector("div.ht-field > span:not(.ht-field__label)")!));
+        var date = Assert.Single(cut.FindAll("select"));
+        Assert.Equal(
+            ["Sun 22 Nov", "Sat 21 Nov", "Fri 20 Nov", "Thu 19 Nov", "Wed 18 Nov", "Tue 17 Nov", "Mon 16 Nov"],
+            Options(date));
+        Assert.Equal(date.GetAttribute("blazor:elementReference"), FocusedId(JSInterop));
+
+        cut.Find("select").Change("2026-11-20");
+        cut.FindAll(".ht-seg button")[0].Click();
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.True(Assert.Single(_saved).IsCorrection);
+        Assert.Equal(new DateOnly(2026, 11, 20), Assert.Single(_records.RecordsOfGoal(goal)).Date);
+    }
+
+    [Fact]
+    public async Task US3_AS8_from_the_current_weeks_Add_record_Date_lists_its_dates_up_to_the_current_date()
+    {
+        var (cut, _, _) = await OpenRowAsync(YogaThreeTimesAWeek, Utc(26, 10), new DateOnly(2026, 11, 23), name: "Yoga, 3 times a week");
+
+        Assert.Equal("23 – 29 Nov", Text(cut.Find(".ht-field-pair div.ht-field > span:not(.ht-field__label)")));
+        Assert.Equal(["Thu 26 Nov", "Wed 25 Nov", "Tue 24 Nov", "Mon 23 Nov"], Options(cut.Find("select")));
+    }
+
+    [Fact]
+    public async Task US3_AS8_Edit_has_the_records_date_fixed_its_value_filled_its_preview_and_Delete_record()
+    {
+        var (cut, goal, row) = await OpenRowAsync(
+            Reading20MinDaily, Utc(20, 10), Mon16, editing: 0, arrange: g => _records.Seed(g, Mon16, RecordValue.FromAmount(20)));
+
+        Assert.Equal("Record · Reading, 20 min daily", cut.Find(".ht-dialog__head h2").TextContent);
+        Assert.Equal("Mon 16 Nov", Text(Field(cut, "For").QuerySelector("span:not(.ht-field__label)")!));
+        Assert.Empty(cut.FindAll("select"));
+        var input = cut.Find(".ht-stepper input");
+        Assert.Equal("20", input.GetAttribute("value"));
+        Assert.Equal("20 of 20 min", Text(cut.Find(".ht-target")));
+        Assert.Equal("width:100%", cut.Find(".ht-progress > span").GetAttribute("style"));
+        Assert.Equal(["Save record", "Cancel", "Delete record"], cut.FindAll(".ht-dialog__foot .ht-btn").Select(b => b.TextContent));
+        var delete = cut.FindAll(".ht-dialog__foot .ht-btn")[2];
+        Assert.Equal(["ht-btn", "ht-btn--ghost"], delete.ClassList.ToArray());
+        Assert.Equal("ht-spacer", delete.PreviousElementSibling!.ClassName);
+        Assert.Equal(input.GetAttribute("blazor:elementReference"), FocusedId(JSInterop));
+        Assert.True(string.IsNullOrEmpty(cut.Find("textarea").TextContent));
+
+        cut.Find(".ht-stepper input").Change("12");
+        Assert.Equal("12 of 20 min", Text(cut.Find(".ht-target")));
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        var saved = Assert.Single(_saved);
+        Assert.Equal(EvaluationState.Failed, saved.State);
+        Assert.True(saved.IsCorrection);
+        var record = Assert.Single(_records.RecordsOfGoal(goal));
+        Assert.Equal((row.Records[0].Id, Mon16, 12), (record.Id, record.Date, record.Value.Amount!.Value));
+    }
+
+    [Fact]
+    public async Task US3_AS3_Delete_record_deletes_it_and_raises_saved_with_the_entry_now_Missed()
+    {
+        var (cut, goal, _) = await OpenRowAsync(
+            Reading20MinDaily, Utc(20, 10), Mon16, editing: 0, arrange: g => _records.Seed(g, Mon16, RecordValue.FromAmount(20)));
+
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[2].ClickAsync(new MouseEventArgs());
+
+        var saved = Assert.Single(_saved);
+        Assert.Equal(EvaluationState.Missed, saved.State);
+        Assert.Empty(saved.Records);
+        Assert.Empty(_records.RecordsOfGoal(goal));
+    }
+
+    [Fact]
+    public async Task Edit_of_a_weeks_record_has_its_own_date_no_Date_select_and_a_preview_without_the_record_it_replaces()
+    {
+        var (cut, goal, row) = await OpenRowAsync(YogaThreeTimesAWeek, Utc(18, 10), Mon16, editing: 0, arrange: g =>
+        {
+            _records.Seed(g, Mon16, RecordValue.FromAnswer(YesNoAnswer.Yes));
+            _records.Seed(g, new DateOnly(2026, 11, 17), RecordValue.FromAnswer(YesNoAnswer.Yes));
+        }, name: "Yoga, 3 times a week");
+
+        Assert.Equal("Mon 16 Nov", Text(Field(cut, "For").QuerySelector("span:not(.ht-field__label)")!));
+        Assert.Empty(cut.FindAll(".ht-field-pair"));
+        Assert.Empty(cut.FindAll("select"));
+        var answers = cut.FindAll(".ht-seg button");
+        Assert.Equal(["true", "false"], answers.Select(b => b.GetAttribute("aria-pressed")));
+        Assert.Equal("2 of 3 times", Text(cut.Find(".ht-target")));
+        Assert.Equal(answers[0].GetAttribute("blazor:elementReference"), FocusedId(JSInterop));
+
+        cut.FindAll(".ht-seg button")[1].Click();
+        Assert.Equal("1 of 3 times", Text(cut.Find(".ht-target")));
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Single(_saved);
+        Assert.Equal(
+            [(row.Records[0].Id, YesNoAnswer.No), (row.Records[1].Id, YesNoAnswer.Yes)],
+            _records.RecordsOfGoal(goal).Select(r => (r.Id, r.Value.Answer!.Value)));
+    }
+
+    [Fact]
+    public async Task Edit_of_a_record_that_no_longer_exists_says_so_under_For()
+    {
+        var (cut, goal, row) = await OpenRowAsync(
+            Reading20MinDaily, Utc(20, 10), Mon16, editing: 0, arrange: g => _records.Seed(g, Mon16, RecordValue.FromAmount(20)));
+        await using (var scope = Services.CreateAsyncScope())
+        {
+            var deleted = await scope.ServiceProvider.GetRequiredService<RecordingService>()
+                .DeleteRecordAsync(_user, goal, row.Records[0].Id, CancellationToken.None);
+            Assert.Equal(RecordWriteOutcome.Deleted, deleted.Outcome);
+        }
+
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        var error = Assert.Single(cut.FindAll(".ht-field__error"));
+        Assert.Equal("This record does not exist.", error.TextContent);
+        Assert.Equal(error.TextContent, Field(cut, "For").QuerySelector(".ht-field__error")!.TextContent);
+        Assert.Empty(_saved);
+    }
+
+    [Fact]
+    public async Task A_value_refusal_in_Edit_sits_under_the_field()
+    {
+        var (cut, _, _) = await OpenRowAsync(
+            CoffeeAtMost2Cups, Utc(16, 10), Mon16, editing: 0, arrange: g => _records.Seed(g, Mon16, RecordValue.FromAmount(1)),
+            name: "Coffee, at most 2 cups a day");
+        cut.Find(".ht-stepper input").Change("10000");
+
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        var error = Assert.Single(cut.FindAll(".ht-field__error"));
+        Assert.Equal("Enter a whole number from 0 to 9999.", error.TextContent);
+        Assert.Equal(error.TextContent, Field(cut, "Amount").QuerySelector(".ht-field__error")!.TextContent);
         Assert.Empty(_saved);
     }
 }

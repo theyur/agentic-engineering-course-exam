@@ -467,7 +467,7 @@ record changed below the target and reads Failed; both results say they were cor
 
 ### Tests for User Story 3
 
-- [ ] T061 [P] [US3] Write `tests/HT.UnitTests/Application/Records/CorrectionTests.cs` (after T064, T065; US3-AS1 to AS7, FR-005, FR-006):
+- [X] T061 [P] [US3] Write `tests/HT.UnitTests/Application/Records/CorrectionTests.cs` (after T064, T065; US3-AS1 to AS7, FR-005, FR-006):
   - AS1: a record on a Missed commitment gives Met with `IsCorrection` true;
   - AS2: a Met record changed below the target gives Failed with `IsCorrection` true;
   - AS3: deleting the record of a final commitment gives Missed;
@@ -478,17 +478,17 @@ record changed below the target and reads Failed; both results say they were cor
   - deleting the only record of a Due or Pending entry is not a correction; a record saved exactly at the grace end is;
   - change checks no date and checks the note after the value; a change with a note with text replaces the note, and one without leaves it (FR-007); delete checks nothing after the record;
   - a period at 50 records still takes a change and a delete.
-- [ ] T062 [P] [US3] Add change and delete to `tests/HT.IntegrationTests/Records/RecordStoreTests.cs` (after T064, T065): a change keeps `Id`, `Date` and `Sequence`; a change with a note with text replaces the entry's note, and one with no note or only spaces leaves it; a delete removes only that record; both give `RecordNotFound` for a record of another goal of the same owner. The matching `ChangeRecordAsync` note cases are T061's
+- [X] T062 [P] [US3] Add change and delete to `tests/HT.IntegrationTests/Records/RecordStoreTests.cs` (after T064, T065): a change keeps `Id`, `Date` and `Sequence`; a change with a note with text replaces the entry's note, and one with no note or only spaces leaves it; a delete removes only that record; both give `RecordNotFound` for a record of another goal of the same owner. The matching `ChangeRecordAsync` note cases are T061's
 
 ### Implementation for User Story 3
 
-- [ ] T063 [US3] Add two modes to `RecordDialog.razor` (after T045; HP-002):
+- [X] T063 [US3] Add two modes to `RecordDialog.razor` (after T045; HP-002):
   - the row mode, opened from a History row's "Add record": "For" fixed to that row, and for a period a select of its dates up to the goal's current date; `RecordAsync` as from the head;
   - the "Edit" mode for one record: its date fixed, its value filled, its progress preview through `RecordPreview` with that record as `replacing`, "Save record" (`ChangeRecordAsync`), "Delete record" (`DeleteRecordAsync`) and "Cancel".
-- [ ] T064 [US3] Add `ChangeRecordAsync(ActingUser, GoalId, RecordId, RecordInput, CancellationToken)` to `RecordingService.cs` (after T053; contracts/application-api.md): access; `FindRecordDateAsync` (`RecordNotFound`); the entry of that date; the value; the note; `ChangeAsync`. No date step (plan "Resolved in the spec" 1). It returns `Changed` with the `RecordId`, the entry and `IsCorrection`
-- [ ] T065 [US3] Add `DeleteRecordAsync(ActingUser, GoalId, RecordId, CancellationToken)` to `RecordingService.cs` (after T064): access; `FindRecordDateAsync` (`RecordNotFound`); `DeleteAsync`. It returns `Deleted` with the entry and `IsCorrection`
-- [ ] T066 [US3] Add the row actions of HP-001 to `HistoryCard.razor` (after T054, T063, T065): in the actions column, "Add record" on a commitment without a record, "Edit" on one with a record, and "Add record" on a period with fewer than 50 records; in the Recorded cell, each period record as a button that opens "Edit"; offered whatever the state, final included. The accessible names of contracts/host.md, each starting with the visible text. A row's "Add record" opens the RecordDialog's row mode (T063)
-- [ ] T067 [P] [US3] Extend `tests/HT.UiTests/Components/Records/HistoryCardTests.cs` and `RecordDialogTests.cs` (after T066; US3-AS8): the row actions per row kind and record count, in the actions column, on final rows too, every accessible name, the fixed "For" from a row with a period's dates, and "Edit" with its filled value, its preview and "Delete record"
+- [X] T064 [US3] Add `ChangeRecordAsync(ActingUser, GoalId, RecordId, RecordInput, CancellationToken)` to `RecordingService.cs` (after T053; contracts/application-api.md): access; `FindRecordDateAsync` (`RecordNotFound`); the entry of that date; the value; the note; `ChangeAsync`. No date step (plan "Resolved in the spec" 1). It returns `Changed` with the `RecordId`, the entry and `IsCorrection`
+- [X] T065 [US3] Add `DeleteRecordAsync(ActingUser, GoalId, RecordId, CancellationToken)` to `RecordingService.cs` (after T064): access; `FindRecordDateAsync` (`RecordNotFound`); `DeleteAsync`. It returns `Deleted` with the entry and `IsCorrection`
+- [X] T066 [US3] Add the row actions of HP-001 to `HistoryCard.razor` (after T054, T063, T065): in the actions column, "Add record" on a commitment without a record, "Edit" on one with a record, and "Add record" on a period with fewer than 50 records; in the Recorded cell, each period record as a button that opens "Edit"; offered whatever the state, final included. The accessible names of contracts/host.md, each starting with the visible text. A row's "Add record" opens the RecordDialog's row mode (T063)
+- [X] T067 [P] [US3] Extend `tests/HT.UiTests/Components/Records/HistoryCardTests.cs` and `RecordDialogTests.cs` (after T066; US3-AS8): the row actions per row kind and record count, in the actions column, on final rows too, every accessible name, the fixed "For" from a row with a period's dates, and "Edit" with its filled value, its preview and "Delete record"
 
 **Checkpoint**: the full suite passes. In the running app, a Missed row takes a record and turns Met. Commit.
 
