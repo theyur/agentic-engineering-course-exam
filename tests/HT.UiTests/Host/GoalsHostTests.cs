@@ -155,11 +155,38 @@ public sealed class GoalsHostTests(HostFixture host)
         }
     }
 
+    [Fact]
+    public async Task Slice_5_the_owners_prerendered_goal_page_has_Record_and_other_accounts_and_administrators_still_get_404()
+    {
+        var (owner, goal, name) = await OwnerWithGoalAsync("record-owner", everyDay: true);
+        using (owner)
+        {
+            var (status, html) = await owner.GetPageAsync($"{GoalsAddress}/{goal.Value}");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            Assert.Contains($"<h1>{name}, 15 min daily</h1>", html, StringComparison.Ordinal);
+            Assert.Contains("aria-haspopup=\"dialog\">Record</button>", html, StringComparison.Ordinal);
+        }
+
+        using var other = await host.SignedInBrowserAsync(Email("record-other"), Role.RegisteredUser);
+        using var administrator = await host.SignedInBrowserAsync(Email("record-admin"), Role.Administrator);
+        foreach (var browser in new[] { other, administrator })
+        {
+            var (status, html) = await browser.GetPageAsync($"{GoalsAddress}/{goal.Value}");
+
+            Assert.Equal(HttpStatusCode.NotFound, status);
+            Assert.Contains("Page not found", html, StringComparison.Ordinal);
+            Assert.DoesNotContain(name, html, StringComparison.Ordinal);
+            Assert.DoesNotContain(">Record</button>", html, StringComparison.Ordinal);
+        }
+    }
+
     /// <summary>
     /// A registered user signed in, with one goal created through the host's <see cref="GoalService"/> on a new Published
-    /// catalog habit: 15 min on Monday to Friday, from today in UTC (the account's zone) at the host's clock.
+    /// catalog habit: 15 min on Monday to Friday, or on every day with <paramref name="everyDay"/>, from today in UTC (the
+    /// account's zone) at the host's clock.
     /// </summary>
-    private async Task<(HttpClient Browser, GoalId Goal, string HabitName)> OwnerWithGoalAsync(string who)
+    private async Task<(HttpClient Browser, GoalId Goal, string HabitName)> OwnerWithGoalAsync(string who, bool everyDay = false)
     {
         var name = $"Ui-Go Goal {Guid.NewGuid():N}"[..30];
         var habit = await host.ArrangeCatalogHabitAsync(Definition(name));
@@ -173,7 +200,7 @@ public sealed class GoalsHostTests(HostFixture host)
             Target = new GoalTargetFields
             {
                 BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 15, DurationUnit = DurationUnit.Minutes,
-                ScheduleKind = ScheduleKind.FixedDays, Days = Weekdays.ToHashSet(),
+                ScheduleKind = ScheduleKind.FixedDays, Days = everyDay ? Enum.GetValues<DayOfWeek>().ToHashSet() : Weekdays.ToHashSet(),
             },
             StartDate = today,
         }, CancellationToken.None);

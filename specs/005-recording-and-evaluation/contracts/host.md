@@ -20,6 +20,14 @@ No route is added. `/goals/{Id:guid}` changes:
 
 - **Page head**: the name and tags of slice 4, and the primary action "Record". "Record" is absent when
   `GetRecordableAsync` gives no entry. No other action (slices 7 and 8).
+- **Layout** (`design/pages/PageGoalDetail`, slice-5 state; T046): `GoalDetailBody` renders slice 4's "← Goals",
+  head and tags, then slice 4's Notice, on top; then two columns in `ht-grid-2`:
+  - left (`ht-stack`): the History card;
+  - right (`ht-stack`): slice 4's Settings card, then the Recent notes card.
+
+  A goal with no begun entry has the design's single-card layout: the Settings card alone in `ht-grid-2`, as in
+  slice 4. That is also the layout until the History card is built (US1 builds only the head, "Record" and the
+  RecordDialog).
 - **Reads**: `GetRecordableAsync` first, then `GetHistoryAsync(D − 365, D)` with that result's `CurrentDate` D
   (research R-12), and `GetRecentNotesAsync`. A goal with no current date (not started) shows no "Record", no
   History card and no Recent notes card, only slice 4's content.
@@ -51,27 +59,44 @@ No route is added. `/goals/{Id:guid}` changes:
 
 ## Dialogs
 
-- **RecordDialog** (HP-002, `design/components/RecordDialog`, `RecordForms`):
-  - **Opened from "Record"**: "For" is a select of `GetRecordableAsync`'s entries, worded as the design shows them
-    ("Today, Fri 30 Oct", "Wed 28 Oct · Pending, 22 h left"). For a per-week entry, a second select lists that
-    week's dates up to the goal's current date.
+- **RecordDialog** (HP-002, `design/components/RecordDialog`, `RecordForms`; the texts are `RecordingText`'s, T045):
+  - **Title**: "Record · " and the goal's name ("Record · Reading, 20 min daily"), the same for "Edit"
+    (`RecordingText.Title`).
+  - **Sub line** (`RecordingText.TargetLine`): "Reduce · " and the target text for a Reduce goal ("Reduce · at most
+    2 cups a day", "Reduce · avoided every day"); "Build · at least ", the amount, " · " and the schedule part for a
+    Build count or duration goal ("Build · at least 20 min · every day"); "Build · " and the schedule part for a Build
+    yes/no goal ("Build · Mon · Wed · Fri", "Build · 3 times a week").
+  - **Opened from "Record"**: "For" is a select of `GetRecordableAsync`'s entries, newest first, worded as the design
+    shows them (`RecordingText.ForLabel`: "Today, Fri 30 Oct", "Wed 28 Oct · Pending, 22 h left", a week's "26 Oct –
+    1 Nov"). For a per-week entry, a second select "Date" (`ht-field-pair`) lists that week's dates up to the goal's
+    current date, newest first, the first one chosen. Focus moves to "For" on open.
   - **Opened from a row's "Add record"**: "For" is fixed to that row, and for a period it lists the row's dates up
     to the current date.
-  - **Field**, by measurement:
+  - **Field**, by measurement, labelled by `RecordingText.FieldLabel` (`RecordFields`):
     - yes/no: "Did you do it?", with Yes and No in a `SegmentedControl` and nothing selected;
-    - count: a `Stepper` with the unit;
-    - duration: whole minutes.
+    - count: "Amount", a `Stepper` (from 0, step 1) with the unit as stored after it;
+    - duration: "Time spent", a `Stepper` of whole minutes (from 0, step 5) with "minutes" after it, also for a goal
+      in hours.
+
+    The Stepper's input has the label as its accessible name.
   - **Text around the field**:
     - the target in the sub line;
-    - the progress under the field, live, by `RecordingText`;
-    - the partial-progress sentence, as `design/components/RecordDialog.html` words it ("Partial time is kept.
-      Below 20 min the day counts as Failed when it is finalized.");
-    - for a Reduce goal, the help text of `design/components/RecordForms.html` ("At most 2. Enter 0 if you had
-      none: an empty day cannot prove you stayed under the limit."), with "No" in place of 0 for yes/no (FR-013);
-    - "Note (optional)", empty, with the help "An empty field keeps the existing note.".
+    - the progress under the field (`ht-target` with an `ht-progress` bar filled to `RecordingText.ProgressFill`),
+      live: `RecordingText.Progress` of `RecordPreview.Progress` for the value being entered ("12 of 20 min", "1 of
+      at most 2 cups", "2 of 3 times"); none for a yes/no commitment, and none for a count or duration commitment
+      without a value;
+    - the partial-progress sentence of a Build count or duration goal (`RecordingText.PartialNote`), as
+      `design/components/RecordDialog.html` words it ("Partial time is kept. Below 20 min the day counts as Failed
+      when it is finalized.");
+    - for a Reduce goal, the help text (`RecordingText.ReduceHelp`): "At most 2 cups. Enter 0 if you had none: an
+      empty day cannot prove you stayed under the limit." for count and duration, and "Choose No if you avoided it:
+      an empty day cannot prove you stayed under the limit." for yes/no (FR-013);
+    - "Note (optional)", empty, with the placeholder "What happened? Only you can see notes." and the help "An empty
+      field keeps the existing note.".
   - **Buttons**: "Save record" and "Cancel". "Edit" opens the same dialog for one record, with its date fixed and
     its value filled, and adds "Delete record". There is no "Excuse instead" (slice 7).
-  - **Refusals**: the result's `Message`, under the field it is about, one at a time.
+  - **Refusals**: the result's `Message`, under the field it is about, one at a time: a value refusal under the
+    field, "The note can have at most 500 characters." under the note, and the date and limit refusals under "For".
   - **Focus**: on open it moves to the first field. Esc and × close the dialog, and focus returns to the opener
     (constitution IV).
 - **NoteDialog** (HP-003):

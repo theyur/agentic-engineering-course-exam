@@ -1,49 +1,28 @@
 @page "/goals/{Id:guid}"
 @attribute [Authorize]
-@using System.Globalization
-@using HT.Application.Accounts
 @using HT.Application.Goals
 @using HT.Domain.Goals
 @using HT.Ui.Account
-@using HT.Ui.Components.Goals
+@using HT.Ui.Components.Records
 @using Microsoft.AspNetCore.Authorization
 @inject GoalService GoalService
 @inject ActingUserAccessor ActingUsers
 @inject NavigationManager Navigation
-@* design/pages/PageGoalDetail, slice 4 state (HP-004, contracts/host.md): "← Goals", the name, the tags (category,
-   Build or Reduce, Commitment-based or Period-based), the attempt line, the FR-034 Notice for a habit no longer in the
-   catalog, and the Settings card. No actions, GoalStats, trend, history, pauses, notes or earlier attempts (slices 5
-   to 8). Static. An administrator, an unknown goal and another account's goal all get the Not found page with 404
-   (FR-020, FR-021); the page title names no goal until the owner's goal is found. *@
-<PageTitle>@(_goal?.Name ?? "Goal") · Habit Tracker</PageTitle>
+@* design/pages/PageGoalDetail, slice 5 state (HP-001, research R-12, contracts/host.md "Routes"): the static shell of
+   the goal page. It looks the goal up: an administrator, an unknown goal and another account's goal all get the Not
+   found page with 404 (slice 4 FR-020, FR-021), and the page title names no goal until the owner's goal is found. For
+   the owner's goal it renders GoalDetailBody, the interactive, prerendered part, with the goal identifier only. *@
+<PageTitle>@(_name ?? "Goal") · Habit Tracker</PageTitle>
 
-@if (_goal is { } goal)
+@if (_name is not null)
 {
     <div class="ht-container">
-        <BackLink Href="/goals" Text="Goals" />
-        <div class="ht-page-head ht-detail-head">
-            <div>
-                <h1>@goal.Name</h1>
-                <div class="ht-inline ht-head-tags">
-                    <Tag Text="@goal.Habit.Category.ToString()" />
-                    <Tag Text="@goal.BuildOrReduce.ToString()" />
-                    <Tag Text="@(goal.GoalScheduleKind == GoalScheduleKind.CommitmentBased ? "Commitment-based" : "Period-based")" />
-                    <span class="ht-attempt">@AttemptLine(goal)</span>
-                </div>
-            </div>
-        </div>
-        @if (goal.Habit.IsInCatalog == false)
-        {
-            <Notice Neutral="true">This habit is no longer in the public catalog. Your goal keeps working.</Notice>
-        }
-        <div class="ht-grid-2">
-            <GoalSettingsCard Details="goal" />
-        </div>
+        <GoalDetailBody Id="Id" />
     </div>
 }
 
 @code {
-    private GoalDetails? _goal;
+    private string? _name;
 
     [Parameter]
     public Guid Id { get; set; }
@@ -57,10 +36,6 @@
             return;
         }
 
-        _goal = result.Goal;
+        _name = result.Goal!.Name;
     }
-
-    /// <summary>"Attempt 1 · started 14 Jul" once the goal has started, "Attempt 1 · starts 23 Nov" before (HP-004).</summary>
-    private static string AttemptLine(GoalDetails goal) =>
-        "Attempt " + goal.AttemptNumber.ToString(CultureInfo.InvariantCulture) + " · " + (goal.HasStarted ? "started " : "starts ") + DateTexts.DayMonth(goal.AttemptStartDate);
 }

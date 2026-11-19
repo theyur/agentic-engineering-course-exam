@@ -492,6 +492,16 @@ Each section: **Decision**, **Rationale**, **Alternatives considered**.
     Entries that are still Upcoming are not shown. `GoalService` and `GoalDetails` stay unchanged.
   - **A goal that has not started** (D is null): no "Record", no History card and no Recent notes card. The page
     shows slice 4's head, Notice and Settings card, which already say when the goal starts.
+  - **The page's two columns** (T046, `design/pages/PageGoalDetail` slice-5 state): head, tags and Notice on top,
+    then `ht-grid-2` with the History card in the left `ht-stack` and the Settings card, then the Recent notes card,
+    in the right one. Without a begun entry, and until the History card is built, the Settings card stands alone in
+    `ht-grid-2`, the design's layout for that case.
+  - **The RecordDialog's texts** (T045, settled by the design step T004 and written by `RecordingText`): the title
+    "Record · {goal name}"; the sub line `TargetLine` ("Build · at least 20 min · every day", "Reduce · at most 2
+    cups a day"); the "For" labels of `ForLabel` and, for a week, the "Date" select of its dates up to the current
+    date, newest first; the field labels "Did you do it?", "Amount" and "Time spent" (`FieldLabel`); the progress
+    line and bar (`Progress`, `ProgressFill`); the partial-progress sentence (`PartialNote`) or the Reduce help
+    (`ReduceHelp`); and "Note (optional)" with the help "An empty field keeps the existing note.".
   - **History card**: the begun entries of the last 366 days up to the goal's current date, newest first, the
     first 10 with "Show all N →", which expands the card in place (plan "Resolved in the spec" 7). The columns are
     Date, Recorded, Result (StatusChip) and Note, with the row actions of HP-001. Under the table: "Corrections

@@ -1,19 +1,22 @@
 using Bunit;
 using Bunit.TestDoubles;
 using HT.Application.Goals;
+using HT.Application.Records;
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Time;
 using HT.Ui.Components.Pages;
 using HT.UnitTests.Fakes;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
 namespace HT.UiTests.Components.Pages;
 
 /// <summary>
-/// HP-004, US2-AS7, US7-AS8, FR-020: the goal page over the real GoalService and the fakes. Today is Tuesday 17 November
+/// HP-004, US2-AS7, US7-AS8, FR-020, and slice 5 HP-001 and US1-AS9: the goal page over the real GoalService,
+/// RecordingService and the fakes, with "Record" when something can be recorded now. Today is Tuesday 17 November
 /// 2026 in UTC, the zone of the signed-in user (no stored zone, the UTC default), as in the design's preview.
 /// </summary>
 public sealed class GoalDetailPageTests : BunitContext
@@ -27,6 +30,7 @@ public sealed class GoalDetailPageTests : BunitContext
     private readonly FakeCatalogHabitStore _catalog;
     private readonly FakeCustomHabitStore _customHabits;
     private readonly FakeGoalStore _goals;
+    private readonly FakeRecordStore _records;
     private int _notFound;
 
     public GoalDetailPageTests()
@@ -35,6 +39,7 @@ public sealed class GoalDetailPageTests : BunitContext
         _catalog = this.AddCatalog();
         _customHabits = this.AddCustomHabits();
         _goals = this.AddGoals();
+        _records = (FakeRecordStore)Services.GetRequiredService<IRecordStore>();
         ((FakeTimeProvider)Services.GetRequiredService<TimeProvider>()).SetUtcNow(new DateTimeOffset(2026, 11, 17, 10, 0, 0, TimeSpan.Zero));
         Services.GetRequiredService<BunitNavigationManager>().OnNotFound += (_, _) => _notFound++;
     }
@@ -57,6 +62,12 @@ public sealed class GoalDetailPageTests : BunitContext
 
     private static List<(string Label, string Value)> Rows(IRenderedComponent<GoalDetail> cut) =>
         cut.FindAll("dl.ht-kv dt").Zip(cut.FindAll("dl.ht-kv dd"), (dt, dd) => (Text(dt), Text(dd))).ToList();
+
+    private static GoalTargetFields Reading20MinDaily => new()
+    {
+        BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 20, DurationUnit = DurationUnit.Minutes,
+        ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+    };
 
     private static GoalTargetFields YesNoOnMonWedFri => new()
     {
@@ -94,7 +105,9 @@ public sealed class GoalDetailPageTests : BunitContext
             Rows(cut));
         Assert.Equal(Sentence, cut.Find(".ht-card .ht-card__sub").TextContent);
         Assert.Empty(cut.FindAll(".ht-notice"));
-        foreach (var absent in new[] { "Edit settings", "Pause", "End goal", "Record", "Consistency", "streak", "History", "Notes", "Earlier attempts" })
+        // Tuesday 17 November is not scheduled, but Monday 16 is Pending: "Record" is the page head's one action (HP-001).
+        Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        foreach (var absent in new[] { "Edit settings", "Pause", "End goal", "Consistency", "streak", "Earlier attempts", "Excuse" })
         {
             Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
         }
@@ -123,6 +136,69 @@ public sealed class GoalDetailPageTests : BunitContext
             Rows(cut));
         Assert.Equal(Sentence, cut.Find(".ht-card__sub").TextContent);
         Assert.Empty(cut.FindAll(".ht-notice"));
+        Assert.Empty(cut.FindAll(".ht-page-head button"));
+        Assert.DoesNotContain(">Record<", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HP_001_a_goal_with_a_Due_commitment_has_the_primary_action_Record_and_no_other_action()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, Today);
+
+        var cut = RenderGoal(id);
+
+        var actions = cut.FindAll(".ht-page-head button");
+        var record = Assert.Single(actions);
+        Assert.Equal("Record", record.TextContent);
+        Assert.Equal(["ht-btn", "ht-btn--primary"], record.ClassList.ToArray());
+        Assert.Equal("dialog", record.GetAttribute("aria-haspopup"));
+        Assert.Equal("ht-spacer", record.PreviousElementSibling!.ClassName);
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+    }
+
+    [Fact]
+    public async Task HP_001_a_per_week_goal_in_its_first_partial_week_has_no_Record()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        // Tuesday 17 November: the first week starts on Monday 23, so nothing can be recorded yet.
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), new GoalTargetFields
+        {
+            BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.YesNo, ScheduleKind = ScheduleKind.Times, Times = 3, Period = SchedulePeriod.Week,
+        }, Today);
+
+        var cut = RenderGoal(id);
+
+        Assert.Equal("Attempt 1 · started 17 Nov", cut.Find(".ht-attempt").TextContent);
+        Assert.Empty(cut.FindAll(".ht-page-head button"));
+    }
+
+    [Fact]
+    public async Task US1_AS9_Record_opens_the_RecordDialog_and_a_save_records_today_and_closes_it()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, Today);
+        var cut = RenderGoal(id);
+
+        cut.Find(".ht-page-head button").Click();
+
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Equal("Record · Reading, 20 min daily", dialog.QuerySelector("h2")!.TextContent);
+        Assert.Equal("Build · at least 20 min · every day", dialog.QuerySelector(".ht-dialog__sub")!.TextContent);
+        Assert.Equal(["Today, Tue 17 Nov"], dialog.QuerySelectorAll("select option").Select(o => o.TextContent));
+        Assert.Equal("Time spent", dialog.QuerySelector(".ht-stepper input")!.GetAttribute("aria-label"));
+
+        cut.Find(".ht-stepper input").Change("12");
+        Assert.Equal("12 of 20 min", Text(cut.Find(".ht-target")));
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        var record = Assert.Single(_records.RecordsOfGoal(id));
+        Assert.Equal((Today, 12), (record.Date, record.Value.Amount!.Value));
+        Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
     }
 
     [Fact]

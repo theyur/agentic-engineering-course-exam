@@ -1,0 +1,104 @@
+@rendermode InteractiveServer
+@using System.Globalization
+@using HT.Application.Accounts
+@using HT.Application.Goals
+@using HT.Application.Records
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Ui.Account
+@using HT.Ui.Components.Goals
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageGoalDetail, slice 5 state (HP-001, research R-12, contracts/host.md "Goal page"): the interactive
+   part of the goal page, prerendered, with the goal identifier as its only parameter. Slice 4's head ("← Goals", the
+   name, the tags and the attempt line), with the primary action "Record" when something can be recorded now (FR-011)
+   and no other action; slice 4's Notice for a habit no longer in the catalog; then the page's two columns: the History
+   card on the left (US5) and the Settings card, then the Recent notes card (US4), on the right. Until the History card
+   exists the page has the design's layout for a goal with no begun entry: the Settings card alone in ht-grid-2. A goal
+   with no current date shows no "Record". "Record" opens the RecordDialog; after a save, what can be recorded is read
+   again. Every use case runs in its own scope. *@
+@if (_goal is { } goal)
+{
+    <BackLink Href="/goals" Text="Goals" />
+    <div class="ht-page-head ht-detail-head">
+        <div>
+            <h1>@goal.Name</h1>
+            <div class="ht-inline ht-head-tags">
+                <Tag Text="@goal.Habit.Category.ToString()" />
+                <Tag Text="@goal.BuildOrReduce.ToString()" />
+                <Tag Text="@(goal.GoalScheduleKind == GoalScheduleKind.CommitmentBased ? "Commitment-based" : "Period-based")" />
+                <span class="ht-attempt">@AttemptLine(goal)</span>
+            </div>
+        </div>
+        @if (CanRecord)
+        {
+            <span class="ht-spacer"></span>
+            <button type="button" class="ht-btn ht-btn--primary" aria-haspopup="dialog" @ref="_recordButton" @onclick="OpenRecord">Record</button>
+        }
+    </div>
+    @if (goal.Habit.IsInCatalog == false)
+    {
+        <Notice Neutral="true">This habit is no longer in the public catalog. Your goal keeps working.</Notice>
+    }
+    <div class="ht-grid-2">
+        <GoalSettingsCard Details="goal" />
+    </div>
+    @if (CanRecord)
+    {
+        <RecordDialog Open="_recordOpen" OnClose="CloseRecord" ReturnFocus="_recordButton" GoalId="goal.Id" GoalName="@goal.Name"
+                      Recordable="_recordable!" ActingUser="_actingUser" OnSaved="SavedAsync" />
+    }
+}
+
+@code {
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private GoalDetails? _goal;
+    private GoalHistory? _recordable;
+    private bool _recordOpen;
+    private ElementReference _recordButton;
+
+    /// <summary>The goal's identifier; the page shell has already found it among the acting user's goals.</summary>
+    [Parameter]
+    public Guid Id { get; set; }
+
+    /// <summary>"Record" is offered only when something can be recorded now (FR-011, HP-002).</summary>
+    private bool CanRecord => _recordable is { Entries.Count: > 0 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _actingUser = await ActingUsers.GetAsync();
+        var read = await UseCases.RunAsync<GoalService, GoalReadResult>(
+            (service, token) => service.GetAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        if (read.Goal is not { } goal)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        _goal = goal;
+        await ReadRecordableAsync();
+    }
+
+    private async Task ReadRecordableAsync()
+    {
+        var recordable = await UseCases.RunAsync<RecordingService, RecordableResult>(
+            (service, token) => service.GetRecordableAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        _recordable = recordable.History;
+    }
+
+    private void OpenRecord() => _recordOpen = true;
+
+    private void CloseRecord() => _recordOpen = false;
+
+    private async Task SavedAsync(HistoryEntry entry)
+    {
+        _recordOpen = false;
+        await ReadRecordableAsync();
+    }
+
+    /// <summary>"Attempt 1 · started 14 Jul" once the goal has started, "Attempt 1 · starts 23 Nov" before (slice 4 HP-004).</summary>
+    private static string AttemptLine(GoalDetails goal) =>
+        "Attempt " + goal.AttemptNumber.ToString(CultureInfo.InvariantCulture) + " · " + (goal.HasStarted ? "started " : "starts ") + DateTexts.DayMonth(goal.AttemptStartDate);
+}

@@ -1,0 +1,75 @@
+@using HT.Domain.Habits
+@using HT.Domain.Records
+@* design/components/RecordForms, slice 5 state (HP-002): the field of a record by the goal's measurement, in one
+   ht-field with its label. Yes/no: "Did you do it?", Yes | No in a SegmentedControl with nothing selected until the
+   user chooses. Count: the Stepper (from 0, step 1) with the goal's unit as stored after it. Duration: the Stepper of
+   whole minutes (from 0, step 5) with "minutes" after it. The Stepper's input has the label as its accessible name. A
+   refusal about the value sits under the control; what the dialog passes as ChildContent (the progress line and the
+   help) follows it. A typed value is passed on as it is: the use case decides the refusal. *@
+<div class="ht-field">
+    <span class="ht-field__label">@Label</span>
+    @if (Measurement == Measurement.YesNo)
+    {
+        <SegmentedControl TValue="YesNoAnswer" Options="Answers" Label="@Label" Value="Answer" ValueChanged="AnswerChanged"
+                          DescribedBy="@(Error is null ? null : ErrorId)" />
+    }
+    else
+    {
+        <Stepper Id="@InputId" Label="@Label" Value="Amount" ValueChanged="AmountChanged" Min="0"
+                 Max="@(Measurement == Measurement.Duration ? RecordLimits.MaxMinutes : RecordLimits.MaxCount)"
+                 Step="@(Measurement == Measurement.Duration ? 5 : 1)"
+                 Unit="@(Measurement == Measurement.Duration ? "minutes" : Unit)"
+                 DescribedBy="@(Error is null ? null : ErrorId)" Invalid="@(Error is not null)" />
+    }
+    @if (Error is not null)
+    {
+        <span class="ht-field__error" id="@ErrorId">@Error</span>
+    }
+    @ChildContent
+</div>
+
+@code {
+    private static readonly IReadOnlyList<(YesNoAnswer Value, string Label)> Answers =
+        [(YesNoAnswer.Yes, "Yes"), (YesNoAnswer.No, "No")];
+
+    private readonly string _id = $"record-field-{Guid.NewGuid():N}";
+
+    /// <summary>The goal's measurement, which decides the control.</summary>
+    [Parameter, EditorRequired]
+    public Measurement Measurement { get; set; }
+
+    /// <summary>The field's label: "Did you do it?", "Amount" or "Time spent" (RecordingText.FieldLabel).</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>The count unit as stored; ignored for yes/no and duration.</summary>
+    [Parameter]
+    public string? Unit { get; set; }
+
+    /// <summary>The chosen answer of a yes/no goal; null until the user chooses.</summary>
+    [Parameter]
+    public YesNoAnswer? Answer { get; set; }
+
+    [Parameter]
+    public EventCallback<YesNoAnswer> AnswerChanged { get; set; }
+
+    /// <summary>The amount of a count goal or the minutes of a duration goal; null while the field is empty.</summary>
+    [Parameter]
+    public int? Amount { get; set; }
+
+    [Parameter]
+    public EventCallback<int?> AmountChanged { get; set; }
+
+    /// <summary>The use case's refusal about the value, shown under the control.</summary>
+    [Parameter]
+    public string? Error { get; set; }
+
+    /// <summary>What follows the control and its refusal: the progress line and the help.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The id of the Stepper's input, so a page can move the focus to it.</summary>
+    public string InputId => _id + "-input";
+
+    private string ErrorId => _id + "-error";
+}
