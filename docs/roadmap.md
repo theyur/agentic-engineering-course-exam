@@ -31,7 +31,7 @@ in its idea brief, which assumed the catalog also carried the account foundation
 | 2 | `habit-catalog` | A new user does not start from a blank page. Anyone can browse curated catalog habits by category, with suggested starting goals; administrators curate them; users keep private custom habits. | §3, §4 (without Suggest for catalog), §8 (catalog) | 1 | — | — | shipped | [002](../specs/002-habit-catalog/spec.md) |
 | 3 | `demo-hosting` | Reviewers open the app in a browser, with demonstration data, without installing anything. | §10; ARCH §7 | 1 | 2 | — | shipped | [003](../specs/003-demo-hosting/spec.md) |
 | 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | — | shipped | [004](../specs/004-goals/spec.md) |
-| 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Now | implementing | [005](../specs/005-recording-and-evaluation/spec.md) |
+| 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | Now | AC tests green | [005](../specs/005-recording-and-evaluation/spec.md) |
 | 6 | `personal-reports` | A user sees how consistent they are: a dashboard of upcoming, due and overdue commitments and Missed results, consistency with its count, strict streaks with their unit, trends. | §6 | 5 | — | Next | not started | — |
 | 7 | `excusals-and-pauses` | Excused commitments and paused expectations are left out of consistency and neither extend nor break the streak. | §5.3 | 5, 6 | — | Next | not started | — |
 | 8 | `goal-changes` | A user changes a goal from the next evaluation boundary, ends it with an outcome, and restarts it as a new attempt, with earlier attempts kept in history. | §5.4 | 5, 6 | 7 | Later | not started | — |
@@ -85,6 +85,12 @@ Only what the order depends on. Scope is decided in each spec.
 5. **`recording-and-evaluation`** is the core of the product: evaluation as a deterministic function of
    stored facts and a supplied time (`TimeProvider`). Demo data has to show Pending, Met, Failed and Missed
    results relative to the current time. A correction's effect on reports is verified in slice 6.
+   Deferred by the owner on 2026-11-19, after the manual quickstart: a redesign of note editing. The
+   History's Note column shows the note as plain text, or "—" when there is none. A row with a record
+   changes its note only through the record dialog, which opens with the current note; what is saved there
+   is the note, and an empty field removes it. Rows without a record keep "Add note". This changes FR-007
+   and its locked acceptance criteria (AC-037, and AC-011, AC-035, AC-036, AC-039 and AC-064 to check), so
+   it gets its own spec folder after slice 5 ships, before slice 6 shows notes on reports and Home.
 6. **`personal-reports`** comes before excusals and pauses so the core value is demonstrable earlier
    (decision R3). Consistency and streak formatting come from one shared formatter (constitution IV).
 7. **`excusals-and-pauses`** extends the evaluation of slice 5 and the reports of slice 6. SPEC §11.2 can
