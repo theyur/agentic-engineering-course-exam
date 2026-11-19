@@ -79,7 +79,7 @@ public sealed class RecordDialogTests : BunitContext
             .Add(x => x.Recordable, recordable)
             .Add(x => x.ActingUser, _user)
             .Add(x => x.OnClose, () => _closed++)
-            .Add(x => x.OnSaved, (HistoryEntry entry) => _saved.Add(entry)));
+            .Add(x => x.OnSaved, entry => _saved.Add(entry)));
         return (cut, goal);
     }
 
@@ -295,6 +295,27 @@ public sealed class RecordDialogTests : BunitContext
     }
 
     [Fact]
+    public async Task A_refusal_about_For_sits_under_the_For_select_which_it_describes_and_marks_invalid()
+    {
+        var (cut, goal) = await OpenAsync(YogaThreeTimesAWeek, Utc(18, 10), "Yoga, 3 times a week");
+        Assert.Null(Field(cut, "For").QuerySelector("select")!.GetAttribute("aria-invalid"));
+        for (var i = 0; i < RecordLimits.MaxRecordsPerPeriod; i++)
+        {
+            _records.Seed(goal, Mon16, RecordValue.FromAnswer(YesNoAnswer.Yes));
+        }
+
+        cut.FindAll(".ht-seg button")[0].Click();
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        var error = Assert.Single(cut.FindAll(".ht-field__error"));
+        Assert.Equal("This evaluation period already has 50 records.", error.TextContent);
+        var select = Field(cut, "For").QuerySelector("select")!;
+        Assert.Equal(error.Id, select.GetAttribute("aria-describedby"));
+        Assert.Equal("true", select.GetAttribute("aria-invalid"));
+        Assert.Empty(_saved);
+    }
+
+    [Fact]
     public async Task A_count_out_of_range_is_refused_under_the_field()
     {
         var (cut, _) = await OpenAsync(CoffeeAtMost2Cups, Utc(16, 10), "Coffee, at most 2 cups a day");
@@ -364,7 +385,7 @@ public sealed class RecordDialogTests : BunitContext
             .Add(x => x.Editing, editing is { } index ? entry.Records[index] : null)
             .Add(x => x.ActingUser, _user)
             .Add(x => x.OnClose, () => _closed++)
-            .Add(x => x.OnSaved, (HistoryEntry saved) => _saved.Add(saved)));
+            .Add(x => x.OnSaved, saved => _saved.Add(saved)));
         return (cut, goal, entry);
     }
 

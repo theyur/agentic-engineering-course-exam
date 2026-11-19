@@ -74,7 +74,7 @@ internal static class RecordMapping
     {
         (Yes, null) => RecordValue.FromAnswer(YesNoAnswer.Yes),
         (No, null) => RecordValue.FromAnswer(YesNoAnswer.No),
-        (null, int amount) when amount is >= 0 and <= RecordLimits.MaxCount => RecordValue.FromAmount(amount),
+        (null, { } amount) when amount is >= 0 and <= RecordLimits.MaxCount => RecordValue.FromAmount(amount),
         _ => throw new InvalidOperationException($"The stored record {row.Id} has no valid value."),
     };
 }

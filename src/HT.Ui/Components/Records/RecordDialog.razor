@@ -183,7 +183,8 @@
         @<label class="ht-field">
             <span class="ht-field__label">For</span>
             <select class="ht-input" @ref="_forSelect" @onchange="ChooseEntry"
-                    aria-describedby="@(ErrorOf(RecordFieldKind.For) is null ? null : ForErrorId)">
+                    aria-describedby="@(ErrorOf(RecordFieldKind.For) is null ? null : ForErrorId)"
+                    aria-invalid="@(ErrorOf(RecordFieldKind.For) is null ? null : "true")">
                 @foreach (var option in Recordable.Entries)
                 {
                     <option value="@Key(option.FirstDate)" selected="@(option.FirstDate == entry.FirstDate)">@ForLabel(option)</option>

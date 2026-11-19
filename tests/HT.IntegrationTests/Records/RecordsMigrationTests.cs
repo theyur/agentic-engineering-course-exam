@@ -163,7 +163,7 @@ public sealed class RecordsMigrationTests(MigrationDatabaseFixture database)
         return lines;
     }
 
-    private Task InsertRecordAsync(Guid goal, DateOnly date, byte? answer, int? amount) =>
+    private Task<int> InsertRecordAsync(Guid goal, DateOnly date, byte? answer, int? amount) =>
         Sql.ExecuteAsync(database.ConnectionString,
             "INSERT INTO [GoalRecords] ([Id], [GoalId], [Date], [Answer], [Amount]) VALUES (@id, @goal, @date, @answer, @amount)",
             ("@id", Guid.NewGuid()), ("@goal", goal), ("@date", date.ToDateTime(TimeOnly.MinValue)),

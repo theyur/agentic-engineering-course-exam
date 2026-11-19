@@ -1,10 +1,8 @@
-using HT.Application.Accounts;
 using HT.Application.Records;
 using HT.Domain.Accounts;
 using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
-using HT.Domain.Records;
 using static HT.UnitTests.Application.Records.RecordWorld;
 using static HT.UnitTests.Domain.Goals.GoalSamples;
 using static HT.UnitTests.Domain.Time.Instants;

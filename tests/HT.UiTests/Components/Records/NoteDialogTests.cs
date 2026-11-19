@@ -101,14 +101,14 @@ public sealed class NoteDialogTests : BunitContext
             .Add(x => x.Row, history.Entries.Single(e => e.FirstDate == row))
             .Add(x => x.ActingUser, _user)
             .Add(x => x.OnClose, () => _closed++)
-            .Add(x => x.OnSaved, (HistoryEntry entry) => _saved.Add(entry)));
+            .Add(x => x.OnSaved, entry => _saved.Add(entry)));
         return (cut, goal);
     }
 
     private static Task SaveAsync(IRenderedComponent<NoteDialog> cut) =>
         cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
 
-    private static string? AreaValue(IRenderedComponent<NoteDialog> cut)
+    private static string AreaValue(IRenderedComponent<NoteDialog> cut)
     {
         var area = cut.Find("textarea");
         var value = area.GetAttribute("value");

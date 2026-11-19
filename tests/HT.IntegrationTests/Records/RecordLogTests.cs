@@ -199,8 +199,8 @@ public sealed class RecordLogTests(DatabaseFixture database)
         return new RecordId(id);
     }
 
-    /// <summary>Stores a note row by plain SQL, with no check.</summary>
-    private Task InsertNoteAsync(GoalId goal, DateOnly key, string text) =>
+    /// <summary>Stores a note row by plain SQL, with no check; gives the number of rows written.</summary>
+    private Task<int> InsertNoteAsync(GoalId goal, DateOnly key, string text) =>
         Sql.ExecuteAsync(database.ConnectionString,
             "INSERT INTO [GoalNotes] ([GoalId], [EntryDate], [Text]) VALUES (@goal, @date, @text)",
             ("@goal", goal.Value), ("@date", key.ToDateTime(TimeOnly.MinValue)), ("@text", text));

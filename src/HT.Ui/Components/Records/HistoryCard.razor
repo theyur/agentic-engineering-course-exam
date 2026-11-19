@@ -128,7 +128,7 @@
     /// </summary>
     public ValueTask FocusAsync(DateOnly row, RecordId? record)
     {
-        if (ShownRows.FirstOrDefault(entry => entry.FirstDate == row) is not { } entry)
+        if (ShownRows.FirstOrDefault(e => e.FirstDate == row) is not { } entry)
         {
             return ValueTask.CompletedTask;
         }

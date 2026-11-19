@@ -89,8 +89,8 @@ public sealed class HistoryCardTests : BunitContext
         GoalHistory history, Action<HistoryCard.RowAction>? onAction = null, Action<HistoryEntry>? onNote = null) =>
         Render<HistoryCard>(p => p
             .Add(x => x.History, history)
-            .Add(x => x.OnAction, (HistoryCard.RowAction a) => onAction?.Invoke(a))
-            .Add(x => x.OnNote, (HistoryEntry e) => onNote?.Invoke(e)));
+            .Add(x => x.OnAction, a => onAction?.Invoke(a))
+            .Add(x => x.OnNote, e => onNote?.Invoke(e)));
 
     private static List<string> Dates(IRenderedComponent<HistoryCard> cut) =>
         cut.FindAll("tbody tr").Select(row => Text(row.QuerySelector("td")!)).ToList();
@@ -416,7 +416,7 @@ public sealed class HistoryCardTests : BunitContext
         await NoteButton(cut, "Tue 3 Nov").ClickAsync(new MouseEventArgs());
         await NoteButton(cut, "Wed 4 Nov").ClickAsync(new MouseEventArgs());
 
-        Assert.Equal([(Tue3Nov, "Fell asleep early."), (new DateOnly(2026, 11, 4), (string?)null)], rows.Select(r => (r.FirstDate, r.Note)));
+        Assert.Equal([(Tue3Nov, "Fell asleep early."), (new DateOnly(2026, 11, 4), null)], rows.Select(r => (r.FirstDate, r.Note)));
         Assert.Empty(actions);
     }
 

@@ -83,8 +83,8 @@ public sealed class RecordPrivacyTests(DatabaseFixture database)
         var dailyRecord = await AddAsync(a, daily, Day(Wed18), true, Wed18, Minutes(25), Note("A's daily note."));
         var weekRecord = await AddAsync(a, weekly, Week(Mon16), false, Wed18, RecordValue.FromAmount(21), Note("A's week note."));
         await AddAsync(a, weekly, Week(Mon16), false, Thu19, RecordValue.FromAmount(22), null);
-        var bsRecord = await AddAsync(b, bsGoal, Day(Wed18), true, Wed18, Minutes(30), Note("B's own note."));
-        return new World(a, b, daily, weekly, bsGoal, dailyRecord, weekRecord, bsRecord);
+        await AddAsync(b, bsGoal, Day(Wed18), true, Wed18, Minutes(30), Note("B's own note."));
+        return new World(a, b, daily, weekly, bsGoal, dailyRecord, weekRecord);
     }
 
     private async Task<RecordId> AddAsync(AccountId owner, GoalId goal, EntrySpan entry, bool isCommitment, DateOnly date, RecordValue value, NoteText? note)
@@ -215,7 +215,7 @@ public sealed class RecordPrivacyTests(DatabaseFixture database)
     }
 
     private sealed record World(
-        AccountId A, AccountId B, GoalId Daily, GoalId Weekly, GoalId BsGoal, RecordId DailyRecord, RecordId WeekRecord, RecordId BsRecord);
+        AccountId A, AccountId B, GoalId Daily, GoalId Weekly, GoalId BsGoal, RecordId DailyRecord, RecordId WeekRecord);
 
     /// <summary>A's and B's record and note rows; equal when every column of every row is equal.</summary>
     private sealed record Snapshot(IReadOnlyList<string> ARecords, IReadOnlyList<string> ANotes, IReadOnlyList<string> BRecords, IReadOnlyList<string> BNotes)

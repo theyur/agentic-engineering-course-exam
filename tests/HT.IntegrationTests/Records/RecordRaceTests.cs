@@ -23,6 +23,9 @@ public sealed class RecordRaceTests(DatabaseFixture database)
     /// <summary>How long the test waits at most for both writes to queue on the held lock.</summary>
     private static readonly TimeSpan QueueTimeout = TimeSpan.FromSeconds(10);
 
+    /// <summary>The two amounts of the commitment race, in minutes: either write may be the one that is kept.</summary>
+    private static readonly int[] RacedMinutes = [12, 25];
+
     [Fact]
     public async Task Two_concurrent_records_on_one_commitment_leave_one_record()
     {
@@ -32,12 +35,12 @@ public sealed class RecordRaceTests(DatabaseFixture database)
 
         var writes = await RaceAsync(owner, goal, (store, value) =>
             store.AddAsync(owner, goal, Day(Wed18), true, Wed18, value, null, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None),
-            Minutes(12), Minutes(25));
+            Minutes(RacedMinutes[0]), Minutes(RacedMinutes[1]));
 
         Assert.All(writes, w => Assert.Equal(RecordStoreWriteOutcome.Written, w.Outcome));
         Assert.Equal(writes[0].RecordId, writes[1].RecordId);
         var row = Assert.Single(await RecordRowsAsync(database.ConnectionString, goal));
-        Assert.Contains((int)row["Amount"]!, new[] { 12, 25 });
+        Assert.Contains((int)row["Amount"]!, RacedMinutes);
     }
 
     [Fact]
