@@ -439,7 +439,7 @@ read just before and just after each grace end.
 
 ### Tests for User Story 2
 
-- [ ] T058 [P] [US2] Write `tests/HT.UnitTests/Application/Records/StateTests.cs` through `GetHistoryAsync` and `RecordAsync` (after T053; US2-AS1 to AS13):
+- [X] T058 [P] [US2] Write `tests/HT.UnitTests/Application/Records/StateTests.cs` through `GetHistoryAsync` and `RecordAsync` (after T053; US2-AS1 to AS13):
   - AS1 to AS3: Upcoming, Due, Pending with its grace end, Missed at the grace end and after, with no call in between (HP-010);
   - AS4 to AS10: one representative final case each, the Domain tests T016 covering the full matrix;
   - AS11: a record that reaches the target is Pending with its progress during the grace period, then Met;
@@ -447,11 +447,11 @@ read just before and just after each grace end.
   - AS13: an account in "Europe/Kyiv", a goal on Saturday 24 October 2026, read at `2026-10-26T20:59:00Z` (Pending, grace end `2026-10-26T21:00:00Z`) and at `2026-10-26T21:00:00Z` (final);
   - edge cases (slice 4 FR-027): after a large move east, the first commitment of the new version that has already ended when the change is made is Pending or final by the same rules from its own end; across a gap or an overlap, two consecutive commitments are each Pending with different grace ends;
   - the independent test of the story: days 1 to 3, just before and just after each grace end.
-- [ ] T059 [P] [US2] Write `tests/HT.UiTests/Host/NoBackgroundWorkTests.cs` (HP-010, research R-14): the host's service provider registers no `IHostedService` beyond those of the framework that slices 1 to 4 already have, listed by type name in the test
+- [X] T059 [P] [US2] Write `tests/HT.UiTests/Host/NoBackgroundWorkTests.cs` (HP-010, research R-14): the host's service provider registers no `IHostedService` beyond those of the framework that slices 1 to 4 already have, listed by type name in the test
 
 ### Implementation for User Story 2
 
-- [ ] T060 [US2] Fix what T058 and T059 find in `RecordingService.cs`, `Evaluator.cs` or `HistoryCard.razor`. If they pass at once, record that here and change nothing
+- [X] T060 [US2] Fix what T058 and T059 find in `RecordingService.cs`, `Evaluator.cs` or `HistoryCard.razor`. If they pass at once, record that here and change nothing
 
 **Checkpoint**: the full suite passes. Commit.
 

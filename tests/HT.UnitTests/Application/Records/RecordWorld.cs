@@ -22,7 +22,14 @@ namespace HT.UnitTests.Application.Records;
 public sealed class RecordWorld
 {
     public RecordWorld()
+        : this(new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero))
     {
+    }
+
+    /// <summary>A world whose clock starts at <paramref name="clockStart"/>, for a test dated before 1 November 2026.</summary>
+    public RecordWorld(DateTimeOffset clockStart)
+    {
+        Clock = new FakeTimeProvider(clockStart);
         Goals = new FakeGoalStore(Accounts, CatalogHabits, CustomHabits);
         Records = new FakeRecordStore(Goals);
         User = GoalInputs.RegisteredUserWithDefaultZone(Accounts);
@@ -41,8 +48,11 @@ public sealed class RecordWorld
 
     public FakeRecordStore Records { get; }
 
-    /// <summary>The clock, from 00:00 UTC on 1 November 2026; it only moves forward, and every test sets it before it creates a goal.</summary>
-    public FakeTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero));
+    /// <summary>
+    /// The clock, from 00:00 UTC on 1 November 2026 unless the world was made with another start; it only moves forward,
+    /// and every test sets it before it creates a goal.
+    /// </summary>
+    public FakeTimeProvider Clock { get; }
 
     public InstallationTimeZone DefaultZone { get; } = InstallationTimeZone.From(null);
 
