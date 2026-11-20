@@ -50,8 +50,8 @@ figures derived from them; changes nothing else in it. Decides the roadmap row "
 - One source of truth: a correction, a late record, a deleted record or the end of a grace period changes every
   figure on the next read, with nothing to invalidate or re-synchronize (constitution II holds by construction).
 - Every read recomputes a goal's whole attempt. At demo scale (goals of weeks to a few months, a year at most in
-  tests) that is cheap; slice 6's SC-007 (a year of daily results in under 2 seconds per page) checks it on the
-  hosted demo.
+  tests) that is cheap; slice 6's SC-007 (a goal with 366 daily results read in under 2 seconds) checks it in
+  an integration test against SQL Server, since the hosted demo's goals are at most 84 days old.
 - The dashboard and the goals overview evaluate every goal of the user on each read; a user with many goals pays
   for all of them. Accepted for v1.
 - Slice 9's figures over all consenting users will be the most expensive reads; this ADR does not decide them

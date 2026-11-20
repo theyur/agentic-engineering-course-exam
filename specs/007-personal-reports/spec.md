@@ -48,7 +48,9 @@ the roadmap's technical row):
   it has not reached (FR-002, US1-AS4).
 - Q: Which Missed results are "Missed this week" on the Home? → A: Those that became Missed this week: their grace
   period ended at or after Monday 00:00 of the current week in the account's time zone. The previous week's
-  Saturday, Sunday and per-week period therefore appear early in the week (FR-012, US6-AS4).
+  Friday (its grace period ends exactly at Monday 00:00, which counts, slice 5 FR-016), Saturday, Sunday and
+  per-week period therefore appear early in the week, and its Thursday does not. Around a clock change in that
+  weekend, Friday's grace end moves to Monday 01:00 (counted) or Sunday 23:00 (not counted) (FR-012, US6-AS4).
 - Q: Over which results are a goal's personal figures computed? → A: The whole current attempt (the report range),
   not a rolling window; the community views' rolling 30 days (SPEC §7) are slice 9's own figure ("Terms used
   below", FR-001, FR-003).
@@ -263,10 +265,16 @@ the target 20, and its last results with their states.
    weeks that have begun, each the week's progress (2 for a week with two "Yes"), with the target 3 (FR-006).
 5. **Given** a yes/no goal on Monday, Wednesday and Friday, **Then** its trend has one value per Monday-to-Sunday
    week, the number of its commitments recorded "Yes", with the target the number of its commitments in that week
-   (FR-006).
+   (FR-006); **given** a yes/no goal on Tuesday and Thursday read on a Monday, its latest bar is the previous
+   week's (FR-006, a week's bar begins with its first commitment).
 6. **Given** a commitment with a record of 0, **Then** its trend value is 0; **given** one with no record, it has
-   no value (FR-006).
-7. *(page)* **Given** the goal page, **Then** the GoalStats card shows the strip with its legend and an accessible
+   no value; **given** a per-day or per-week period with no record, it has no value, also for a Reduce goal
+   (FR-006).
+7. **Given** a Reduce yes/no goal "avoided on" Monday, Wednesday and Friday with "Yes" on one commitment of a week
+   and "No" on the other two, **Then** that week's value is 1 and its target 0 (FR-006); **given** a Build
+   duration goal "30 min, 3 times a week" with records of 30, 25 and 40 minutes in a week, that week's value is 2
+   and its target 3.
+8. *(page)* **Given** the goal page, **Then** the GoalStats card shows the strip with its legend and an accessible
    label that counts each state, and the trend card shows bars with a dashed target line (HP-001, HP-006).
 
 ---
@@ -316,11 +324,14 @@ the Today list in that order.
    (FR-012).
 2. **Given** the same user, **Then** the Today list has every Pending result first, the one whose grace period
    ends soonest first, then every Due result, then every Missed result that became final this week, newest first;
-   each with its goal, date, state and progress, and for Pending the instant its grace period ends (FR-012).
+   entries that tie are in the goal order of FR-011; each with its goal, date, state and progress, and for Pending
+   the instant its grace period ends (FR-012).
 3. **Given** a per-week goal in its week, **Then** its Due week is in the Today list and is counted among the Due
    results (FR-012).
 4. **Given** a Missed result that became final before the Monday of the current week (in the account's time
-   zone), **Then** it is not in the Today list and not counted (FR-012).
+   zone), **Then** it is not in the Today list and not counted; **given** a commitment on the previous Friday with
+   no record, read on Monday at 00:00, **Then** it is Missed this week, and the previous Thursday's is not
+   (FR-012; Clarifications 2026-11-20 (clarify)).
 5. **Given** a user with goals, **Then** the dashboard lists every goal with its consistency, current streak and
    longest streak with their unit, in the order of FR-011 (FR-012).
 6. **Given** notes on several goals, **Then** the dashboard gives the 5 with the latest dates across all goals,
@@ -330,7 +341,7 @@ the Today list in that order.
    Wednesday commitment as Upcoming, after the Missed results; a goal with a Due result, and one whose next
    commitment or period starts more than 6 days after its current date, get no Upcoming entry; no count is given
    for Upcoming (FR-012; D-2, Clarifications 2026-11-20).
-9. *(page)* **Given** the signed-in Home, **Then** it shows the four StatTiles "Due today", "Pending · still can
+9. *(page)* **Given** the signed-in Home, **Then** it shows the four StatTiles "Due now", "Pending · still can
    record", "Missed this week" and "Active goals", the Today card, the "Active goals" card and the "Recent notes"
    card (HP-003).
 
@@ -362,9 +373,9 @@ to read A's goal report, and each reads their own dashboard and overview, which 
 ### User Story 8 - Demo reports (Priority: P2)
 
 Reviewers who sign in as a demo account with history find non-trivial consistency and streaks, a Today list
-with Due, Pending and Missed results, and recent notes, without waiting for real time to pass: `demo4` with 28 days
-(slice 5), and `demo5` with 12 weeks, whose trends fill all their bars. Visitors see an example GoalStats card on
-the visitor Home.
+with Due and Pending results, and recent notes, without waiting for real time to pass: `demo4` with 28 days
+(slice 5), and `demo5` with 12 weeks, whose trends fill all their bars and whose Today list also has a result
+Missed this week. Visitors see an example GoalStats card on the visitor Home.
 
 **Why this priority**: constitution VI and SPEC §10; needed for the hosted demo, not for the core flow.
 
@@ -381,9 +392,10 @@ the visitor Home.
 3. **Given** the same run on a Wednesday to Sunday, **Then** "Yoga, 3 times a week" reads "33% (1 of 3)", current
    streak 1 week, longest 1 week; on a Tuesday "0% (0 of 2)", 0 weeks and 0 weeks; on a Monday "33% (1 of 3)",
    0 weeks and 1 week (FR-030).
-4. **Given** the same run, **When** `demo4@example.com` reads its dashboard, **Then** its Today list has Pending,
-   Due and, when one became final this week, Missed results, and its recent notes include "Fell asleep early." and
-   "Birthday cake at work." (FR-030).
+4. **Given** the same run, **When** `demo4@example.com` reads its dashboard, **Then** its Today list has the
+   Pending results of Reading and Sugar on R − 2 and R − 1 and their Due results on R, no Missed result and 0
+   "Missed this week" (every Missed result of `demo4` became final before the current week), and its recent notes
+   include "Fell asleep early." and "Birthday cake at work." (FR-030).
 5. **Given** the same run, **Then** demo history loading's results are those of slice 5, unchanged, and the
    slice-4 demo goals of `demo1` to `demo3` read "N/A" and streaks of 0 (FR-031).
 6. *(page)* **Given** an anonymous visitor on the visitor Home, **Then** the hero shows a GoalStats card labelled
@@ -393,7 +405,7 @@ the visitor Home.
    of FR-032, and demo report loading's results are "created", "demo goals added" and "demo records added" for
    `demo5@example.com`, naming no goal, habit, note, unit or amount (FR-032).
 8. **Given** that run on Wednesday 2026-11-18, **When** `demo5@example.com` reads its reports at the run time,
-   **Then** "Screen time, at most 120 min a day" reads "95% (78 of 82)", 27 days, longest 34 days; "Strength
+   **Then** "Screen time, at most 120 min a day" reads "93% (77 of 82)", 0 days, longest 34 days; "Strength
    training, 2 times a week" "81% (9 of 11)", 3 weeks, longest 4 weeks; "Walking, 30 min, 3 days a week" "82% (29
    of 35)", 7 commitments, longest 15 commitments; and their trends have 14, 12 and 14 bars (FR-032).
 9. **Given** `demo5@example.com` already exists, **When** demo report loading runs again, **Then** its result is
@@ -402,6 +414,14 @@ the visitor Home.
     its result is "no demo password configured" or "demo password does not meet the password rule" and no account
     is created; demo loading's and demo history loading's results never name `demo5@example.com` (FR-031,
     FR-032).
+11. **Given** the run of AS-7 on any weekday, with the default time zone UTC, **When** `demo5@example.com` reads
+    its dashboard at the run time,
+    **Then** "Missed this week" is 1 and the Today list has the Missed result of "Screen time, at most 120 min a
+    day" on R − 3 (on a Monday, the previous Friday, whose grace period ends exactly at Monday 00:00) (FR-032).
+12. **Given** that run on Wednesday 2026-11-18, **Then** the dashboard counts 3 Due, 3 Pending, 1 Missed this week
+    and 3 goals, and its Today list is, in this order: Screen time 16 Nov (Pending), Walking 16 Nov (Pending),
+    Screen time 17 Nov (Pending), Screen time 18 Nov (Due), Walking 18 Nov (Due), Strength training 16 – 22 Nov
+    (Due), Screen time 15 Nov (Missed), with no Upcoming entry (FR-011, FR-012, FR-032).
 
 ---
 
@@ -421,7 +441,9 @@ the visitor Home.
 - A result corrected from Missed to Met in the middle of a long run joins the runs on each side of it into one
   streak.
 - An amount above the target: the trend shows the amount (45 of target 20), and the result counts as Met.
-- A duration goal in hours: trend values and the target are in minutes (a target of 1 h is 60).
+- A duration goal in hours whose bars are amounts (commitment-based, or a Reduce period): trend values and the
+  target are in minutes (a target of 1 h is 60, and the page's target line reads "Target 60 min"). A Build
+  duration period ("30 min, 3 times a week") has bars that count the records reaching the amount, against N.
 - A goal whose catalog habit is Unpublished keeps its reports (slice 4 FR-034).
 - Midnight between Sunday and Monday in the account's time zone: Missed results that became final last week leave
   the Today list and the "Missed this week" count.
@@ -475,16 +497,29 @@ the visitor Home.
   - a per-week goal: one bar per evaluation period, the last 12; the value is the period's progress (slice 5
     FR-014), the target its N (Build, Reduce yes/no) or its amount (Reduce count or duration);
   - a commitment-based yes/no goal: one bar per Monday-to-Sunday week that contains at least one of its
-    commitments, the last 12; the value is the number of the week's commitments recorded "Yes" for a Build goal
-    or "No" for a Reduce goal, the target the number of its commitments in that week;
+    commitments, the last 12; the value is the number of the week's commitments recorded "Yes", for Build and
+    Reduce alike (as slice 5 FR-014 counts "Yes" as 1); the target is the number of its commitments in that week
+    (those on or after the start date, Upcoming ones of the current week included) for a Build goal, and 0 for a
+    Reduce goal, whose every commitment is to be avoided;
   - a commitment-based count or duration goal: one bar per commitment, the last 14; the value is its recorded
     amount, the target the goal's amount;
   - a per-day goal: one bar per day, the last 14; the value is the day's progress (slice 5 FR-014), the target as
     for a per-week goal.
 
-  A commitment or day without a record has no value (not 0); a recorded 0 is 0. Amounts above the target are
-  given as recorded. Durations are in minutes (a goal in hours: the amount times 60). The value counts the
-  records of every state, Due and Pending included: the trend shows amounts, not verdicts.
+  A bar begins when its commitment, day or evaluation period begins; a week of a commitment-based yes/no goal
+  begins when its first commitment begins, so on a Monday a Tuesday-and-Thursday goal has no bar for the current
+  week yet. A bar whose commitment, day or week has no record has no value (not 0), unlike slice 5's progress of
+  a period without records, which is 0: an unrecorded Reduce day or week is unknown, not within the limit (slice
+  5 FR-013). A bar with at least one record has its value, 0 included. Values above the target are given as
+  recorded.
+
+  A bar's value is an *amount* (a count, or minutes) for a commitment-based count or duration goal and for a
+  Reduce count or duration period; there durations are in minutes, the values and the target alike (a goal in
+  hours: the amount times 60). Everywhere else the value is a *number of records* against a number: "Yes" records
+  for yes/no goals, and for a Build count or duration period the records that each reach the amount, against N
+  (slice 5 FR-014; "Cycling, 30 min, 3 times a week" has bars such as 2 against the target 3, and a 25-minute ride
+  is not counted in them; its minutes are in the History). The value counts the records of every state, Due and
+  Pending included: the trend shows recorded progress, not verdicts.
 
 **Goal report**
 
@@ -517,7 +552,8 @@ the visitor Home.
     of the user's goals;
   - the Today list: every Pending result, the one whose grace period ends soonest first; then every Due result, by
     goal in the order of FR-011; then every Missed result whose grace period ended this week, the latest grace end
-    first; each with its goal (identifier, name, Build or Reduce), its date (a per-week period: its first and last
+    first; Pending or Missed entries whose grace periods end at the same instant are in the goal order of FR-011;
+    each with its goal (identifier, name, Build or Reduce), its date (a per-week period: its first and last
     date), its state, its progress, whether it has a record, whether it has a note, and for Pending the instant
     its grace period ends;
     after those, the Upcoming entries (Clarifications 2026-11-20, D-2; SPEC §6): for each goal with no Due
@@ -527,7 +563,8 @@ the visitor Home.
   - every goal with its consistency (FR-002) and its current and longest streak with their unit, in the order of
     FR-011;
   - the recent notes across all the user's goals: at most 5, those of the commitments or periods with the latest
-    first dates, newest first, each with its goal's name, its date (a per-week period: its first and last date),
+    first dates, newest first, notes with the same first date in the goal order of FR-011 (the 5 are chosen in
+    this order), each with its goal's name, its date (a per-week period: its first and last date),
     the note and the state.
 - **FR-013**: A user with no goals MUST get counts of 0 and empty lists, never a refusal.
 
@@ -583,16 +620,21 @@ the visitor Home.
     Weeks 1 to 11 are always weeks of the goal (its first full week starts at most 6 days after its start date),
     and week 12 only when R is a Monday;
   - on catalog habit "Screen time": Reduce, duration at most 120 minutes, once per day ("Screen time, at most 120
-    min a day"); on each date R − k with k from 3 to 84 one record: 90 minutes when k is even, 110 when k is odd,
-    except k from 30 to 32: 150 minutes, with the note "Long train ride." on R − 31; k = 50: no record; R − 2: 100
-    minutes; R − 1 and R: no record.
+    min a day"); on each date R − k with k from 4 to 84 one record: 90 minutes when k is even, 110 when k is odd,
+    except k from 30 to 32: 150 minutes, with the note "Long train ride." on R − 31; k = 50: no record; R − 3: no
+    record, so that on every weekday a result became Missed this week (its grace period ends at R 00:00, never
+    before the Monday of R's week); R − 2: 100 minutes; R − 1 and R: no record.
 
   Its results for a created account are "created", "demo goals added" and "demo records added" for
   `demo5@example.com`, also when some or all goals are left out; they name the demo email but never a goal,
   habit, note, unit or amount. Read by `demo5@example.com` at the run time:
   - "Screen time, at most 120 min a day" (any weekday): final results R − 84 to R − 3, of which R − 30 to R − 32
-    Failed and R − 50 Missed: "95% (78 of 82)", current streak 27 days, longest 34 days; R − 2 (with 100 minutes)
-    and R − 1 Pending, R Due;
+    Failed and R − 50 and R − 3 Missed: "93% (77 of 82)", current streak 0 days, longest 34 days (R − 84 to
+    R − 51); R − 2 (with 100 minutes) and R − 1 Pending, R Due; on the dashboard, R − 3 is Missed this week
+    (US8-AS11). This holds in the default time zone UTC, which has no clock change (the hosted demo uses UTC). In
+    a default time zone with a clock change in the 48 hours after R − 2 00:00, R − 3's grace period ends at 23:00
+    or 01:00 local time instead: after a change back, a run on a Monday finds it final before the week; after a
+    change forward, a run between 00:00 and 01:00 finds it still Pending (slice 5 FR-016);
   - "Strength training, 2 times a week", on a Wednesday to Sunday: weeks 1 to 11 final, week 4 Failed and week 7
     Missed: "81% (9 of 11)", current streak 3 weeks, longest 4 weeks; on a Tuesday week 1 is Pending: "80% (8 of
     10)", 2 weeks, longest 4 weeks; on a Monday week 1 is Pending and the goal also has a week 12 (its start date
@@ -612,9 +654,11 @@ the visitor Home.
     streaks", three stats "Consistency" (FR-002), "Streak, {unit}" and "Longest, {unit}" (FR-003, FR-004, the unit
     in its plural form), then the ConsistencyStrip of the recent results (FR-005) and its legend; the legend and
     cells show only Met, Failed, Missed and Pending (Excused and Paused come in slice 7);
-  - the TrendChart card (`design/components/TrendChart`): bars of FR-006 with the dashed target line "Target {n}"
-    (a duration in hours: "Target {n} h"), a bar without a value drawn empty, and date labels; the title and sub
-    line per goal kind as the design gives them (Design changes before build).
+  - the TrendChart card (`design/components/TrendChart`): bars of FR-006 with the dashed target line "Target {n}
+    min" when the bars are amounts in minutes (FR-006), in hours too ({n} is FR-006's target in minutes, so the
+    page converts nothing), and "Target {n}" otherwise (counts and numbers of records, e.g. "Target 3" for
+    "Cycling, 30 min, 3 times a week"), a bar without a value drawn empty, and date labels; the title and sub line
+    per goal kind as the design gives them (Design changes before build).
 
   A goal with no begun entry keeps the slice 5 page without these cards. Pauses and earlier attempts stay absent.
 - **HP-002**: The Goals page (`/goals`, `design/pages/PageGoals`) MUST show the full GoalListItem
@@ -628,7 +672,8 @@ the visitor Home.
   "excused and paused").
 - **HP-003**: The signed-in Home of a registered user with goals (`design/pages/PageHomeSignedIn`) MUST show,
   under slice 4's page head:
-  - four StatTiles (`design/components/StatTile`): "Due today", "Pending · still can record" (`ht-tile--pending`),
+  - four StatTiles (`design/components/StatTile`): "Due now" (it counts Due commitments, days and weeks, whose
+    rows read "Due today" or "Due this week", slice 5 HP-004), "Pending · still can record" (`ht-tile--pending`),
     "Missed this week" (`ht-tile--failed`) and "Active goals", with the counts of FR-012; choosing one of the first
     three filters the Today list to that state, choosing it again shows all; "Active goals" links to `/goals`;
   - the Today card with one CommitmentRow (`design/components/CommitmentRow`) per entry of FR-012's Today list: the
@@ -665,8 +710,10 @@ the visitor Home.
   habit names or figures of a user's report (constitution III).
 - **HP-008**: The hosted demo's smoke check (`tools/HT.SmokeCheck`) MUST also find, signed in as
   `demo4@example.com`, the word "Consistency" and the unit "commitments" on the page of "Reading, 20 min daily",
-  and "Due today" on the Home; and, signed in as `demo5@example.com`, the name of each of its demo goals on its
-  Goals page and the unit "weeks" on the page of "Strength training, 2 times a week". Every data parameter of demo
+  and "Due now" on the Home; and, signed in as `demo5@example.com`, the name of each of its demo goals on its
+  Goals page, the unit "weeks" on the page of "Strength training, 2 times a week", and "Missed this week" with a
+  row whose StatusChip reads "Missed" on the Home. These are presence checks: the figures themselves are
+  checked by the acceptance tests of FR-030 and FR-032 at a fixed run time. Every data parameter of demo
   report loading's port gets its `SmokeCheckCoverage` entry (slice 3 "Coverage rule").
 - **HP-009**: Derived figures MUST NOT be cached or stored: every figure of this slice is computed on read from the
   stored records, settings versions and the supplied time (D-4; ARCHITECTURE §9;
@@ -674,14 +721,18 @@ the visitor Home.
   evaluate each goal once and derive all of that read's figures from it; nothing outlives the read.
 - **HP-010**: `CONTEXT.md` MUST get the terms of this slice, each with a NOT-boundary (constitution I): Consistency
   (final results only, per goal, never a band), Streak (current and longest, strict, in the goal's unit), Report
-  range, Recent results and Trend (amounts, not verdicts), Dashboard (the signed-in Home's Today view; in-app only,
+  range, Recent results and Trend (recorded progress, not verdicts), Dashboard (the signed-in Home's Today view; in-app only,
   not a reminder), and Demo report loading. The Pending entry gains "and never extends one" (D-1); the Upcoming
   entry stays, and the Home now shows it (D-2); Demo account names `demo5@example.com`, created by demo report
-  loading; Demo refresh lists demo report loading among the tasks that run again.
+  loading; Demo refresh lists demo report loading among the tasks that run again. These entries were added on
+  2026-11-20 in the revision after critic pass 1, together with this spec's decisions (constitution I, "same
+  change"), before `/speckit-ac-translate`.
 - **HP-011**: The host MUST run demo report loading at every start, after demo history loading, and log its
   results as demo history loading's are logged (slice 5 HP-007): an account line for `demo5@example.com`, then for
   a created account a "Demo goals …" and a "Demo records …" line, each with the demo email and the result text
-  only. A fault in it is logged without secrets and does not stop the start (ADR 0007). The deployment's success
+  only. With no demo password, or one that fails the password rule, it logs the one line "Demo report loading:
+  {result}" ("Demo report loading: no demo password configured"), after "Demo history loading: {result}". A fault
+  in it is logged without secrets and does not stop the start (ADR 0007). The deployment's success
   check (ADR 0015) also requires its result. The order and the amended "later slices" rule of ADR 0007 and ADR
   0018 are recorded in [ADR 0021](../../docs/adr/0021-demo-report-loading.md). The daily scheduled refresh (slice 5
   HP-009) re-creates `demo5` with the rest of the demo data, so its figures stay as FR-032 gives them.
@@ -689,19 +740,38 @@ the visitor Home.
 ### Slice 4 and 5 requirements and tests this slice changes
 
 - Slice 4 HP-003 and `design/pages/PageGoals` "Slice 4 state" (reduced items in name order, no figures): amended
-  by HP-002; the slice 4 list use case is unchanged (FR-016). Test: the Goals page's UI tests.
+  by HP-002; the slice 4 list use case is unchanged (FR-016). Tests: the Goals page's UI tests, and
+  `tests/HT.UiTests/Components/Shared/HabitComponentTests.cs`, whose reduced GoalListItem test asserts no
+  `ht-strip`, actions, "Record" or "%"; it keeps a reduced item only where slice 6 still renders one, and the full
+  item gets its own tests.
 - Slice 4 HP-010 and `design/pages/PageHomeSignedIn` "Slice 4 state" (a user with goals sees the page head only
   "until slice 6"): amended by HP-003. Test: the Home's UI tests.
 - Slice 5 HP-001 and `design/pages/PageGoalDetail` "Slice 5 state" ("No GoalStats, strip, trend …"): amended by
   HP-001. Test: the goal page's UI tests.
 - Slice 2 HP-012 and `design/pages/PageHomeVisitor` "Slice 2 state" ("No GoalStats card yet (it needs demo goals,
-  slice 6)"): amended by HP-004.
-- Slice 4 HP-018 and slice 5 HP-008 (smoke check): extended by HP-008.
+  slice 6)"): amended by HP-004. Slice 2 US5-AS8 ("with no Published habit nothing else from the preview is
+  shown") is amended: the example card is part of the hero, not of the catalog preview, so it is shown with or
+  without Published habits. Test: `tests/HT.UiTests/Components/Pages/HomeVisitorTests.cs`
+  (`US5_AS8_HP_012_with_no_Published_habit_nothing_else_from_the_preview_is_shown`), which today asserts that
+  "Example goal", `.ht-card`, `.ht-stats` and `.ht-strip` are absent; it changes to assert the absence of the
+  catalog preview only, and a new test checks the example card.
+- Slice 4 HP-018 and slice 5 HP-008 (smoke check): extended by HP-008. Tests that compare check lines exactly
+  change with it: `tests/HT.UiTests/Host/SmokeCheckHostTests.cs` (the list of check names, which gains a
+  `demo5@example.com` check, and "PASS demo history demo4@example.com (11 of 11)", whose count grows with
+  HP-008's demo4 texts) and `tests/HT.UiTests/SmokeChecks/RunnerBehaviourTests.cs` (exact check lines and their
+  positions, such as `lines[7]`). `tests/HT.UiTests/SmokeChecks/CoverageTests.cs` changes too: its `Ports` list
+  gains demo report loading's port, so that the coverage rule enumerates that port's parameters, and the exact
+  count of `SmokeCheckCoverage` entries (10 since slice 5) grows by that port's entries.
 - Slice 5 HP-007 and ADR 0007's startup tasks (administrator creation, demo loading, demo history loading):
   extended by HP-011 with demo report loading as the fourth task. Tests: the host's startup tests
   (`tests/HT.UiTests/Host/StartupLogTests.cs`, `tests/HT.UiTests/Operator/StartupTasksDemoTests.cs`) compare the
   "Demo " lines exactly; they change to expect `demo5@example.com`'s lines after `demo4@example.com`'s, which stay
-  as they are.
+  as they are, and, with no demo password or a weak one, three lines instead of two: "Demo loading: …", "Demo
+  history loading: …" and "Demo report loading: …" (HP-011). The fault test
+  `A_fault_in_demo_history_loading_is_logged_as_an_error_after_demo_loadings_lines_and_the_start_goes_on`
+  asserts that the history fault is the last "Demo " line; demo report loading runs after it, so the test
+  changes to expect `demo5@example.com`'s lines after the fault (the start goes on), and a new test covers a
+  fault in demo report loading.
 - The locked acceptance criteria of slices 1, 2, 4 and 5 (`tests/HT.AcceptanceTests/Features/F001`, `F002`, `F004`,
   `F005`) are not changed and must keep passing (FR-016, FR-030, FR-031); `demo5` comes from a separate task
   because F005 AC-051 and AC-059 let demo history loading name `demo4` only.
@@ -717,11 +787,14 @@ Constitution IV and ADR 0008 require `design/` to change first:
 - `design/components/TrendChart`: the bar kinds of FR-006 with their titles and sub lines (for example "Minutes
   per day · last 14 days", "Times per week · last 12 weeks", "Days done per week · last 12 weeks"), an empty bar
   for no value, no paused bars until slice 7; its rule "Use weeks for weekly and commitment-based goals" becomes
-  "weeks for per-week goals and commitment-based yes/no goals; commitments or days otherwise".
+  "weeks for per-week goals and commitment-based yes/no goals; commitments or days otherwise"; its wording
+  "recorded amounts per day or week" and "Bars show amounts, not verdicts" becomes recorded progress, an amount or
+  a number of records (FR-006), not verdicts; the target line "Target {n} min" or "Target {n}" (HP-001).
 - `design/pages/PageGoals` and `components/GoalListItem`: a slice-6 state without Tabs, the meta line of HP-002
   (no "missed Tue"), and the footnote without "excused and paused".
 - `design/pages/PageHomeSignedIn`, `components/CommitmentRow` and `StatTile`: a slice-6 state with the rows and
-  actions of HP-003: "Record" or "Edit" instead of "Add time" and "+1", no "Excuse", dates as "Tue 17 Nov", the
+  actions of HP-003: the first tile labelled "Due now" instead of "Due today" (it also counts per-week periods,
+  which are "Due this week", constitution I); "Record" or "Edit" instead of "Add time" and "+1", no "Excuse", dates as "Tue 17 Nov", the
   sentence for an empty Today list, the tile filter, Upcoming rows (D-2); "Recent notes" items with "{goal name} ·
   {date}".
 - `design/components/StatusChip`: the Upcoming chip reads "Upcoming" (constitution I; `CONTEXT.md` Upcoming is NOT
@@ -739,7 +812,7 @@ Constitution IV and ADR 0008 require `design/` to change first:
   the goal's unit.
 - **Report range**: the goal's current attempt up to the supplied time.
 - **Recent results**: the latest 30 (or 15) ended results of a goal with their states.
-- **Trend**: recorded amounts per commitment, day or week against the target; amounts, not verdicts.
+- **Trend**: recorded progress (an amount, or a number of records) per commitment, day or week against the target; not verdicts.
 - **Dashboard**: the counts, Today list, goal summaries and recent notes of one user at a supplied time.
 
 All are derived on read from records, settings versions and the supplied time; none is entered or stored by the
@@ -761,16 +834,23 @@ user.
   an anonymous visitor, and none returns another account's goal, result, note or figure (constitution III).
 - **SC-006**: On the hosted demo, on any day until 2027-01-31, `demo4@example.com` shows a consistency with its
   count, a non-zero current streak and a longest streak above 10 for at least one goal, and a Today list with Due
-  and Pending results, and `demo5@example.com` shows every trend with its full number of bars (14 or 12); the smoke
-  check confirms it after every deployment.
-- **SC-007**: The goal page, the Goals page and the Home each render their reports for a goal with a year of daily
-  results in under 2 seconds on the hosted demo.
+  and Pending results, and `demo5@example.com` shows every trend with its full number of bars (14 or 12) and a
+  result Missed this week. Measured in two parts: the acceptance tests of FR-030 and FR-032 prove these figures
+  for a run at a fixed time on each weekday kind they name, and the daily refresh (slice 5 HP-009) re-creates the
+  same data relative to each day; after every deployment the smoke check confirms only that the hosted demo has
+  this data and shows its reports (the presence texts of HP-008), not the figures themselves.
+- **SC-007**: For a user with three goals, one of them with 366 days of daily results, the goal report, the goals
+  overview and the dashboard are each returned in under 2 seconds, measured by an integration test against SQL
+  Server (ADR 0006) that creates the goal at a supplied time a year earlier; the hosted demo's goals are at most
+  84 days old, so it cannot measure this.
 - **SC-008**: Every page of this slice passes the accessibility rules of constitution IV (HP-006).
 
 ## Decisions due before acceptance criteria
 
-The roadmap places two decisions in this slice; this spec added two of its own. All four were answered by the
-owner on 2026-11-20 (see `## Clarifications`).
+The roadmap places three decisions in this slice (D-1, D-4 and R3); this spec added D-2 and D-3 in
+`/speckit-specify` and D-5 in `/speckit-clarify`. All six were answered by the owner on 2026-11-20 (see
+`## Clarifications`), as were the four further clarify answers (rounding, "Missed this week", report range, the
+trend of commitment-based count and duration goals).
 
 - **Product row of the roadmap**:
   - **D-1** (FR-003, US2-AS4; SPEC §11.7 first part, `CONTEXT.md` Pending): a Pending result in the current
