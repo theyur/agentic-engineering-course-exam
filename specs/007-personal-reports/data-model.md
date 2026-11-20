@@ -178,7 +178,7 @@ states: "90% (18 of 20)", current 6 and longest 11 commitments. No store is read
 |---|---|
 | `IDemoReportStore` | `Task<CreateDemoAccountOutcome> CreateDemoReportAccountAsync(Email email, string password, DemoAccountProfile profile, IReadOnlyList<DemoHistoryGoal> goals, CancellationToken ct)` |
 | `DemoReportService` | `const string DemoEmail = "demo5@example.com"`; `Task<DemoReportLoadingResult> LoadAsync(string? demoPassword, CancellationToken ct)` |
-| `DemoReport` | `IReadOnlyList<string> GoalNames`; `IReadOnlyList<DemoHistoryGoal> For(DateOnly runDate)`; the note texts "On holiday.", "Sore shoulder.", "Long train ride." |
+| `DemoReport` | `IReadOnlyList<string> GoalNames`; `IReadOnlyList<DemoHistoryGoal> For(DateOnly runDate)`; the note texts as the constants `WalkingNote` ("On holiday."), `StrengthNote` ("Sore shoulder.") and `ScreenTimeNote` ("Long train ride."), named in T072 |
 | `DemoReportLoadingResult` | `Outcome` (`NoPassword`, `PasswordRuleNotMet`, `Loaded`), `Message`, `Accounts` (`IReadOnlyList<DemoReportAccountResult>`, one item when loaded) |
 | `DemoReportAccountResult` | `Email`, `Outcome` (`DemoAccountOutcome`), `Message` ("created" or "already exists"), `Goals` (`DemoGoalsResult?`), `Records` (`DemoRecordsResult?`); member for member as `DemoHistoryAccountResult` |
 

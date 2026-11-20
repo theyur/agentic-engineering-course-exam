@@ -49,6 +49,41 @@ internal static partial class StartupTasks
         await RunStepAsync("Administrator creation", logger, () => CreateAdministratorAsync(services, logger));
         await RunStepAsync("Demo loading", logger, () => LoadDemoDataAsync(services, logger));
         await RunStepAsync("Demo history loading", logger, () => LoadDemoHistoryAsync(services, logger));
+        await RunStepAsync("Demo report loading", logger, () => LoadDemoReportAsync(services, logger));
+    }
+
+    // Slice 6 HP-011: at every start, right after demo history loading (ADR 0021). The demo password, from the same key,
+    // is passed on and never logged.
+    private static async Task LoadDemoReportAsync(IServiceProvider services, ILogger logger)
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+
+        await using var scope = services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<DemoReportService>()
+            .LoadAsync(configuration[DemoPasswordKey], CancellationToken.None);
+
+        if (result.Outcome != DemoReportLoadingOutcome.Loaded)
+        {
+            LogDemoReportLoading(logger, result.Message);
+            return;
+        }
+
+        // Slice 6 contracts/host.md "Operator log": demo history loading's templates, the account line, then for a created
+        // account its goal line and its record line. The results name the demo email and a result text only, never a
+        // goal, habit, note, unit or amount (FR-032, HP-007).
+        foreach (var account in result.Accounts)
+        {
+            LogDemoAccount(logger, account.Email, account.Message);
+            if (account.Goals is { } goals)
+            {
+                LogDemoGoals(logger, account.Email, goals.Message);
+            }
+
+            if (account.Records is { } records)
+            {
+                LogDemoRecords(logger, account.Email, records.Message);
+            }
+        }
     }
 
     // HP-021, HP-017: at every start, right after administrator creation. The demo password is passed on and never logged.
@@ -184,6 +219,9 @@ internal static partial class StartupTasks
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Demo history loading: {Result}")]
     private static partial void LogDemoHistoryLoading(ILogger logger, string? result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo report loading: {Result}")]
+    private static partial void LogDemoReportLoading(ILogger logger, string? result);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Demo records {Email}: {Result}")]
     private static partial void LogDemoRecords(ILogger logger, string email, string result);

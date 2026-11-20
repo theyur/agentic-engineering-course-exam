@@ -63,6 +63,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<ICustomHabitStore, CustomHabitStore>();
         services.AddScoped<IDemoDataStore, DemoDataStore>();
         services.AddScoped<IDemoHistoryStore, DemoHistoryStore>();
+        services.AddScoped<IDemoReportStore, DemoReportStore>();
         services.AddScoped<IGoalStore, GoalStore>();
         services.AddScoped<IRecordStore, RecordStore>();
         return services;

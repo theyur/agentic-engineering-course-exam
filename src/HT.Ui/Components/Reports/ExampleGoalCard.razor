@@ -1,0 +1,6 @@
+@using HT.Application.Reports
+@* design/pages/PageHomeVisitor, slice 6 state (HP-004, D-3): the hero's example card, the static GoalStats with the
+   eyebrow "Example goal", ExampleGoal's title, figures and 21-result strip. The figures are fixed examples that belong
+   to no account; the card reads no store, so the page is the same for every visitor. It is part of the hero, not of the
+   catalog preview, so it shows with or without Published habits. *@
+<GoalStats View="ExampleGoal.Stats" Strip="ExampleGoal.Strip" Unit="ExampleGoal.Stats.Unit" Eyebrow="Example goal" Title="@ExampleGoal.Title" />

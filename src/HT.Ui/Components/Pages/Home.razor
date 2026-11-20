@@ -14,7 +14,7 @@
 @inject ActingUserAccessor ActingUsers
 @* One address for both Homes (HP-009). Static: the services are injected directly. The visitor Home: the hero,
    "How it works" and "Popular in the catalog" with the wording of design/pages/PageHomeVisitor, slice 2 state
-   (HP-012, ADR 0008). *@
+   (HP-012, ADR 0008), and in the hero slice 6's ExampleGoalCard, with or without Published habits (HP-004, D-3). *@
 <PageTitle>Habit Tracker</PageTitle>
 
 <AuthorizeView>
@@ -67,6 +67,7 @@
                     </div>
                     <p class="ht-hero__fine">Your goals and notes stay private. Community comparison is opt-in.</p>
                 </div>
+                <ExampleGoalCard />
             </div>
         </section>
         <div class="ht-container">

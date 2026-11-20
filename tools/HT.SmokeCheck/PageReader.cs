@@ -6,7 +6,7 @@ namespace HT.SmokeCheck;
 /// <summary>
 /// Reads what the smoke check needs from a server-rendered page (contracts/smoke-check.md): the antiforgery token
 /// and handler names of a form, the first heading, the names on habit cards and goal items, the goal items' links, the
-/// text of a card, and the linked stylesheets and scripts.
+/// text of a card, the stat labels, tile labels and status chips (slice 6), and the linked stylesheets and scripts.
 /// Every value is HTML-decoded. Names and texts are compared in memory and never printed.
 /// </summary>
 public static partial class PageReader
@@ -104,6 +104,24 @@ public static partial class PageReader
     }
 
     /// <summary>
+    /// The text of every GoalStats stat label, in document order: each element whose class list holds
+    /// <c>ht-stat__label</c>, such as "Consistency" or "Streak, commitments" (smoke checks 6 and 7, slice 6 research R-11).
+    /// </summary>
+    public static IReadOnlyList<string> ReadStatLabels(string html) => ReadLeafTexts(html, StatLabelPattern());
+
+    /// <summary>
+    /// The text of every StatTile label, in document order: each element whose class list holds <c>ht-tile__label</c>,
+    /// such as "Due now" or "Missed this week" (smoke checks 6 and 7, slice 6 research R-11).
+    /// </summary>
+    public static IReadOnlyList<string> ReadTileLabels(string html) => ReadLeafTexts(html, TileLabelPattern());
+
+    /// <summary>
+    /// The text of every StatusChip, in document order: each element whose class list holds <c>ht-status</c> (not only a
+    /// modifier such as <c>ht-status--missed</c>), such as "Missed" (smoke check 7, slice 6 research R-11).
+    /// </summary>
+    public static IReadOnlyList<string> ReadStatusChips(string html) => ReadLeafTexts(html, StatusChipPattern());
+
+    /// <summary>
     /// The <c>href</c> of every <c>&lt;link rel="stylesheet"&gt;</c> and the <c>src</c> of every
     /// <c>&lt;script src&gt;</c>, in document order, as written on the page; inline scripts have no <c>src</c> and are
     /// left out.
@@ -159,6 +177,22 @@ public static partial class PageReader
     }
 
     private static string Text(string inner) => WebUtility.HtmlDecode(InnerTagPattern().Replace(inner, string.Empty)).Trim();
+
+    /// <summary>The decoded text of every leaf element the pattern matches, in document order; inner tags are removed.</summary>
+    private static List<string> ReadLeafTexts(string html, Regex pattern)
+    {
+        ArgumentNullException.ThrowIfNull(html);
+        return [.. pattern.Matches(html).Select(m => Text(m.Groups["inner"].Value))];
+    }
+
+    [GeneratedRegex("""<(?<tag>[a-z][a-z0-9]*)\b[^>]*\bclass="(?:[^"]*\s)?ht-stat__label(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</\k<tag>\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex StatLabelPattern();
+
+    [GeneratedRegex("""<(?<tag>[a-z][a-z0-9]*)\b[^>]*\bclass="(?:[^"]*\s)?ht-tile__label(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</\k<tag>\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex TileLabelPattern();
+
+    [GeneratedRegex("""<(?<tag>[a-z][a-z0-9]*)\b[^>]*\bclass="(?:[^"]*\s)?ht-status(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</\k<tag>\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex StatusChipPattern();
 
     [GeneratedRegex("""name="__RequestVerificationToken"[^>]*value="(?<value>[^"]*)"|value="(?<value>[^"]*)"[^>]*name="__RequestVerificationToken"(?=[\s/>])""")]
     private static partial Regex TokenPattern();

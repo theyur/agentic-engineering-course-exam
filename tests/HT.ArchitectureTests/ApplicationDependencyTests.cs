@@ -57,6 +57,18 @@ public sealed class ApplicationDependencyTests
     }
 
     [Fact]
+    public void OnlyTheDemoReportServiceMayDependOnTheDemoReportStorePort()
+    {
+        // Nested types (async state machines, closures) belong to their service, so the name allows a nested suffix.
+        Types().That().ResideInAssembly(ArchitectureModel.Application)
+            .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Operator\.DemoReportService([+/].*)?$")
+            .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Operator\.IDemoReportStore$")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IDemoReportStore)))
+            .Because("the demo report port writes private records and notes without an acting user; only demo report loading may use it (ADR 0013, ADR 0021, slice 6 research R-14)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
     public void OnlyTheGoalTypesTheThreeHabitServicesTheProfileServiceTheRecordingServiceAndTheReportServiceMayDependOnTheGoalStorePort()
     {
         // Nested types (async state machines, closures) belong to their service, so the names allow a nested suffix.

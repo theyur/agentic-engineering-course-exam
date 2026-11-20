@@ -101,12 +101,21 @@ public sealed class UiDependencyTests
     }
 
     [Fact]
+    public void NoUiTypeMayDependOnTheDemoReportStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IDemoReportStore)))
+            .Because("the port writes private demo records and notes without an acting user; the host reaches it only through DemoReportService (ADR 0010, ADR 0013, ADR 0021, slice 6 research R-14)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
     public void OnlyTheHostsOperatorTypesMayDependOnTheOperatorServices()
     {
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
             .And().DoNotResideInNamespaceMatching(@"^HT\.Ui\.Operator(\..*)?$")
-            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService), typeof(DemoDataService), typeof(DemoHistoryService)))
-            .Because("no page offers administrator creation, demo loading or demo history loading; only the startup tasks run them (FR-014, FR-016, research R-13, slice 5 research R-13)")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService), typeof(DemoDataService), typeof(DemoHistoryService), typeof(DemoReportService)))
+            .Because("no page offers administrator creation, demo loading, demo history loading or demo report loading; only the startup tasks run them (FR-014, FR-016, research R-13, slice 5 research R-13, slice 6 research R-14)")
             .Check(ArchitectureModel.Architecture);
     }
 }

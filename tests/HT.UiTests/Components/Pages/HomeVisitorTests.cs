@@ -9,7 +9,8 @@ namespace HT.UiTests.Components.Pages;
 
 /// <summary>
 /// Slice 1 US5-AS8, AS9, HP-011, amended by slice 2 HP-012 (US5-AS2): the visitor Home shows the hero with
-/// "Register free" and "Browse the catalog", "How it works" and "Popular in the catalog", and nothing else.
+/// "Register free" and "Browse the catalog", "How it works" and "Popular in the catalog", and, since slice 6 HP-004, the
+/// hero's example GoalStats card, and nothing else.
 /// </summary>
 public sealed class HomeVisitorTests : BunitContext
 {
@@ -51,7 +52,7 @@ public sealed class HomeVisitorTests : BunitContext
     {
         var cut = Render<Home>();
 
-        Assert.Equal("How it works", Assert.Single(cut.FindAll("h2")).TextContent);
+        Assert.Equal("How it works", Assert.Single(cut.FindAll(".ht-section__head h2")).TextContent);
         var steps = cut.FindAll(".ht-step");
         Assert.Equal(["1", "2", "3"], steps.Select(s => s.QuerySelector(".ht-step__n")!.TextContent));
         Assert.Equal(["Pick a habit", "Record what happened", "See your consistency"], steps.Select(s => s.QuerySelector("h3")!.TextContent));
@@ -64,8 +65,11 @@ public sealed class HomeVisitorTests : BunitContext
             steps.Select(s => s.QuerySelector("p")!.TextContent));
     }
 
+    /// <summary>
+    /// Amended by slice 6 HP-004: the example card is part of the hero, not of the catalog preview, so only the
+    /// catalog preview (and slice 9's community parts) are absent.
+    /// </summary>
     [Theory]
-    [InlineData("Example goal")]
     [InlineData("Popular in the catalog")]
     [InlineData("Community")]
     [InlineData("participants")]
@@ -78,7 +82,38 @@ public sealed class HomeVisitorTests : BunitContext
         var cut = Render<Home>();
 
         Assert.DoesNotContain(absent, cut.Markup.Replace("Community comparison is opt-in.", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
-        Assert.Empty(cut.FindAll(".ht-card, .ht-habit, .ht-bands, .ht-stats, .ht-strip"));
+        Assert.Empty(cut.FindAll(".ht-habit, .ht-grid-4, .ht-bands"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HP_004_the_hero_has_the_example_goal_card_with_its_texts_and_21_cells(bool withPublishedHabits)
+    {
+        if (withPublishedHabits)
+        {
+            _store.Add(Catalog("Hv Reading"));
+        }
+
+        var cut = Render<Home>();
+
+        var card = cut.Find(".ht-hero .ht-hero__inner > section.ht-card");
+        Assert.Equal("Example goal", card.QuerySelector(".ht-eyebrow")!.TextContent);
+        Assert.Equal("Yoga, 3 days a week", card.QuerySelector("h2.ht-card__title")!.TextContent);
+        Assert.Equal(
+            ["90% (18 of 20)", "6", "11"],
+            card.QuerySelectorAll(".ht-stat__value").Select(v => v.TextContent));
+        Assert.Equal(
+            ["Consistency", "Streak, commitments", "Longest, commitments"],
+            card.QuerySelectorAll(".ht-stat__label").Select(l => l.TextContent));
+        var strip = card.QuerySelector(".ht-strip")!;
+        Assert.Equal("img", strip.GetAttribute("role"));
+        var cells = strip.QuerySelectorAll(".ht-strip__cell");
+        Assert.Equal(21, cells.Length);
+        Assert.Equal(
+            [.. Enumerable.Repeat("ht-cell--met", 11), "ht-cell--missed", "ht-cell--met", "ht-cell--failed", .. Enumerable.Repeat("ht-cell--met", 6), "ht-cell--pending"],
+            cells.Select(c => c.ClassList.Single(name => name.StartsWith("ht-cell--", StringComparison.Ordinal))));
+        Assert.Equal(["Met", "Failed", "Missed", "Pending"], card.QuerySelectorAll(".ht-legend span").Select(s => s.TextContent));
     }
 
     [Fact]
@@ -94,7 +129,7 @@ public sealed class HomeVisitorTests : BunitContext
 
         var cut = Render<Home>();
 
-        Assert.Equal(["How it works", "Popular in the catalog"], cut.FindAll("h2").Select(h => h.TextContent));
+        Assert.Equal(["How it works", "Popular in the catalog"], cut.FindAll(".ht-section__head h2").Select(h => h.TextContent));
         var seeAll = cut.Find(".ht-section__head a");
         Assert.Equal("See all 5 →", seeAll.TextContent);
         Assert.Equal("/catalog", seeAll.GetAttribute("href"));
