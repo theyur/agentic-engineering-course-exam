@@ -66,9 +66,9 @@ No route is added. `/goals/{Id:guid}` changes:
 
     | Row | Controls, in this order |
     |---|---|
-    | commitment, no record | "Add record", then "Add note" (no note) or "Edit note" (a note) |
+    | commitment, no record | "Add note" (no note) or "Edit note" (a note), then "Add record" |
     | commitment, a record | "Edit" |
-    | period, no record | "Add record", then "Add note" or "Edit note" |
+    | period, no record | "Add note" or "Edit note", then "Add record" |
     | period, 1 to 49 records | "Add record" |
     | period, 50 records | none |
 
@@ -77,15 +77,17 @@ No route is added. `/goals/{Id:guid}` changes:
     its "Edit" mode (`HistoryCard.OnAction`). "Add note" and "Edit note" open the NoteDialog for that row
     (`HistoryCard.OnNote`). After any save or delete the page reads what can be recorded, the history and the recent
     notes again before the dialog closes. Then the focus goes:
-    - after the RecordDialog, back to the record's button while the row still shows it, otherwise to the row's first
-      action (`HistoryCard.FocusAsync`);
+    - after the RecordDialog, back to the record's button while the row still shows it, otherwise to the row's record
+      control, "Add record" (`HistoryCard.FocusAsync`);
     - after the NoteDialog, to the row's "Add note" or "Edit note" as it shows after the save
       (`HistoryCard.FocusNoteAsync`). Nothing gets it if the row has neither.
 
     On the next read after a row's first record, its note control is gone. After its last record is deleted, it is
     back ("Edit note" when the row still has its note). Amended 2026-11-20, specs/006-note-editing, ADR 0019: the
     note controls were the Note column's button on every row; a row with a record now changes its note only in the
-    RecordDialog.
+    RecordDialog. Amended 2026-11-20 (owner's decision after implementation): the note control now comes before "Add
+    record", so the record control ("Add record" or "Edit") is always the rightmost; it was "Add record", then the
+    note control.
 - **Recent notes card** (right column, after Settings; `RecentNotesCard`, T074, T075): `GetRecentNotesAsync`, read
   after the history and only for a goal with a current date. An `HtCard` titled "Recent notes", then each note,
   newest first, as an `ht-goal` item: the note in quotes and its `StatusChip` on the top line (`ht-goal__top`,

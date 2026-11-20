@@ -144,9 +144,9 @@ no business rules in Blazor). `GoalHistory` carries `GoalScheduleKind` and `Peri
   `design/tokens.json` as 5.5:1 or more on `bg`, `surface` and `surface-2`, so HP-006's 4.5:1 holds with no new token.
   The Note button and its `_noteButtons` entry for that column go.
 - **Actions column**, per row:
-  - a commitment without a record: "Add record", then "Add note" or "Edit note";
+  - a commitment without a record: "Add note" or "Edit note", then "Add record";
   - a commitment with a record: "Edit" only;
-  - a period without a record: "Add record", then "Add note" or "Edit note";
+  - a period without a record: "Add note" or "Edit note", then "Add record";
   - a period with records: "Add record" while it has fewer than 50 records, and no note control.
 - **Names**: "Add note for {date}" and "Edit note of {date}", in the actions column's ghost `ht-btn--sm` style with
   `aria-haspopup="dialog"`, as slice 5's controls are.
@@ -156,6 +156,12 @@ no business rules in Blazor). `GoalHistory` carries `GoalScheduleKind` and `Peri
 
 "Add record" comes first, because recording is the row's main action. The spec says "next to 'Add record'" and names
 no order. `design/` confirms the order in the slice 5 state block of `PageGoalDetail` (Work order step 1).
+
+Amended 2026-11-20 (owner's decision after implementation): the note control now comes before "Add record", so the
+record control ("Add record" or "Edit") is always the rightmost, for visual consistency across rows. The decision
+above, "Add record" first, was reversed by the owner. The order is in the markup (DOM order, visual order and Tab
+order are the same), not in CSS. Focus is unchanged: after the RecordDialog, the record's button or the row's record
+control; after the NoteDialog, the row's note control.
 
 **Why the control is hidden rather than refused below the UI**: this is a page rule, not a privacy rule. FR-002 keeps
 `SaveNoteAsync` as slice 5 specifies it, for any begun date with or without records (AC-035, AC-036 and AC-039 stay

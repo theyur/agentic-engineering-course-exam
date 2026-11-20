@@ -11,11 +11,12 @@
    place. Date and Recorded come from RecordingText (a commitment's record as text; a period's records side by side,
    ht-inline, each a button that opens "Edit" of that record; "—" without a record), Result is the StatusChip, and Note
    is the row's note as plain text, or "—", in ht-muted, never a control. The row actions, whatever the row's state,
-   final included, in this order: "Add record", then "Add note" (no note) or "Edit note" (a note) on a commitment or
+   final included, in this order: "Add note" (no note) or "Edit note" (a note), then "Add record", on a commitment or
    period without a record; "Edit" on a commitment with a record; "Add record" on a period with 1 to 49 records; none on
    a period with 50. A row with a record changes its note only in the RecordDialog. The record control is always the
-   first button of the actions cell. Every row control is a ghost small button with aria-haspopup="dialog" and an
-   accessible name that starts with its visible text and names its row ("Add note for {date}", "Edit note of {date}").
+   last button of the actions cell, so it is the rightmost on every row (the owner's order, 2026-11-20). Every row
+   control is a ghost small button with aria-haspopup="dialog" and an accessible name that starts with its visible text
+   and names its row ("Add note for {date}", "Edit note of {date}").
    The card raises OnAction for a record and OnNote for a note; the page opens the RecordDialog or the NoteDialog and,
    when it closes, gives the focus back through FocusAsync or FocusNoteAsync. With no begun entry the card is not
    rendered. *@
@@ -60,8 +61,18 @@
                     <td><StatusChip State="entry.State" ScheduleKind="History.GoalScheduleKind" Period="History.Period" /></td>
                     <td class="ht-muted">@(entry.Note ?? NoNote)</td>
                     <td class="ht-actions">
-                        @* The record control comes first and keeps its place in the markup whether or not a note control
-                           follows it, so Blazor keeps its element, and its element reference, when the note control goes. *@
+                        @* The note control comes first and the record control last, so the record control is always the
+                           rightmost. Blazor matches elements by their place in this markup, not by their position in the
+                           cell, so the record control keeps its element, and its element reference, when the note
+                           control goes. *@
+                        @if (HasNoteControl(entry))
+                        {
+                            var hasNote = entry.Note is not null;
+                            <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog"
+                                    aria-label="@(hasNote ? EditNote + " of " + date : AddNote + " for " + date)"
+                                    @ref="_noteButtons[entry.FirstDate]"
+                                    @onclick="() => OnNote.InvokeAsync(entry)">@(hasNote ? EditNote : AddNote)</button>
+                        }
                         @if (IsCommitment)
                         {
                             var record = entry.Records.Count == 0 ? null : entry.Records[0];
@@ -75,14 +86,6 @@
                             <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog" aria-label="@(AddRecord + " for " + date)"
                                     @ref="_actionButtons[entry.FirstDate]"
                                     @onclick="() => OnAction.InvokeAsync(new RowAction(entry, null))">@AddRecord</button>
-                        }
-                        @if (HasNoteControl(entry))
-                        {
-                            var hasNote = entry.Note is not null;
-                            <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog"
-                                    aria-label="@(hasNote ? EditNote + " of " + date : AddNote + " for " + date)"
-                                    @ref="_noteButtons[entry.FirstDate]"
-                                    @onclick="() => OnNote.InvokeAsync(entry)">@(hasNote ? EditNote : AddNote)</button>
                         }
                     </td>
                 </tr>

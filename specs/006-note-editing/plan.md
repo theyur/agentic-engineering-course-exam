@@ -175,7 +175,8 @@ sits with the port that takes it, in `HT.Application.Records`, public for the AC
    - `design/pages/PageGoalDetail.html` and `.md`:
      - the Note column as `ht-muted` text or "—";
      - the actions per row kind (host contract table): "Add record" first, then "Add note" or "Edit note", on rows
-       without a record only;
+       without a record only (reversed by the owner on 2026-11-20: the note control first, then "Add record"; see
+       "Decided in the plan" item 1);
      - the accessible names "Add note for {date}" and "Edit note of {date}";
    - `design/components/RecordDialog.html` and `.md`, `RecordForms.html` and `.md`:
      - the note field filled, with its help per goal kind (the three texts of research R-07);
@@ -238,6 +239,9 @@ check them.
 
 1. **The order of the row controls**: "Add record" comes before "Add note" or "Edit note". The spec says "next to 'Add
    record'". `design/` confirms the order in step 1 (research R-08).
+   Amended 2026-11-20 (owner's decision after implementation): the plan put "Add record" first; the owner reversed
+   it. The note control now comes before "Add record", so the record control ("Add record" or "Edit") is always the
+   rightmost. The order is in the markup, not in CSS, and focus is unchanged.
 2. **The NoteDialog's title is fixed when it opens** (R-09). A save that removes the note does not retitle the
    dialog as it closes.
 3. **The page sends `""` for an empty field, never null** (R-06), so only callers other than the page keep a note by
@@ -278,7 +282,7 @@ callers of the port: `RecordLogTests`' wrapper, `GoalPrivacyHostTests` and the i
   Implementation reports the solution's tests only. Roadmap row 5a reaches `AC tests green` only after
   `/speckit-ac-tests-analyze`.
 - **The last record of a period with a note**: deleting it brings back "Edit note" with the note (FR-004, HP-002).
-  Focus returns through `FocusAsync`, to the row's first action ("Add record"), not to "Edit note". This matches slice
+  Focus returns through `FocusAsync`, to the row's record control ("Add record"), not to "Edit note". This matches slice
   5's rule that the focus goes to the record's button while the row shows it, otherwise the row's action. A bUnit test
   checks it.
 - **Two tabs**: a save in one tab overwrites a note changed in another tab that its field did not show. The spec

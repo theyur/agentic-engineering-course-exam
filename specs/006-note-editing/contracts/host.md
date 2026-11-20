@@ -29,13 +29,17 @@ The columns stay Date, Recorded, Result, Note and the empty-headed actions colum
 
   | Row | Controls, in this order |
   |---|---|
-  | commitment, no record | "Add record", then "Add note" (no note) or "Edit note" (a note) |
+  | commitment, no record | "Add note" (no note) or "Edit note" (a note), then "Add record" |
   | commitment, a record | "Edit" |
-  | period, no record | "Add record", then "Add note" or "Edit note" |
+  | period, no record | "Add note" or "Edit note", then "Add record" |
   | period, 1 to 49 records | "Add record" |
   | period, 50 records | none |
 
-  A period's records stay buttons in the Recorded cell that open "Edit" of that record.
+  A period's records stay buttons in the Recorded cell that open "Edit" of that record. The record control ("Add
+  record" or "Edit") is always the last button of the row, the rightmost.
+
+  Amended 2026-11-20 (owner's decision after implementation): the note control now comes before "Add record", so the
+  record control is always the rightmost. It was "Add record", then the note control.
 - **Accessible names**: slice 5's table, with its two note rows replaced:
 
   | Control | Accessible name |
@@ -50,7 +54,7 @@ The columns stay Date, Recorded, Result, Note and the empty-headed actions colum
   - after the NoteDialog closes, `FocusNoteAsync(row)` gives the focus to the row's "Add note" or "Edit note" as it
     shows after the save. Nothing gets it if the row has neither;
   - after the RecordDialog closes, `FocusAsync` works as in slice 5: the record's button while the row shows it,
-    otherwise the row's first action.
+    otherwise the row's record control ("Add record").
 - On the next read after a row's first record, its note control is gone. After its last record is deleted, it is back
   ("Edit note" when the row still has its note).
 

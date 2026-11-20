@@ -186,11 +186,11 @@ public sealed class HistoryCardTests : BunitContext
         {
             var actions = row.QuerySelectorAll("td")[4];
             Assert.True(actions.ClassList.Contains("ht-actions"));
-            // specs/006-note-editing HP-002: a row without a record has "Add record", then its note control; every
-            // other row at most one control.
+            // specs/006-note-editing HP-002: a row without a record has its note control, then "Add record", so the
+            // record control is the rightmost (the owner's order, 2026-11-20); every other row at most one control.
             if (Text(row.QuerySelectorAll("td")[1]) == "—")
             {
-                Assert.Equal(["Add record", "Add note"], actions.Children.Select(Text));
+                Assert.Equal(["Add note", "Add record"], actions.Children.Select(Text));
             }
             else
             {
@@ -273,25 +273,27 @@ public sealed class HistoryCardTests : BunitContext
     private static bool IsNoteControl(IElement button) => Text(button) is AddNote or EditNote;
 
     /// <summary>
-    /// The row's record control ("Add record" or "Edit"), the first button of its actions cell. Any second button is the
-    /// row's note control (specs/006-note-editing HP-002), so the row has exactly one record control.
+    /// The row's record control ("Add record" or "Edit"), the last button of its actions cell, so the rightmost (the
+    /// owner's order, 2026-11-20). Any button before it is the row's note control (specs/006-note-editing HP-002), so the
+    /// row has exactly one record control.
     /// </summary>
     private static IElement Action(IRenderedComponent<HistoryCard> cut, string date)
     {
         var buttons = Row(cut, date).QuerySelectorAll("td.ht-actions > button");
         Assert.InRange(buttons.Length, 1, 2);
-        Assert.False(IsNoteControl(buttons[0]));
+        Assert.False(IsNoteControl(buttons[^1]));
         if (buttons.Length == 2)
         {
-            Assert.True(IsNoteControl(buttons[1]));
+            Assert.True(IsNoteControl(buttons[0]));
         }
 
-        return buttons[0];
+        return buttons[^1];
     }
 
     /// <summary>
-    /// The row's note control ("Add note" or "Edit note"), or null when it has none. It is the last of the two buttons of
-    /// the actions cell of a row without a record (specs/006-note-editing HP-002); the helper asserts that.
+    /// The row's note control ("Add note" or "Edit note"), or null when it has none. It is the first of the two buttons of
+    /// the actions cell of a row without a record, before "Add record" (specs/006-note-editing HP-002); the helper asserts
+    /// that.
     /// </summary>
     private static IElement? NoteControl(IRenderedComponent<HistoryCard> cut, string date)
     {
@@ -306,7 +308,7 @@ public sealed class HistoryCardTests : BunitContext
         var note = Assert.Single(notes);
         var actions = row.QuerySelectorAll("td.ht-actions > button");
         Assert.Equal(2, actions.Length);
-        Assert.Same(actions[1], note);
+        Assert.Same(actions[0], note);
         Assert.Equal("—", Text(row.QuerySelectorAll("td")[1]));
         return note;
     }

@@ -33,6 +33,8 @@ The last part of the preview shows the page as slice 5 builds it (HP-001, US3-AS
 
 Amended 2026-11-20, specs/006-note-editing, ADR 0019 (note editing, HP-001 and HP-002 there): the Note cell shows the note as plain text, and a row's note control ("Add note" or "Edit note") is in the actions column, after "Add record", on rows without a record only. A row with a record changes its note only in the RecordDialog, which opens with the note filled in.
 
+Amended 2026-11-20 (owner's decision after implementation): the note control now comes before "Add record", so the record control is always the rightmost. It came after "Add record" before, because recording is the row's main action.
+
 - Page head: slice 4's "← Goals", name, tags and attempt line, then `ht-spacer` and the primary action "Record" (`aria-haspopup="dialog"`), which opens the RecordDialog with its "For" select (`components/RecordDialog.md`, "Slice 5 state"). No other action (Edit settings, Pause and End goal are slices 7 and 8). "Record" is absent when nothing can be recorded now (no Due and no Pending commitment or period).
 - Under the head: slice 4's Notice for a habit no longer in the catalog, unchanged.
 - Two columns (`ht-grid-2`), as in the full preview:
@@ -52,13 +54,13 @@ Amended 2026-11-20, specs/006-note-editing, ADR 0019 (note editing, HP-001 and H
 
     | Row | Controls |
     |---|---|
-    | a commitment without a record | "Add record", then "Add note" (no note) or "Edit note" (a note) |
+    | a commitment without a record | "Add note" (no note) or "Edit note" (a note), then "Add record" |
     | a commitment with a record | "Edit" (it opens that one record) |
-    | a period without a record | "Add record", then "Add note" or "Edit note" |
+    | a period without a record | "Add note" or "Edit note", then "Add record" |
     | a period with 1 to 49 records | "Add record" |
     | a period with 50 records | none |
 
-    "Add record" comes first: recording is the row's main action. "Add note" and "Edit note" open the NoteDialog (`components/NoteDialog.md`, "Slice 5 state"); the other controls open the RecordDialog, which shows the row's note in its note field (`components/RecordDialog.md`, "Slice 5 state"). In the slice-5 state the Due row's action is "Add record" too; the full preview keeps its primary "Record".
+    The record control ("Add record" or "Edit") is always the rightmost, the last button of the row, so it stays in the same place whether or not a note control comes before it. "Add note" and "Edit note" open the NoteDialog (`components/NoteDialog.md`, "Slice 5 state"); the other controls open the RecordDialog, which shows the row's note in its note field (`components/RecordDialog.md`, "Slice 5 state"). In the slice-5 state the Due row's action is "Add record" too; the full preview keeps its primary "Record".
 - The row actions are offered whatever the state, final rows included, so a Missed or Failed commitment or period takes a record as a correction (US3-AS4). All row controls are ghost `ht-btn--sm` buttons with `aria-haspopup="dialog"`.
 - A row's note control follows its records on the next read: it is gone after the row's first record, and back after its last record is deleted ("Edit note" when the row still has its note). After the NoteDialog closes, the focus goes to the row's "Add note" or "Edit note" as it shows after the save.
 - The preview's rows show each case: "Add note" on rows without a record or a note (Mon 16 Nov, Pending; Sun 8 Nov, Missed), "Edit note" on a Missed row with a note (Sat 14 Nov, "Away for the weekend."), and a note as text only on rows with a record (Thu 12 Nov, "Fell asleep early."; the per-day Sun 15 Nov; the week 27 Jul – 2 Aug).

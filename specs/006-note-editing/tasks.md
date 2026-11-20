@@ -420,4 +420,8 @@ One PR for slice 5a. Each checkpoint is a commit on the feature branch.
   - a wording that `design/` changes is changed in this feature's spec too, as the spec says, and in every document that repeats it (Conventions, T037; pass 1 MINOR-2, pass 2 MINOR-2);
   - T001's documents-only commit runs the full suite first, and T036 compares with T002's own analyzer baselines (pass 2 MINOR-3, MINOR-4);
   - the History card's slice 5 note tests are renamed for the new rule (T029; pass 2 MINOR-5, MINOR-6). Reports: [critic-tasks-pass-2.md](critic-tasks-pass-2.md).
+- Amended 2026-11-20 (owner's decision after implementation): the order of T003 and T028 ("Add record" first, the
+  record control the first button of its row) was reversed by the owner after implementation. The note control now
+  comes before "Add record", so the record control is always the last button of its row, the rightmost. The finished
+  tasks above keep their original wording.
 - Stop at any checkpoint to validate a story on its own.

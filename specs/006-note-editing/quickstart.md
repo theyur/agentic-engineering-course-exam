@@ -53,11 +53,13 @@ Open `https://localhost:7194` and sign in as `demo4@example.com` with the demo p
 account was created (slice 5 quickstart, section 3).
 
 1. "Reading, 20 min daily". The Note column is plain text: "Fell asleep early." on the Failed row R − 6, and "—" on
-   rows without a note. The row R − 6 offers only "Edit". No row with a record has a note control.
+   rows without a note. The row R − 6 offers only "Edit". No row with a record has a note control. On every row the
+   record control ("Add record" or "Edit") is the rightmost button.
 2. "Edit" on R − 6: the note field holds "Fell asleep early.", with the help "Clear the field to remove the note.".
    Clear it and save: the row shows "—" and is still Failed. That is three actions: open, edit, save (SC-004).
    "Edit" again, type "Fell asleep early." and save: the note is back.
-3. After "Show all", the Missed row R − 10 shows "Away for the weekend." as text, with "Add record" and "Edit note".
+3. After "Show all", the Missed row R − 10 shows "Away for the weekend." as text, with "Edit note" and "Add record".
+   (Amended 2026-11-20, owner's decision after implementation: the note control now comes before "Add record".)
    "Edit note" opens "Edit note · Reading, 20 min daily" with the note in the field. "Cancel" returns the focus to
    "Edit note".
 4. Slice 5's step 4: "Add record" on that Missed row. The note field holds "Away for the weekend.". Save 20 minutes
