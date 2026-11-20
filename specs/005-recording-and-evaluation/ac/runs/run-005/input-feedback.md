@@ -1,0 +1,7 @@
+## Feedback for the test writer
+
+1. **F005/AC-010 rows 02-07, F005/AC-043 rows 01-05 and F005/AC-047 rows 01-07: `<n>` inside an Examples cell is not resolved.**
+   - What goes wrong: Reqnroll does not expand a placeholder inside a cell value. So when `<actor>` or `<goal>` is substituted, the step gets the literal text `<n>` inside the email, for example `` `f5.ac010.owner.<n>@example.com` `` or "the goal of `` `f5.ac047.owner.<n>@example.com` ``".
+   - Where: `F005Arrange.ActorAsync` (Support/F005/F005Arrange.cs) and `F005Arrange.GoalPhraseAsync`, through `GoalOf`, use that email as written. They are reached from `F005Actions.RunAsync`, `F005Actions.ReadAsync` and `F005Actions.CallAsync`. The lookup then finds no account or goal from the Given steps, and the use case is never called.
+   - What is required: acceptance.md, Conventions, "Examples", says every email in such an item contains `<n>`, meaning the row's value in the column `n`. Replace `<n>` in emails coming from step arguments with the current row's `n` value before any lookup. The row's `n` is available from the scenario's example arguments (`ScenarioContext.ScenarioInfo.Arguments["n"]`). Do this in one central place, such as a step argument transformation or `ActorAsync`/`GoalPhraseAsync`, so every step that takes an actor or goal phrase from a cell is covered.
+   - Afterwards: confirm that "nothing is recorded" (AC-010) and the owner's history read (AC-047) refer to the row's own accounts.

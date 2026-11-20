@@ -211,7 +211,7 @@ public sealed class GoalsHostTests(HostFixture host)
                 Assert.Equal(GoalWriteOutcomeKind.Created, created.Kind);
                 goal = created.Id!.Value;
                 var written = await services.GetRequiredService<IRecordStore>().AddAsync(
-                    account, goal, new EntrySpan(first, first, first), true, first, RecordValue.FromAmount(15), null, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None);
+                    account, goal, new EntrySpan(first, first, first), true, first, RecordValue.FromAmount(15), NoteWrite.Keep, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None);
                 Assert.Equal(RecordStoreWriteOutcome.Written, written.Outcome);
             }
 

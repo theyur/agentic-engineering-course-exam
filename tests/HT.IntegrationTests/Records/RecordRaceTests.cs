@@ -34,7 +34,7 @@ public sealed class RecordRaceTests(DatabaseFixture database)
         var goal = await GoalAsync(database, owner, "Race commitment", suffix, Reading20MinDaily());
 
         var writes = await RaceAsync(owner, goal, (store, value) =>
-            store.AddAsync(owner, goal, Day(Wed18), true, Wed18, value, null, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None),
+            store.AddAsync(owner, goal, Day(Wed18), true, Wed18, value, NoteWrite.Keep, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None),
             Minutes(RacedMinutes[0]), Minutes(RacedMinutes[1]));
 
         Assert.All(writes, w => Assert.Equal(RecordStoreWriteOutcome.Written, w.Outcome));
@@ -55,7 +55,7 @@ public sealed class RecordRaceTests(DatabaseFixture database)
             ("@goal", goal.Value), ("@date", Wed18.ToDateTime(TimeOnly.MinValue)));
 
         var writes = await RaceAsync(owner, goal, (store, value) =>
-            store.AddAsync(owner, goal, Day(Wed18), false, Wed18, value, null, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None),
+            store.AddAsync(owner, goal, Day(Wed18), false, Wed18, value, NoteWrite.Keep, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None),
             RecordValue.FromAmount(2), RecordValue.FromAmount(3));
 
         Assert.Single(writes, w => w.Outcome == RecordStoreWriteOutcome.Written);

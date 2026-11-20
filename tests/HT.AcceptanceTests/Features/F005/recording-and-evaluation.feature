@@ -43,11 +43,11 @@ Feature: Recording and evaluation
     And reading the history of the goal from 2026-11-15 to 2026-11-29 gives no record
 
     Examples:
-      | n  | schedule                                | created at             | start date | date       | why                                                              |
-      | 01 | fixed days Monday, Wednesday and Friday | `2026-11-16T08:00:00Z` | 2026-11-16 | 2026-11-17 | a Tuesday                                                        |
-      | 02 | fixed days on all seven days            | `2026-11-18T10:00:00Z` | 2026-11-18 | 2026-11-17 | before the start date                                            |
-      | 03 | 1 time per day                          | `2026-11-18T10:00:00Z` | 2026-11-18 | 2026-11-17 | before the start date                                            |
-      | 04 | 3 times per week                        | `2026-11-18T10:00:00Z` | 2026-11-18 | 2026-11-18 | before the first week, 2026-11-23 to 2026-11-29                  |
+      | n  | schedule                                | created at             | start date | date       | why                                                               |
+      | 01 | fixed days Monday, Wednesday and Friday | `2026-11-16T08:00:00Z` | 2026-11-16 | 2026-11-17 | a Tuesday                                                         |
+      | 02 | fixed days on all seven days            | `2026-11-18T10:00:00Z` | 2026-11-18 | 2026-11-17 | before the start date                                             |
+      | 03 | 1 time per day                          | `2026-11-18T10:00:00Z` | 2026-11-18 | 2026-11-17 | before the start date                                             |
+      | 04 | 3 times per week                        | `2026-11-18T10:00:00Z` | 2026-11-18 | 2026-11-18 | before the first week, 2026-11-23 to 2026-11-29                   |
       | 05 | 3 times per week                        | `2026-11-18T10:00:00Z` | 2026-11-18 | 2026-11-22 | before the first week, and not begun: the date check comes first |
 
   @AC-006 @FR-002 @US1-AS6
@@ -58,14 +58,14 @@ Feature: Recording and evaluation
     Then <result>
 
     Examples:
-      | n  | time zone   | schedule                                | time                   | date       | result                                                                              |
+      | n  | time zone   | schedule                                | time                   | date       | result                                                                               |
       | 01 | UTC         | fixed days on all seven days            | `2026-11-18T10:00:00Z` | 2026-11-19 | the result is "You cannot record a day that has not begun." and nothing is recorded |
       | 02 | UTC         | 1 time per day                          | `2026-11-18T10:00:00Z` | 2026-11-19 | the result is "You cannot record a day that has not begun." and nothing is recorded |
       | 03 | UTC         | fixed days Monday, Wednesday and Friday | `2026-11-18T10:00:00Z` | 2026-11-19 | the result is "Nothing is scheduled on this date." and nothing is recorded          |
       | 04 | UTC         | fixed days on all seven days            | `2026-11-18T23:59:59Z` | 2026-11-19 | the result is "You cannot record a day that has not begun." and nothing is recorded |
-      | 05 | UTC         | fixed days on all seven days            | `2026-11-19T00:00:00Z` | 2026-11-19 | recording succeeds with the state Due, not a correction                             |
+      | 05 | UTC         | fixed days on all seven days            | `2026-11-19T00:00:00Z` | 2026-11-19 | recording succeeds with the state Due, not a correction                              |
       | 06 | Europe/Kyiv | fixed days on all seven days            | `2026-11-18T21:59:59Z` | 2026-11-19 | the result is "You cannot record a day that has not begun." and nothing is recorded |
-      | 07 | Europe/Kyiv | fixed days on all seven days            | `2026-11-18T22:00:00Z` | 2026-11-19 | recording succeeds with the state Due, not a correction                             |
+      | 07 | Europe/Kyiv | fixed days on all seven days            | `2026-11-18T22:00:00Z` | 2026-11-19 | recording succeeds with the state Due, not a correction                              |
       | 08 | UTC         | 3 times per week                        | `2026-11-18T10:00:00Z` | 2026-11-20 | the result is "You cannot record a day that has not begun." and nothing is recorded |
 
   @AC-007 @FR-005 @US1-AS7
@@ -112,10 +112,10 @@ Feature: Recording and evaluation
     And reading the history of the goal from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18 with one record, <stored>
 
     Examples:
-      | n  | measurement         | given                           | stored                                   |
-      | 01 | yes/no              | Yes together with the amount 5  | (2026-11-18, Yes), with no amount        |
-      | 02 | count 5 `pages`     | the amount 3 together with Yes  | (2026-11-18, 3), with neither Yes nor No |
-      | 03 | duration 20 minutes | the amount 12 together with No  | (2026-11-18, 12), with neither Yes nor No |
+      | n  | measurement         | given                           | stored                                     |
+      | 01 | yes/no              | Yes together with the amount 5  | (2026-11-18, Yes), with no amount          |
+      | 02 | count 5 `pages`     | the amount 3 together with Yes  | (2026-11-18, 3), with neither Yes nor No   |
+      | 03 | duration 20 minutes | the amount 12 together with No  | (2026-11-18, 12), with neither Yes nor No  |
 
   @AC-010 @FR-005 @FR-018 @US1-AS7
   Scenario Outline: Recording checks the acting user, the goal, the date, the value and the note in that order
@@ -130,12 +130,12 @@ Feature: Recording and evaluation
     Examples:
       | n  | actor                                              | date       | value    | note                     | result                                        |
       | 01 | the anonymous visitor                              | 2026-11-17 | no value | a text of 501 characters | "You are not signed in."                      |
-      | 02 | the administrator `f5.ac010.admin.02@example.com`  | 2026-11-17 | no value | a text of 501 characters | "Goals are for registered users."             |
-      | 03 | `f5.ac010.other.03@example.com`                    | 2026-11-17 | no value | a text of 501 characters | "This goal does not exist."                   |
-      | 04 | `f5.ac010.owner.04@example.com`                    | 2026-11-17 | no value | a text of 501 characters | "Nothing is scheduled on this date."          |
-      | 05 | `f5.ac010.owner.05@example.com`                    | 2026-11-19 | no value | a text of 501 characters | "You cannot record a day that has not begun." |
-      | 06 | `f5.ac010.owner.06@example.com`                    | 2026-11-18 | no value | a text of 501 characters | "Enter a whole number from 0 to 9999."        |
-      | 07 | `f5.ac010.owner.07@example.com`                    | 2026-11-18 | 3        | a text of 501 characters | "The note can have at most 500 characters."   |
+      | 02 | the administrator `f5.ac010.admin.<n>@example.com` | 2026-11-17 | no value | a text of 501 characters | "Goals are for registered users."             |
+      | 03 | `f5.ac010.other.<n>@example.com`                   | 2026-11-17 | no value | a text of 501 characters | "This goal does not exist."                   |
+      | 04 | `f5.ac010.owner.<n>@example.com`                   | 2026-11-17 | no value | a text of 501 characters | "Nothing is scheduled on this date."          |
+      | 05 | `f5.ac010.owner.<n>@example.com`                   | 2026-11-19 | no value | a text of 501 characters | "You cannot record a day that has not begun." |
+      | 06 | `f5.ac010.owner.<n>@example.com`                   | 2026-11-18 | no value | a text of 501 characters | "Enter a whole number from 0 to 9999."        |
+      | 07 | `f5.ac010.owner.<n>@example.com`                   | 2026-11-18 | 3        | a text of 501 characters | "The note can have at most 500 characters."   |
 
   @AC-011 @FR-007 @US1-AS8
   Scenario: A note given with a record is trimmed
@@ -153,10 +153,10 @@ Feature: Recording and evaluation
     Then it gives, in this order, 2026-11-18 <first> and 2026-11-19 <second>
 
     Examples:
-      | n  | time                   | first                                     | second                                                                         |
-      | 01 | `2026-11-18T10:00:00Z` | Due, grace ends `2026-11-21T00:00:00Z`     | from `2026-11-19T00:00:00Z` to `2026-11-20T00:00:00Z`, Upcoming, no grace end |
-      | 02 | `2026-11-18T23:59:59Z` | Due, grace ends `2026-11-21T00:00:00Z`     | Upcoming, no grace end                                                         |
-      | 03 | `2026-11-19T00:00:00Z` | Pending, grace ends `2026-11-21T00:00:00Z` | Due, grace ends `2026-11-22T00:00:00Z`                                         |
+      | n  | time                   | first                                     | second                                                                              |
+      | 01 | `2026-11-18T10:00:00Z` | Due, grace ends `2026-11-21T00:00:00Z`     | from `2026-11-19T00:00:00Z` to `2026-11-20T00:00:00Z`, Upcoming, no grace end      |
+      | 02 | `2026-11-18T23:59:59Z` | Due, grace ends `2026-11-21T00:00:00Z`     | Upcoming, no grace end                                                              |
+      | 03 | `2026-11-19T00:00:00Z` | Pending, grace ends `2026-11-21T00:00:00Z` | Due, grace ends `2026-11-22T00:00:00Z`                                              |
 
   @AC-013 @FR-010 @FR-016 @US2-AS2 @US2-AS3
   Scenario Outline: An unrecorded commitment is Pending for 48 hours after its end and then Missed by itself
@@ -167,11 +167,11 @@ Feature: Recording and evaluation
     Then it gives the entry 2026-11-18, no record, <entry>
 
     Examples:
-      | n  | time                   | entry                                                      |
+      | n  | time                   | entry                                                     |
       | 01 | `2026-11-19T00:00:00Z` | Pending, grace ends `2026-11-21T00:00:00Z`, no correction |
       | 02 | `2026-11-20T23:59:59Z` | Pending, grace ends `2026-11-21T00:00:00Z`, no correction |
-      | 03 | `2026-11-21T00:00:00Z` | Missed, no grace end, correction                           |
-      | 04 | `2026-11-21T00:00:01Z` | Missed, no grace end, correction                           |
+      | 03 | `2026-11-21T00:00:00Z` | Missed, no grace end, correction                          |
+      | 04 | `2026-11-21T00:00:01Z` | Missed, no grace end, correction                          |
 
   @AC-014 @FR-004 @FR-014 @US2-AS4
   Scenario Outline: A final Build duration commitment is Met at or above its target and Failed below it
@@ -233,11 +233,11 @@ Feature: Recording and evaluation
     Then it gives the entry 2026-11-16 to 2026-11-22, <state>, <progress>
 
     Examples:
-      | n  | records                                                                           | state  | progress              |
-      | 01 | Yes for 2026-11-16, Yes for 2026-11-18 and Yes for 2026-11-20                     | Met    | progress 3 of 3 times |
-      | 02 | Yes for 2026-11-16, Yes for 2026-11-18 and No for 2026-11-20                      | Failed | progress 2 of 3 times |
+      | n  | records                                                                            | state  | progress              |
+      | 01 | Yes for 2026-11-16, Yes for 2026-11-18 and Yes for 2026-11-20                      | Met    | progress 3 of 3 times |
+      | 02 | Yes for 2026-11-16, Yes for 2026-11-18 and No for 2026-11-20                       | Failed | progress 2 of 3 times |
       | 03 | Yes for 2026-11-16, Yes for 2026-11-17, Yes for 2026-11-18 and Yes for 2026-11-19 | Met    | progress 4 of 3 times |
-      | 04 | Yes for 2026-11-16 and Yes for 2026-11-18                                         | Failed | progress 2 of 3 times |
+      | 04 | Yes for 2026-11-16 and Yes for 2026-11-18                                          | Failed | progress 2 of 3 times |
 
   @AC-018 @FR-014 @US2-AS8
   Scenario Outline: A final per-week Build count period counts only the records that reach the amount
@@ -248,12 +248,12 @@ Feature: Recording and evaluation
     Then it gives the entry 2026-11-16 to 2026-11-22, <state>, <progress>
 
     Examples:
-      | n  | records                                                                       | state  | progress              |
-      | 01 | 20 for 2026-11-16, 25 for 2026-11-17 and 12 for 2026-11-18                    | Failed | progress 2 of 3 times |
+      | n  | records                                                                        | state  | progress              |
+      | 01 | 20 for 2026-11-16, 25 for 2026-11-17 and 12 for 2026-11-18                     | Failed | progress 2 of 3 times |
       | 02 | 20 for 2026-11-16, 25 for 2026-11-17, 12 for 2026-11-18 and 30 for 2026-11-19 | Met    | progress 3 of 3 times |
-      | 03 | 19 for 2026-11-16, 19 for 2026-11-17 and 19 for 2026-11-18                    | Failed | progress 0 of 3 times |
-      | 04 | 20 for 2026-11-16, 20 for 2026-11-17 and 20 for 2026-11-18                    | Met    | progress 3 of 3 times |
-      | 05 | 60 for 2026-11-16                                                             | Failed | progress 1 of 3 times |
+      | 03 | 19 for 2026-11-16, 19 for 2026-11-17 and 19 for 2026-11-18                     | Failed | progress 0 of 3 times |
+      | 04 | 20 for 2026-11-16, 20 for 2026-11-17 and 20 for 2026-11-18                     | Met    | progress 3 of 3 times |
+      | 05 | 60 for 2026-11-16                                                              | Failed | progress 1 of 3 times |
 
   @AC-019 @FR-014 @US2-AS9
   Scenario Outline: A final per-day Reduce count period is Met when its total is within the limit
@@ -279,14 +279,14 @@ Feature: Recording and evaluation
     Then it gives the entry 2026-11-18, <state>, <progress>
 
     Examples:
-      | n  | settings                        | records                                   | state  | progress                |
-      | 01 | Reduce, yes/no, 1 time per day  | Yes for 2026-11-18                        | Met    | progress 1 of at most 1 |
-      | 02 | Reduce, yes/no, 1 time per day  | Yes for 2026-11-18 and Yes for 2026-11-18 | Failed | progress 2 of at most 1 |
-      | 03 | Reduce, yes/no, 1 time per day  | No for 2026-11-18                         | Met    | progress 0 of at most 1 |
-      | 04 | Build, yes/no, 2 times per day  | Yes for 2026-11-18 and Yes for 2026-11-18 | Met    | progress 2 of 2 times   |
-      | 05 | Build, yes/no, 2 times per day  | Yes for 2026-11-18                        | Failed | progress 1 of 2 times   |
-      | 06 | Build, yes/no, 2 times per day  | Yes for 2026-11-18 and No for 2026-11-18  | Failed | progress 1 of 2 times   |
-      | 07 | Build, yes/no, 2 times per day  | Yes, Yes and Yes for 2026-11-18           | Met    | progress 3 of 2 times   |
+      | n  | settings                       | records                                   | state  | progress                |
+      | 01 | Reduce, yes/no, 1 time per day | Yes for 2026-11-18                        | Met    | progress 1 of at most 1 |
+      | 02 | Reduce, yes/no, 1 time per day | Yes for 2026-11-18 and Yes for 2026-11-18 | Failed | progress 2 of at most 1 |
+      | 03 | Reduce, yes/no, 1 time per day | No for 2026-11-18                         | Met    | progress 0 of at most 1 |
+      | 04 | Build, yes/no, 2 times per day | Yes for 2026-11-18 and Yes for 2026-11-18 | Met    | progress 2 of 2 times   |
+      | 05 | Build, yes/no, 2 times per day | Yes for 2026-11-18                        | Failed | progress 1 of 2 times   |
+      | 06 | Build, yes/no, 2 times per day | Yes for 2026-11-18 and No for 2026-11-18  | Failed | progress 1 of 2 times   |
+      | 07 | Build, yes/no, 2 times per day | Yes, Yes and Yes for 2026-11-18           | Met    | progress 3 of 2 times   |
 
   @AC-021 @FR-012 @US2-AS11
   Scenario Outline: An ended commitment or period stays Pending during its grace period, even when its records reach the target
@@ -335,9 +335,9 @@ Feature: Recording and evaluation
 
     Examples:
       | n  | created at             | date       | time                   | start                  | end                    | entry                                                                                     |
-      | 01 | `2026-10-24T08:00:00Z` | 2026-10-24 | `2026-10-26T20:59:59Z` | `2026-10-23T21:00:00Z` | `2026-10-24T21:00:00Z` | Pending, grace ends `2026-10-26T21:00:00Z` (23:00 in Kyiv on Monday 26 October 2026)      |
+      | 01 | `2026-10-24T08:00:00Z` | 2026-10-24 | `2026-10-26T20:59:59Z` | `2026-10-23T21:00:00Z` | `2026-10-24T21:00:00Z` | Pending, grace ends `2026-10-26T21:00:00Z` (23:00 in Kyiv on Monday 26 October 2026)    |
       | 02 | `2026-10-24T08:00:00Z` | 2026-10-24 | `2026-10-26T21:00:00Z` | `2026-10-23T21:00:00Z` | `2026-10-24T21:00:00Z` | Missed, no grace end                                                                      |
-      | 03 | `2027-03-27T08:00:00Z` | 2027-03-27 | `2027-03-29T21:59:59Z` | `2027-03-26T22:00:00Z` | `2027-03-27T22:00:00Z` | Pending, grace ends `2027-03-29T22:00:00Z` (01:00 in Kyiv on Tuesday 30 March 2027)       |
+      | 03 | `2027-03-27T08:00:00Z` | 2027-03-27 | `2027-03-29T21:59:59Z` | `2027-03-26T22:00:00Z` | `2027-03-27T22:00:00Z` | Pending, grace ends `2027-03-29T22:00:00Z` (01:00 in Kyiv on Tuesday 30 March 2027)     |
       | 04 | `2027-03-27T08:00:00Z` | 2027-03-27 | `2027-03-29T22:00:00Z` | `2027-03-26T22:00:00Z` | `2027-03-27T22:00:00Z` | Missed, no grace end                                                                      |
 
   @AC-024 @FR-006 @US3-AS1
@@ -380,13 +380,13 @@ Feature: Recording and evaluation
     Then <result>
 
     Examples:
-      | n  | before            | time                   | action                                 | result                                                                                                                                       |
-      | 01 | nothing           | `2026-11-20T23:59:59Z` | records 20 for 2026-11-18              | recording succeeds with the state Pending, not a correction                                                                                  |
-      | 02 | nothing           | `2026-11-21T00:00:00Z` | records 20 for 2026-11-18              | recording succeeds with the state Met, a correction                                                                                          |
-      | 03 | 12 for 2026-11-18 | `2026-11-18T12:00:00Z` | deletes the record of 2026-11-18       | deleting succeeds with the state Due, not a correction, and the history from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, Due, no record         |
-      | 04 | 12 for 2026-11-18 | `2026-11-20T23:59:59Z` | deletes the record of 2026-11-18       | deleting succeeds with the state Pending, not a correction, and the history from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, Pending, no record |
-      | 05 | 12 for 2026-11-18 | `2026-11-20T23:59:59Z` | changes the record of 2026-11-18 to 20 | changing succeeds with the state Pending, not a correction                                                                                   |
-      | 06 | 12 for 2026-11-18 | `2026-11-21T00:00:00Z` | changes the record of 2026-11-18 to 20 | changing succeeds with the state Met, a correction                                                                                           |
+      | n  | before            | time                   | action                                 | result                                                                                                                                                         |
+      | 01 | nothing           | `2026-11-20T23:59:59Z` | records 20 for 2026-11-18              | recording succeeds with the state Pending, not a correction                                                                                                    |
+      | 02 | nothing           | `2026-11-21T00:00:00Z` | records 20 for 2026-11-18              | recording succeeds with the state Met, a correction                                                                                                            |
+      | 03 | 12 for 2026-11-18 | `2026-11-18T12:00:00Z` | deletes the record of 2026-11-18       | deleting succeeds with the state Due, not a correction, and the history from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, Due, no record               |
+      | 04 | 12 for 2026-11-18 | `2026-11-20T23:59:59Z` | deletes the record of 2026-11-18       | deleting succeeds with the state Pending, not a correction, and the history from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, Pending, no record       |
+      | 05 | 12 for 2026-11-18 | `2026-11-20T23:59:59Z` | changes the record of 2026-11-18 to 20 | changing succeeds with the state Pending, not a correction                                                                                                     |
+      | 06 | 12 for 2026-11-18 | `2026-11-21T00:00:00Z` | changes the record of 2026-11-18 to 20 | changing succeeds with the state Met, a correction                                                                                                             |
 
   @AC-028 @FR-006 @FR-014 @US3-AS4
   Scenario: A missing record added to a Failed week is a correction that makes it Met
@@ -444,11 +444,11 @@ Feature: Recording and evaluation
     And reading the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 20) for the first goal and records (2026-11-18, 30) for the second goal
 
     Examples:
-      | n  | action                                                    |
-      | 01 | changes the second goal's record of 2026-11-18 to 12      |
-      | 02 | deletes the second goal's record of 2026-11-18            |
+      | n  | action                                                      |
+      | 01 | changes the second goal's record of 2026-11-18 to 12        |
+      | 02 | deletes the second goal's record of 2026-11-18              |
       | 03 | changes a record identifier that belongs to no record to 12 |
-      | 04 | deletes a record identifier that belongs to no record     |
+      | 04 | deletes a record identifier that belongs to no record       |
 
   @AC-033 @FR-003 @FR-005
   Scenario Outline: An evaluation period takes at most 50 records, but its records can still be changed or deleted
@@ -459,12 +459,12 @@ Feature: Recording and evaluation
     Then <result>
 
     Examples:
-      | n  | action                                                                     | result                                                                                                                                       |
-      | 01 | records Yes for 2026-11-18                                                 | the result is "This evaluation period already has 50 records." and the history from 2026-11-18 to 2026-11-18 gives 50 records              |
-      | 02 | records Yes for 2026-11-18 with the note a text of 501 characters          | the result is "The note can have at most 500 characters." and the history from 2026-11-18 to 2026-11-18 gives 50 records and no note      |
-      | 03 | records no value for 2026-11-18                                            | the result is "Choose Yes or No." and the history from 2026-11-18 to 2026-11-18 gives 50 records                                            |
-      | 04 | changes the first record of 2026-11-18 to No                               | changing succeeds with the state Due, not a correction, and the history from 2026-11-18 to 2026-11-18 gives 50 records, exactly one of them (2026-11-18, No) |
-      | 05 | deletes the first record of 2026-11-18 and then records Yes for 2026-11-18 | deleting and recording both succeed with the state Due, not a correction, and the history from 2026-11-18 to 2026-11-18 gives 50 records |
+      | n  | action                                                             | result                                                                                                                                                   |
+      | 01 | records Yes for 2026-11-18                                         | the result is "This evaluation period already has 50 records." and the history from 2026-11-18 to 2026-11-18 gives 50 records                            |
+      | 02 | records Yes for 2026-11-18 with the note a text of 501 characters  | the result is "The note can have at most 500 characters." and the history from 2026-11-18 to 2026-11-18 gives 50 records and no note                     |
+      | 03 | records no value for 2026-11-18                                    | the result is "Choose Yes or No." and the history from 2026-11-18 to 2026-11-18 gives 50 records                                                         |
+      | 04 | changes the first record of 2026-11-18 to No                       | changing succeeds with the state Due, not a correction, and the history from 2026-11-18 to 2026-11-18 gives 50 records, exactly one of them (2026-11-18, No) |
+      | 05 | deletes the first record of 2026-11-18 and then records Yes for 2026-11-18 | deleting and recording both succeed with the state Due, not a correction, and the history from 2026-11-18 to 2026-11-18 gives 50 records             |
 
   @AC-034 @FR-001 @FR-009
   Scenario Outline: A record belongs to the week of its date, not to the week of the instant it is saved
@@ -498,29 +498,31 @@ Feature: Recording and evaluation
     And reading the history of the goal from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18 with <result>
 
     Examples:
-      | n  | note            | result               |
-      | 01 | `""`            | no note              |
-      | 02 | `"   "`         | no note              |
+      | n  | note            | result              |
+      | 01 | `""`            | no note             |
+      | 02 | `"   "`         | no note             |
       | 03 | "New note."     | the note "New note." |
       | 04 | "  New note.  " | the note "New note." |
 
   @AC-037 @FR-007 @US4-AS3
-  Scenario Outline: A note given with a record replaces the note only when it has text
+  Scenario Outline: A note given with a record is the note; no note leaves it unchanged
     Given the registered user `f5.ac037.user.<n>@example.com`, who created the custom habit `Yoga`
     And at `2026-11-16T08:00:00Z` `f5.ac037.user.<n>@example.com` created a goal on their custom habit `Yoga` with Build, yes/no, 3 times per week and the start date 2026-11-16
     And at `2026-11-18T10:00:00Z` `f5.ac037.user.<n>@example.com` recorded Yes for 2026-11-16 and saved the note "Knee was sore." for 2026-11-16
     When `f5.ac037.user.<n>@example.com` <action>
     Then it succeeds with the state Due, not a correction
-    And reading the history of the goal from 2026-11-16 to 2026-11-22 gives the entry 2026-11-16 to 2026-11-22 with the note <note>
+    And reading the history of the goal from 2026-11-16 to 2026-11-22 gives the entry 2026-11-16 to 2026-11-22 with <note>
 
     Examples:
-      | n  | action                                                               | note             |
-      | 01 | records Yes for 2026-11-18                                           | "Knee was sore." |
-      | 02 | records Yes for 2026-11-18 with the note `"   "`                     | "Knee was sore." |
-      | 03 | records Yes for 2026-11-18 with the note `""`                        | "Knee was sore." |
-      | 04 | records Yes for 2026-11-18 with the note "Better today."             | "Better today."  |
-      | 05 | changes the record of 2026-11-16 to No                               | "Knee was sore." |
-      | 06 | changes the record of 2026-11-16 to No with the note "Better today." | "Better today."  |
+      | n  | action                                                                 | note                     |
+      | 01 | records Yes for 2026-11-18                                             | the note "Knee was sore." |
+      | 02 | records Yes for 2026-11-18 with the note `"   "`                       | no note                  |
+      | 03 | records Yes for 2026-11-18 with the note `""`                          | no note                  |
+      | 04 | records Yes for 2026-11-18 with the note "Better today."               | the note "Better today."  |
+      | 05 | changes the record of 2026-11-16 to No                                 | the note "Knee was sore." |
+      | 06 | changes the record of 2026-11-16 to No with the note "Better today."   | the note "Better today."  |
+      | 07 | changes the record of 2026-11-16 to No with the note `""`              | no note                  |
+      | 08 | changes the record of 2026-11-16 to No with the note "Knee was sore."  | the note "Knee was sore." |
 
   @AC-038 @FR-005 @FR-007 @US4-AS4
   Scenario Outline: A note has at most 500 characters
@@ -531,13 +533,13 @@ Feature: Recording and evaluation
     Then <result>
 
     Examples:
-      | n  | action                                                                   | result                                                                                                                                                       |
-      | 01 | saves the note a text of 501 characters for 2026-11-18                   | the result is "The note can have at most 500 characters." and the history from 2026-11-18 to 2026-11-18 gives the note "Back was tired."                      |
-      | 02 | saves the note a text of 500 characters for 2026-11-18                   | saving the note succeeds and the history from 2026-11-18 to 2026-11-18 gives a text of 500 characters as the note                                            |
-      | 03 | records 20 for 2026-11-18 with the note a text of 501 characters         | the result is "The note can have at most 500 characters." and the history from 2026-11-18 to 2026-11-18 gives no record and the note "Back was tired."        |
-      | 04 | records 20 for 2026-11-18 with the note a text of 500 characters         | recording succeeds with the state Due, not a correction, and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 20) and a text of 500 characters as the note |
-      | 05 | saves the note a padded text of 500 characters for 2026-11-18            | saving the note succeeds and the history from 2026-11-18 to 2026-11-18 gives a text of 500 characters as the note                                            |
-      | 06 | records 20 for 2026-11-18 with the note a padded text of 500 characters  | recording succeeds with the state Due, not a correction, and the history from 2026-11-18 to 2026-11-18 gives a text of 500 characters as the note            |
+      | n  | action                                                                  | result                                                                                                                                                                    |
+      | 01 | saves the note a text of 501 characters for 2026-11-18                  | the result is "The note can have at most 500 characters." and the history from 2026-11-18 to 2026-11-18 gives the note "Back was tired."                                  |
+      | 02 | saves the note a text of 500 characters for 2026-11-18                  | saving the note succeeds and the history from 2026-11-18 to 2026-11-18 gives a text of 500 characters as the note                                                        |
+      | 03 | records 20 for 2026-11-18 with the note a text of 501 characters        | the result is "The note can have at most 500 characters." and the history from 2026-11-18 to 2026-11-18 gives no record and the note "Back was tired."                    |
+      | 04 | records 20 for 2026-11-18 with the note a text of 500 characters        | recording succeeds with the state Due, not a correction, and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 20) and a text of 500 characters as the note |
+      | 05 | saves the note a padded text of 500 characters for 2026-11-18           | saving the note succeeds and the history from 2026-11-18 to 2026-11-18 gives a text of 500 characters as the note                                                        |
+      | 06 | records 20 for 2026-11-18 with the note a padded text of 500 characters | recording succeeds with the state Due, not a correction, and the history from 2026-11-18 to 2026-11-18 gives a text of 500 characters as the note                        |
 
   @AC-039 @FR-002 @FR-007 @US4-AS5
   Scenario Outline: Any begun date of a week names that week's one note
@@ -547,13 +549,13 @@ Feature: Recording and evaluation
     Then <result>
 
     Examples:
-      | n  | action                                                                                     | result                                                                                                                                                         |
-      | 01 | saves the note "Week note." for 2026-11-18                                                 | saving the note succeeds and the history from 2026-11-16 to 2026-11-22 gives the entry 2026-11-16 to 2026-11-22 with the note "Week note."                      |
-      | 02 | saves the note "Week note." for 2026-11-16 and then the note "Second note." for 2026-11-17 | both succeed and the history from 2026-11-16 to 2026-11-22 gives the entry 2026-11-16 to 2026-11-22 with the note "Second note."                               |
-      | 03 | saves the note "Week note." for 2026-11-20                                                 | the result is "You cannot record a day that has not begun." and the history from 2026-11-16 to 2026-11-22 gives no note                                        |
-      | 04 | saves the note "Week note." for 2026-11-15                                                 | the result is "Nothing is scheduled on this date." and the history from 2026-11-16 to 2026-11-22 gives no note                                                 |
-      | 05 | saves the note a text of 501 characters for 2026-11-20                                     | the result is "You cannot record a day that has not begun." (the date is checked before the note) and the history from 2026-11-16 to 2026-11-22 gives no note |
-      | 06 | saves the note a text of 501 characters for 2026-11-15                                     | the result is "Nothing is scheduled on this date." (the date is checked before the note) and the history from 2026-11-16 to 2026-11-22 gives no note          |
+      | n  | action                                                                                      | result                                                                                                                                                       |
+      | 01 | saves the note "Week note." for 2026-11-18                                                  | saving the note succeeds and the history from 2026-11-16 to 2026-11-22 gives the entry 2026-11-16 to 2026-11-22 with the note "Week note."                   |
+      | 02 | saves the note "Week note." for 2026-11-16 and then the note "Second note." for 2026-11-17 | both succeed and the history from 2026-11-16 to 2026-11-22 gives the entry 2026-11-16 to 2026-11-22 with the note "Second note."                             |
+      | 03 | saves the note "Week note." for 2026-11-20                                                  | the result is "You cannot record a day that has not begun." and the history from 2026-11-16 to 2026-11-22 gives no note                                     |
+      | 04 | saves the note "Week note." for 2026-11-15                                                  | the result is "Nothing is scheduled on this date." and the history from 2026-11-16 to 2026-11-22 gives no note                                              |
+      | 05 | saves the note a text of 501 characters for 2026-11-20                                      | the result is "You cannot record a day that has not begun." (the date is checked before the note) and the history from 2026-11-16 to 2026-11-22 gives no note |
+      | 06 | saves the note a text of 501 characters for 2026-11-15                                      | the result is "Nothing is scheduled on this date." (the date is checked before the note) and the history from 2026-11-16 to 2026-11-22 gives no note        |
 
   @AC-040 @FR-008 @US4-AS6
   Scenario: The recent notes are the 5 with the latest dates, newest first, each with its state
@@ -606,13 +608,13 @@ Feature: Recording and evaluation
     Then <result>
 
     Examples:
-      | n  | actor                           | first      | last       | result                                                             |
-      | 01 | `f5.ac043.owner.01@example.com` | 2026-11-18 | 2026-11-18 | it gives exactly one entry, 2026-11-18                             |
-      | 02 | `f5.ac043.owner.02@example.com` | 2026-11-16 | 2027-11-16 | it gives 364 entries, the first 2026-11-18 and the last 2027-11-16 |
-      | 03 | `f5.ac043.owner.03@example.com` | 2026-11-16 | 2027-11-17 | the result is "Choose a range of 1 to 366 days."                   |
-      | 04 | `f5.ac043.owner.04@example.com` | 2026-11-19 | 2026-11-18 | the result is "Choose a range of 1 to 366 days."                   |
-      | 05 | `f5.ac043.other.05@example.com` | 2026-11-16 | 2027-11-17 | the result is "This goal does not exist."                          |
-      | 06 | the anonymous visitor           | 2026-11-16 | 2027-11-17 | the result is "You are not signed in."                             |
+      | n  | actor                            | first      | last       | result                                                             |
+      | 01 | `f5.ac043.owner.<n>@example.com` | 2026-11-18 | 2026-11-18 | it gives exactly one entry, 2026-11-18                             |
+      | 02 | `f5.ac043.owner.<n>@example.com` | 2026-11-16 | 2027-11-16 | it gives 364 entries, the first 2026-11-18 and the last 2027-11-16 |
+      | 03 | `f5.ac043.owner.<n>@example.com` | 2026-11-16 | 2027-11-17 | the result is "Choose a range of 1 to 366 days."                   |
+      | 04 | `f5.ac043.owner.<n>@example.com` | 2026-11-19 | 2026-11-18 | the result is "Choose a range of 1 to 366 days."                   |
+      | 05 | `f5.ac043.other.<n>@example.com` | 2026-11-16 | 2027-11-17 | the result is "This goal does not exist."                          |
+      | 06 | the anonymous visitor            | 2026-11-16 | 2027-11-17 | the result is "You are not signed in."                             |
 
   @AC-044 @FR-014 @US5-AS2
   Scenario Outline: Progress is given at any state, as the goal's kind of target counts it
@@ -623,14 +625,14 @@ Feature: Recording and evaluation
     Then its entry that contains 2026-11-18 is Due, <progress>
 
     Examples:
-      | n  | settings                                                 | records                                                     | progress                        |
-      | 01 | Build, duration 20 minutes, fixed days on all seven days | 12 for 2026-11-18                                           | progress 12 of 20 minutes       |
+      | n  | settings                                                 | records                                                    | progress                        |
+      | 01 | Build, duration 20 minutes, fixed days on all seven days | 12 for 2026-11-18                                          | progress 12 of 20 minutes       |
       | 02 | Build, count 20 `pages`, 3 times per week                | 20 for 2026-11-16, 25 for 2026-11-17 and 12 for 2026-11-18 | progress 2 of 3 times           |
-      | 03 | Reduce, count 1 `sweet`, 1 time per day                  | 1 for 2026-11-18 and 1 for 2026-11-18                       | progress total 2 of at most 1   |
-      | 04 | Reduce, yes/no, 1 time per day                           | Yes, Yes and No for 2026-11-18                              | progress 2 of at most 1         |
-      | 05 | Build, duration 1 in hours, fixed days on all seven days | 45 for 2026-11-18                                           | progress 45 of 60 minutes       |
-      | 06 | Build, yes/no, 2 times per day                           | Yes and No for 2026-11-18                                   | progress 1 of 2 times           |
-      | 07 | Reduce, duration 30 minutes, 1 time per day              | 10 and 15 for 2026-11-18                                    | progress total 25 of at most 30 |
+      | 03 | Reduce, count 1 `sweet`, 1 time per day                  | 1 for 2026-11-18 and 1 for 2026-11-18                      | progress total 2 of at most 1   |
+      | 04 | Reduce, yes/no, 1 time per day                           | Yes, Yes and No for 2026-11-18                             | progress 2 of at most 1         |
+      | 05 | Build, duration 1 in hours, fixed days on all seven days | 45 for 2026-11-18                                          | progress 45 of 60 minutes       |
+      | 06 | Build, yes/no, 2 times per day                           | Yes and No for 2026-11-18                                  | progress 1 of 2 times           |
+      | 07 | Reduce, duration 30 minutes, 1 time per day              | 10 and 15 for 2026-11-18                                   | progress total 25 of at most 30 |
 
   @AC-045 @FR-011 @US5-AS3
   Scenario Outline: What can be recorded now is every Due and every Pending commitment or period, newest first
@@ -640,14 +642,14 @@ Feature: Recording and evaluation
     Then it gives <entries>
 
     Examples:
-      | n  | schedule                                | start date | time                   | entries                                                                                                                                                                         |
+      | n  | schedule                                | start date | time                   | entries                                                                                                                                                                                   |
       | 01 | fixed days on all seven days            | 2026-11-16 | `2026-11-19T10:00:00Z` | in this order: 2026-11-19, Due, grace ends `2026-11-22T00:00:00Z`; 2026-11-18, Pending, grace ends `2026-11-21T00:00:00Z`; 2026-11-17, Pending, grace ends `2026-11-20T00:00:00Z` |
-      | 02 | 1 time per day                          | 2026-11-16 | `2026-11-19T10:00:00Z` | in this order: 2026-11-19, Due; 2026-11-18, Pending; 2026-11-17, Pending                                                                                                        |
-      | 03 | fixed days Monday, Wednesday and Friday | 2026-11-16 | `2026-11-19T10:00:00Z` | exactly one entry: 2026-11-18, Pending, grace ends `2026-11-21T00:00:00Z`                                                                                                       |
-      | 04 | fixed days Monday, Wednesday and Friday | 2026-11-16 | `2026-11-21T10:00:00Z` | exactly one entry: 2026-11-20, Pending, grace ends `2026-11-23T00:00:00Z`                                                                                                       |
-      | 05 | 3 times per week                        | 2026-11-16 | `2026-11-24T10:00:00Z` | in this order: 2026-11-23 to 2026-11-29, Due, grace ends `2026-12-02T00:00:00Z`; 2026-11-16 to 2026-11-22, Pending, grace ends `2026-11-25T00:00:00Z`                          |
-      | 06 | 3 times per week                        | 2026-11-16 | `2026-11-25T00:00:00Z` | exactly one entry: 2026-11-23 to 2026-11-29, Due                                                                                                                                |
-      | 07 | fixed days Friday                       | 2026-11-20 | `2026-11-18T10:00:00Z` | no entry                                                                                                                                                                        |
+      | 02 | 1 time per day                          | 2026-11-16 | `2026-11-19T10:00:00Z` | in this order: 2026-11-19, Due; 2026-11-18, Pending; 2026-11-17, Pending                                                                                                                  |
+      | 03 | fixed days Monday, Wednesday and Friday | 2026-11-16 | `2026-11-19T10:00:00Z` | exactly one entry: 2026-11-18, Pending, grace ends `2026-11-21T00:00:00Z`                                                                                                                 |
+      | 04 | fixed days Monday, Wednesday and Friday | 2026-11-16 | `2026-11-21T10:00:00Z` | exactly one entry: 2026-11-20, Pending, grace ends `2026-11-23T00:00:00Z`                                                                                                                 |
+      | 05 | 3 times per week                        | 2026-11-16 | `2026-11-24T10:00:00Z` | in this order: 2026-11-23 to 2026-11-29, Due, grace ends `2026-12-02T00:00:00Z`; 2026-11-16 to 2026-11-22, Pending, grace ends `2026-11-25T00:00:00Z`                                    |
+      | 06 | 3 times per week                        | 2026-11-16 | `2026-11-25T00:00:00Z` | exactly one entry: 2026-11-23 to 2026-11-29, Due                                                                                                                                          |
+      | 07 | fixed days Friday                       | 2026-11-20 | `2026-11-18T10:00:00Z` | no entry                                                                                                                                                                                  |
 
   @AC-046 @FR-011 @US5-AS3
   Scenario Outline: After a move east, the old and the new day are both Due while they overlap
@@ -658,9 +660,9 @@ Feature: Recording and evaluation
     Then it gives, in this order, <entries>
 
     Examples:
-      | n  | time                   | entries                                                                                                                                                                                                                                                                                                       |
+      | n  | time                   | entries                                                                                                                                                                                                                                                                                                        |
       | 01 | `2026-11-18T23:00:00Z` | 2026-11-19 from `2026-11-18T22:00:00Z` to `2026-11-19T22:00:00Z`, Due, grace ends `2026-11-21T22:00:00Z`; 2026-11-18 from `2026-11-18T05:00:00Z` to `2026-11-19T05:00:00Z`, Due, grace ends `2026-11-21T05:00:00Z`; 2026-11-17, Pending, grace ends `2026-11-20T05:00:00Z`; 2026-11-16, Pending, grace ends `2026-11-19T05:00:00Z` |
-      | 02 | `2026-11-19T05:00:00Z` | 2026-11-19, Due, grace ends `2026-11-21T22:00:00Z`; 2026-11-18, Pending, grace ends `2026-11-21T05:00:00Z`; 2026-11-17, Pending, grace ends `2026-11-20T05:00:00Z`                                                                                                                                         |
+      | 02 | `2026-11-19T05:00:00Z` | 2026-11-19, Due, grace ends `2026-11-21T22:00:00Z`; 2026-11-18, Pending, grace ends `2026-11-21T05:00:00Z`; 2026-11-17, Pending, grace ends `2026-11-20T05:00:00Z`                                                                                                                                             |
 
   @AC-047 @FR-017 @FR-018 @US6-AS1
   Scenario Outline: Another registered user gets "This goal does not exist." from every use case of this slice
@@ -674,13 +676,13 @@ Feature: Recording and evaluation
 
     Examples:
       | n  | use case                                   | goal                                         |
-      | 01 | record                                     | the goal of `f5.ac047.owner.01@example.com` |
-      | 02 | change, with the owner's record identifier | the goal of `f5.ac047.owner.02@example.com` |
-      | 03 | delete, with the owner's record identifier | the goal of `f5.ac047.owner.03@example.com` |
-      | 04 | save note                                  | the goal of `f5.ac047.owner.04@example.com` |
-      | 05 | history                                    | the goal of `f5.ac047.owner.05@example.com` |
-      | 06 | recordable now                             | the goal of `f5.ac047.owner.06@example.com` |
-      | 07 | recent notes                               | the goal of `f5.ac047.owner.07@example.com` |
+      | 01 | record                                     | the goal of `f5.ac047.owner.<n>@example.com` |
+      | 02 | change, with the owner's record identifier | the goal of `f5.ac047.owner.<n>@example.com` |
+      | 03 | delete, with the owner's record identifier | the goal of `f5.ac047.owner.<n>@example.com` |
+      | 04 | save note                                  | the goal of `f5.ac047.owner.<n>@example.com` |
+      | 05 | history                                    | the goal of `f5.ac047.owner.<n>@example.com` |
+      | 06 | recordable now                             | the goal of `f5.ac047.owner.<n>@example.com` |
+      | 07 | recent notes                               | the goal of `f5.ac047.owner.<n>@example.com` |
       | 08 | record                                     | a goal identifier that belongs to no goal    |
       | 09 | history                                    | a goal identifier that belongs to no goal    |
 
@@ -697,9 +699,9 @@ Feature: Recording and evaluation
     And the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 20) for the goal of `f5.ac048.owner.<n>@example.com` and records (2026-11-18, 30) for the goal of `f5.ac048.other.<n>@example.com`
 
     Examples:
-      | n  | action                   |
+      | n  | action                  |
       | 01 | changes the record to 12 |
-      | 02 | deletes the record       |
+      | 02 | deletes the record      |
 
   @AC-049 @FR-018 @US6-AS3
   Scenario Outline: An administrator gets "Goals are for registered users." from every use case of this slice
@@ -848,10 +850,10 @@ Feature: Recording and evaluation
     And `demo4@example.com`'s goal list is <goals>
 
     Examples:
-      | n  | habits                                                           | goals                                                                                                         |
-      | 01 | a Published `Yoga`, a Draft `Reading` and an Unpublished `Sugar` | exactly one goal, on the catalog habit `Yoga`, Build, yes/no, 3 times per week                                |
+      | n  | habits                                                           | goals                                                                                                      |
+      | 01 | a Published `Yoga`, a Draft `Reading` and an Unpublished `Sugar` | exactly one goal, on the catalog habit `Yoga`, Build, yes/no, 3 times per week                             |
       | 02 | a Published `reading`, a Draft `Sugar` and a Draft `Yoga`        | exactly one goal, on the catalog habit `reading`, Build, duration 20 minutes, fixed days on all seven days |
-      | 03 | a Draft `Reading`, a Draft `Sugar` and a Draft `Yoga`            | empty                                                                                                         |
+      | 03 | a Draft `Reading`, a Draft `Sugar` and a Draft `Yoga`            | empty                                                                                                      |
 
   @AC-061 @FR-030 @US7-AS6
   Scenario Outline: Demo history loading without a demo password creates no account
@@ -892,17 +894,17 @@ Feature: Recording and evaluation
     Then <result>
 
     Examples:
-      | n  | measurement         | before | change                                                                | result                                                                                                                                                                                  |
-      | 01 | count 5 `pages`     | 5      | the record of 2026-11-18 to no value                                  | the result is "Enter a whole number from 0 to 9999." and the history from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, Met, records (2026-11-18, 5), note "First note."          |
-      | 02 | count 5 `pages`     | 5      | the record of 2026-11-18 to -1                                        | the result is "Enter a whole number from 0 to 9999." and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 5)                                                         |
-      | 03 | count 5 `pages`     | 5      | the record of 2026-11-18 to 10000                                     | the result is "Enter a whole number from 0 to 9999." and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 5)                                                         |
-      | 04 | duration 20 minutes | 20     | the record of 2026-11-18 to 1441                                      | the result is "Enter a whole number of minutes from 0 to 1440." and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 20)                                              |
-      | 05 | yes/no              | Yes    | the record of 2026-11-18 to no value                                  | the result is "Choose Yes or No." and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, Yes)                                                                          |
-      | 06 | count 5 `pages`     | 5      | the record of 2026-11-18 to 3 with the note a text of 501 characters  | the result is "The note can have at most 500 characters." and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 5) and the note "First note."                       |
-      | 07 | count 5 `pages`     | 5      | a record identifier that belongs to no record to no value             | the result is "This record does not exist." (the record is checked before the value) and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 5)                        |
-      | 08 | count 5 `pages`     | 5      | the record of 2026-11-18 to 9999                                      | changing succeeds with the state Met, a correction, and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 9999) and the note "First note."                           |
-      | 09 | count 5 `pages`     | 5      | the record of 2026-11-18 to the amount 7 together with Yes            | changing succeeds with the state Met, a correction, and the history from 2026-11-18 to 2026-11-18 gives one record, (2026-11-18, 7), with neither Yes nor No                            |
-      | 10 | yes/no              | No     | the record of 2026-11-18 to Yes together with the amount 5            | changing succeeds with the state Met, a correction, and the history from 2026-11-18 to 2026-11-18 gives one record, (2026-11-18, Yes), with no amount                                   |
+      | n  | measurement         | before | change                                                                | result                                                                                                                                                                                       |
+      | 01 | count 5 `pages`     | 5      | the record of 2026-11-18 to no value                                  | the result is "Enter a whole number from 0 to 9999." and the history from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, Met, records (2026-11-18, 5), note "First note."            |
+      | 02 | count 5 `pages`     | 5      | the record of 2026-11-18 to -1                                        | the result is "Enter a whole number from 0 to 9999." and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 5)                                                            |
+      | 03 | count 5 `pages`     | 5      | the record of 2026-11-18 to 10000                                     | the result is "Enter a whole number from 0 to 9999." and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 5)                                                            |
+      | 04 | duration 20 minutes | 20     | the record of 2026-11-18 to 1441                                      | the result is "Enter a whole number of minutes from 0 to 1440." and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 20)                                                |
+      | 05 | yes/no              | Yes    | the record of 2026-11-18 to no value                                  | the result is "Choose Yes or No." and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, Yes)                                                                             |
+      | 06 | count 5 `pages`     | 5      | the record of 2026-11-18 to 3 with the note a text of 501 characters  | the result is "The note can have at most 500 characters." and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 5) and the note "First note."                           |
+      | 07 | count 5 `pages`     | 5      | a record identifier that belongs to no record to no value             | the result is "This record does not exist." (the record is checked before the value) and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 5)                           |
+      | 08 | count 5 `pages`     | 5      | the record of 2026-11-18 to 9999                                      | changing succeeds with the state Met, a correction, and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 9999) and the note "First note."                              |
+      | 09 | count 5 `pages`     | 5      | the record of 2026-11-18 to the amount 7 together with Yes            | changing succeeds with the state Met, a correction, and the history from 2026-11-18 to 2026-11-18 gives one record, (2026-11-18, 7), with neither Yes nor No                                |
+      | 10 | yes/no              | No     | the record of 2026-11-18 to Yes together with the amount 5            | changing succeeds with the state Met, a correction, and the history from 2026-11-18 to 2026-11-18 gives one record, (2026-11-18, Yes), with no amount                                       |
       | 11 | count 5 `pages`     | 5      | the record of 2026-11-18 to -1 with the note a text of 501 characters | the result is "Enter a whole number from 0 to 9999." (the value is checked before the note) and the history from 2026-11-18 to 2026-11-18 gives records (2026-11-18, 5) and the note "First note." |
 
   @AC-065 @FR-001 @FR-010
@@ -924,40 +926,40 @@ Feature: Recording and evaluation
     Then its entry that contains 2026-11-18 is <state>, <progress>
 
     Examples:
-      | n  | settings                                                    | records                                                     | state  | progress                        |
-      | 01 | Build, count 5 `pages`, fixed days on all seven days        | 4 for 2026-11-18                                            | Failed | progress 4 of 5                 |
-      | 02 | Build, count 5 `pages`, fixed days on all seven days        | 5 for 2026-11-18                                            | Met    | progress 5 of 5                 |
-      | 03 | Build, count 5 `pages`, fixed days on all seven days        | 6 for 2026-11-18                                            | Met    | progress 6 of 5                 |
-      | 04 | Build, count 5 `pages`, 2 times per day                     | 5 and 5 for 2026-11-18                                      | Met    | progress 2 of 2 times           |
-      | 05 | Build, count 5 `pages`, 2 times per day                     | 5 and 4 for 2026-11-18                                      | Failed | progress 1 of 2 times           |
-      | 06 | Build, duration 20 minutes, 1 time per day                  | 19 for 2026-11-18                                           | Failed | progress 0 of 1 times           |
-      | 07 | Build, duration 20 minutes, 1 time per day                  | 20 for 2026-11-18                                           | Met    | progress 1 of 1 times           |
-      | 08 | Build, duration 20 minutes, 3 times per week                | 20 for 2026-11-16, 19 for 2026-11-17 and 20 for 2026-11-18 | Failed | progress 2 of 3 times           |
-      | 09 | Build, duration 20 minutes, 3 times per week                | 20 for 2026-11-16, 20 for 2026-11-17 and 20 for 2026-11-18 | Met    | progress 3 of 3 times           |
-      | 10 | Reduce, duration 30 minutes, fixed days on all seven days   | 30 for 2026-11-18                                           | Met    | progress 30 of 30               |
-      | 11 | Reduce, duration 30 minutes, fixed days on all seven days   | 31 for 2026-11-18                                           | Failed | progress 31 of 30               |
-      | 12 | Reduce, duration 30 minutes, 1 time per day                 | 20 and 10 for 2026-11-18                                    | Met    | progress total 30 of at most 30 |
-      | 13 | Reduce, duration 30 minutes, 1 time per day                 | 20 and 11 for 2026-11-18                                    | Failed | progress total 31 of at most 30 |
-      | 14 | Reduce, count 3 `sweets`, 1 time per week                   | 1 for 2026-11-16 and 2 for 2026-11-18                       | Met    | progress total 3 of at most 3   |
-      | 15 | Reduce, count 3 `sweets`, 1 time per week                   | 2 for 2026-11-16 and 2 for 2026-11-18                       | Failed | progress total 4 of at most 3   |
-      | 16 | Reduce, yes/no, 2 times per week                            | Yes for 2026-11-16, Yes for 2026-11-17 and No for 2026-11-18  | Met    | progress 2 of at most 2         |
-      | 17 | Reduce, yes/no, 2 times per week                            | Yes for 2026-11-16, Yes for 2026-11-17 and Yes for 2026-11-18 | Failed | progress 3 of at most 2         |
-      | 18 | Reduce, yes/no, 2 times per day                             | Yes and Yes for 2026-11-18                                  | Met    | progress 2 of at most 2         |
-      | 19 | Reduce, yes/no, 2 times per day                             | Yes, Yes and Yes for 2026-11-18                             | Failed | progress 3 of at most 2         |
-      | 20 | Build, count 5 `pages`, 2 times per day                     | 6 and 6 for 2026-11-18                                      | Met    | progress 2 of 2 times           |
-      | 21 | Build, duration 20 minutes, 1 time per day                  | 21 for 2026-11-18                                           | Met    | progress 1 of 1 times           |
-      | 22 | Build, duration 20 minutes, 3 times per week                | 21 for 2026-11-16, 21 for 2026-11-17 and 21 for 2026-11-18 | Met    | progress 3 of 3 times           |
-      | 23 | Reduce, duration 30 minutes, fixed days on all seven days   | 29 for 2026-11-18                                           | Met    | progress 29 of 30               |
-      | 24 | Reduce, duration 30 minutes, 1 time per day                 | 20 and 9 for 2026-11-18                                     | Met    | progress total 29 of at most 30 |
-      | 25 | Reduce, count 3 `sweets`, 1 time per week                   | 1 for 2026-11-16 and 1 for 2026-11-18                       | Met    | progress total 2 of at most 3   |
-      | 26 | Reduce, yes/no, 2 times per week                            | Yes for 2026-11-16 and No for 2026-11-18                    | Met    | progress 1 of at most 2         |
-      | 27 | Reduce, yes/no, 2 times per day                             | Yes and No for 2026-11-18                                   | Met    | progress 1 of at most 2         |
-      | 28 | Reduce, duration 60 minutes, 1 time per week                | 30 for 2026-11-16 and 29 for 2026-11-18                     | Met    | progress total 59 of at most 60 |
-      | 29 | Reduce, duration 60 minutes, 1 time per week                | 30 for 2026-11-16 and 30 for 2026-11-18                     | Met    | progress total 60 of at most 60 |
-      | 30 | Reduce, duration 60 minutes, 1 time per week                | 30 for 2026-11-16 and 31 for 2026-11-18                     | Failed | progress total 61 of at most 60 |
-      | 31 | Build, count 5 `pages`, 2 times per day                     | 10 for 2026-11-18                                           | Failed | progress 1 of 2 times           |
-      | 32 | Build, duration 20 minutes, 3 times per week                | 60 for 2026-11-16                                           | Failed | progress 1 of 3 times           |
-      | 33 | Build, duration 20 minutes, 3 times per week                | 60 for 2026-11-16, 1 for 2026-11-17 and 59 for 2026-11-18  | Failed | progress 2 of 3 times           |
+      | n  | settings                                                   | records                                                      | state  | progress                        |
+      | 01 | Build, count 5 `pages`, fixed days on all seven days       | 4 for 2026-11-18                                             | Failed | progress 4 of 5                 |
+      | 02 | Build, count 5 `pages`, fixed days on all seven days       | 5 for 2026-11-18                                             | Met    | progress 5 of 5                 |
+      | 03 | Build, count 5 `pages`, fixed days on all seven days       | 6 for 2026-11-18                                             | Met    | progress 6 of 5                 |
+      | 04 | Build, count 5 `pages`, 2 times per day                    | 5 and 5 for 2026-11-18                                       | Met    | progress 2 of 2 times           |
+      | 05 | Build, count 5 `pages`, 2 times per day                    | 5 and 4 for 2026-11-18                                       | Failed | progress 1 of 2 times           |
+      | 06 | Build, duration 20 minutes, 1 time per day                 | 19 for 2026-11-18                                            | Failed | progress 0 of 1 times           |
+      | 07 | Build, duration 20 minutes, 1 time per day                 | 20 for 2026-11-18                                            | Met    | progress 1 of 1 times           |
+      | 08 | Build, duration 20 minutes, 3 times per week               | 20 for 2026-11-16, 19 for 2026-11-17 and 20 for 2026-11-18   | Failed | progress 2 of 3 times           |
+      | 09 | Build, duration 20 minutes, 3 times per week               | 20 for 2026-11-16, 20 for 2026-11-17 and 20 for 2026-11-18   | Met    | progress 3 of 3 times           |
+      | 10 | Reduce, duration 30 minutes, fixed days on all seven days  | 30 for 2026-11-18                                            | Met    | progress 30 of 30               |
+      | 11 | Reduce, duration 30 minutes, fixed days on all seven days  | 31 for 2026-11-18                                            | Failed | progress 31 of 30               |
+      | 12 | Reduce, duration 30 minutes, 1 time per day                | 20 and 10 for 2026-11-18                                     | Met    | progress total 30 of at most 30 |
+      | 13 | Reduce, duration 30 minutes, 1 time per day                | 20 and 11 for 2026-11-18                                     | Failed | progress total 31 of at most 30 |
+      | 14 | Reduce, count 3 `sweets`, 1 time per week                  | 1 for 2026-11-16 and 2 for 2026-11-18                        | Met    | progress total 3 of at most 3   |
+      | 15 | Reduce, count 3 `sweets`, 1 time per week                  | 2 for 2026-11-16 and 2 for 2026-11-18                        | Failed | progress total 4 of at most 3   |
+      | 16 | Reduce, yes/no, 2 times per week                           | Yes for 2026-11-16, Yes for 2026-11-17 and No for 2026-11-18 | Met    | progress 2 of at most 2         |
+      | 17 | Reduce, yes/no, 2 times per week                           | Yes for 2026-11-16, Yes for 2026-11-17 and Yes for 2026-11-18 | Failed | progress 3 of at most 2        |
+      | 18 | Reduce, yes/no, 2 times per day                            | Yes and Yes for 2026-11-18                                   | Met    | progress 2 of at most 2         |
+      | 19 | Reduce, yes/no, 2 times per day                            | Yes, Yes and Yes for 2026-11-18                              | Failed | progress 3 of at most 2         |
+      | 20 | Build, count 5 `pages`, 2 times per day                    | 6 and 6 for 2026-11-18                                       | Met    | progress 2 of 2 times           |
+      | 21 | Build, duration 20 minutes, 1 time per day                 | 21 for 2026-11-18                                            | Met    | progress 1 of 1 times           |
+      | 22 | Build, duration 20 minutes, 3 times per week               | 21 for 2026-11-16, 21 for 2026-11-17 and 21 for 2026-11-18   | Met    | progress 3 of 3 times           |
+      | 23 | Reduce, duration 30 minutes, fixed days on all seven days  | 29 for 2026-11-18                                            | Met    | progress 29 of 30               |
+      | 24 | Reduce, duration 30 minutes, 1 time per day                | 20 and 9 for 2026-11-18                                      | Met    | progress total 29 of at most 30 |
+      | 25 | Reduce, count 3 `sweets`, 1 time per week                  | 1 for 2026-11-16 and 1 for 2026-11-18                        | Met    | progress total 2 of at most 3   |
+      | 26 | Reduce, yes/no, 2 times per week                           | Yes for 2026-11-16 and No for 2026-11-18                     | Met    | progress 1 of at most 2         |
+      | 27 | Reduce, yes/no, 2 times per day                            | Yes and No for 2026-11-18                                    | Met    | progress 1 of at most 2         |
+      | 28 | Reduce, duration 60 minutes, 1 time per week               | 30 for 2026-11-16 and 29 for 2026-11-18                      | Met    | progress total 59 of at most 60 |
+      | 29 | Reduce, duration 60 minutes, 1 time per week               | 30 for 2026-11-16 and 30 for 2026-11-18                      | Met    | progress total 60 of at most 60 |
+      | 30 | Reduce, duration 60 minutes, 1 time per week               | 30 for 2026-11-16 and 31 for 2026-11-18                      | Failed | progress total 61 of at most 60 |
+      | 31 | Build, count 5 `pages`, 2 times per day                    | 10 for 2026-11-18                                            | Failed | progress 1 of 2 times           |
+      | 32 | Build, duration 20 minutes, 3 times per week               | 60 for 2026-11-16                                            | Failed | progress 1 of 3 times           |
+      | 33 | Build, duration 20 minutes, 3 times per week               | 60 for 2026-11-16, 1 for 2026-11-17 and 59 for 2026-11-18    | Failed | progress 2 of 3 times           |
 
   @AC-067 @FR-002 @FR-011 @US5-AS3
   Scenario: After a move east, the old and the new day can both be recorded while they overlap
@@ -977,8 +979,8 @@ Feature: Recording and evaluation
     And the history gives, in this order, <entries>
 
     Examples:
-      | n  | run time               | R                  | start date | last date  | entries |
-      | 01 | `2026-11-22T10:00:00Z` | Sunday 2026-11-22  | 2026-10-25 | 2026-11-22 | 4 entries: 2026-10-26 to 2026-11-01, Missed, no record; 2026-11-02 to 2026-11-08, Failed, records (2026-11-02, Yes), (2026-11-04, Yes), note "Knee was sore."; 2026-11-09 to 2026-11-15, Met, records (2026-11-09, Yes), (2026-11-11, Yes), (2026-11-13, Yes); 2026-11-16 to 2026-11-22, Due, grace ends `2026-11-25T00:00:00Z`, no record |
+      | n  | run time               | R                  | start date | last date  | entries                                                                                                                                                                                                                                                                                                                                                       |
+      | 01 | `2026-11-22T10:00:00Z` | Sunday 2026-11-22  | 2026-10-25 | 2026-11-22 | 4 entries: 2026-10-26 to 2026-11-01, Missed, no record; 2026-11-02 to 2026-11-08, Failed, records (2026-11-02, Yes), (2026-11-04, Yes), note "Knee was sore."; 2026-11-09 to 2026-11-15, Met, records (2026-11-09, Yes), (2026-11-11, Yes), (2026-11-13, Yes); 2026-11-16 to 2026-11-22, Due, grace ends `2026-11-25T00:00:00Z`, no record                     |
       | 02 | `2026-11-24T10:00:00Z` | Tuesday 2026-11-24 | 2026-10-27 | 2026-11-29 | 4 entries: 2026-11-02 to 2026-11-08, Missed, no record; 2026-11-09 to 2026-11-15, Failed, records (2026-11-09, Yes), (2026-11-11, Yes), note "Knee was sore."; 2026-11-16 to 2026-11-22, Pending, grace ends `2026-11-25T00:00:00Z`, records (2026-11-16, Yes), (2026-11-18, Yes), (2026-11-20, Yes), progress 3 of 3 times; 2026-11-23 to 2026-11-29, Due, no record |
 
   @AC-069 @FR-030 @US7-AS6
@@ -989,8 +991,47 @@ Feature: Recording and evaluation
     Then <result>
 
     Examples:
-      | n  | demo password | why                        | result |
+      | n  | demo password | why                        | result                                                                                                                                                                                         |
       | 01 | `exampl1`     | 7 characters, with a digit | its result is "demo password does not meet the password rule", and no other result, and demo history loading run afterwards with the demo password `example2026` gives "created" for `demo4@example.com` |
       | 02 | `examples`    | 8 characters, no digit     | its result is "demo password does not meet the password rule", and no other result, and demo history loading run afterwards with the demo password `example2026` gives "created" for `demo4@example.com` |
       | 03 | `abc`         | 3 characters, no digit     | its result is "demo password does not meet the password rule", and no other result, and demo history loading run afterwards with the demo password `example2026` gives "created" for `demo4@example.com` |
-      | 04 | `exampl12`    | 8 characters, with a digit | its results are, in this order, "created", "demo goals added" and "demo records added", each for `demo4@example.com`, and sign-in with `demo4@example.com` and `exampl12` succeeds |
+      | 04 | `exampl12`    | 8 characters, with a digit | its results are, in this order, "created", "demo goals added" and "demo records added", each for `demo4@example.com`, and sign-in with `demo4@example.com` and `exampl12` succeeds            |
+
+  @AC-070 @FR-007 @US4-AS8
+  Scenario Outline: Deleting the only record of a commitment keeps its note
+    Given the registered user `f5.ac070.user.<n>@example.com`, who created the custom habit `Reading`
+    And `f5.ac070.user.<n>@example.com` created a goal on their custom habit `Reading` with Build, duration 20 minutes, fixed days on all seven days and the start date 2026-11-18
+    And `f5.ac070.user.<n>@example.com` recorded 12 for 2026-11-18 with the note "Fell asleep early."
+    When at <time> `f5.ac070.user.<n>@example.com` deletes the record of 2026-11-18
+    Then <result>
+    And reading the history of the goal from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, <state>, no record, note "Fell asleep early."
+
+    Examples:
+      | n  | time                   | result                                                 | state  |
+      | 01 | `2026-11-18T12:00:00Z` | deleting succeeds with the state Due, not a correction | Due    |
+      | 02 | `2026-11-22T10:00:00Z` | deleting succeeds with the state Missed, a correction  | Missed |
+
+  @AC-071 @FR-007 @US4-AS9
+  Scenario Outline: The first record of a Missed commitment that has a note: the note given is the note, no note keeps it
+    Given the registered user `f5.ac071.user.<n>@example.com`, who created the custom habit `Reading`
+    And `f5.ac071.user.<n>@example.com` created a goal on their custom habit `Reading` with Build, duration 20 minutes, fixed days on all seven days and the start date 2026-11-18
+    And at `2026-11-22T10:00:00Z` `f5.ac071.user.<n>@example.com` saved the note "Away for the weekend." for 2026-11-18
+    When at `2026-11-22T10:00:00Z` `f5.ac071.user.<n>@example.com` <action>
+    Then recording succeeds with the state Met, a correction
+    And reading the history of the goal from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, Met, records (2026-11-18, 20), <note>
+
+    Examples:
+      | n  | action                                                          | note                         |
+      | 01 | records 20 for 2026-11-18 with the note "Away for the weekend." | note "Away for the weekend." |
+      | 02 | records 20 for 2026-11-18 with the note `""`                    | no note                      |
+      | 03 | records 20 for 2026-11-18 with the note `"   "`                 | no note                      |
+      | 04 | records 20 for 2026-11-18                                       | note "Away for the weekend." |
+
+  @AC-072 @FR-007 @US4-AS10
+  Scenario: Changing the record of a commitment without a note, with a note, adds the note
+    Given the registered user `f5.ac072.user@example.com`, who created the custom habit `Reading`
+    And `f5.ac072.user@example.com` created a goal on their custom habit `Reading` with Build, duration 20 minutes, fixed days on all seven days and the start date 2026-11-18
+    And `f5.ac072.user@example.com` recorded 15 for 2026-11-18
+    When `f5.ac072.user@example.com` changes the record of 2026-11-18 to 20 with the note "Back was tired."
+    Then changing succeeds with the state Due, not a correction
+    And reading the history of the goal from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, Due, records (2026-11-18, 20), note "Back was tired."

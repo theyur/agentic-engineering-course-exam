@@ -47,7 +47,7 @@ public sealed class RecordNoteStoreTests(DatabaseFixture database)
         var suffix = Suffix();
         var owner = await OwnerAsync(database, "note-upsert", suffix);
         var goal = await GoalAsync(database, owner, "Note upsert", suffix, Reading20MinDaily());
-        await WithStoreAsync(s => s.AddAsync(owner, goal, Day(Wed18), true, Wed18, Minutes(12), null, RecordLimits.MaxRecordsPerPeriod, None));
+        await WithStoreAsync(s => s.AddAsync(owner, goal, Day(Wed18), true, Wed18, Minutes(12), NoteWrite.Keep, RecordLimits.MaxRecordsPerPeriod, None));
 
         var added = await SaveNoteAsync(owner, goal, Day(Wed18), Note("Fell asleep early."));
         var addedRows = await NoteRowsAsync(database.ConnectionString, goal);
@@ -71,7 +71,7 @@ public sealed class RecordNoteStoreTests(DatabaseFixture database)
         var suffix = Suffix();
         var owner = await OwnerAsync(database, "note-delete", suffix);
         var goal = await GoalAsync(database, owner, "Note delete", suffix, Reading20MinDaily());
-        await WithStoreAsync(s => s.AddAsync(owner, goal, Day(Wed18), true, Wed18, Minutes(20), Note("Back was tired."), RecordLimits.MaxRecordsPerPeriod, None));
+        await WithStoreAsync(s => s.AddAsync(owner, goal, Day(Wed18), true, Wed18, Minutes(20), NoteWrite.Replace(Note("Back was tired.")), RecordLimits.MaxRecordsPerPeriod, None));
         await SaveNoteAsync(owner, goal, Day(Thu19), Note("Long meeting."));
 
         var deleted = await SaveNoteAsync(owner, goal, Day(Wed18), null);

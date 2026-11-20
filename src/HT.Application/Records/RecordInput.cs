@@ -15,8 +15,8 @@ public sealed record RecordInput
     public int? Amount { get; init; }
 
     /// <summary>
-    /// The note given with the record (FR-007): with text after trimming it adds or replaces the entry's note; null,
-    /// empty or only spaces leave the existing note unchanged.
+    /// The note given with the record (FR-007, specs/006-note-editing FR-001): null keeps the entry's note; a text empty
+    /// after trimming removes it; any other text, trimmed, becomes the note.
     /// </summary>
     public string? Note { get; init; }
 }

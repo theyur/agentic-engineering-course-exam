@@ -75,6 +75,9 @@ public sealed class RecordLogTests(DatabaseFixture database)
         return note!;
     }
 
+    /// <summary>A record write's <see cref="NoteWrite.Replace"/> with the marked note <paramref name="what"/>.</summary>
+    private static NoteWrite ReplaceWith(string what) => NoteWrite.Replace(NoteOf(Note(what)));
+
     /// <summary>
     /// The application as the integration tests build it, with <paramref name="clock"/>, only <paramref name="capture"/>
     /// as its logger, and the real record store behind a decorator that gives a wrong outcome for the member
@@ -324,30 +327,33 @@ public sealed class RecordLogTests(DatabaseFixture database)
         var exceptions = new List<Exception>();
 
         // The owner: every member writes or reads.
-        var added = await StoreAsync(services, s => s.AddAsync(owner, world.Daily, day, true, Mon16, RecordValue.FromAmount(Duration), NoteOf(Note("added")), 50, None));
-        var addedToWeek = await StoreAsync(services, s => s.AddAsync(owner, world.Weekly, week, false, Tue17, RecordValue.FromAmount(Count), NoteOf(Note("week")), 50, None));
+        var added = await StoreAsync(services, s => s.AddAsync(owner, world.Daily, day, true, Mon16, RecordValue.FromAmount(Duration), ReplaceWith("added"), 50, None));
+        var addedToWeek = await StoreAsync(services, s => s.AddAsync(owner, world.Weekly, week, false, Tue17, RecordValue.FromAmount(Count), ReplaceWith("week"), 50, None));
         Assert.Equal(RecordStoreWriteOutcome.Written, added.Outcome);
         Assert.Equal(RecordStoreWriteOutcome.Written, addedToWeek.Outcome);
         var record = added.RecordId!.Value;
         Assert.Equal(Mon16, await StoreAsync(services, s => s.FindRecordDateAsync(owner, world.Daily, record, None)));
-        Assert.Equal(RecordStoreWriteOutcome.Written, (await StoreAsync(services, s => s.ChangeAsync(owner, world.Daily, record, day, RecordValue.FromAmount(ChangedDuration), NoteOf(Note("changed")), None))).Outcome);
+        Assert.Equal(RecordStoreWriteOutcome.Written, (await StoreAsync(services, s => s.ChangeAsync(owner, world.Daily, record, day, RecordValue.FromAmount(ChangedDuration), ReplaceWith("changed"), None))).Outcome);
         Assert.Equal(RecordStoreWriteOutcome.Written, (await StoreAsync(services, s => s.SaveNoteAsync(owner, world.Daily, day, NoteOf(Note("saved")), None))).Outcome);
+        var removed = await StoreAsync(services, s => s.ChangeAsync(owner, world.Daily, record, day, RecordValue.FromAmount(Duration), NoteWrite.Remove, None));
+        Assert.Equal(RecordStoreWriteOutcome.Written, removed.Outcome);
+        Assert.Null(removed.Entry!.Note);
         Assert.NotEmpty((await StoreAsync(services, s => s.ReadAsync(owner, world.Daily, Mon16, Sun22, None))).Records);
         Assert.NotEmpty(await StoreAsync(services, s => s.ReadRecentNoteKeysAsync(owner, world.Weekly, 5, None)));
 
         // Another owner: every member gives nothing.
-        Assert.Equal(RecordStoreWriteOutcome.GoalNotFound, (await StoreAsync(services, s => s.AddAsync(other, world.Daily, day, true, Mon16, RecordValue.FromAmount(Duration), NoteOf(Note("other")), 50, None))).Outcome);
+        Assert.Equal(RecordStoreWriteOutcome.GoalNotFound, (await StoreAsync(services, s => s.AddAsync(other, world.Daily, day, true, Mon16, RecordValue.FromAmount(Duration), ReplaceWith("other"), 50, None))).Outcome);
         Assert.Null(await StoreAsync(services, s => s.FindRecordDateAsync(other, world.Daily, record, None)));
-        Assert.Equal(RecordStoreWriteOutcome.GoalNotFound, (await StoreAsync(services, s => s.ChangeAsync(other, world.Daily, record, day, RecordValue.FromAmount(Duration), NoteOf(Note("other")), None))).Outcome);
+        Assert.Equal(RecordStoreWriteOutcome.GoalNotFound, (await StoreAsync(services, s => s.ChangeAsync(other, world.Daily, record, day, RecordValue.FromAmount(Duration), ReplaceWith("other"), None))).Outcome);
         Assert.Equal(RecordStoreWriteOutcome.GoalNotFound, (await StoreAsync(services, s => s.DeleteAsync(other, world.Daily, record, day, None))).Outcome);
         Assert.Equal(RecordStoreWriteOutcome.GoalNotFound, (await StoreAsync(services, s => s.SaveNoteAsync(other, world.Daily, day, NoteOf(Note("other")), None))).Outcome);
         Assert.Empty((await StoreAsync(services, s => s.ReadAsync(other, world.Daily, Mon16, Sun22, None))).Records);
         Assert.Empty(await StoreAsync(services, s => s.ReadRecentNoteKeysAsync(other, world.Daily, 5, None)));
 
         // The owner's own refusals: a record of another goal, and a period at its limit.
-        Assert.Equal(RecordStoreWriteOutcome.RecordNotFound, (await StoreAsync(services, s => s.ChangeAsync(owner, world.Weekly, record, week, RecordValue.FromAmount(Count), NoteOf(Note("wrong goal")), None))).Outcome);
+        Assert.Equal(RecordStoreWriteOutcome.RecordNotFound, (await StoreAsync(services, s => s.ChangeAsync(owner, world.Weekly, record, week, RecordValue.FromAmount(Count), ReplaceWith("wrong goal"), None))).Outcome);
         Assert.Equal(RecordStoreWriteOutcome.RecordNotFound, (await StoreAsync(services, s => s.DeleteAsync(owner, world.Weekly, record, week, None))).Outcome);
-        Assert.Equal(RecordStoreWriteOutcome.LimitReached, (await StoreAsync(services, s => s.AddAsync(owner, world.Weekly, week, false, Wed18, RecordValue.FromAmount(Count), NoteOf(Note("limit")), 1, None))).Outcome);
+        Assert.Equal(RecordStoreWriteOutcome.LimitReached, (await StoreAsync(services, s => s.AddAsync(owner, world.Weekly, week, false, Wed18, RecordValue.FromAmount(Count), ReplaceWith("limit"), 1, None))).Outcome);
 
         // Every member with a cancelled token.
         using var cancelled = new CancellationTokenSource();
@@ -355,9 +361,9 @@ public sealed class RecordLogTests(DatabaseFixture database)
         var token = cancelled.Token;
         var calls = new Func<IRecordStore, Task>[]
         {
-            s => s.AddAsync(owner, world.Daily, day, true, Mon16, RecordValue.FromAmount(Duration), NoteOf(Note("cancelled")), 50, token),
+            s => s.AddAsync(owner, world.Daily, day, true, Mon16, RecordValue.FromAmount(Duration), ReplaceWith("cancelled"), 50, token),
             s => s.FindRecordDateAsync(owner, world.Daily, record, token),
-            s => s.ChangeAsync(owner, world.Daily, record, day, RecordValue.FromAmount(Duration), NoteOf(Note("cancelled")), token),
+            s => s.ChangeAsync(owner, world.Daily, record, day, RecordValue.FromAmount(Duration), ReplaceWith("cancelled"), token),
             s => s.DeleteAsync(owner, world.Daily, record, day, token),
             s => s.SaveNoteAsync(owner, world.Daily, day, NoteOf(Note("cancelled")), token),
             s => s.ReadAsync(owner, world.Daily, Mon16, Sun22, token),
@@ -433,7 +439,52 @@ public sealed class RecordLogTests(DatabaseFixture database)
         Assert.Single(await RecordSamples.RecordRowsAsync(database.ConnectionString, world.Weekly));
 
         exceptions.AddRange(await DatabaseFaultsAsync(services, world, record));
+        exceptions.AddRange(await NoteDeleteFaultsAsync(services, world, record));
         AssertNoProtectedValue(capture, exceptions, []);
+    }
+
+    /// <summary>
+    /// The rollback of a record's write whose note delete fails (specs/006-note-editing FR-003, ADR 0019 "a refused or
+    /// failed save"): only the notes trigger of <see cref="DatabaseFaultsAsync"/> is created, so a change of the daily
+    /// goal's record, which has a note, writes its record row and then fails on the note's delete, whose error text
+    /// carries the note. A store change with <see cref="NoteWrite.Remove"/> and a use-case change with an empty note
+    /// each fail with the store's own exception, and the record rows and the note rows stay as they were read before.
+    /// The trigger is dropped afterwards.
+    /// </summary>
+    private async Task<IReadOnlyList<Exception>> NoteDeleteFaultsAsync(IServiceProvider services, World world, RecordId record)
+    {
+        const string failed = "Saving a record failed (SQL error 50000).";
+        var owner = world.User;
+        var account = owner.AccountId!.Value;
+        var day = new EntrySpan(Mon16, Mon16, Mon16);
+        var exceptions = new List<Exception>();
+        var recordsBefore = await RecordSamples.RecordRowsAsync(database.ConnectionString, world.Daily);
+        var notesBefore = await RecordSamples.NoteRowsAsync(database.ConnectionString, world.Daily);
+        Assert.Contains(notesBefore, n => (DateTime)n["EntryDate"]! == Mon16.ToDateTime(TimeOnly.MinValue));
+        await Sql.ExecuteAsync(database.ConnectionString, NotesTrigger(world.Daily));
+        try
+        {
+            var writes = new Func<IServiceProvider, Task>[]
+            {
+                p => StoreAsync(p, s => s.ChangeAsync(account, world.Daily, record, day, RecordValue.FromAmount(ChangedDuration), NoteWrite.Remove, None)),
+                p => RecordingAsync(p, s => s.ChangeRecordAsync(owner, world.Daily, record, Minutes(ChangedDuration, string.Empty), None)),
+            };
+            foreach (var write in writes)
+            {
+                var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => write(services));
+                Assert.Equal(failed, exception.Message);
+                Assert.Null(exception.InnerException);
+                exceptions.Add(exception);
+            }
+        }
+        finally
+        {
+            await Sql.ExecuteAsync(database.ConnectionString, "DROP TRIGGER IF EXISTS [dbo].[TR_It_Rl_GoalNotes_Fault]");
+        }
+
+        Assert.Equal(recordsBefore.Select(r => string.Join("|", r.Values)), (await RecordSamples.RecordRowsAsync(database.ConnectionString, world.Daily)).Select(r => string.Join("|", r.Values)));
+        Assert.Equal(notesBefore.Select(r => string.Join("|", r.Values)), (await RecordSamples.NoteRowsAsync(database.ConnectionString, world.Daily)).Select(r => string.Join("|", r.Values)));
+        return exceptions;
     }
 
     /// <summary>
@@ -468,8 +519,11 @@ public sealed class RecordLogTests(DatabaseFixture database)
                 p => RecordingAsync(p, s => s.DeleteRecordAsync(owner, world.Daily, record, None)),
                 p => RecordingAsync(p, s => s.SaveNoteAsync(owner, world.Daily, Mon16, Note("replaced"), None)),
                 p => RecordingAsync(p, s => s.SaveNoteAsync(owner, world.Daily, Mon16, null, None)),
-                p => StoreAsync(p, s => s.AddAsync(account, world.Daily, day, true, Mon16, RecordValue.FromAmount(ChangedDuration), null, 50, None)),
-                p => StoreAsync(p, s => s.ChangeAsync(account, world.Daily, record, day, RecordValue.FromAmount(ChangedDuration), NoteOf(Note("changed")), None)),
+                p => StoreAsync(p, s => s.AddAsync(account, world.Daily, day, true, Mon16, RecordValue.FromAmount(ChangedDuration), NoteWrite.Keep, 50, None)),
+                p => StoreAsync(p, s => s.ChangeAsync(account, world.Daily, record, day, RecordValue.FromAmount(ChangedDuration), ReplaceWith("changed"), None)),
+
+                // The record's own note delete: the record's UPDATE fires its trigger first, so the delete is not reached.
+                p => StoreAsync(p, s => s.ChangeAsync(account, world.Daily, record, day, RecordValue.FromAmount(ChangedDuration), NoteWrite.Remove, None)),
                 p => StoreAsync(p, s => s.DeleteAsync(account, world.Daily, record, day, None)),
                 p => StoreAsync(p, s => s.SaveNoteAsync(account, world.Daily, day, NoteOf(Note("replaced")), None)),
                 p => StoreAsync(p, s => s.SaveNoteAsync(account, world.Daily, day, null, None)),
@@ -532,7 +586,7 @@ public sealed class RecordLogTests(DatabaseFixture database)
     private sealed class FaultingRecordStore(IRecordStore inner, FaultSwitch faults) : IRecordStore
     {
         public Task<RecordStoreWrite> AddAsync(
-            AccountId owner, GoalId goal, EntrySpan entry, bool isCommitment, DateOnly date, RecordValue value, NoteText? note, int limit,
+            AccountId owner, GoalId goal, EntrySpan entry, bool isCommitment, DateOnly date, RecordValue value, NoteWrite note, int limit,
             CancellationToken cancellationToken) =>
             faults.Member == nameof(AddAsync)
                 ? Task.FromResult(RecordStoreWrite.RecordNotFound)
@@ -542,7 +596,7 @@ public sealed class RecordLogTests(DatabaseFixture database)
             inner.FindRecordDateAsync(owner, goal, record, cancellationToken);
 
         public Task<RecordStoreWrite> ChangeAsync(
-            AccountId owner, GoalId goal, RecordId record, EntrySpan entry, RecordValue value, NoteText? note, CancellationToken cancellationToken) =>
+            AccountId owner, GoalId goal, RecordId record, EntrySpan entry, RecordValue value, NoteWrite note, CancellationToken cancellationToken) =>
             faults.Member == nameof(ChangeAsync)
                 ? Task.FromResult(RecordStoreWrite.LimitReached)
                 : inner.ChangeAsync(owner, goal, record, entry, value, note, cancellationToken);

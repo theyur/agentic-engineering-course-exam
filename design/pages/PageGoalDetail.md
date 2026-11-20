@@ -31,6 +31,10 @@ The second part of the preview shows the page as slice 4 builds it (HP-004, ADR 
 
 The last part of the preview shows the page as slice 5 builds it (HP-001, US3-AS8, US4-AS7, US5-AS5, ADR 0008). Today is Tue 17 Nov 2026 in the first two examples and Tue 18 Aug 2026 in the per-week one.
 
+Amended 2026-11-20, specs/006-note-editing, ADR 0019 (note editing, HP-001 and HP-002 there): the Note cell shows the note as plain text, and a row's note control ("Add note" or "Edit note") is in the actions column, before "Add record", on rows without a record only, so the record control is always the rightmost. A row with a record changes its note only in the RecordDialog, which opens with the note filled in.
+
+That order is the owner's decision after implementation (2026-11-20). The first version of this amendment put the note control after "Add record", because recording is the row's main action.
+
 - Page head: slice 4's "← Goals", name, tags and attempt line, then `ht-spacer` and the primary action "Record" (`aria-haspopup="dialog"`), which opens the RecordDialog with its "For" select (`components/RecordDialog.md`, "Slice 5 state"). No other action (Edit settings, Pause and End goal are slices 7 and 8). "Record" is absent when nothing can be recorded now (no Due and no Pending commitment or period).
 - Under the head: slice 4's Notice for a habit no longer in the catalog, unchanged.
 - Two columns (`ht-grid-2`), as in the full preview:
@@ -45,9 +49,21 @@ The last part of the preview shows the page as slice 5 builds it (HP-001, US3-AS
   - Date: "Tue 17 Nov" for a commitment or a day; "10 – 16 Aug" for a week, or "27 Jul – 2 Aug" across a month end;
   - Recorded: "—" without a record. A commitment shows its record as text ("25 min", "Yes", "3 cups"; a count with its unit as stored, "1 sweet", "2 sweet"). A period shows each of its records as its own ghost button with its value, side by side (`ht-inline`); each opens the RecordDialog's "Edit" state for that record;
   - Result: the StatusChip of the row's state (`components/StatusChip.md`, "Slice 5 state");
-  - Note: the ghost button "Add note" without a note, or the note itself as a ghost button; both open the NoteDialog (`components/NoteDialog.md`, "Slice 5 state");
-  - actions: "Add record" on a commitment without a record, "Edit" on a commitment with one (it opens that one record), and "Add record" on a period with fewer than 50 records. In the slice-5 state the Due row's action is "Add record" too; the full preview keeps its primary "Record".
+  - Note: the row's note as plain text, or "—" without one, in a plain `td` with `ht-muted` text (`--ink-muted`, 5.5:1 or more). It is not a control;
+  - actions (`td.ht-actions`), in this order:
+
+    | Row | Controls |
+    |---|---|
+    | a commitment without a record | "Add note" (no note) or "Edit note" (a note), then "Add record" |
+    | a commitment with a record | "Edit" (it opens that one record) |
+    | a period without a record | "Add note" or "Edit note", then "Add record" |
+    | a period with 1 to 49 records | "Add record" |
+    | a period with 50 records | none |
+
+    The record control ("Add record" or "Edit") is always the rightmost, the last button of the row, so it stays in the same place whether or not a note control comes before it. "Add note" and "Edit note" open the NoteDialog (`components/NoteDialog.md`, "Slice 5 state"); the other controls open the RecordDialog, which shows the row's note in its note field (`components/RecordDialog.md`, "Slice 5 state"). In the slice-5 state the Due row's action is "Add record" too; the full preview keeps its primary "Record".
 - The row actions are offered whatever the state, final rows included, so a Missed or Failed commitment or period takes a record as a correction (US3-AS4). All row controls are ghost `ht-btn--sm` buttons with `aria-haspopup="dialog"`.
+- A row's note control follows its records on the next read: it is gone after the row's first record, and back after its last record is deleted ("Edit note" when the row still has its note). After the NoteDialog closes, the focus goes to the row's "Add note" or "Edit note" as it shows after the save.
+- The preview's rows show each case: "Add note" on rows without a record or a note (Mon 16 Nov, Pending; Sun 8 Nov, Missed), "Edit note" on a Missed row with a note (Sat 14 Nov, "Away for the weekend."), and a note as text only on rows with a record (Thu 12 Nov, "Fell asleep early."; the per-day Sun 15 Nov; the week 27 Jul – 2 Aug).
 - Accessible names of the repeated row controls. Each starts with its visible text and names its row ({date} is "Tue 17 Nov", or the week's "10 – 16 Aug"):
 
   | Control | Accessible name |
@@ -56,7 +72,7 @@ The last part of the preview shows the page as slice 5 builds it (HP-001, US3-AS
   | "Add record" | "Add record for Tue 17 Nov" |
   | "Edit" | "Edit record of Tue 17 Nov" |
   | "Add note" | "Add note for Tue 17 Nov" |
-  | a note button | the note's text, then ", edit note of Tue 17 Nov" ("Away for the weekend., edit note of Sat 14 Nov") |
+  | "Edit note" | "Edit note of Sat 14 Nov" |
 
 - Recent notes card (right column, after Settings): the title "Recent notes", then at most 5 notes, newest first, each an `ht-goal` item: the note in quotes and its StatusChip on the top line (`ht-goal__top`, `ht-spacer` before the chip), and its date under it (`ht-goal__meta`: "Thu 12 Nov", or "27 Jul – 2 Aug" for a week). The card is absent while the goal has no note.
 - A goal with no begun entry (not started yet, or a current date with no commitment or period yet, such as a per-week goal's days before its first week) shows no "Record", no History card and no Recent notes card: only slice 4's content.

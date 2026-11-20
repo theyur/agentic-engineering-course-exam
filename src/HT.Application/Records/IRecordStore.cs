@@ -24,8 +24,11 @@ public interface IRecordStore
     /// commitment (<paramref name="isCommitment"/>), an existing record of the entry keeps its identifier and its place
     /// in the stored order and gets <paramref name="value"/>; otherwise a record is inserted. For a period,
     /// <see cref="RecordStoreWrite.LimitReached"/>, with nothing written, when the entry already has
-    /// <paramref name="limit"/> records. A <paramref name="note"/> is added or replaced under <see cref="EntrySpan.Key"/>;
-    /// null leaves the note unchanged (FR-007). Written gives the record's identifier.
+    /// <paramref name="limit"/> records. <see cref="RecordStoreWrite.GoalNotFound"/> and
+    /// <see cref="RecordStoreWrite.LimitReached"/> write nothing, the note included (specs/006-note-editing FR-003).
+    /// In the record's transaction, <paramref name="note"/> applies to the note under <see cref="EntrySpan.Key"/>
+    /// (FR-001, D-1): <see cref="NoteWrite.Keep"/> leaves it, <see cref="NoteWrite.Remove"/> deletes it, and
+    /// <see cref="NoteWrite.Replace"/> adds or replaces it. Written gives the record's identifier.
     /// </summary>
     Task<RecordStoreWrite> AddAsync(
         AccountId owner,
@@ -34,7 +37,7 @@ public interface IRecordStore
         bool isCommitment,
         DateOnly date,
         RecordValue value,
-        NoteText? note,
+        NoteWrite note,
         int limit,
         CancellationToken cancellationToken);
 
@@ -44,8 +47,10 @@ public interface IRecordStore
     /// <summary>
     /// Gives the goal's record <paramref name="record"/> the value <paramref name="value"/>; its date, identifier and
     /// place in the stored order stay (FR-003). <see cref="RecordStoreWrite.GoalNotFound"/> or
-    /// <see cref="RecordStoreWrite.RecordNotFound"/> write nothing. A <paramref name="note"/> is added or replaced
-    /// under <see cref="EntrySpan.Key"/>; null leaves the note unchanged (FR-007). Written gives the record's identifier.
+    /// <see cref="RecordStoreWrite.RecordNotFound"/> write nothing, the note included (specs/006-note-editing FR-003).
+    /// In the record's transaction, <paramref name="note"/> applies to the note under <see cref="EntrySpan.Key"/>
+    /// (FR-001, D-1): <see cref="NoteWrite.Keep"/> leaves it, <see cref="NoteWrite.Remove"/> deletes it, and
+    /// <see cref="NoteWrite.Replace"/> adds or replaces it. Written gives the record's identifier.
     /// </summary>
     Task<RecordStoreWrite> ChangeAsync(
         AccountId owner,
@@ -53,12 +58,13 @@ public interface IRecordStore
         RecordId record,
         EntrySpan entry,
         RecordValue value,
-        NoteText? note,
+        NoteWrite note,
         CancellationToken cancellationToken);
 
     /// <summary>
     /// Deletes the goal's record <paramref name="record"/> (FR-003). <see cref="RecordStoreWrite.GoalNotFound"/> or
-    /// <see cref="RecordStoreWrite.RecordNotFound"/> write nothing.
+    /// <see cref="RecordStoreWrite.RecordNotFound"/> write nothing. It never changes the entry's note, also when it
+    /// deletes the entry's only record (specs/006-note-editing FR-004).
     /// </summary>
     Task<RecordStoreWrite> DeleteAsync(AccountId owner, GoalId goal, RecordId record, EntrySpan entry, CancellationToken cancellationToken);
 

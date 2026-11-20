@@ -112,7 +112,7 @@ public sealed class GoalPrivacyHostTests(HostFixture host)
             {
                 Assert.True(NoteText.TryCreate(text, out var note, out _));
                 var written = await records.AddAsync(
-                    owner, goal, new EntrySpan(date, date, date), true, date, RecordValue.FromAmount(minutes), note, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None);
+                    owner, goal, new EntrySpan(date, date, date), true, date, RecordValue.FromAmount(minutes), NoteWrite.Replace(note!), RecordLimits.MaxRecordsPerPeriod, CancellationToken.None);
                 Assert.Equal(RecordStoreWriteOutcome.Written, written.Outcome);
             }
         }

@@ -3,6 +3,7 @@ using Bunit;
 using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Domain.Accounts;
+using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
@@ -17,7 +18,8 @@ using Microsoft.Extensions.Time.Testing;
 namespace HT.UiTests.Components.Records;
 
 /// <summary>
-/// The goal page's History card (HP-001, US5-AS5; design/pages/PageGoalDetail, slice 5 state), rendered from the
+/// The goal page's History card (HP-001, US5-AS5; specs/006-note-editing HP-001, HP-002, SC-002;
+/// design/pages/PageGoalDetail, slice 5 state as amended by specs/006-note-editing), rendered from the
 /// history that the real RecordingService reads over the fakes. The user has no stored time zone, so the goals are in
 /// UTC and every time below is a UTC literal. Records and notes are seeded straight into the fake record store; each
 /// goal is created at 08:00 on its start date, and its history read at the instant the test names.
@@ -28,6 +30,7 @@ public sealed class HistoryCardTests : BunitContext
 
     private static readonly DateOnly Mon2Nov = new(2026, 11, 2);
     private static readonly DateOnly Tue3Nov = new(2026, 11, 3);
+    private static readonly DateOnly Wed4Nov = new(2026, 11, 4);
     private static readonly DateOnly Fri13Nov = new(2026, 11, 13);
     private static readonly DateOnly Mon16Nov = new(2026, 11, 16);
     private static readonly DateOnly Mon10Aug = new(2026, 8, 10);
@@ -100,16 +103,23 @@ public sealed class HistoryCardTests : BunitContext
 
     /// <summary>
     /// Reading, 20 min daily, from Monday 2 November 2026, read at 10:00Z on Friday 13 November: 12 begun days, 20 min on
-    /// the 2nd (Met), 12 min on the 3rd (Failed) with the note "Fell asleep early.", nothing since.
+    /// the 2nd (Met), 12 min on the 3rd (Failed) with the note "Fell asleep early.", nothing since; with
+    /// <paramref name="wed4Note"/>, Wednesday 4 (Missed, no record) has that note.
     /// </summary>
     private async Task<IRenderedComponent<HistoryCard>> TwelveDaysAsync(
-        Action<HistoryCard.RowAction>? onAction = null, Action<HistoryEntry>? onNote = null)
+        Action<HistoryCard.RowAction>? onAction = null, Action<HistoryEntry>? onNote = null, string? wed4Note = null)
     {
         var goal = await GoalAsync(Reading20MinDaily, Mon2Nov);
         _records.Seed(goal, Mon2Nov, RecordValue.FromAmount(20));
         _records.Seed(goal, Tue3Nov, RecordValue.FromAmount(12));
         Assert.True(NoteText.TryCreate("Fell asleep early.", out var note, out _));
         _records.SeedNote(goal, Tue3Nov, note!);
+        if (wed4Note is not null)
+        {
+            Assert.True(NoteText.TryCreate(wed4Note, out var missedNote, out _));
+            _records.SeedNote(goal, Wed4Nov, missedNote!);
+        }
+
         return RenderCard(await PageHistoryAsync(goal, Fri13Nov, new DateTimeOffset(2026, 11, 13, 10, 0, 0, TimeSpan.Zero)), onAction, onNote);
     }
 
@@ -169,13 +179,23 @@ public sealed class HistoryCardTests : BunitContext
         Assert.Equal("Fell asleep early.", Cell(cut, "Tue 3 Nov", 3));
         Assert.Equal("20 min", Cell(cut, "Mon 2 Nov", 1));
         Assert.Equal("Met", Cell(cut, "Mon 2 Nov", 2));
-        Assert.Equal("Add note", Cell(cut, "Mon 2 Nov", 3));
+        // specs/006-note-editing HP-001: the Note cell is the note as text, or "—", not "Add note".
+        Assert.Equal("—", Cell(cut, "Mon 2 Nov", 3));
         Assert.Equal("Due today", Text(cut.Find("tbody tr td span.ht-chip.ht-status.ht-status--due")));
         Assert.All(cut.FindAll("tbody tr"), row =>
         {
             var actions = row.QuerySelectorAll("td")[4];
             Assert.True(actions.ClassList.Contains("ht-actions"));
-            Assert.Single(actions.Children);
+            // specs/006-note-editing HP-002: a row without a record has its note control, then "Add record", so the
+            // record control is the rightmost (the owner's order, 2026-11-20); every other row at most one control.
+            if (Text(row.QuerySelectorAll("td")[1]) == "—")
+            {
+                Assert.Equal(["Add note", "Add record"], actions.Children.Select(Text));
+            }
+            else
+            {
+                Assert.Single(actions.Children);
+            }
         });
         // A commitment's record is text, not a button (design/pages/PageGoalDetail.md).
         Assert.All(cut.FindAll("tbody tr"), row => Assert.Empty(row.QuerySelectorAll("td")[1].QuerySelectorAll("button")));
@@ -247,8 +267,51 @@ public sealed class HistoryCardTests : BunitContext
     private static IElement Row(IRenderedComponent<HistoryCard> cut, string date) =>
         cut.FindAll("tbody tr").Single(row => Text(row.QuerySelector("td")!) == date);
 
-    private static IElement Action(IRenderedComponent<HistoryCard> cut, string date) =>
-        Assert.Single(Row(cut, date).QuerySelectorAll("td.ht-actions > button"));
+    private const string AddNote = "Add note";
+    private const string EditNote = "Edit note";
+
+    private static bool IsNoteControl(IElement button) => Text(button) is AddNote or EditNote;
+
+    /// <summary>
+    /// The row's record control ("Add record" or "Edit"), the last button of its actions cell, so the rightmost (the
+    /// owner's order, 2026-11-20). Any button before it is the row's note control (specs/006-note-editing HP-002), so the
+    /// row has exactly one record control.
+    /// </summary>
+    private static IElement Action(IRenderedComponent<HistoryCard> cut, string date)
+    {
+        var buttons = Row(cut, date).QuerySelectorAll("td.ht-actions > button");
+        Assert.InRange(buttons.Length, 1, 2);
+        Assert.False(IsNoteControl(buttons[^1]));
+        if (buttons.Length == 2)
+        {
+            Assert.True(IsNoteControl(buttons[0]));
+        }
+
+        return buttons[^1];
+    }
+
+    /// <summary>
+    /// The row's note control ("Add note" or "Edit note"), or null when it has none. It is the first of the two buttons of
+    /// the actions cell of a row without a record, before "Add record" (specs/006-note-editing HP-002); the helper asserts
+    /// that.
+    /// </summary>
+    private static IElement? NoteControl(IRenderedComponent<HistoryCard> cut, string date)
+    {
+        var row = Row(cut, date);
+        var buttons = row.QuerySelectorAll("button");
+        var notes = buttons.Where(IsNoteControl).ToList();
+        if (notes.Count == 0)
+        {
+            return null;
+        }
+
+        var note = Assert.Single(notes);
+        var actions = row.QuerySelectorAll("td.ht-actions > button");
+        Assert.Equal(2, actions.Length);
+        Assert.Same(actions[0], note);
+        Assert.Equal("—", Text(row.QuerySelectorAll("td")[1]));
+        return note;
+    }
 
     private static List<IElement> RecordButtons(IRenderedComponent<HistoryCard> cut, string date) =>
         Row(cut, date).QuerySelectorAll("td")[1].QuerySelectorAll("span.ht-inline > button").ToList();
@@ -293,7 +356,9 @@ public sealed class HistoryCardTests : BunitContext
         AssertRowControl(Action(cut, "Wed 4 Nov"), "Add record", "Add record for Wed 4 Nov");
         AssertRowControl(Action(cut, "Tue 3 Nov"), "Edit", "Edit record of Tue 3 Nov");
         AssertRowControl(Action(cut, "Mon 2 Nov"), "Edit", "Edit record of Mon 2 Nov");
-        Assert.Equal(12, cut.FindAll("td.ht-actions > button").Count);
+        // One record control on each of the 12 rows, plus "Add note" on the 10 rows without a record (Fri 13, Thu 12,
+        // Wed 11, Tue 10, Mon 9, Sun 8, Sat 7, Fri 6, Thu 5 and Wed 4 Nov; specs/006-note-editing HP-002).
+        Assert.Equal(22, cut.FindAll("td.ht-actions > button").Count);
     }
 
     [Fact]
@@ -333,7 +398,10 @@ public sealed class HistoryCardTests : BunitContext
         var buttons = RecordButtons(cut, "10 – 16 Aug");
         Assert.Equal(records, buttons.Count);
         Assert.Equal($"Yes, edit record {records} of 10 – 16 Aug", buttons[^1].GetAttribute("aria-label"));
-        Assert.Single(Row(cut, "17 – 23 Aug").QuerySelectorAll("td.ht-actions > button"));
+        Assert.Null(NoteControl(cut, "10 – 16 Aug"));
+        // "17 – 23 Aug" has no record: its record control, then its note control (specs/006-note-editing HP-002).
+        AssertRowControl(Action(cut, "17 – 23 Aug"), "Add record", "Add record for 17 – 23 Aug");
+        AssertRowControl(NoteControl(cut, "17 – 23 Aug")!, AddNote, "Add note for 17 – 23 Aug");
     }
 
     [Fact]
@@ -373,23 +441,32 @@ public sealed class HistoryCardTests : BunitContext
         Assert.Equal([recordButton, actionButton, actionButton], focused);
     }
 
-    // ---- US4-AS7: the Note cell's actions (HP-001, HP-003, contracts/host.md "Accessible names") ----
+    // ---- US4-AS7 as amended by specs/006-note-editing: the Note cell is text, and only a row without a record has a
+    // note control (HP-001, HP-002, contracts/host.md "History card") ----
 
-    private static IElement NoteButton(IRenderedComponent<HistoryCard> cut, string date) =>
-        Assert.Single(Row(cut, date).QuerySelectorAll("td")[3].QuerySelectorAll("button"));
+    private const string Away = "Away for the weekend.";
 
     [Fact]
-    public async Task US4_AS7_every_row_offers_Add_note_without_a_note_and_the_note_as_a_button_with_one_whatever_its_state()
+    public async Task HP_002_only_a_row_without_a_record_offers_Add_note_or_Edit_note_and_the_Note_cell_is_text()
     {
-        var cut = await TwelveDaysAsync();
+        var cut = await TwelveDaysAsync(wed4Note: Away);
         cut.Find("section.ht-card > button").Click();
 
-        AssertRowControl(NoteButton(cut, "Tue 3 Nov"), "Fell asleep early.", "Fell asleep early., edit note of Tue 3 Nov");
-        AssertRowControl(NoteButton(cut, "Mon 2 Nov"), "Add note", "Add note for Mon 2 Nov");
-        AssertRowControl(NoteButton(cut, "Fri 13 Nov"), "Add note", "Add note for Fri 13 Nov");
+        Assert.Equal("Fell asleep early.", Cell(cut, "Tue 3 Nov", 3));
+        Assert.Null(NoteControl(cut, "Tue 3 Nov"));
+        Assert.Equal("—", Cell(cut, "Mon 2 Nov", 3));
+        Assert.Null(NoteControl(cut, "Mon 2 Nov"));
+        Assert.Equal("—", Cell(cut, "Fri 13 Nov", 3));
+        AssertRowControl(NoteControl(cut, "Fri 13 Nov")!, AddNote, "Add note for Fri 13 Nov");
         Assert.Equal("Missed", Cell(cut, "Wed 4 Nov", 2));
-        AssertRowControl(NoteButton(cut, "Wed 4 Nov"), "Add note", "Add note for Wed 4 Nov");
-        Assert.All(cut.FindAll("tbody tr"), row => Assert.Single(row.QuerySelectorAll("td")[3].QuerySelectorAll("button")));
+        Assert.Equal(Away, Cell(cut, "Wed 4 Nov", 3));
+        AssertRowControl(NoteControl(cut, "Wed 4 Nov")!, EditNote, "Edit note of Wed 4 Nov");
+        Assert.All(cut.FindAll("tbody tr"), row =>
+        {
+            var note = row.QuerySelectorAll("td")[3];
+            Assert.Equal(["ht-muted"], note.ClassList.ToArray());
+            Assert.Empty(note.Children);
+        });
     }
 
     [Fact]
@@ -401,36 +478,162 @@ public sealed class HistoryCardTests : BunitContext
 
         var cut = RenderCard(await PageHistoryAsync(goal, new DateOnly(2026, 8, 18), new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero)));
 
-        AssertRowControl(NoteButton(cut, "10 – 16 Aug"), "Knee was sore.", "Knee was sore., edit note of 10 – 16 Aug");
-        AssertRowControl(NoteButton(cut, "17 – 23 Aug"), "Add note", "Add note for 17 – 23 Aug");
+        Assert.Equal("Knee was sore.", Cell(cut, "10 – 16 Aug", 3));
+        Assert.Empty(Row(cut, "10 – 16 Aug").QuerySelectorAll("td")[3].Children);
+        AssertRowControl(NoteControl(cut, "10 – 16 Aug")!, EditNote, "Edit note of 10 – 16 Aug");
+        AssertRowControl(NoteControl(cut, "17 – 23 Aug")!, AddNote, "Add note for 17 – 23 Aug");
     }
 
     [Fact]
-    public async Task The_Note_cells_buttons_raise_their_row()
+    public async Task The_note_controls_raise_their_row()
     {
         var rows = new List<HistoryEntry>();
         var actions = new List<HistoryCard.RowAction>();
-        var cut = await TwelveDaysAsync(actions.Add, rows.Add);
+        var cut = await TwelveDaysAsync(actions.Add, rows.Add, Away);
         cut.Find("section.ht-card > button").Click();
 
-        await NoteButton(cut, "Tue 3 Nov").ClickAsync(new MouseEventArgs());
-        await NoteButton(cut, "Wed 4 Nov").ClickAsync(new MouseEventArgs());
+        await NoteControl(cut, "Fri 13 Nov")!.ClickAsync(new MouseEventArgs());
+        await NoteControl(cut, "Wed 4 Nov")!.ClickAsync(new MouseEventArgs());
 
-        Assert.Equal([(Tue3Nov, "Fell asleep early."), (new DateOnly(2026, 11, 4), null)], rows.Select(r => (r.FirstDate, r.Note)));
+        Assert.Equal([(Fri13Nov, null), (Wed4Nov, Away)], rows.Select(r => (r.FirstDate, r.Note)));
         Assert.Empty(actions);
     }
 
     [Fact]
-    public async Task FocusNoteAsync_gives_the_focus_to_the_rows_Note_button_and_nothing_for_a_row_not_shown()
+    public async Task FocusNoteAsync_gives_the_focus_to_the_rows_note_control_and_nothing_for_a_row_without_one()
     {
-        var cut = await TwelveDaysAsync();
-        var noteButton = NoteButton(cut, "Fri 13 Nov").GetAttribute("blazor:elementReference");
+        // TwelveDaysAsync's goal without its note: Tue 3 Nov has a record and is the 11th row, not shown at first.
+        var goal = await GoalAsync(Reading20MinDaily, Mon2Nov);
+        _records.Seed(goal, Tue3Nov, RecordValue.FromAmount(12));
+        var at = new DateTimeOffset(2026, 11, 13, 10, 0, 0, TimeSpan.Zero);
+        var cut = RenderCard(await PageHistoryAsync(goal, Fri13Nov, at));
+        var noteControl = NoteControl(cut, "Fri 13 Nov")!.GetAttribute("blazor:elementReference");
+        Task FocusNoteAsync(DateOnly row) => cut.InvokeAsync(() => cut.Instance.FocusNoteAsync(row).AsTask());
 
-        await cut.InvokeAsync(() => cut.Instance.FocusNoteAsync(Fri13Nov).AsTask());
-        await cut.InvokeAsync(() => cut.Instance.FocusNoteAsync(Tue3Nov).AsTask());
+        await FocusNoteAsync(Fri13Nov);
+        await FocusNoteAsync(Tue3Nov);
+        cut.Find("section.ht-card > button").Click();
+        await FocusNoteAsync(Tue3Nov);
+        // Fri 13 gets its first record: on the next read its note control is gone, and nothing gets the focus.
+        _records.Seed(goal, Fri13Nov, RecordValue.FromAmount(20));
+        var history = await PageHistoryAsync(goal, Fri13Nov, at);
+        cut.Render(p => p.Add(x => x.History, history));
+        Assert.Null(NoteControl(cut, "Fri 13 Nov"));
+        await FocusNoteAsync(Fri13Nov);
 
         var focused = JSInterop.VerifyFocusAsyncInvoke().Arguments[0];
-        Assert.Equal(noteButton, Assert.IsType<ElementReference>(focused).Id);
+        Assert.Equal(noteControl, Assert.IsType<ElementReference>(focused).Id);
+    }
+
+    // ---- SC-002 (specs/006-note-editing, US1-AS7, US2-AS2): at most one control changes a row's note on its own ----
+
+    /// <summary>
+    /// Every begun row of one goal, each with <paramref name="records"/> records and, with <paramref name="withNote"/>,
+    /// the note "Away for the weekend.". A commitment: Reading, 20 min daily, from Monday 2 November 2026, read at 10:00Z
+    /// on Friday 13 November and shown in full: Fri 13 is Due; Thu 12 and Wed 11 are Pending (Wed 11's grace period ends
+    /// at 00:00Z on Saturday 14); Tue 10 to Mon 2 are final, as Tue 10's grace period ended at 00:00Z on Friday 13. Its
+    /// record is 12 min (Failed when final), and 20 min on Mon 2 (Met). A period: Yoga, 3 times a week, from Monday 20
+    /// July 2026, read at 10:00Z on Tuesday 18 August: 17 – 23 Aug is Due; 10 – 16 Aug is Pending (its grace period ends
+    /// at 00:00Z on Wednesday 19); the three weeks before are final. Its records are Yes on the week's Tuesday: one is
+    /// Failed (1 of 3) when final, 50 are Met.
+    /// </summary>
+    [Theory]
+    [InlineData(false, 0, false, new[] { EvaluationState.Due, EvaluationState.Pending, EvaluationState.Missed })]
+    [InlineData(false, 0, true, new[] { EvaluationState.Due, EvaluationState.Pending, EvaluationState.Missed })]
+    [InlineData(false, 1, false, new[] { EvaluationState.Due, EvaluationState.Pending, EvaluationState.Met, EvaluationState.Failed })]
+    [InlineData(false, 1, true, new[] { EvaluationState.Due, EvaluationState.Pending, EvaluationState.Met, EvaluationState.Failed })]
+    [InlineData(true, 0, false, new[] { EvaluationState.Due, EvaluationState.Pending, EvaluationState.Missed })]
+    [InlineData(true, 0, true, new[] { EvaluationState.Due, EvaluationState.Pending, EvaluationState.Missed })]
+    [InlineData(true, 1, false, new[] { EvaluationState.Due, EvaluationState.Pending, EvaluationState.Failed })]
+    [InlineData(true, 1, true, new[] { EvaluationState.Due, EvaluationState.Pending, EvaluationState.Failed })]
+    [InlineData(true, 50, false, new[] { EvaluationState.Due, EvaluationState.Pending, EvaluationState.Met })]
+    [InlineData(true, 50, true, new[] { EvaluationState.Due, EvaluationState.Pending, EvaluationState.Met })]
+    public async Task SC_002_a_row_has_one_note_control_without_a_record_none_with_one_and_its_Note_cell_is_text(
+        bool period, int records, bool withNote, EvaluationState[] states)
+    {
+        var raised = new List<HistoryEntry>();
+        var actions = new List<HistoryCard.RowAction>();
+        Assert.True(NoteText.TryCreate(Away, out var note, out _));
+        GoalHistory history;
+        if (period)
+        {
+            var goal = await GoalAsync(YogaThreeTimesAWeek, new DateOnly(2026, 7, 20));
+            for (var monday = new DateOnly(2026, 7, 20); monday <= new DateOnly(2026, 8, 17); monday = monday.AddDays(7))
+            {
+                for (var i = 0; i < records; i++)
+                {
+                    _records.Seed(goal, monday.AddDays(1), RecordValue.FromAnswer(YesNoAnswer.Yes));
+                }
+
+                if (withNote)
+                {
+                    _records.SeedNote(goal, monday, note!);
+                }
+            }
+
+            history = await PageHistoryAsync(goal, new DateOnly(2026, 8, 18), new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero));
+        }
+        else
+        {
+            var goal = await GoalAsync(Reading20MinDaily, Mon2Nov);
+            for (var day = Mon2Nov; day <= Fri13Nov; day = day.AddDays(1))
+            {
+                for (var i = 0; i < records; i++)
+                {
+                    _records.Seed(goal, day, RecordValue.FromAmount(day == Mon2Nov ? 20 : 12));
+                }
+
+                if (withNote)
+                {
+                    _records.SeedNote(goal, day, note!);
+                }
+            }
+
+            history = await PageHistoryAsync(goal, Fri13Nov, new DateTimeOffset(2026, 11, 13, 10, 0, 0, TimeSpan.Zero));
+        }
+
+        var cut = RenderCard(history, actions.Add, raised.Add);
+        if (!period)
+        {
+            cut.Find("section.ht-card > button").Click();
+        }
+
+        var dates = Dates(cut);
+        Assert.Equal(period ? 5 : 12, dates.Count);
+        Assert.Equal(
+            states.Order(),
+            history.Entries.Where(e => e.State != EvaluationState.Upcoming).Select(e => e.State).Distinct().Order());
+        var clicks = 0;
+        foreach (var date in dates)
+        {
+            var noteCell = Row(cut, date).QuerySelectorAll("td")[3];
+            Assert.Equal(withNote ? Away : "—", Text(noteCell));
+            Assert.Equal(["ht-muted"], noteCell.ClassList.ToArray());
+            Assert.Empty(noteCell.Children);
+
+            // Every control of the row, clicked in turn: only a note control raises OnNote.
+            var before = raised.Count;
+            var buttons = Row(cut, date).QuerySelectorAll("button").Length;
+            for (var i = 0; i < buttons; i++)
+            {
+                await Row(cut, date).QuerySelectorAll("button")[i].ClickAsync(new MouseEventArgs());
+            }
+
+            clicks += buttons;
+            var ofRow = raised.Skip(before).ToList();
+            if (records == 0)
+            {
+                Assert.Equal(date, RecordingText.EntryDate(Assert.Single(ofRow)));
+                AssertRowControl(NoteControl(cut, date)!, withNote ? EditNote : AddNote, withNote ? $"Edit note of {date}" : $"Add note for {date}");
+            }
+            else
+            {
+                Assert.Empty(ofRow);
+                Assert.Null(NoteControl(cut, date));
+            }
+        }
+
+        Assert.Equal(clicks, actions.Count + raised.Count);
     }
 
     [Fact]

@@ -16,4 +16,12 @@ The last part of the preview shows the variants as slice 5 builds them (HP-002, 
 - Reduce, yes/no, N times a day: "Record · Snacking, at most 2 times a day", sub line "Reduce · at most 2 times a day"; "Did you do it?"; the progress line "1 of at most 2 times"; the same help as above.
 - Build, count, N times a week: "Record · Reading, 20 pages, 3 times a week", sub line "Build · at least 20 pages · 3 times a week"; "For" with the week ("26 Oct – 1 Nov") and the "Date" select; the field "Amount" with the unit "pages"; the progress line "2 of 3 times"; the help "Partial amounts are kept. With fewer than 3 records of at least 20 pages the week counts as Failed when it is finalized.".
 
-Every variant ends with "Note (optional)", empty, and the help "An empty field keeps the existing note.", then "Save record" and "Cancel". No "Excuse instead" (slice 7); the full preview keeps it, still provisional.
+Every variant ends with "Note (optional)", then "Save record" and "Cancel". The note field is empty here because none of these entries has a note; it opens with the entry's current note when there is one (`RecordDialog.md`, "Note, buttons and refusals"). Its help depends on the goal:
+
+- "Clear the field to remove the note." for the commitment-based goals (Yoga, 3 days a week; No phone in bed, avoided every day);
+- "This note is for the whole day. Clear the field to remove it." for the per-day periods (Coffee, at most 2 cups a day; Snacking, at most 2 times a day);
+- "This note is for the whole week. Clear the field to remove it." for the per-week period (Reading, 20 pages, 3 times a week).
+
+No "Excuse instead" (slice 7); the full preview keeps it, still provisional.
+
+Amended 2026-11-20, specs/006-note-editing, ADR 0019: every variant had the help "An empty field keeps the existing note."; the field now opens with the current note, and an empty field removes it.

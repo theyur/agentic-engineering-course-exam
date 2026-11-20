@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using HT.Application.Accounts;
 using HT.Application.Goals;
 using HT.Domain.Accounts;
@@ -50,8 +51,9 @@ public sealed class RecordingService
     /// (<see cref="RecordWriteOutcome.NothingScheduled"/>); its day has begun (<see cref="RecordWriteOutcome.DayNotBegun"/>);
     /// the value for the measurement of the version in effect for the entry (FR-004, FR-015); the note (FR-007); then the
     /// store adds the record, or for a commitment replaces its one record in place, and refuses a period that already has
-    /// <see cref="RecordLimits.MaxRecordsPerPeriod"/> records. A note with text adds or replaces the entry's note; none
-    /// leaves it unchanged. <see cref="RecordWriteOutcome.Recorded"/> carries the record's identifier, the entry after
+    /// <see cref="RecordLimits.MaxRecordsPerPeriod"/> records. In the record's transaction, a note with text adds or
+    /// replaces the entry's note, an empty one removes it, and none leaves it unchanged (specs/006-note-editing FR-001);
+    /// a refusal writes neither. <see cref="RecordWriteOutcome.Recorded"/> carries the record's identifier, the entry after
     /// the write and whether the write was a correction (FR-006).
     /// </summary>
     public async Task<RecordWriteResult> RecordAsync(
@@ -83,7 +85,7 @@ public sealed class RecordingService
             return ValueRefused(problem);
         }
 
-        if (!NoteText.TryCreate(input.Note, out var note, out _))
+        if (!TryNoteWriteOf(input.Note, out var note))
         {
             return RecordWriteResult.Refused(RecordWriteOutcome.NoteTooLong, RecordTexts.NoteTooLong);
         }
@@ -120,8 +122,9 @@ public sealed class RecordingService
     /// nothing); the value for the measurement of the version in effect for the record's entry (FR-004, FR-015); then
     /// the note (FR-007). There is no date step: the record's date never changes (FR-003), and while versions differ
     /// only in their time zone it always passes FR-002 again (plan "Resolved in the spec" 1). The record keeps its
-    /// identifier, date and place in the stored order. A note with text adds or replaces the entry's note; none leaves
-    /// it unchanged. <see cref="RecordWriteOutcome.Changed"/> carries the record's identifier, the entry after the write
+    /// identifier, date and place in the stored order. In the record's transaction, a note with text adds or replaces
+    /// the entry's note, an empty one removes it, and none leaves it unchanged (specs/006-note-editing FR-001); a
+    /// refusal writes neither. <see cref="RecordWriteOutcome.Changed"/> carries the record's identifier, the entry after the write
     /// and whether the change was a correction (FR-006).
     /// </summary>
     public async Task<RecordWriteResult> ChangeRecordAsync(
@@ -149,7 +152,7 @@ public sealed class RecordingService
             return ValueRefused(problem);
         }
 
-        if (!NoteText.TryCreate(input.Note, out var note, out _))
+        if (!TryNoteWriteOf(input.Note, out var note))
         {
             return RecordWriteResult.Refused(RecordWriteOutcome.NoteTooLong, RecordTexts.NoteTooLong);
         }
@@ -472,6 +475,29 @@ public sealed class RecordingService
     private static CalendarEntry NoteEntryOf(Goal goal, DateOnly key) =>
         GoalTimeline.EntryOf(goal, key)
         ?? throw new InvalidOperationException("A stored note's key belongs to no commitment or period of its goal.");
+
+    /// <summary>
+    /// What a record's write does to its entry's note (specs/006-note-editing FR-001, D-1; research R-02): null keeps
+    /// the note, and <see cref="NoteText.TryCreate"/> is not called; a text empty after trimming removes it; any other
+    /// text, trimmed, replaces it. False, with nothing to write, for more than 500 characters after trimming.
+    /// </summary>
+    private static bool TryNoteWriteOf(string? input, [NotNullWhen(true)] out NoteWrite? write)
+    {
+        if (input is null)
+        {
+            write = NoteWrite.Keep;
+            return true;
+        }
+
+        if (!NoteText.TryCreate(input, out var text, out _))
+        {
+            write = null;
+            return false;
+        }
+
+        write = text is null ? NoteWrite.Remove : NoteWrite.Replace(text);
+        return true;
+    }
 
     /// <summary>The entry as the record store sees it: its note key and its first and last date (research R-05).</summary>
     private static EntrySpan SpanOf(CalendarEntry entry) => new(entry.Key, entry.FirstDate, entry.LastDate);

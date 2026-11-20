@@ -5,6 +5,7 @@ using HT.Application.Records;
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Records;
 using HT.Domain.Time;
 using HT.Ui.Components.Pages;
 using HT.UnitTests.Fakes;
@@ -232,8 +233,10 @@ public sealed class GoalDetailPageTests : BunitContext
         AngleSharp.Dom.IElement Row() =>
             cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov");
         Assert.Equal(["Sat 14 Nov", "—", "Missed"], Row().QuerySelectorAll("td").Take(3).Select(Text));
-        var button = Row().QuerySelector("td.ht-actions > button")!;
-        // The row keeps its one action button, so the focus goes back to the same element after each save.
+        var button = Row().QuerySelector("td.ht-actions > button:last-of-type")!;
+        // The row's record control stays its last button, so the focus goes back to the same element after each save
+        // (specs/006-note-editing: its "Add note" comes before it while the row has no record; the owner's order,
+        // 2026-11-20).
         var buttonId = button.GetAttribute("blazor:elementReference");
         Assert.False(string.IsNullOrEmpty(buttonId));
         Assert.Equal("Add record for Sat 14 Nov", button.GetAttribute("aria-label"));
@@ -247,7 +250,7 @@ public sealed class GoalDetailPageTests : BunitContext
 
         Assert.Empty(cut.FindAll("[role=dialog]"));
         Assert.Equal(["Sat 14 Nov", "20 min", "Met"], Row().QuerySelectorAll("td").Take(3).Select(Text));
-        var edit = Row().QuerySelector("td.ht-actions > button")!;
+        var edit = Row().QuerySelector("td.ht-actions > button:last-of-type")!;
         Assert.Equal(("Edit", "Edit record of Sat 14 Nov"), (edit.TextContent, edit.GetAttribute("aria-label")));
         var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
         Assert.Equal(buttonId, focused[1]);
@@ -258,7 +261,7 @@ public sealed class GoalDetailPageTests : BunitContext
 
         Assert.Empty(cut.FindAll("[role=dialog]"));
         Assert.Equal(["Sat 14 Nov", "—", "Missed"], Row().QuerySelectorAll("td").Take(3).Select(Text));
-        Assert.Equal("Add record", Row().QuerySelector("td.ht-actions > button")!.TextContent);
+        Assert.Equal("Add record", Row().QuerySelector("td.ht-actions > button:last-of-type")!.TextContent);
         Assert.Empty(_records.RecordsOfGoal(goal.Id));
         var refocused = JSInterop.VerifyFocusAsyncInvoke(4).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
         Assert.Equal(buttonId, refocused[3]);
@@ -278,13 +281,16 @@ public sealed class GoalDetailPageTests : BunitContext
                 [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
             new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
         var cut = RenderGoal(goal.Id);
-        AngleSharp.Dom.IElement NoteButton() =>
-            cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov")
-                .QuerySelectorAll("td")[3].QuerySelector("button")!;
+        AngleSharp.Dom.IElement Row() =>
+            cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov");
+        // specs/006-note-editing HP-002: the note control is the first button of the actions column, before "Add record".
+        AngleSharp.Dom.IElement NoteButton() => Row().QuerySelectorAll("td.ht-actions > button")[0];
         // No note yet: no Recent notes card, and the right column holds the Settings card alone.
         Assert.Equal(["History", "Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Equal(["Add note", "Add record"], Row().QuerySelectorAll("td.ht-actions > button").Select(Text));
         Assert.Equal(("Add note", "Add note for Sat 14 Nov"), (NoteButton().TextContent, NoteButton().GetAttribute("aria-label")));
-        // The row keeps its one Note button, so the focus goes back to the same element after the save.
+        Assert.Equal("—", Text(Row().QuerySelectorAll("td")[3]));
+        // The note control stays the same element when the save turns it into "Edit note", so the focus goes back to it.
         var buttonId = NoteButton().GetAttribute("blazor:elementReference");
         Assert.False(string.IsNullOrEmpty(buttonId));
 
@@ -296,27 +302,147 @@ public sealed class GoalDetailPageTests : BunitContext
         await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
 
         Assert.Empty(cut.FindAll("[role=dialog]"));
-        Assert.Equal(
-            ("Away for the weekend.", "Away for the weekend., edit note of Sat 14 Nov"),
-            (NoteButton().TextContent, NoteButton().GetAttribute("aria-label")));
-        Assert.Equal("Missed", Text(cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov").QuerySelectorAll("td")[2]));
+        Assert.Equal("Away for the weekend.", Text(Row().QuerySelectorAll("td")[3]));
+        Assert.Empty(Row().QuerySelectorAll("td")[3].Children);
+        Assert.Equal(("Edit note", "Edit note of Sat 14 Nov"), (NoteButton().TextContent, NoteButton().GetAttribute("aria-label")));
+        Assert.Equal("Missed", Text(Row().QuerySelectorAll("td")[2]));
         var right = cut.FindAll(".ht-grid-2 > .ht-stack")[1];
         Assert.Equal(["Settings", "Recent notes"], right.QuerySelectorAll(".ht-card__title").Select(Text));
         var item = Assert.Single(right.QuerySelectorAll("div.ht-goal"));
         Assert.Equal(["\"Away for the weekend.\"", "Missed"], item.QuerySelectorAll("div.ht-goal__top > span:not(.ht-spacer)").Select(Text));
         Assert.Equal("Sat 14 Nov", Text(item.QuerySelector("div.ht-goal__meta")!));
-        // Focus: the TextArea on open, then the row's Note button, now the note, on close.
+        // Focus: the TextArea on open, then the row's note control, now "Edit note", on close.
         var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
         Assert.Equal(buttonId, focused[1]);
 
         await NoteButton().ClickAsync(new MouseEventArgs());
+        Assert.Equal("Edit note · Reading, 20 min daily", cut.Find("[role=dialog] h2").TextContent);
         Assert.Equal("Away for the weekend.", cut.Find("textarea").GetAttribute("value") ?? cut.Find("textarea").TextContent);
         cut.Find("textarea").Input("   ");
         await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
 
-        Assert.Equal("Add note", NoteButton().TextContent);
+        Assert.Equal(("Add note", "Add note for Sat 14 Nov"), (NoteButton().TextContent, NoteButton().GetAttribute("aria-label")));
+        Assert.Equal("—", Text(Row().QuerySelectorAll("td")[3]));
         Assert.Equal(["History", "Settings"], cut.FindAll(".ht-card__title").Select(Text));
         Assert.Empty(_records.NotesOfGoal(goal.Id));
+    }
+
+    // ---- specs/006-note-editing US2-AS4, US2-AS5, SC-004: the note of a History row ----
+
+    private static readonly DateOnly Sat14 = new(2026, 11, 14);
+
+    /// <summary>
+    /// Reading, 20 min daily, from Tuesday 10 November in UTC, owned by the signed-in user; at 10:00 on Tuesday 17
+    /// November Saturday 14's grace period ended at 00:00 that day, so Saturday 14 is final (Missed without a record).
+    /// With <paramref name="minutes"/>, Saturday 14 has that record; with <paramref name="note"/>, that note.
+    /// </summary>
+    private GoalId ReadingWithSat14(int? minutes, string? note)
+    {
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 10);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        if (minutes is { } amount)
+        {
+            _records.Seed(goal.Id, Sat14, RecordValue.FromAmount(amount));
+        }
+
+        if (note is not null)
+        {
+            Assert.True(NoteText.TryCreate(note, out var text, out _));
+            _records.SeedNote(goal.Id, Sat14, text!);
+        }
+
+        return goal.Id;
+    }
+
+    private static AngleSharp.Dom.IElement Sat14Row(IRenderedComponent<GoalDetail> cut) =>
+        cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov");
+
+    private static List<string> Sat14Actions(IRenderedComponent<GoalDetail> cut) =>
+        Sat14Row(cut).QuerySelectorAll("td.ht-actions > button").Select(Text).ToList();
+
+    private static string NoteField(IRenderedComponent<GoalDetail> cut) =>
+        cut.Find("[role=dialog] textarea").GetAttribute("value") ?? string.Empty;
+
+    [Fact]
+    public async Task US2_AS5_Add_record_on_a_Missed_row_with_a_note_opens_the_RecordDialog_with_the_note_in_its_field()
+    {
+        var cut = RenderGoal(ReadingWithSat14(null, "Away for the weekend."));
+        Assert.Equal(["Edit note", "Add record"], Sat14Actions(cut));
+
+        await Sat14Row(cut).QuerySelectorAll("td.ht-actions > button")[1].ClickAsync(new MouseEventArgs());
+
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Equal("Record · Reading, 20 min daily", dialog.QuerySelector("h2")!.TextContent);
+        Assert.Equal("Sat 14 Nov", Text(dialog.QuerySelector(".ht-field > span:not(.ht-field__label)")!));
+        Assert.Equal("Away for the weekend.", NoteField(cut));
+    }
+
+    [Fact]
+    public async Task US2_AS4_deleting_the_only_record_of_a_row_with_a_note_shows_its_note_and_Edit_note_again_and_focuses_Add_record()
+    {
+        var goal = ReadingWithSat14(20, "Away for the weekend.");
+        var cut = RenderGoal(goal);
+        Assert.Equal(["Sat 14 Nov", "20 min", "Met", "Away for the weekend."], Sat14Row(cut).QuerySelectorAll("td").Take(4).Select(Text));
+        Assert.Equal(["Edit"], Sat14Actions(cut));
+        var recordControl = Sat14Row(cut).QuerySelector("td.ht-actions > button:last-of-type")!.GetAttribute("blazor:elementReference");
+
+        await Sat14Row(cut).QuerySelector("td.ht-actions > button:last-of-type")!.ClickAsync(new MouseEventArgs());
+        Assert.Equal("Away for the weekend.", NoteField(cut));
+        cut.Find("[role=dialog] textarea").Input(string.Empty);
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[2].ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal(["Sat 14 Nov", "—", "Missed", "Away for the weekend."], Sat14Row(cut).QuerySelectorAll("td").Take(4).Select(Text));
+        Assert.Equal(["Edit note", "Add record"], Sat14Actions(cut));
+        Assert.Equal("Edit note of Sat 14 Nov", Sat14Row(cut).QuerySelectorAll("td.ht-actions > button")[0].GetAttribute("aria-label"));
+        Assert.Empty(_records.RecordsOfGoal(goal));
+        Assert.Equal("Away for the weekend.", Assert.Single(_records.NotesOfGoal(goal)).Value.Value);
+        // Focus: the dialog's first field on open, then the row's "Add record", the same element as its "Edit", on close.
+        var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
+        var addRecord = Sat14Row(cut).QuerySelector("td.ht-actions > button:last-of-type")!;
+        Assert.Equal(("Add record", recordControl), (addRecord.TextContent, focused[1]));
+    }
+
+    [Fact]
+    public async Task SC_004_on_a_row_with_a_record_Edit_clearing_the_field_and_Save_record_remove_the_note()
+    {
+        var goal = ReadingWithSat14(20, "Away for the weekend.");
+        var cut = RenderGoal(goal);
+
+        // The three actions: open, edit, save.
+        await Sat14Row(cut).QuerySelector("td.ht-actions > button:last-of-type")!.ClickAsync(new MouseEventArgs());
+        cut.Find("[role=dialog] textarea").Input(string.Empty);
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal(["Sat 14 Nov", "20 min", "Met", "—"], Sat14Row(cut).QuerySelectorAll("td").Take(4).Select(Text));
+        Assert.Equal(["Edit"], Sat14Actions(cut));
+        Assert.Single(_records.RecordsOfGoal(goal));
+        Assert.Empty(_records.NotesOfGoal(goal));
+    }
+
+    [Fact]
+    public async Task SC_004_on_a_row_without_a_record_Edit_note_changing_the_text_and_Save_note_replace_the_note()
+    {
+        var goal = ReadingWithSat14(null, "Away for the weekend.");
+        var cut = RenderGoal(goal);
+
+        // The three actions: open, edit, save.
+        await Sat14Row(cut).QuerySelectorAll("td.ht-actions > button")[0].ClickAsync(new MouseEventArgs());
+        cut.Find("[role=dialog] textarea").Input("Visiting family.");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal(["Sat 14 Nov", "—", "Missed", "Visiting family."], Sat14Row(cut).QuerySelectorAll("td").Take(4).Select(Text));
+        Assert.Equal(["Edit note", "Add record"], Sat14Actions(cut));
+        Assert.Empty(_records.RecordsOfGoal(goal));
+        Assert.Equal("Visiting family.", Assert.Single(_records.NotesOfGoal(goal)).Value.Value);
     }
 
     [Fact]

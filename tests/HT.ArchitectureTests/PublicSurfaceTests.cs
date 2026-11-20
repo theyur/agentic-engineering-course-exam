@@ -29,6 +29,7 @@ public sealed class PublicSurfaceTests
     /// Slice 5 (research R-13): the new public types of <c>HT.Domain.Records</c>, <c>HT.Domain.Evaluation</c> and
     /// <c>HT.Application.Records</c> are in the surface checked above and have no NodaTime type in a signature. The
     /// namespaces must be exported and hold the named types, so moving them cannot make the rule pass on nothing.
+    /// <c>NoteWrite</c> and <c>NoteWriteKind</c> join them with specs/006-note-editing (research R-11).
     /// </summary>
     [Theory]
     [InlineData("HT.Domain.Records", "RecordValue")]
@@ -36,6 +37,8 @@ public sealed class PublicSurfaceTests
     [InlineData("HT.Application.Records", "RecordingText")]
     [InlineData("HT.Application.Records", "IRecordStore")]
     [InlineData("HT.Application.Records", "RecordPreview")]
+    [InlineData("HT.Application.Records", "NoteWrite")]
+    [InlineData("HT.Application.Records", "NoteWriteKind")]
     public void TheNewRecordingTypesHaveNoNodaTimeTypeInTheirSignatures(string ns, string typeName)
     {
         var types = new[] { ArchitectureModel.Domain, ArchitectureModel.Application }

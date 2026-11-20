@@ -256,6 +256,35 @@ public sealed class RecordingTextTests
         Assert.Null(RecordingText.ReduceHelp(History(OnDays(MonWedFri))));
     }
 
+    [Fact]
+    public void HP_003_NoteHelp_of_a_commitment_based_goal_says_that_clearing_the_field_removes_the_note()
+    {
+        Assert.Equal("Clear the field to remove the note.", RecordingText.NoteHelp(History(Reading20MinDaily())));
+        Assert.Equal("Clear the field to remove the note.", RecordingText.NoteHelp(History(OnDays(MonWedFri))));
+        Assert.Equal(
+            "Clear the field to remove the note.",
+            RecordingText.NoteHelp(History(Target(YesNoDays(BuildOrReduce.Reduce, AllDays)))));
+    }
+
+    [Fact]
+    public void HP_003_NoteHelp_of_a_per_day_period_says_that_the_note_is_for_the_whole_day()
+    {
+        Assert.Equal(
+            "This note is for the whole day. Clear the field to remove it.",
+            RecordingText.NoteHelp(History(CoffeeAtMost2Cups())));
+        Assert.Equal(
+            "This note is for the whole day. Clear the field to remove it.",
+            RecordingText.NoteHelp(History(Target(DurationTimes(20, DurationUnit.Minutes, 2, SchedulePeriod.Day)))));
+    }
+
+    [Fact]
+    public void HP_003_NoteHelp_of_a_per_week_period_says_that_the_note_is_for_the_whole_week()
+    {
+        Assert.Equal(
+            "This note is for the whole week. Clear the field to remove it.",
+            RecordingText.NoteHelp(History(Pages20ThreeTimesAWeek())));
+    }
+
     public static TheoryData<GoalTarget, string> TargetLines() => new()
     {
         { Reading20MinDaily(), "Build · at least 20 min · every day" },

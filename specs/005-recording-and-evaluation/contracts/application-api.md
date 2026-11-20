@@ -50,18 +50,32 @@ The rules behind these outcomes:
 - **Record**:
   - for a commitment, an existing record's value is replaced, and it keeps its identifier;
   - for a period, a record is added;
-  - a note with text adds or replaces the entry's note;
-  - no note, or one that is empty after trimming, leaves the note unchanged (FR-003, FR-007).
+  - the note (FR-003, FR-007):
+    - no note given (`RecordInput.Note` null): the entry's note is unchanged;
+    - a note that is empty after trimming (`""`, only spaces): the entry has no note after the write;
+    - a note with text: that text, trimmed, is the entry's note after the write, whether it had none, the same one
+      or another one;
+    - the note is written in the same transaction as the record. So `NoteTooLong`, `RecordLimitReached`,
+      `RecordNotFound` and every refusal before them leave the records and the note as they were;
+    - for a period, the note is the whole period's, whichever of its records is recorded or changed.
+
+  Amended 2026-11-20, specs/006-note-editing, ADR 0019: no note, or one that was empty after trimming, left the note
+  unchanged.
 - **Change** replaces the value of that one record. Its date never changes (FR-003). There is no date step: see
   plan "Resolved in the spec" 1. The note follows the record rule above.
-- **Delete** removes the record. Deleting the only record of a final entry makes it Missed.
+- **Delete** removes the record and never changes the note, also when it was the entry's only record (FR-007).
+  Deleting the only record of a final entry makes it Missed, with its note if it had one. Amended 2026-11-20,
+  specs/006-note-editing, ADR 0019: what a delete does to the note was not stated.
 - **Save note**:
   - the date names the entry, and any begun date of a week names that week;
   - a note with text replaces the note, and one that is empty after trimming removes it;
-  - the entry's state does not change (FR-007).
+  - the entry's state does not change (FR-007);
+  - it works for any entry, with or without records. The page offers the NoteDialog only on rows without a record,
+    but the use case does not check for records (amended 2026-11-20, specs/006-note-editing, ADR 0019).
 - **`IsCorrection`** is true when the entry was final at the supplied time, that is when its grace end was on or
   before it (FR-006, FR-016). It is false for a refusal.
-- **`Entry`** is the entry after the write, as `GetHistoryAsync` gives it at the same time.
+- **`Entry`** is the entry after the write, as `GetHistoryAsync` gives it at the same time. So its `Note` shows the
+  outcome of the note rules above.
 - **History**:
   - every entry of the goal's evaluation calendar in the range (slice 4 FR-013), in date order;
   - a per-week entry gives all of its records, also those with dates outside the range;

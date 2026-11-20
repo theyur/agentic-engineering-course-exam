@@ -18,7 +18,8 @@ using Microsoft.Extensions.Time.Testing;
 namespace HT.UiTests.Components.Records;
 
 /// <summary>
-/// The NoteDialog (HP-003, US4-AS7; design/components/NoteDialog, slice 5 state), opened for a History row over the real
+/// The NoteDialog (HP-003, US4-AS7; specs/006-note-editing HP-004; design/components/NoteDialog, slice 5 state as amended
+/// by specs/006-note-editing), opened for a History row without a record over the real
 /// RecordingService and the fakes. The user has no stored time zone, so the goals are in UTC and every time below is a
 /// UTC literal. The goals start on Monday 16 November 2026, created at 08:00 that day; the row comes from the history
 /// read at the instant each test names. At 10:00 on Friday 20 November, Monday 16's grace period ended at 00:00 on
@@ -150,10 +151,10 @@ public sealed class NoteDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task Opened_from_a_note_the_field_starts_with_it_and_saving_without_a_change_keeps_it()
+    public async Task HP_004_opened_from_Edit_note_the_title_is_Edit_note_the_field_starts_with_the_note_and_saving_without_a_change_keeps_it()
     {
         var (cut, goal) = await OpenAsync(Reading20MinDaily, Utc(20, 10), Mon16, g => SeedNote(g, Mon16, "Away for the weekend."));
-        Assert.Equal("Add note · Reading, 20 min daily", cut.Find(".ht-dialog__head h2").TextContent);
+        Assert.Equal("Edit note · Reading, 20 min daily", cut.Find(".ht-dialog__head h2").TextContent);
         Assert.Equal("Away for the weekend.", AreaValue(cut));
 
         await SaveAsync(cut);
@@ -191,6 +192,27 @@ public sealed class NoteDialogTests : BunitContext
 
         Assert.Null(Assert.Single(_saved).Note);
         Assert.Empty(_records.NotesOfGoal(goal));
+    }
+
+    [Fact]
+    public async Task HP_004_a_save_that_removes_the_note_keeps_the_title_Edit_note_until_the_dialog_closes()
+    {
+        var (cut, _) = await OpenAsync(Reading20MinDaily, Utc(20, 10), Mon16, g => SeedNote(g, Mon16, "Away for the weekend."));
+        Assert.Equal("Edit note · Reading, 20 min daily", cut.Find(".ht-dialog__head h2").TextContent);
+        cut.Find("textarea").Input("");
+
+        await SaveAsync(cut);
+        // The page reads the row again before it closes the dialog, so the open dialog gets the row without its note.
+        var saved = Assert.Single(_saved);
+        Assert.Null(saved.Note);
+        cut.Render(p => p.Add(x => x.Row, saved));
+
+        Assert.Equal("Edit note · Reading, 20 min daily", cut.Find(".ht-dialog__head h2").TextContent);
+        cut.Render(p => p.Add(x => x.Open, false));
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        // Opened again for the row, now without a note, it is "Add note".
+        cut.Render(p => p.Add(x => x.Open, true));
+        Assert.Equal("Add note · Reading, 20 min daily", cut.Find(".ht-dialog__head h2").TextContent);
     }
 
     [Fact]

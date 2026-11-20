@@ -89,7 +89,8 @@ public sealed class RecordPrivacyTests(DatabaseFixture database)
 
     private async Task<RecordId> AddAsync(AccountId owner, GoalId goal, EntrySpan entry, bool isCommitment, DateOnly date, RecordValue value, NoteText? note)
     {
-        var written = await WithStoreAsync(s => s.AddAsync(owner, goal, entry, isCommitment, date, value, note, RecordLimits.MaxRecordsPerPeriod, None));
+        var written = await WithStoreAsync(s => s.AddAsync(
+            owner, goal, entry, isCommitment, date, value, note is null ? NoteWrite.Keep : NoteWrite.Replace(note), RecordLimits.MaxRecordsPerPeriod, None));
         Assert.Equal(RecordStoreWriteOutcome.Written, written.Outcome);
         return written.RecordId!.Value;
     }
@@ -110,7 +111,8 @@ public sealed class RecordPrivacyTests(DatabaseFixture database)
     /// <summary>
     /// Every member of the store called by <paramref name="owner"/> on A's goals with A's records, with values that would
     /// write if the goals were <paramref name="owner"/>'s: a record on each goal, a change and a delete of each of A's
-    /// records, a note added and a note deleted on each goal, a read of each goal's range and its recent note keys.
+    /// records, a note added and a note deleted on each goal, a record added and a record changed with
+    /// <see cref="NoteWrite.Remove"/>, a read of each goal's range and its recent note keys.
     /// </summary>
     private async Task AssertEveryMemberGivesNothingAsync(AccountId owner, World world)
     {
@@ -118,15 +120,25 @@ public sealed class RecordPrivacyTests(DatabaseFixture database)
         foreach (var (goal, entry, isCommitment, record) in goals)
         {
             AssertRefusedWrite(
-                await WithStoreAsync(s => s.AddAsync(owner, goal, entry, isCommitment, Thu19, Minutes(5), Note("Not A's note."), RecordLimits.MaxRecordsPerPeriod, None)),
+                await WithStoreAsync(s => s.AddAsync(
+                    owner, goal, entry, isCommitment, Thu19, Minutes(5), NoteWrite.Replace(Note("Not A's note.")), RecordLimits.MaxRecordsPerPeriod, None)),
                 RecordStoreWriteOutcome.GoalNotFound);
             Assert.Null(await WithStoreAsync(s => s.FindRecordDateAsync(owner, goal, record, None)));
             AssertRefusedWrite(
-                await WithStoreAsync(s => s.ChangeAsync(owner, goal, record, entry, Minutes(5), Note("Not A's note."), None)),
+                await WithStoreAsync(s => s.ChangeAsync(owner, goal, record, entry, Minutes(5), NoteWrite.Replace(Note("Not A's note.")), None)),
                 RecordStoreWriteOutcome.GoalNotFound);
             AssertRefusedWrite(await WithStoreAsync(s => s.DeleteAsync(owner, goal, record, entry, None)), RecordStoreWriteOutcome.GoalNotFound);
             AssertRefusedWrite(await WithStoreAsync(s => s.SaveNoteAsync(owner, goal, entry, Note("Not A's note."), None)), RecordStoreWriteOutcome.GoalNotFound);
             AssertRefusedWrite(await WithStoreAsync(s => s.SaveNoteAsync(owner, goal, entry, null, None)), RecordStoreWriteOutcome.GoalNotFound);
+
+            // The record's own note delete (specs/006-note-editing FR-001): from another owner it gives GoalNotFound too,
+            // and leaves A's note, which the callers' snapshots check.
+            AssertRefusedWrite(
+                await WithStoreAsync(s => s.AddAsync(owner, goal, entry, isCommitment, Thu19, Minutes(5), NoteWrite.Remove, RecordLimits.MaxRecordsPerPeriod, None)),
+                RecordStoreWriteOutcome.GoalNotFound);
+            AssertRefusedWrite(
+                await WithStoreAsync(s => s.ChangeAsync(owner, goal, record, entry, Minutes(5), NoteWrite.Remove, None)),
+                RecordStoreWriteOutcome.GoalNotFound);
 
             var read = await WithStoreAsync(s => s.ReadAsync(owner, goal, Mon16, Sun22, None));
             Assert.Empty(read.Records);
@@ -171,7 +183,7 @@ public sealed class RecordPrivacyTests(DatabaseFixture database)
         {
             Assert.Null(await WithStoreAsync(s => s.FindRecordDateAsync(world.B, world.BsGoal, record, None)));
             AssertRefusedWrite(
-                await WithStoreAsync(s => s.ChangeAsync(world.B, world.BsGoal, record, Day(Wed18), Minutes(5), Note("B's other note."), None)),
+                await WithStoreAsync(s => s.ChangeAsync(world.B, world.BsGoal, record, Day(Wed18), Minutes(5), NoteWrite.Replace(Note("B's other note.")), None)),
                 RecordStoreWriteOutcome.RecordNotFound);
             AssertRefusedWrite(await WithStoreAsync(s => s.DeleteAsync(world.B, world.BsGoal, record, Day(Wed18), None)), RecordStoreWriteOutcome.RecordNotFound);
         }
@@ -190,7 +202,7 @@ public sealed class RecordPrivacyTests(DatabaseFixture database)
         {
             Assert.Null(await WithStoreAsync(s => s.FindRecordDateAsync(world.A, goal, recordOfTheOtherGoal, None)));
             AssertRefusedWrite(
-                await WithStoreAsync(s => s.ChangeAsync(world.A, goal, recordOfTheOtherGoal, entry, Minutes(5), Note("Wrong goal."), None)),
+                await WithStoreAsync(s => s.ChangeAsync(world.A, goal, recordOfTheOtherGoal, entry, Minutes(5), NoteWrite.Replace(Note("Wrong goal.")), None)),
                 RecordStoreWriteOutcome.RecordNotFound);
             AssertRefusedWrite(await WithStoreAsync(s => s.DeleteAsync(world.A, goal, recordOfTheOtherGoal, entry, None)), RecordStoreWriteOutcome.RecordNotFound);
         }

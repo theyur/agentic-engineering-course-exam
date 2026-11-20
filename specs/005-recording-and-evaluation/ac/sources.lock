@@ -2,10 +2,10 @@
   "group": "sources",
   "feature": "specs/005-recording-and-evaluation",
   "files": {
-    "specs/005-recording-and-evaluation/acceptance.md": "dc05f60b4aa2a1470fcf90f46bd76b00086d481208cc82e74d4b2a866e911b61"
+    "specs/005-recording-and-evaluation/acceptance.md": "1acb1babb485ccce9eb576bfe56b84fefa7a132fb03802274455e515075d1804"
   },
   "spec": {
     "path": "specs/005-recording-and-evaluation/spec.md",
-    "sha256": "9b12232e72acae0f2b278c5bb14026072e9c357adc609ff183521975ae1eebd6"
+    "sha256": "59b8742874fdf5fb4e8dee081e0f559751d61385c22b298d1298e3a31742529c"
   }
 }
