@@ -195,9 +195,18 @@ public static class RecordingText
             throw new ArgumentException("A Pending entry has a grace end.", nameof(entry));
         }
 
+        return date + Separator + "Pending, " + HoursLeft(graceEnds, now).ToString(CultureInfo.InvariantCulture) + " h left";
+    }
+
+    /// <summary>
+    /// The whole hours from <paramref name="now"/> to <paramref name="graceEnds"/>, rounded up: 5 for exactly 5 hours
+    /// and for 4 hours and 1 second, 1 in the last hour, 0 at or after the end. <see cref="ForLabel"/> and the reports'
+    /// "{N} h left to record" share this one rule.
+    /// </summary>
+    public static long HoursLeft(DateTimeOffset graceEnds, DateTimeOffset now)
+    {
         var ticks = Math.Max((graceEnds - now).Ticks, 0L);
-        var hours = (ticks + TimeSpan.TicksPerHour - 1) / TimeSpan.TicksPerHour;
-        return date + Separator + "Pending, " + hours.ToString(CultureInfo.InvariantCulture) + " h left";
+        return (ticks + TimeSpan.TicksPerHour - 1) / TimeSpan.TicksPerHour;
     }
 
     /// <summary>

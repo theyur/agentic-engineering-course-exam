@@ -382,6 +382,18 @@ public sealed class RecordingTextTests
         Assert.Equal(expected, RecordingText.ForLabel(entry, Friday, Now));
     }
 
+    // Hours left (slice 6 research R-13)
+
+    [Theory]
+    [InlineData(5 * 3600, 5)]
+    [InlineData((4 * 3600) + 1, 5)]
+    [InlineData(1, 1)]
+    [InlineData(0, 0)]
+    [InlineData(-1, 0)]
+    [InlineData(-3600, 0)]
+    public void HoursLeft_is_the_whole_hours_to_the_grace_end_rounded_up_and_0_from_the_end_on(int secondsLeft, long expected) =>
+        Assert.Equal(expected, RecordingText.HoursLeft(Now.AddSeconds(secondsLeft), Now));
+
     // Culture (constitution II)
 
     [Fact]

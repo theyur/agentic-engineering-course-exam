@@ -14,7 +14,7 @@ This folder is the single source of truth for the UI of `HT.Ui` (Blazor).
 
 All `.html` files open directly in a browser (they link `../css/*.css`). They are references with demo data, not production code.
 
-Many previews end with "Slice N state" blocks after the full design: what slice N builds of that page or component (ADR 0008). Build from the latest slice block that exists, and keep the full design as the target of later slices. [pages.md](pages.md) sums up each slice; slice 4 (goals) adds the states of New goal, Goals, the goal page, the signed-in catalog, the habit details, the custom habit page, Admin, the signed-in Home, Profile, Register, TopNav, MobileNav, HabitCard and GoalListItem; slice 5 (recording and evaluation) adds the states of the goal page (Record, History and Recent notes), RecordDialog, RecordForms, NoteDialog and StatusChip.
+Many previews end with "Slice N state" blocks after the full design: what slice N builds of that page or component (ADR 0008). Build from the latest slice block that exists, and keep the full design as the target of later slices. [pages.md](pages.md) sums up each slice; slice 4 (goals) adds the states of New goal, Goals, the goal page, the signed-in catalog, the habit details, the custom habit page, Admin, the signed-in Home, Profile, Register, TopNav, MobileNav, HabitCard and GoalListItem; slice 5 (recording and evaluation) adds the states of the goal page (Record, History and Recent notes), RecordDialog, RecordForms, NoteDialog and StatusChip; slice 6 (personal reports) adds the states of the goal page (GoalStats and TrendChart), Goals, the signed-in Home (StatTiles, Today, Active goals, Recent notes), the visitor Home (the example GoalStats card), GoalStats, ConsistencyStrip, TrendChart, GoalListItem, CommitmentRow, StatTile, StatusChip ("Upcoming") and GoalSummary. In every slice-6 state a consistency or streak value is one whole text ("90% (18 of 20)", "6 commitments"), with no `<small>` part.
 
 ## Rules for implementation
 
@@ -41,11 +41,11 @@ Many previews end with "Slice N state" blocks after the full design: what slice 
 - `PageCatalogVisitor` — The catalog for visitors: search, a register Notice, FilterPanel on the left and a grid of HabitCards. ([notes](pages/PageCatalogVisitor.md), [preview](pages/PageCatalogVisitor.html))
 - `PageCommunity` — The full Community page: participation status, Consistency Bands with names, rules, and catalog habit performance. ([notes](pages/PageCommunity.md), [preview](pages/PageCommunity.html))
 - `PageCustomHabit` — Create or edit a private custom habit. ([notes](pages/PageCustomHabit.md), [preview](pages/PageCustomHabit.html))
-- `PageGoalDetail` — The goal page: everything about one attempt of one goal — stats, trend, history with corrections, settings, pauses, notes and earlier attempts. Slice 4 builds the head and the Settings card; slice 5 adds "Record", the History card and the Recent notes card. ([notes](pages/PageGoalDetail.md), [preview](pages/PageGoalDetail.html))
-- `PageGoals` — The Goals list: Tabs Active · Paused · Ended, and one GoalListItem per goal. Built first in slice 4, without Tabs. ([notes](pages/PageGoals.md), [preview](pages/PageGoals.html))
+- `PageGoalDetail` — The goal page: everything about one attempt of one goal — stats, trend, history with corrections, settings, pauses, notes and earlier attempts. Slice 4 builds the head and the Settings card; slice 5 adds "Record", the History card and the Recent notes card; slice 6 adds the GoalStats and TrendChart cards above History. ([notes](pages/PageGoalDetail.md), [preview](pages/PageGoalDetail.html))
+- `PageGoals` — The Goals list: Tabs Active · Paused · Ended, and one GoalListItem per goal. Built first in slice 4, without Tabs; slice 6 shows the full items and the footnote, still without Tabs. ([notes](pages/PageGoals.md), [preview](pages/PageGoals.html))
 - `PageHabitDetail` — The catalog habit page, opened from "See details" / "Details" on a HabitCard. ([notes](pages/PageHabitDetail.md), [preview](pages/PageHabitDetail.html))
-- `PageHomeSignedIn` — The signed-in Home (Today): greeting, four StatTiles, the Today list and active goals. ([notes](pages/PageHomeSignedIn.md), [preview](pages/PageHomeSignedIn.html))
-- `PageHomeVisitor` — The visitor Home in layout A: hero with an example goal, How it works, catalog preview and community bands. ([notes](pages/PageHomeVisitor.md), [preview](pages/PageHomeVisitor.html))
+- `PageHomeSignedIn` — The signed-in Home (Today): greeting, four StatTiles, the Today list and active goals. Built in slice 6 for users with goals: "Due now", Pending, Missed this week and Active goals, the Today rows with Upcoming last, Active goals and Recent notes. ([notes](pages/PageHomeSignedIn.md), [preview](pages/PageHomeSignedIn.html))
+- `PageHomeVisitor` — The visitor Home in layout A: hero with an example goal, How it works, catalog preview and community bands. Slice 6 adds the example goal card, with fixed example figures that belong to no account. ([notes](pages/PageHomeVisitor.md), [preview](pages/PageHomeVisitor.html))
 - `PageNewGoal` — The New goal form, opened from "Use this habit" (pre-filled with the suggested starting goal) or "+ New goal". ([notes](pages/PageNewGoal.md), [preview](pages/PageNewGoal.html))
 - `PagePrivacy` — Privacy: what stays private, that community comparison is opt-in and off by default, and what administrators cannot see. ([notes](pages/PagePrivacy.md), [preview](pages/PagePrivacy.html))
 - `PageProfile` — The personal profile: header with avatar, name and email, then Tabs for Account, Community, Goal history and Custom habits. ([notes](pages/PageProfile.md), [preview](pages/PageProfile.html))
@@ -75,17 +75,17 @@ Many previews end with "Slice N state" blocks after the full design: what slice 
 - `Button` — Buttons start an action; one primary button per card or page area, for the thing that area is for. ([guide](components/Button.md), [preview](components/Button.html))
 
 **Status**
-- `StatusChip` — A status chip shows the evaluation state of one commitment or period, always as a word plus a coloured dot. Slice 5 uses Met, Failed, Missed, Pending, Due today and Due this week. ([guide](components/StatusChip.md), [preview](components/StatusChip.html))
+- `StatusChip` — A status chip shows the evaluation state of one commitment or period, always as a word plus a coloured dot. Slice 5 uses Met, Failed, Missed, Pending, Due today and Due this week; slice 6 adds Upcoming. ([guide](components/StatusChip.md), [preview](components/StatusChip.html))
 - `Tag` — A tag is a small neutral label for categories, Build / Reduce intent and admin states. ([guide](components/Tag.md), [preview](components/Tag.html))
 
 **Tracking**
 - `CommitmentRow` — One row per commitment or period in the Today list: name, schedule or progress, a status chip and the next action. ([guide](components/CommitmentRow.md), [preview](components/CommitmentRow.html))
 - `ConsistencyStrip` — A grid of small squares, one per commitment or period, oldest first, showing how each was evaluated. ([guide](components/ConsistencyStrip.md), [preview](components/ConsistencyStrip.html))
-- `GoalListItem` — One goal in the Goals list: name and schedule, consistency, current streak, the last 15 results and the next action. Slice 4 builds a reduced item: name, Build or Reduce Tag and meta line. ([guide](components/GoalListItem.md), [preview](components/GoalListItem.html))
+- `GoalListItem` — One goal in the Goals list: name and schedule, consistency, current streak, the last 15 results and the next action. Slice 4 builds a reduced item: name, Build or Reduce Tag and meta line; slice 6 builds the full item. ([guide](components/GoalListItem.md), [preview](components/GoalListItem.html))
 - `GoalStats` — The goal summary card: consistency, current streak and longest streak, with the history strip below. ([guide](components/GoalStats.md), [preview](components/GoalStats.html))
 - `GoalSummary` — A compact list of active goals with consistency and streak, used on the signed-in Home. ([guide](components/GoalSummary.md), [preview](components/GoalSummary.html))
 - `StatTile` — A tile with one big number and a short label, in a row of four at the top of the signed-in Home. ([guide](components/StatTile.md), [preview](components/StatTile.html))
-- `TrendChart` — A simple bar chart of recorded amounts per day or week, with the target as a dashed line. ([guide](components/TrendChart.md), [preview](components/TrendChart.html))
+- `TrendChart` — A simple bar chart of recorded progress per commitment, day or week, with the target as a dashed line. Slice 6 fixes its title and sub line per goal kind. ([guide](components/TrendChart.md), [preview](components/TrendChart.html))
 
 **Catalog**
 - `FilterPanel` — The left column of the catalog: category (single choice) and intent (Build / Reduce). ([guide](components/FilterPanel.md), [preview](components/FilterPanel.html))

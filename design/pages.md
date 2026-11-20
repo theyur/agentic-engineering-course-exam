@@ -12,7 +12,7 @@ Every page follows layout A: TopNav, a page head, content centered at `container
 ## Home · signed in (`PageHomeSignedIn`)
 1. TopNav, signed-in variant with "+ New goal" and avatar.
 2. Page head: greeting in `heading-1` and today's date.
-3. Four StatTiles: Due today · Pending · Missed this week · Active goals.
+3. Four StatTiles: Due now · Pending · Missed this week · Active goals.
 4. Two columns: Today card (CommitmentRows: Pending, Due today, Missed) | GoalSummary + Recent notes.
 
 ## Catalog · visitor (`PageCatalogVisitor`)
@@ -40,7 +40,7 @@ Every page follows layout A: TopNav, a page head, content centered at `container
 ## Goal detail (`PageGoalDetail`)
 1. BackLink "← Goals", `heading-1` goal name, tags (category, Build / Reduce, Commitment-based / Period-based), attempt line.
 2. Actions on the right: Edit settings (ghost), Pause (secondary), End goal (ghost), Record (primary). Pause and End goal open a Dialog.
-3. Left column: GoalStats with ConsistencyStrip · TrendChart (amount per week or day, target line) · History table (date, recorded, StatusChip, note, Record / Edit / Add record).
+3. Left column: GoalStats with ConsistencyStrip · TrendChart (recorded progress per commitment, day or week, target line) · History table (date, recorded, StatusChip, note, Record / Edit / Add record).
 4. Right column: Settings (KeyValue, "changes apply from the next commitment") · Pauses · Recent notes · Earlier attempts with outcome.
 
 ## New goal (`PageNewGoal`)
@@ -153,3 +153,22 @@ What slice 5 builds of the pages and dialogs above, on top of slices 1, 2 and 4.
 - StatusChip (`components/StatusChip`): "Met", "Failed", "Missed", "Pending", "Due today" (a commitment or a day) and "Due this week" (a week), always with their word. No Upcoming chip, Excused or Paused.
 - New goal (`PageNewGoal`): "How do you measure it?" gains its help line "You can record partial amounts; the target decides the result.".
 - Home, signed in (`PageHomeSignedIn`), Goals (`PageGoals`) and the other pages: unchanged in slice 5.
+
+## Slice 6 (personal reports)
+
+What slice 6 builds of the pages above, on top of slices 1, 2, 4 and 5. A page shows only the sections and links whose slice has shipped (ADR 0008); the full previews stay as they are, and each preview's "Slice 6 state" block shows the built state. Texts that disagreed with the spec were replaced in the full previews too: the upcoming StatusChip reads "Upcoming" (not "Due Mon"), the Home's first StatTile reads "Due now" (not "Due today"), the TrendChart shows recorded progress, an amount or a number of records, not verdicts, with weeks for per-week goals and commitment-based yes/no goals and commitments or days otherwise, and a commitment-based yes/no goal's trend is titled "Days done per week" (not "Sessions per week"). In every slice-6 state a consistency or streak value is one whole text ("90% (18 of 20)", "6 commitments"), with no `<small>` part.
+
+- Goal page (`PageGoalDetail`, `/goals/{id}`): slice 5's page, with two cards added in the left column above the History card:
+  1. GoalStats: the eyebrow "This attempt", the title "Consistency and streaks", "Consistency" ("92% (24 of 26)" or "N/A"), "Streak, {unit}" and "Longest, {unit}" (plural unit), then the ConsistencyStrip of the last 30 ended results with its legend (Met, Failed, Missed, Pending);
+  2. TrendChart: the title and sub line of the goal's kind ("Minutes per day", "Last 14 days"), the bars (an empty outline for no record), the dashed target line "Target {n} min" or "Target {n}", the date labels.
+
+  A goal with no begun entry keeps the slice 5 page without these cards. No pauses or earlier attempts.
+- Goals (`PageGoals`, `/goals`): still no Tabs; full GoalListItems, goals with a Pending result first, then those with a Due one, then the others, each group by name. Each item: the name link, the Build or Reduce Tag, a Pending StatusChip, slice 4's meta line plus the progress of a Due entry with a record ("12 of 20 min today", "1 of 2 this week"), "Consistency", "Current streak", the mini strip of the last 15 results, and "Record" (primary with a Due entry, secondary with only Pending ones, absent otherwise). The footnote "Each goal is counted on its own. Consistency counts only finalized results; pending ones are left out." No goals: slice 4's EmptyState.
+- Home, signed in (`PageHomeSignedIn`), a registered user with goals, under slice 4's page head:
+  1. four StatTiles across the page: "Due now", "Pending · still can record", "Missed this week" (buttons with `aria-pressed` that filter the Today list) and "Active goals" (a link to `/goals`);
+  2. two columns: the Today card (CommitmentRows: Pending, then Due, then Missed this week, then Upcoming; "Record", "Edit", "Add note" or "Edit note", none on Upcoming; "Nothing to record right now." with no row) | the "Active goals" card (GoalSummary, at most 5, then "All goals →") and the "Recent notes" card (at most 5; absent without notes).
+
+  No goals: slice 4's EmptyState. An administrator: the page head only. No "Excuse" (slice 7).
+- Home, visitor (`PageHomeVisitor`): the hero gains the GoalStats card labelled "Example goal" ("Yoga, 3 days a week", "90% (18 of 20)", streak 6 and longest 11 commitments, a strip of 21 fixed results with its legend). Its figures are fixed examples that belong to no account; it shows with or without Published habits. The rest is slice 2's.
+- StatusChip (`components/StatusChip`): slice 5's chips plus "Upcoming" (`ht-status--due`) on the Home's Upcoming rows.
+- The other pages and dialogs: unchanged in slice 6.
