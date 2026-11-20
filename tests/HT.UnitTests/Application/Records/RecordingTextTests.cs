@@ -274,7 +274,7 @@ public sealed class RecordingTextTests
             RecordingText.NoteHelp(History(CoffeeAtMost2Cups())));
         Assert.Equal(
             "This note is for the whole day. Clear the field to remove it.",
-            RecordingText.NoteHelp(History(Target(DurationTimes(20, DurationUnit.Minutes, 2, SchedulePeriod.Day, BuildOrReduce.Build)))));
+            RecordingText.NoteHelp(History(Target(DurationTimes(20, DurationUnit.Minutes, 2, SchedulePeriod.Day)))));
     }
 
     [Fact]

@@ -153,7 +153,7 @@ public sealed class NoteTests
         _world.At(Wed18TenOClock);
         Saved(await SaveNoteAsync(goal, Tue17, "Knee was sore."));
 
-        var result = await _world.RecordAsync(goal, Wed18, Yes(null));
+        var result = await _world.RecordAsync(goal, Wed18, Yes());
 
         Assert.Equal(RecordWriteOutcome.Recorded, result.Outcome);
         Assert.Equal("Knee was sore.", result.Entry!.Note);

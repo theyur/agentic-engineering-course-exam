@@ -493,7 +493,7 @@ public sealed class HistoryCardTests : BunitContext
         await NoteControl(cut, "Fri 13 Nov")!.ClickAsync(new MouseEventArgs());
         await NoteControl(cut, "Wed 4 Nov")!.ClickAsync(new MouseEventArgs());
 
-        Assert.Equal([(Fri13Nov, (string?)null), (Wed4Nov, Away)], rows.Select(r => (r.FirstDate, r.Note)));
+        Assert.Equal([(Fri13Nov, null), (Wed4Nov, Away)], rows.Select(r => (r.FirstDate, r.Note)));
         Assert.Empty(actions);
     }
 

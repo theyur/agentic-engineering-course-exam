@@ -5,8 +5,9 @@
 This contract gives only what changes in
 [slice 5's host contract](../../005-recording-and-evaluation/contracts/host.md): the goal page's History card, the
 RecordDialog and the NoteDialog. Implementation amends that document in place, with a dated line citing this feature
-and ADR 0019 (Work order step 2). The texts are proposals that `design/` confirms first (constitution IV, Work order
-step 1).
+and ADR 0019 (Work order step 2). The texts were proposals that `design/` confirms first (constitution IV, Work order
+step 1). Checked 2026-11-20 (T037): `design/` confirms every text and order below unchanged (`pages/PageGoalDetail`,
+`components/RecordDialog`, `RecordForms`, `NoteDialog`, `pages.md`).
 
 ## Unchanged
 

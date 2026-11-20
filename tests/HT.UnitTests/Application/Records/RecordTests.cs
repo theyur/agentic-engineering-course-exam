@@ -488,7 +488,7 @@ public sealed class RecordTests
         _world.At(Mon16TenOClock);
         Recorded(await _world.RecordAsync(goal, Mon16, Minutes(12, "Back was tired.")));
 
-        var entry = Recorded(await _world.RecordAsync(goal, Mon16, Minutes(25, null)));
+        var entry = Recorded(await _world.RecordAsync(goal, Mon16, Minutes(25)));
 
         Assert.Equal("Back was tired.", entry.Note);
         Assert.Equal("Back was tired.", _world.Records.NotesOfGoal(goal)[Mon16].Value);

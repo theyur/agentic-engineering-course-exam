@@ -487,7 +487,7 @@ public sealed class CorrectionTests
         var goal = await GoalAsync(Reading20MinDaily);
         var record = await RecordAtAsync(goal, Mon16, Minutes(12, "Back was tired."), Mon16TenOClock);
 
-        var entry = Changed(await _world.ChangeAsync(goal, record, Minutes(25, null)), record);
+        var entry = Changed(await _world.ChangeAsync(goal, record, Minutes(25)), record);
 
         Assert.Equal("Back was tired.", entry.Note);
         Assert.Equal(25, Assert.Single(entry.Records).Amount);
