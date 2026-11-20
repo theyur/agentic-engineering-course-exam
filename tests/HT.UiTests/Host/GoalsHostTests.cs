@@ -228,6 +228,75 @@ public sealed class GoalsHostTests(HostFixture host)
         }
     }
 
+    [Fact]
+    public async Task Slice_6_the_owners_prerendered_goal_page_has_the_GoalStats_card_above_the_History_card()
+    {
+        // Every day from 4 days before today (UTC, at the host's clock), with 15 min on the first day: the first day is
+        // Met and the second Missed (its grace period ended at 00:00 today); the next two are Pending, today is Due.
+        var (browser, goal) = await OwnerWithEveryDayGoalAsync("stats-owner", startInDays: -4, recordFirstDay: true);
+        using (browser)
+        {
+            var (status, html) = await browser.GetPageAsync($"{GoalsAddress}/{goal.Value}");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            var stats = html.IndexOf("<h2 class=\"ht-card__title\">Consistency and streaks</h2>", StringComparison.Ordinal);
+            var history = html.IndexOf("<h2 class=\"ht-card__title\">History</h2>", StringComparison.Ordinal);
+            Assert.True(stats >= 0, "The GoalStats card is missing.");
+            Assert.True(history > stats, "The GoalStats card is not above the History card.");
+            Assert.Contains("<div class=\"ht-eyebrow\">This attempt</div>", html, StringComparison.Ordinal);
+            Assert.Contains("<div class=\"ht-stat__value ht-stat__value--text\">50% (1 of 2)</div><div class=\"ht-stat__label\">Consistency</div>", html, StringComparison.Ordinal);
+            Assert.Contains("<div class=\"ht-stat__label\">Streak, commitments</div>", html, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Slice_6_a_goal_not_started_has_neither_the_GoalStats_nor_the_History_card()
+    {
+        var (browser, goal) = await OwnerWithEveryDayGoalAsync("stats-later", startInDays: 3, recordFirstDay: false);
+        using (browser)
+        {
+            var (status, html) = await browser.GetPageAsync($"{GoalsAddress}/{goal.Value}");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            Assert.Contains("<h2 class=\"ht-card__title\">Settings</h2>", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("Consistency and streaks", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("ht-stat__label", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("<h2 class=\"ht-card__title\">History</h2>", html, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// A registered user signed in, with a goal of 15 min on every day stored through the host's goal store on a new
+    /// Published catalog habit, starting <paramref name="startInDays"/> days from today in UTC (the account's zone) at
+    /// the host's clock, and with 15 min recorded on its first day when <paramref name="recordFirstDay"/> is set.
+    /// </summary>
+    private async Task<(HttpClient Browser, GoalId Goal)> OwnerWithEveryDayGoalAsync(string who, int startInDays, bool recordFirstDay)
+    {
+        var name = $"Ui-Go Stats {Guid.NewGuid():N}"[..30];
+        var habit = await host.ArrangeCatalogHabitAsync(Definition(name));
+        var (browser, account) = await host.SignedInAccountAsync(Email(who), Role.RegisteredUser);
+        await using var scope = host.Services.CreateAsyncScope();
+        var services = scope.ServiceProvider;
+        var first = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow()).AddDays(startInDays);
+        Assert.True(GoalTarget.TryCreate(new GoalTargetFields
+        {
+            BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 15, DurationUnit = DurationUnit.Minutes,
+            ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+        }, out var target, out _));
+        var created = await services.GetRequiredService<IGoalStore>().CreateAsync(
+            account, new NewGoal(new GoalHabit(habit, HabitKind.Catalog), first, null, target), NamedTimeZone.Utc, NamedTimeZone.Utc, CancellationToken.None);
+        Assert.Equal(GoalWriteOutcomeKind.Created, created.Kind);
+        var goal = created.Id!.Value;
+        if (recordFirstDay)
+        {
+            var written = await services.GetRequiredService<IRecordStore>().AddAsync(
+                account, goal, new EntrySpan(first, first, first), true, first, RecordValue.FromAmount(15), NoteWrite.Keep, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None);
+            Assert.Equal(RecordStoreWriteOutcome.Written, written.Outcome);
+        }
+
+        return (browser, goal);
+    }
+
     /// <summary>
     /// A registered user signed in, with one goal created through the host's <see cref="GoalService"/> on a new Published
     /// catalog habit: 15 min on Monday to Friday, or on every day with <paramref name="everyDay"/>, from today in UTC (the

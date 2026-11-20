@@ -3,7 +3,9 @@
 @using HT.Application.Accounts
 @using HT.Application.Goals
 @using HT.Application.Records
+@using HT.Application.Reports
 @using HT.Domain.Accounts
+@using HT.Domain.Evaluation
 @using HT.Domain.Goals
 @using HT.Ui.Account
 @using HT.Ui.Components.Goals
@@ -11,20 +13,23 @@
 @inject UseCaseScope UseCases
 @inject ActingUserAccessor ActingUsers
 @inject NavigationManager Navigation
-@* design/pages/PageGoalDetail, slice 5 state (HP-001, research R-12, contracts/host.md "Goal page"): the interactive
-   part of the goal page, prerendered, with the goal identifier as its only parameter. Slice 4's head ("← Goals", the
-   name, the tags and the attempt line), with the primary action "Record" when something can be recorded now (FR-011)
-   and no other action; slice 4's Notice for a habit no longer in the catalog; then the page's two columns: the History
-   card on the left and the Settings card, then the Recent notes card (US4), on the right. The history is read after
-   what can be recorded now, from 365 days before that result's current date D to D. A goal with no current date, or
-   with no begun entry, shows no History card and has the design's layout for that case: the Settings card alone in
-   ht-grid-2. A goal with no current date shows no "Record". "Record" opens the RecordDialog with what can be recorded
-   now; a History row's "Add record", "Edit" or record button opens it for that row or record, with the history's
-   settings (US3, HP-001). "Add note" or "Edit note" of a row without a record opens the NoteDialog for that row (US4,
-   HP-003; specs/006-note-editing HP-002, HP-004). The recent notes are read after the history, and only for a goal with a current date. After a save or a delete, what can be
-   recorded, the history and the recent notes are read again before the dialog closes, so the closing render already
-   has the new rows and notes, and the focus goes back to the head's "Record" or to the row's control as the card now
-   shows it. Every use case runs in its own scope. *@
+@* design/pages/PageGoalDetail, slice 5 state with slice 6's GoalStats card (HP-001, research R-12, contracts/host.md
+   "Goal page"): the interactive part of the goal page, prerendered, with the goal identifier as its only parameter.
+   Slice 4's head ("← Goals", the name, the tags and the attempt line), with the primary action "Record" when something
+   can be recorded now (FR-011) and no other action; slice 4's Notice for a habit no longer in the catalog; then the
+   page's two columns: on the left the GoalStats card ("This attempt", "Consistency and streaks", with the strip of the
+   latest 30 ended results), shown only when the goal's report has a begun entry, above the History card; on the right
+   the Settings card, then the Recent notes card (US4). The history is read after what can be recorded now, from 365
+   days before that result's current date D to D, and the goal's report (slice 6 FR-007) after the history. A goal
+   with no current date, or with no begun entry, shows no History card and has the design's layout for that case: the
+   Settings card alone in ht-grid-2. A goal with no current date shows no "Record". "Record" opens the RecordDialog
+   with what can be recorded now; a History row's "Add record", "Edit" or record button opens it for that row or
+   record, with the history's settings (US3, HP-001). "Add note" or "Edit note" of a row without a record opens the
+   NoteDialog for that row (US4, HP-003; specs/006-note-editing HP-002, HP-004). The recent notes are read after the
+   report, and only for a goal with a current date. After a save or a delete, what can be recorded, the history, the
+   report and the recent notes are read again before the dialog closes, so the closing render already has the new rows,
+   figures and notes, and the focus goes back to the head's "Record" or to the row's control as the card now shows it.
+   Every use case runs in its own scope. *@
 @if (_goal is { } goal)
 {
     <BackLink Href="/goals" Text="Goals" />
@@ -52,6 +57,10 @@
     {
         <div class="ht-grid-2">
             <div class="ht-stack">
+                @if (_report is { HasBegunEntry: true } report)
+                {
+                    <GoalStats View="report.Stats" Strip="StripOf(report)" Unit="report.Stats.Unit" Eyebrow="This attempt" Title="Consistency and streaks" />
+                }
                 <HistoryCard @ref="_historyCard" History="_history!" OnAction="OpenRow" OnNote="OpenNote" />
             </div>
             <div class="ht-stack">
@@ -91,6 +100,7 @@
     private ElementReference _recordButton;
     private HistoryCard? _historyCard;
     private IReadOnlyList<RecentNote> _recentNotes = [];
+    private GoalReport? _report;
     private bool _noteOpen;
 
     /// <summary>The History row the NoteDialog was opened for; kept after it closes, so the focus can go back to it.</summary>
@@ -126,7 +136,8 @@
 
     /// <summary>
     /// What can be recorded now, then, with its current date D, the history of D − 365 to D (366 days; research R-12),
-    /// then the recent notes (FR-008). A goal with no current date has no history and no notes to show.
+    /// then the goal's report (slice 6 FR-007), then the recent notes (FR-008). A goal with no current date has no
+    /// history, no report and no notes to show.
     /// </summary>
     private async Task ReadRecordsAsync()
     {
@@ -136,6 +147,7 @@
         if (_recordable?.CurrentDate is not { } current)
         {
             _history = null;
+            _report = null;
             _recentNotes = [];
             return;
         }
@@ -144,6 +156,9 @@
             (service, token) => service.GetHistoryAsync(_actingUser, new GoalId(Id), current.AddDays(-HistoryDays + 1), current, token),
             CancellationToken.None);
         _history = history.History;
+        var report = await UseCases.RunAsync<ReportService, GoalReportResult>(
+            (service, token) => service.GetGoalReportAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        _report = report.Report;
         var notes = await UseCases.RunAsync<RecordingService, RecentNotesResult>(
             (service, token) => service.GetRecentNotesAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
         _recentNotes = notes.Notes;
@@ -198,6 +213,10 @@
 
     private ValueTask FocusRowAsync() =>
         _row is { } row && _historyCard is { } card ? card.FocusAsync(row.FirstDate, _editing?.Id) : ValueTask.CompletedTask;
+
+    /// <summary>The GoalStats strip: the states of the report's latest ended results, oldest first (FR-005).</summary>
+    private static IReadOnlyList<EvaluationState> StripOf(GoalReport report) =>
+        report.Recent.Results.Select(result => result.State).ToList();
 
     /// <summary>"Attempt 1 · started 14 Jul" once the goal has started, "Attempt 1 · starts 23 Nov" before (slice 4 HP-004).</summary>
     private static string AttemptLine(GoalDetails goal) =>

@@ -1,0 +1,42 @@
+@* design/components/GoalStats (slice-6 state, HP-001, HP-004, HP-005, research R-12): the eyebrow and the title, then
+   three ht-stat boxes in the design's order: "Consistency" with the consistency as one whole ReportText text
+   ("90% (18 of 20)" or "N/A"; ht-stat__value--text), "Streak, {unit}" and "Longest, {unit}" (the plural unit from
+   ReportText) with the streaks as numbers, then the ConsistencyStrip of the given states with its legend. One
+   component for the goal page ("This attempt", "Consistency and streaks") and the visitor Home's example card
+   ("Example goal" and the goal's title); it computes no figure and builds no figure text. *@
+@using System.Globalization
+@using HT.Application.Reports
+@using HT.Domain.Evaluation
+@using HT.Domain.Reports
+<section class="ht-card">
+    <div class="ht-eyebrow">@Eyebrow</div>
+    <h2 class="ht-card__title">@Title</h2>
+    <div class="ht-stats">
+        <div class="ht-stat"><div class="ht-stat__value ht-stat__value--text">@View.ConsistencyText</div><div class="ht-stat__label">Consistency</div></div>
+        <div class="ht-stat"><div class="ht-stat__value">@View.CurrentStreak.ToString(CultureInfo.InvariantCulture)</div><div class="ht-stat__label">@ReportText.StreakLabel(Unit)</div></div>
+        <div class="ht-stat"><div class="ht-stat__value">@View.LongestStreak.ToString(CultureInfo.InvariantCulture)</div><div class="ht-stat__label">@ReportText.LongestLabel(Unit)</div></div>
+    </div>
+    <ConsistencyStrip States="Strip" Unit="Unit" />
+</section>
+
+@code {
+    /// <summary>The goal's figures with their texts.</summary>
+    [Parameter, EditorRequired]
+    public GoalStatsView View { get; set; } = null!;
+
+    /// <summary>The strip's ended results (Met, Failed, Missed or Pending), oldest first.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<EvaluationState> Strip { get; set; } = [];
+
+    /// <summary>The goal's streak unit, which the labels and the strip's label name.</summary>
+    [Parameter, EditorRequired]
+    public StreakUnit Unit { get; set; }
+
+    /// <summary>"This attempt" on the goal page, "Example goal" on the visitor Home.</summary>
+    [Parameter, EditorRequired]
+    public string Eyebrow { get; set; } = string.Empty;
+
+    /// <summary>"Consistency and streaks" on the goal page, the example goal's title on the visitor Home.</summary>
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+}

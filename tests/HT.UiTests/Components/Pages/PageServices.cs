@@ -5,6 +5,7 @@ using HT.Application.Accounts;
 using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Application.Records;
+using HT.Application.Reports;
 using HT.Ui.Account;
 using HT.Ui.Habits;
 using HT.UnitTests.Fakes;
@@ -51,7 +52,7 @@ public static class PageServices
     /// Registers, each with TryAdd, the goal fakes every page test resolves: a <see cref="FakeCustomHabitStore"/>, a
     /// <see cref="FakeAccountStore"/> that knows every signed-in user, a <see cref="FakeGoalStore"/> built from the
     /// registered fakes, a <see cref="FakeRecordStore"/> sharing that goal store's goals, a <see cref="FakeTimeProvider"/>, the UTC <see cref="InstallationTimeZone"/>, and the
-    /// <see cref="GoalService"/>, <see cref="ProfileService"/> and <see cref="RecordingService"/> over them. Returns the
+    /// <see cref="GoalService"/>, <see cref="ProfileService"/>, <see cref="RecordingService"/> and <see cref="ReportService"/> over them. Returns the
     /// registered goal store. The catalog store is the one <see cref="AddCatalog"/> registered, or a new one.
     /// </summary>
     public static FakeGoalStore AddGoals(this BunitContext context)
@@ -78,6 +79,7 @@ public static class PageServices
         services.TryAddScoped<GoalService>();
         services.TryAddScoped<ProfileService>();
         services.TryAddScoped<RecordingService>();
+        services.TryAddScoped<ReportService>();
         return Registered<IGoalStore, FakeGoalStore>(services);
     }
 

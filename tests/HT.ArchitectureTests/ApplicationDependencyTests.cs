@@ -57,7 +57,7 @@ public sealed class ApplicationDependencyTests
     }
 
     [Fact]
-    public void OnlyTheGoalTypesTheThreeHabitServicesTheProfileServiceAndTheRecordingServiceMayDependOnTheGoalStorePort()
+    public void OnlyTheGoalTypesTheThreeHabitServicesTheProfileServiceTheRecordingServiceAndTheReportServiceMayDependOnTheGoalStorePort()
     {
         // Nested types (async state machines, closures) belong to their service, so the names allow a nested suffix.
         Types().That().ResideInAssembly(ArchitectureModel.Application)
@@ -65,8 +65,9 @@ public sealed class ApplicationDependencyTests
             .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Habits\.(CatalogService|CatalogAdministrationService|CustomHabitService)([+/].*)?$")
             .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Accounts\.ProfileService([+/].*)?$")
             .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Records\.RecordingService([+/].*)?$")
+            .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Reports\.ReportService([+/].*)?$")
             .Should().NotDependOnAny(Types(true).That().Are(typeof(IGoalStore)))
-            .Because("goals are private and reached only through owner-scoped use cases; the habit services need counts and the delete rule, the profile service the time-zone change, the recording service the owner's goal (constitution III, slice 4 research R-13, slice 5 research R-13)")
+            .Because("goals are private and reached only through owner-scoped use cases; the habit services need counts and the delete rule, the profile service the time-zone change, the recording service the owner's goal, the report service the owner's goals (constitution III, slice 4 research R-13, slice 5 research R-13, slice 6 research R-14)")
             .Check(ArchitectureModel.Architecture);
     }
 
