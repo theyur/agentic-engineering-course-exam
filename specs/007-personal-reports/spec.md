@@ -66,6 +66,12 @@ the roadmap's technical row):
   0007 and ADR 0018 are recorded in [ADR 0021](../../docs/adr/0021-demo-report-loading.md) (FR-032, HP-011,
   US8-AS7 to US8-AS10).
 
+### Session 2026-11-20 (acceptance review)
+
+- Q: From which date does the 6-day Upcoming window count for a goal that has not started, which has no current
+  date (slice 4 FR-012)? → A: From the account's today: such a goal gets an Upcoming entry when its first
+  commitment or period starts at most 6 days after today (FR-012, US6-AS8).
+
 ## Decisions this slice cites
 
 Recorded in earlier slices and not decided again here:
@@ -94,7 +100,27 @@ Recorded in earlier slices and not decided again here:
 
 ## Slice 4 and 5 behaviour these tests use
 
-Restated here, unchanged, so that this spec alone gives the rules and texts its acceptance tests depend on:
+Restated here, unchanged, so that this spec alone gives the rules and texts its acceptance tests depend on
+(slices 1 and 2 as well, where noted):
+
+- **Password rule** (slice 1 FR-002): every password the system sets (registration, administrator, demo
+  accounts) has at least 8 characters and contains at least one digit; otherwise registration is refused with
+  "At least 8 characters, with a number.", and demo loading, demo history loading and demo report loading give
+  "demo password does not meet the password rule" and create nothing (`walking42`, `admin2026` and
+  `example2026` meet it; `abc` does not).
+- **Seed catalog** (slice 2, demo loading): demo loading loads the seed catalog into an empty catalog, with
+  Published catalog habits that include "Reading", "Yoga" and "Sugar" (the habits of demo history loading's
+  goals) and "Walking", "Strength training" and "Screen time" (the habits of demo report loading's goals,
+  FR-032). So after demo loading on an empty database, every goal of FR-030 and FR-032 is created; an
+  administrator can unpublish a seed habit like any other.
+- **Unpublishing a habit that goals use** (slice 4 FR-033, FR-034): unpublishing a Published catalog habit that
+  at least one goal uses gives, without confirmation, "confirmation needed" and leaves it Published; with
+  confirmation it unpublishes. A goal on an Unpublished habit keeps working for its owner.
+- **Time zone changes** (slice 4 FR-012, FR-026): a change of the account's time zone adds a goal settings
+  version that applies from the first date whose day has not begun on the goal's own timeline; a day that has
+  begun is never moved.
+- **Reduce yes/no commitments** (slice 5): a commitment of a Reduce yes/no goal ("avoided on …") is Met when
+  recorded "No" and Failed when recorded "Yes"; its progress still counts "Yes" as 1.
 
 - **Goals and schedule kinds** (slice 4 FR-001 to FR-013): a goal on fixed days of the week is
   *commitment-based*, each scheduled day on or after its start date being one commitment; a goal of N times per
@@ -558,7 +584,8 @@ Missed this week. Visitors see an example GoalStats card on the visitor Home.
     its grace period ends;
     after those, the Upcoming entries (Clarifications 2026-11-20, D-2; SPEC §6): for each goal with no Due
     result, its earliest Upcoming commitment or period, when its first date is at most 6 days after the goal's
-    current date; the earliest start first, then in the order of FR-011; each with its goal, its date and the
+    current date (for a goal that has not started, which has no current date (slice 4 FR-012), after the
+    account's today; Clarifications 2026-11-20 (acceptance review)); the earliest start first, then in the order of FR-011; each with its goal, its date and the
     state Upcoming. Upcoming entries are not counted;
   - every goal with its consistency (FR-002) and its current and longest streak with their unit, in the order of
     FR-011;
