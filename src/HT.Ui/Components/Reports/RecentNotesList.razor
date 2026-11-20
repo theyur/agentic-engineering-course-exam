@@ -1,0 +1,25 @@
+@using HT.Application.Accounts
+@using HT.Application.Reports
+@* design/pages/PageHomeSignedIn, slice 6 state (HP-003): the Home's "Recent notes" card, static. Each of the dashboard's
+   notes (at most 5, in its order) is an ht-goal item with the note in quotes and "{goal name} · {date}" under it, the
+   date as the History writes it ("Mon 16 Nov", or "9 – 15 Nov" for a week). Nothing is rendered without a note. Slice
+   5's RecentNotesCard (the goal page) is a different card and is not used here. *@
+@if (Notes.Count > 0)
+{
+    <section class="ht-card">
+        <h2 class="ht-card__title">Recent notes</h2>
+        @foreach (var note in Notes)
+        {
+            <div class="ht-goal">@($"\"{note.Note}\"")<div class="ht-goal__meta">@($"{note.GoalName} · {DateOf(note)}")</div></div>
+        }
+    </section>
+}
+
+@code {
+    /// <summary>The dashboard's recent notes.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<DashboardNote> Notes { get; set; } = [];
+
+    private static string DateOf(DashboardNote note) =>
+        note.FirstDate == note.LastDate ? DateTexts.ShortDate(note.FirstDate) : DateTexts.WeekRange(note.FirstDate, note.LastDate);
+}

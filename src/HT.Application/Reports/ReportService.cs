@@ -25,6 +25,9 @@ public sealed class ReportService
     /// <summary>How many ended results each goal of the overview gives at most, the Goals page's mini strip (FR-011).</summary>
     private const int OverviewRecentCount = 15;
 
+    /// <summary>How many recent notes the dashboard gives at most (FR-012).</summary>
+    private const int DashboardNoteCount = 5;
+
     /// <summary>The ended states, each counted in <see cref="RecentResults.Counts"/>, 0 included (FR-005).</summary>
     private static readonly EvaluationState[] EndedStates =
         [EvaluationState.Met, EvaluationState.Failed, EvaluationState.Missed, EvaluationState.Pending];
@@ -108,6 +111,105 @@ public sealed class ReportService
             .ToList();
         return GoalsOverviewResult.Found(new GoalsOverview { Goals = goals, Today = ZoneOf(access.Account!).DateAt(now), ReadAt = now });
     }
+
+    /// <summary>
+    /// The signed-in Home's figures at the supplied time (FR-012, FR-013, research R-06), with "this week" the
+    /// Monday-to-Sunday week that contains the supplied time in the account's time zone (the stored one, else the
+    /// installation default): the counts of Due, Pending and Missed-this-week entries and of goals; the Today list
+    /// (Pending by grace end, then Due in goal order, then Missed this week by latest grace end, ties in goal order, then
+    /// one Upcoming entry per goal with no Due entry that starts within 6 days, earliest start first, then goal order);
+    /// every goal with its figures in goal order; and at most 5 notes, latest first date first, ties in goal order. A user
+    /// with no goals gets counts of 0 and empty lists.
+    /// </summary>
+    public async Task<DashboardResult> GetDashboardAsync(ActingUser actingUser, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await CheckAccountAsync(actingUser, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return DashboardResult.Refused(
+                refusal == AccessRefusal.NotSignedIn ? DashboardOutcome.NotSignedIn : DashboardOutcome.NotForAdministrators,
+                access.Message!);
+        }
+
+        var now = _clock.GetUtcNow();
+        var zone = ZoneOf(access.Account!);
+        var today = zone.DateAt(now);
+        var weekStarts = zone.StartOfDay(today.AddDays(-DaysSinceMonday(today)));
+        var stored = await _goals.ListAsync(access.Owner, cancellationToken).ConfigureAwait(false);
+        var evaluated = new List<GoalEvaluation>(stored.Count);
+        foreach (var goal in stored)
+        {
+            evaluated.Add(await GoalEvaluation.OfAsync(_records, access.Owner, goal, now, cancellationToken).ConfigureAwait(false));
+        }
+
+        var ordered = GoalOrder.Of(evaluated, evaluation => evaluation);
+        var missedThisWeek = ordered
+            .SelectMany((evaluation, rank) => evaluation.Entries
+                .Where(entry => entry.State == EvaluationState.Missed)
+                .Select(entry => (Evaluation: evaluation, Rank: rank, Entry: entry, GraceEnds: GracePeriod.EndOf(entry.Ends))))
+            .Where(missed => missed.GraceEnds >= weekStarts && missed.GraceEnds <= now)
+            .OrderByDescending(missed => missed.GraceEnds)
+            .ThenBy(missed => missed.Rank)
+            .Select(missed => TodayEntryOf(missed.Evaluation, missed.Entry))
+            .ToList();
+        var pending = ordered
+            .SelectMany((evaluation, rank) => evaluation.Pending.Select(entry => (Evaluation: evaluation, Rank: rank, Entry: entry)))
+            .OrderBy(item => item.Entry.GraceEnds)
+            .ThenBy(item => item.Rank)
+            .Select(item => TodayEntryOf(item.Evaluation, item.Entry))
+            .ToList();
+        var due = ordered.SelectMany(evaluation => evaluation.Due.Select(entry => TodayEntryOf(evaluation, entry))).ToList();
+        var upcoming = ordered
+            .Select((evaluation, rank) => (Evaluation: evaluation, Rank: rank))
+            .Where(item => item.Evaluation.Due.Count == 0)
+            .Select(item => (item.Evaluation, item.Rank, Entry: item.Evaluation.NextUpcoming(item.Evaluation.CurrentDate ?? today)))
+            .Where(item => item.Entry is not null)
+            .OrderBy(item => item.Entry!.Starts)
+            .ThenBy(item => item.Rank)
+            .Select(item => TodayEntryOf(item.Evaluation, item.Entry!))
+            .ToList();
+        var notes = ordered
+            .SelectMany((evaluation, rank) => evaluation.Notes.Select(entry => (Evaluation: evaluation, Rank: rank, Entry: entry)))
+            .OrderByDescending(item => item.Entry.FirstDate)
+            .ThenBy(item => item.Rank)
+            .Take(DashboardNoteCount)
+            .Select(item => new DashboardNote
+            {
+                GoalId = item.Evaluation.Goal.Id,
+                GoalName = item.Evaluation.Name,
+                FirstDate = item.Entry.FirstDate,
+                LastDate = item.Entry.LastDate,
+                Note = item.Entry.Note!,
+                State = item.Entry.State,
+            })
+            .ToList();
+
+        return DashboardResult.Found(new Dashboard
+        {
+            Counts = new DashboardCounts { Due = due.Count, Pending = pending.Count, MissedThisWeek = missedThisWeek.Count, Goals = ordered.Count },
+            Today = [.. pending, .. due, .. missedThisWeek, .. upcoming],
+            Goals = ordered.Select(evaluation => new DashboardGoal { GoalId = evaluation.Goal.Id, Name = evaluation.Name, Stats = StatsOf(evaluation) }).ToList(),
+            Notes = notes,
+            AccountToday = today,
+            WeekStarts = weekStarts,
+            ReadAt = now,
+        });
+    }
+
+    /// <summary>The days from this week's Monday to <paramref name="date"/>: 0 on a Monday, 6 on a Sunday.</summary>
+    private static int DaysSinceMonday(DateOnly date) => ((int)date.DayOfWeek + 6) % 7;
+
+    /// <summary>One row of the Today list (FR-012, research R-06): its goal, the goal's settings and what can be recorded now, and the entry.</summary>
+    private static TodayEntry TodayEntryOf(GoalEvaluation evaluation, HistoryEntry entry) => new()
+    {
+        GoalId = evaluation.Goal.Id,
+        GoalName = evaluation.Name,
+        BuildOrReduce = evaluation.BuildOrReduce,
+        ScheduleText = GoalText.ScheduleText(evaluation.LatestTarget),
+        Goal = evaluation.Recordable,
+        Entry = entry,
+    };
 
     /// <summary>One goal of the overview (FR-011, research R-07).</summary>
     private static OverviewGoal OverviewGoalOf(StoredGoal stored, GoalEvaluation evaluation) => new()

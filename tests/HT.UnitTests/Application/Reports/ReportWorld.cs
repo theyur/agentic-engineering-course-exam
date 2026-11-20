@@ -134,6 +134,22 @@ public sealed class ReportWorld
     public Task<GoalReportResult> ReadAsync(GoalId goal, ActingUser? user = null) =>
         Service.GetGoalReportAsync(user ?? User, goal, CancellationToken.None);
 
+    /// <summary>Stores a note directly under the entry whose key is <paramref name="date"/>, with no clock or ownership check.</summary>
+    public void SeedNote(GoalId goal, DateOnly date, string text)
+    {
+        Assert.True(NoteText.TryCreate(text, out var note, out _));
+        Records.SeedNote(goal, date, note!);
+    }
+
+    /// <summary>The dashboard of <see cref="User"/> (or <paramref name="user"/>) at the clock's time, expected found.</summary>
+    public async Task<Dashboard> DashboardAsync(ActingUser? user = null)
+    {
+        var result = await Service.GetDashboardAsync(user ?? User, CancellationToken.None);
+        Assert.Equal(DashboardOutcome.Found, result.Outcome);
+        Assert.Null(result.Message);
+        return result.Dashboard!;
+    }
+
     /// <summary>The goals overview of <see cref="User"/> (or <paramref name="user"/>) at the clock's time, expected found.</summary>
     public async Task<GoalsOverview> OverviewAsync(ActingUser? user = null)
     {

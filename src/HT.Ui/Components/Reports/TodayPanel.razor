@@ -1,0 +1,149 @@
+@rendermode InteractiveServer
+@using HT.Application.Accounts
+@using HT.Application.Records
+@using HT.Application.Reports
+@using HT.Domain.Accounts
+@using HT.Domain.Evaluation
+@using HT.Domain.Goals
+@using HT.Ui.Account
+@using HT.Ui.Components.Records
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@* design/pages/PageHomeSignedIn, slice 6 state (HP-003, research R-12, contracts/host.md "Signed-in Home"): the Home's
+   interactive island, prerendered, with no parameter. It reads the dashboard itself, through UseCaseScope, and renders
+   ht-home__panel (display:contents, so its two parts take their places in the page's ht-home grid): the four StatTiles
+   ("Due now", "Pending · still can record", "Missed this week" as filter buttons with aria-pressed; "Active goals" as a
+   link to /goals), then the Today card with one CommitmentRow per entry, or "Nothing to record right now.". Choosing a
+   filter tile shows only that state's rows (no Upcoming row), choosing it again shows all, choosing another moves the
+   filter. "Record" opens slice 5's RecordDialog fixed to the row (the entry's Goal as Recordable, its Entry as the row),
+   "Edit" opens the row's record, "Add note" and "Edit note" open the NoteDialog. After a save the dashboard is read
+   again before the dialog closes. When either dialog closes, saved or not, the focus returns to the same row's action,
+   found by its goal and first date after the re-read; when the row has left the list, or the filter hides it, it goes
+   to the "Due now" tile, which is always there (constitution IV). *@
+@if (_dashboard is { } dashboard)
+{
+    <div class="ht-home__panel">
+        <div class="ht-grid-4 ht-home__tiles">
+            <StatTile @ref="_dueTile" Label="Due now" Value="dashboard.Counts.Due" Pressed="_filter == EvaluationState.Due"
+                      OnToggle="() => Toggle(EvaluationState.Due)" />
+            <StatTile Label="Pending · still can record" Value="dashboard.Counts.Pending" Modifier="ht-tile--pending"
+                      Pressed="_filter == EvaluationState.Pending" OnToggle="() => Toggle(EvaluationState.Pending)" />
+            <StatTile Label="Missed this week" Value="dashboard.Counts.MissedThisWeek" Modifier="ht-tile--failed"
+                      Pressed="_filter == EvaluationState.Missed" OnToggle="() => Toggle(EvaluationState.Missed)" />
+            <StatTile Label="Active goals" Value="dashboard.Counts.Goals" Href="/goals" />
+        </div>
+        <section class="ht-card">
+            <h2 class="ht-card__title">Today</h2>
+            @if (ShownRows.Count == 0)
+            {
+                <p class="ht-card__sub">Nothing to record right now.</p>
+            }
+            else
+            {
+                @foreach (var entry in ShownRows)
+                {
+                    <CommitmentRow @key="KeyOf(entry)" @ref="_rows[KeyOf(entry)]" Entry="entry" Now="dashboard.ReadAt"
+                                   OnAction="kind => Open(entry, kind)" />
+                }
+            }
+        </section>
+        @if (_recordEntry is { } recordEntry)
+        {
+            <RecordDialog Open="_recordOpen" OnClose="CloseRecord" FocusOnClose="FocusRowAsync"
+                          GoalId="recordEntry.GoalId" GoalName="@recordEntry.GoalName" Recordable="recordEntry.Goal" Row="recordEntry.Entry"
+                          Editing="_editing" ActingUser="_actingUser" OnSaved="SavedAsync" />
+        }
+        @if (_noteEntry is { } noteEntry)
+        {
+            <NoteDialog Open="_noteOpen" OnClose="CloseNote" FocusOnClose="FocusRowAsync" GoalId="noteEntry.GoalId" GoalName="@noteEntry.GoalName"
+                        History="noteEntry.Goal" Row="noteEntry.Entry" ActingUser="_actingUser" OnSaved="SavedAsync" />
+        }
+    </div>
+}
+
+@code {
+    private readonly Dictionary<(GoalId Goal, DateOnly First), CommitmentRow> _rows = [];
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private Dashboard? _dashboard;
+    private StatTile? _dueTile;
+
+    /// <summary>The state the Today list is filtered to; null shows every row.</summary>
+    private EvaluationState? _filter;
+
+    private bool _recordOpen;
+    private bool _noteOpen;
+
+    /// <summary>The row the RecordDialog was opened from; kept after it closes, so the focus can go back to it.</summary>
+    private TodayEntry? _recordEntry;
+
+    /// <summary>The row the NoteDialog was opened from; kept after it closes, so the focus can go back to it.</summary>
+    private TodayEntry? _noteEntry;
+
+    /// <summary>The record "Edit" opened; null for "Record".</summary>
+    private RecordView? _editing;
+
+    /// <summary>The goal and first date of the row whose action opened the last dialog.</summary>
+    private (GoalId Goal, DateOnly First)? _opener;
+
+    /// <summary>The Today list as the filter shows it: every row, or only the rows of the pressed tile's state.</summary>
+    private IReadOnlyList<TodayEntry> ShownRows =>
+        _dashboard is not { } dashboard ? []
+        : _filter is { } state ? dashboard.Today.Where(entry => entry.Entry.State == state).ToList()
+        : dashboard.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _actingUser = await ActingUsers.GetAsync();
+        await ReadAsync();
+    }
+
+    private async Task ReadAsync()
+    {
+        var result = await UseCases.RunAsync<ReportService, DashboardResult>(
+            (service, token) => service.GetDashboardAsync(_actingUser, token), CancellationToken.None);
+        _dashboard = result.Dashboard;
+    }
+
+    private static (GoalId Goal, DateOnly First) KeyOf(TodayEntry entry) => (entry.GoalId, entry.Entry.FirstDate);
+
+    private void Toggle(EvaluationState state) => _filter = _filter == state ? null : state;
+
+    private void Open(TodayEntry entry, CommitmentRow.ActionKind kind)
+    {
+        _opener = KeyOf(entry);
+        if (kind == CommitmentRow.ActionKind.Note)
+        {
+            _noteEntry = entry;
+            _noteOpen = true;
+            return;
+        }
+
+        _recordEntry = entry;
+        _editing = kind == CommitmentRow.ActionKind.Edit ? entry.Entry.Records[0] : null;
+        _recordOpen = true;
+    }
+
+    private void CloseRecord() => _recordOpen = false;
+
+    private void CloseNote() => _noteOpen = false;
+
+    /// <summary>Reads again first, so the render that closes the dialog has the new rows and counts to give the focus back to.</summary>
+    private async Task SavedAsync(HistoryEntry entry)
+    {
+        await ReadAsync();
+        _recordOpen = false;
+        _noteOpen = false;
+    }
+
+    /// <summary>The opener row's action as the list now shows it, or the "Due now" tile when the row is gone or hidden.</summary>
+    private ValueTask FocusRowAsync()
+    {
+        if (_opener is { } key && ShownRows.Any(entry => KeyOf(entry) == key) && _rows.TryGetValue(key, out var row))
+        {
+            return row.FocusAsync();
+        }
+
+        return _dueTile?.FocusAsync() ?? ValueTask.CompletedTask;
+    }
+}

@@ -1,0 +1,46 @@
+@* design/components/StatTile, slice 6 state (HP-003, HP-006): one count with its label, in one of two forms. A filter
+   tile is a native <button type="button"> with aria-pressed, so it is reached with Tab and works with Enter and Space;
+   choosing it raises OnToggle, and the page decides what is pressed. A link tile (Href) is an <a>. Both hold two spans,
+   ht-tile__value then ht-tile__label (a button holds no div); the label is exact, the smoke check reads it. The count is
+   the use case's; the tile computes nothing. *@
+@if (Href is { } href)
+{
+    <a class="@Classes" href="@href" @ref="_control"><span class="ht-tile__value">@Value</span><span class="ht-tile__label">@Label</span></a>
+}
+else
+{
+    <button type="button" class="@Classes" aria-pressed="@(Pressed ? "true" : "false")" @ref="_control" @onclick="() => OnToggle.InvokeAsync()"><span class="ht-tile__value">@Value</span><span class="ht-tile__label">@Label</span></button>
+}
+
+@code {
+    private ElementReference _control;
+
+    /// <summary>The tile's label: "Due now", "Pending · still can record", "Missed this week", "Active goals".</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>The count the use case gives.</summary>
+    [Parameter, EditorRequired]
+    public int Value { get; set; }
+
+    /// <summary>The design's modifier: <c>ht-tile--pending</c> or <c>ht-tile--failed</c>; none for the neutral tiles.</summary>
+    [Parameter]
+    public string? Modifier { get; set; }
+
+    /// <summary>Makes the tile a link to this address in place of a filter button.</summary>
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>Whether the button tile's filter is on (<c>aria-pressed="true"</c>).</summary>
+    [Parameter]
+    public bool Pressed { get; set; }
+
+    /// <summary>The button tile was chosen.</summary>
+    [Parameter]
+    public EventCallback OnToggle { get; set; }
+
+    private string Classes => Modifier is { } modifier ? "ht-card ht-tile " + modifier : "ht-card ht-tile";
+
+    /// <summary>Gives the focus to the tile's button or link (the Today panel's fallback after a dialog closes).</summary>
+    public ValueTask FocusAsync() => _control.FocusAsync();
+}

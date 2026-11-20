@@ -2,12 +2,14 @@
 @using HT.Application.Accounts
 @using HT.Application.Goals
 @using HT.Application.Habits
+@using HT.Application.Reports
 @using HT.Domain.Accounts
 @using HT.Ui.Account
 @using HT.Ui.Components.Goals
+@using HT.Ui.Components.Reports
 @using Microsoft.AspNetCore.Components.Authorization
 @inject CatalogService Catalog
-@inject GoalService GoalService
+@inject ReportService Reports
 @inject ProfileService Profiles
 @inject ActingUserAccessor ActingUsers
 @* One address for both Homes (HP-009). Static: the services are injected directly. The visitor Home: the hero,
@@ -17,10 +19,14 @@
 
 <AuthorizeView>
     <Authorized>
-        @* design/pages/PageHomeSignedIn, slice 4 state: the greeting as heading-1 and today's date, both from the use
-           case at the current time in the account's time zone (HP-010, FR-029), and for a registered user with no goals
-           the EmptyState of the Goals page; with goals nothing more until slice 6 (ADR 0008). An administrator's Home
-           has the page head only. A session whose account is gone gets no greeting, only the slice 1 heading. *@
+        @* design/pages/PageHomeSignedIn, slice 6 state: the greeting as heading-1 and today's date, both from the use
+           case at the current time in the account's time zone (slice 4 HP-010, FR-029); for a registered user with no
+           goals the EmptyState of the Goals page; for one with goals (slice 6 HP-003, contracts/host.md "Signed-in Home")
+           the ht-home grid: the TodayPanel island (tiles and Today card, interactive and prerendered, reading the
+           dashboard itself) and the static right column, the "Active goals" card and the "Recent notes" card (absent
+           without a note), from the page's own dashboard read, so they follow a save on the next page load. An
+           administrator's Home has the page head only. A session whose account is gone gets no greeting, only the slice 1
+           heading. *@
         <div class="ht-container">
             @if (_heading?.Heading is { } heading)
             {
@@ -30,9 +36,22 @@
             {
                 <div class="ht-page-head"><h1>Today</h1></div>
             }
-            @if (_goals is { Outcome: GoalListOutcome.Found, Goals.Count: 0 })
+            @if (_dashboard?.Dashboard is { } dashboard)
             {
-                <NoGoalsEmptyState />
+                if (dashboard.Counts.Goals == 0)
+                {
+                    <NoGoalsEmptyState />
+                }
+                else
+                {
+                    <div class="ht-home">
+                        <TodayPanel />
+                        <div class="ht-stack">
+                            <GoalSummary Goals="dashboard.Goals" />
+                            <RecentNotesList Notes="dashboard.Notes" />
+                        </div>
+                    </div>
+                }
             }
         </div>
     </Authorized>
@@ -81,7 +100,7 @@
 
 @code {
     private HomePreviewResult? _preview;
-    private GoalListResult? _goals;
+    private DashboardResult? _dashboard;
     private HomeHeadingResult? _heading;
 
     [CascadingParameter]
@@ -101,7 +120,7 @@
             if (!user.IsInRole(nameof(Role.Administrator)))
             {
                 // Whether the registered user has goals is the use case's answer; a refusal shows nothing more.
-                _goals = await GoalService.ListAsync(actingUser, CancellationToken.None);
+                _dashboard = await Reports.GetDashboardAsync(actingUser, CancellationToken.None);
             }
         }
     }

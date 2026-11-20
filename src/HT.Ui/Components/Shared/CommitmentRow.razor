@@ -1,0 +1,110 @@
+@using System.Globalization
+@using HT.Application.Records
+@using HT.Application.Reports
+@using HT.Domain.Evaluation
+@using HT.Domain.Goals
+@using HT.Domain.Habits
+@* design/components/CommitmentRow, slice 6 state (HP-003, D-2): one row of the Home's Today card, from a TodayEntry
+   and the instant the dashboard was read. The goal's name with a "Reduce" Tag for a Reduce goal; the meta line per
+   state (Due: the schedule without a record, ReportText.ProgressText with one; Pending: "{date} · N h left to record";
+   Missed: "{date} · no record"; Upcoming: the date; {date} as the History writes it); the progress bar of a Due count or
+   duration entry with a record; the StatusChip; then one action, never primary: "Record" (a Due or Pending period, or
+   a commitment without a record) and "Edit" (a commitment with a record), secondary; "Add note" or "Edit note" (Missed),
+   ghost; none for Upcoming. Each action's accessible name starts with its text and names the row. The row raises
+   OnAction; the island opens the dialog. Every text and value comes from ReportText, RecordingText and the entry; the
+   row computes no figure. *@
+<div class="ht-row">
+    <div class="ht-row__main">
+        @if (Entry.BuildOrReduce == BuildOrReduce.Reduce)
+        {
+            <div class="ht-row__name">@Entry.GoalName <Tag Text="Reduce" /></div>
+        }
+        else
+        {
+            <div class="ht-row__name">@Entry.GoalName</div>
+        }
+        <div class="ht-row__meta">@MetaLine</div>
+        @if (HasBar)
+        {
+            <div class="ht-progress" role="progressbar" aria-valuenow="@Number(Progress.Value ?? 0)" aria-valuemin="0"
+                 aria-valuemax="@Number(Progress.Of)" aria-label="@($"{Entry.GoalName} progress")"><span style="@Width"></span></div>
+        }
+    </div>
+    <StatusChip State="State" ScheduleKind="Entry.Goal.GoalScheduleKind" Period="Entry.Goal.Period" />
+    @if (Action is { } action)
+    {
+        <button type="button" class="@(action == ActionKind.Note ? "ht-btn ht-btn--ghost ht-btn--sm" : "ht-btn ht-btn--secondary ht-btn--sm")"
+                aria-haspopup="dialog" aria-label="@AccessibleName(action)" @ref="_action"
+                @onclick="() => OnAction.InvokeAsync(action)">@ActionText(action)</button>
+    }
+</div>
+
+@code {
+    private ElementReference _action;
+
+    /// <summary>What a row's action opens: the RecordDialog for a new record or for the row's record, or the NoteDialog.</summary>
+    public enum ActionKind
+    {
+        Record,
+        Edit,
+        Note,
+    }
+
+    /// <summary>The entry as the dashboard gives it.</summary>
+    [Parameter, EditorRequired]
+    public TodayEntry Entry { get; set; } = default!;
+
+    /// <summary>The instant the dashboard was read, for "N h left to record".</summary>
+    [Parameter, EditorRequired]
+    public DateTimeOffset Now { get; set; }
+
+    /// <summary>The row's action was chosen.</summary>
+    [Parameter]
+    public EventCallback<ActionKind> OnAction { get; set; }
+
+    /// <summary>Gives the focus to the row's action; an Upcoming row has none, so nothing happens.</summary>
+    public ValueTask FocusAsync() => Action is null ? ValueTask.CompletedTask : _action.FocusAsync();
+
+    private EvaluationState State => Entry.Entry.State;
+
+    private Progress Progress => Entry.Entry.Progress;
+
+    private string Date => RecordingText.EntryDate(Entry.Entry);
+
+    private bool IsCommitment => Entry.Goal.GoalScheduleKind == GoalScheduleKind.CommitmentBased;
+
+    private bool HasBar => State == EvaluationState.Due && Entry.HasRecord && Entry.Goal.Measurement != Measurement.YesNo;
+
+    private string Width => "width:" + RecordingText.ProgressFill(Progress).ToString(CultureInfo.InvariantCulture) + "%";
+
+    private string MetaLine => State switch
+    {
+        EvaluationState.Due => Entry.HasRecord ? ReportText.ProgressText(Entry.Goal, Entry.Entry) : Entry.ScheduleText,
+        EvaluationState.Pending => Date + " · " + ReportText.PendingLeft(Entry.Entry.GraceEnds!.Value, Now),
+        EvaluationState.Missed => Date + " · no record",
+        _ => Date,
+    };
+
+    private ActionKind? Action => State switch
+    {
+        EvaluationState.Due or EvaluationState.Pending => IsCommitment && Entry.HasRecord ? ActionKind.Edit : ActionKind.Record,
+        EvaluationState.Missed => ActionKind.Note,
+        _ => null,
+    };
+
+    private string ActionText(ActionKind action) => action switch
+    {
+        ActionKind.Record => "Record",
+        ActionKind.Edit => "Edit",
+        _ => Entry.HasNote ? "Edit note" : "Add note",
+    };
+
+    private string AccessibleName(ActionKind action) => action switch
+    {
+        ActionKind.Record => $"Record for {Entry.GoalName}, {Date}",
+        ActionKind.Edit => $"Edit record of {Entry.GoalName}, {Date}",
+        _ => Entry.HasNote ? $"Edit note of {Entry.GoalName}, {Date}" : $"Add note for {Entry.GoalName}, {Date}",
+    };
+
+    private static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
+}
