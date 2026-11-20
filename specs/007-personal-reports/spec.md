@@ -41,6 +41,29 @@ the roadmap's technical row):
   SPEC §11.2 may rework period evaluation in slice 7, which then also extends this slice's figures with the
   excluded states (roadmap slice note 7).
 
+### Session 2026-11-20 (clarify)
+
+- Q: How is a consistency percentage rounded? → A: Down to a whole percentage: 2 of 3 is "66% (2 of 3)", 199 of 200
+  "99% (199 of 200)", so "100%" means every counted result was Met and no goal appears to reach a band threshold
+  it has not reached (FR-002, US1-AS4).
+- Q: Which Missed results are "Missed this week" on the Home? → A: Those that became Missed this week: their grace
+  period ended at or after Monday 00:00 of the current week in the account's time zone. The previous week's
+  Saturday, Sunday and per-week period therefore appear early in the week (FR-012, US6-AS4).
+- Q: Over which results are a goal's personal figures computed? → A: The whole current attempt (the report range),
+  not a rolling window; the community views' rolling 30 days (SPEC §7) are slice 9's own figure ("Terms used
+  below", FR-001, FR-003).
+- Q: What does a trend bar show for a commitment-based count or duration goal? → A: One bar per commitment, the last
+  14, each its recorded amount against the goal's amount; weekly bars are only for per-week goals and
+  commitment-based yes/no goals, and the TrendChart design note "weeks for … commitment-based goals" is narrowed to
+  yes/no ones (FR-006, US4-AS3).
+- Q: Does slice 6 add demo data beyond `demo4`'s 28 days? → A: Yes: a new demo account `demo5@example.com` with
+  goals that started 84 days (12 weeks) before the run, so that trends fill their bars and streaks are longer. Slice
+  5's locked criteria say demo history loading names `demo4` and no other account (F005 AC-051, AC-059), so `demo5`
+  is created by a fourth startup task, *demo report loading*, after demo history loading, by the same rules (ADR
+  0007, 0013, 0018); F001, F004 and F005 stay locked. The task's order and the amended "later slices" rule of ADR
+  0007 and ADR 0018 are recorded in [ADR 0021](../../docs/adr/0021-demo-report-loading.md) (FR-032, HP-011,
+  US8-AS7 to US8-AS10).
+
 ## Decisions this slice cites
 
 Recorded in earlier slices and not decided again here:
@@ -109,7 +132,8 @@ Domain types they use. As in slices 1 to 5:
 
 - **FR-NNN** are application behaviours, reachable through Application use cases. The figures (consistency,
   streaks, results, trend values) and their texts are returned by use cases, so acceptance tests check them
-  without a page.
+  without a page. Demo loading, demo history loading and demo report loading (FR-030 to FR-032) are operator
+  capabilities that acceptance tests call directly.
 - **HP-NNN** are host, page and integration requirements, verified by unit, integration and selective UI tests,
   not by acceptance tests.
 - Scenarios marked *(page)* describe page or browser behaviour and are expected to be listed as "Not testable
@@ -337,9 +361,10 @@ to read A's goal report, and each reads their own dashboard and overview, which 
 
 ### User Story 8 - Demo reports (Priority: P2)
 
-Reviewers who sign in as the demo account with history find non-trivial consistency and streaks, a Today list
-with Due, Pending and Missed results, and recent notes, without waiting for real time to pass. Visitors see an
-example GoalStats card on the visitor Home.
+Reviewers who sign in as a demo account with history find non-trivial consistency and streaks, a Today list
+with Due, Pending and Missed results, and recent notes, without waiting for real time to pass: `demo4` with 28 days
+(slice 5), and `demo5` with 12 weeks, whose trends fill all their bars. Visitors see an example GoalStats card on
+the visitor Home.
 
 **Why this priority**: constitution VI and SPEC §10; needed for the hosted demo, not for the core flow.
 
@@ -363,6 +388,20 @@ example GoalStats card on the visitor Home.
    slice-4 demo goals of `demo1` to `demo3` read "N/A" and streaks of 0 (FR-031).
 6. *(page)* **Given** an anonymous visitor on the visitor Home, **Then** the hero shows a GoalStats card labelled
    "Example goal" (HP-004).
+7. **Given** an empty database, a valid demo password and a run at a fixed time, **When** demo loading, demo
+   history loading and then demo report loading run, **Then** `demo5@example.com` is created with the three goals
+   of FR-032, and demo report loading's results are "created", "demo goals added" and "demo records added" for
+   `demo5@example.com`, naming no goal, habit, note, unit or amount (FR-032).
+8. **Given** that run on Wednesday 2026-11-18, **When** `demo5@example.com` reads its reports at the run time,
+   **Then** "Screen time, at most 120 min a day" reads "95% (78 of 82)", 27 days, longest 34 days; "Strength
+   training, 2 times a week" "81% (9 of 11)", 3 weeks, longest 4 weeks; "Walking, 30 min, 3 days a week" "82% (29
+   of 35)", 7 commitments, longest 15 commitments; and their trends have 14, 12 and 14 bars (FR-032).
+9. **Given** `demo5@example.com` already exists, **When** demo report loading runs again, **Then** its result is
+   "already exists", with no goal or record result, and its goals, records and notes are unchanged (FR-032).
+10. **Given** no demo password, or one that fails the password rule, **When** demo report loading runs, **Then**
+    its result is "no demo password configured" or "demo password does not meet the password rule" and no account
+    is created; demo loading's and demo history loading's results never name `demo5@example.com` (FR-031,
+    FR-032).
 
 ---
 
@@ -396,7 +435,8 @@ example GoalStats card on the visitor Home.
 **Terms used below**
 
 - *Report range*: the goal's current attempt, from its start date up to the supplied time. Until slice 8 a goal
-  has one attempt, started with the goal (slice 4), so the report range is the whole goal.
+  has one attempt, started with the goal (slice 4), so the report range is the whole goal. It is never a rolling
+  window (Clarifications 2026-11-20 (clarify)).
 - *Final result*: a commitment or evaluation period in the report range whose state at the supplied time is Met,
   Failed or Missed (slice 5 FR-010). In this slice every final result is *eligible*; slice 7 excludes Excused and
   Paused ones.
@@ -522,6 +562,47 @@ example GoalStats card on the visitor Home.
     of 3)", 0 weeks, longest 1 week. The current week is Due.
 - **FR-031**: Demo loading MUST stay exactly as slices 1, 2 and 4 specify it; the slice-4 demo goals of `demo1` to
   `demo3` start on the run date or later, so at the run time they have no final result: "N/A" and streaks of 0.
+- **FR-032**: *Demo report loading*, a new operator capability that runs after demo history loading
+  (Clarifications 2026-11-20 (clarify)), MUST take the demo password as demo loading does ("no demo password
+  configured", "demo password does not meet the password rule", creating nothing in both cases). With a valid one
+  it creates `demo5@example.com`, a registered user with the demo password (result "created"), or leaves an
+  existing account of that email unchanged (result "already exists", ignoring case; no goal or record result, and
+  none of its private data is read or changed, ADR 0013). The new account has no account name and no custom
+  habits, and uses the installation's default time zone. It gets, as a whole with the account, three goals that
+  start 84 days before the run date R (defined as in slice 5 FR-030; "R − k" is the date k days before R) and
+  their records and notes; each goal is left out when its catalog habit is not Published (looked up by name,
+  ignoring case), and its name follows slice 4 FR-010:
+  - on catalog habit "Walking": Build, duration 30 minutes, fixed days Monday, Wednesday and Friday ("Walking, 30
+    min, 3 days a week"); on each of its commitments R − k with k from 3 to 84 one record: 30 minutes, except k
+    from 9 to 15: 35 minutes; k from 20 to 26: 18 minutes; k from 43 to 49: no record, the latest of these
+    commitments with the note "On holiday."; no record for k from 0 to 2;
+  - on catalog habit "Strength training": Build, yes/no, 2 times per week ("Strength training, 2 times a week").
+    The *current week* contains R; week w (w ≥ 1) is the w-th week before it. Every week of the goal before the
+    current week has "Yes" on its Monday and Thursday, except week 2: Monday, Wednesday and Thursday; week 4:
+    Monday only, with the note "Sore shoulder." on that week; week 7: no record. The current week has no record.
+    Weeks 1 to 11 are always weeks of the goal (its first full week starts at most 6 days after its start date),
+    and week 12 only when R is a Monday;
+  - on catalog habit "Screen time": Reduce, duration at most 120 minutes, once per day ("Screen time, at most 120
+    min a day"); on each date R − k with k from 3 to 84 one record: 90 minutes when k is even, 110 when k is odd,
+    except k from 30 to 32: 150 minutes, with the note "Long train ride." on R − 31; k = 50: no record; R − 2: 100
+    minutes; R − 1 and R: no record.
+
+  Its results for a created account are "created", "demo goals added" and "demo records added" for
+  `demo5@example.com`, also when some or all goals are left out; they name the demo email but never a goal,
+  habit, note, unit or amount. Read by `demo5@example.com` at the run time:
+  - "Screen time, at most 120 min a day" (any weekday): final results R − 84 to R − 3, of which R − 30 to R − 32
+    Failed and R − 50 Missed: "95% (78 of 82)", current streak 27 days, longest 34 days; R − 2 (with 100 minutes)
+    and R − 1 Pending, R Due;
+  - "Strength training, 2 times a week", on a Wednesday to Sunday: weeks 1 to 11 final, week 4 Failed and week 7
+    Missed: "81% (9 of 11)", current streak 3 weeks, longest 4 weeks; on a Tuesday week 1 is Pending: "80% (8 of
+    10)", 2 weeks, longest 4 weeks; on a Monday week 1 is Pending and the goal also has a week 12 (its start date
+    is then a Monday), with "Yes" on Monday and Thursday: "81% (9 of 11)", 2 weeks, longest 5 weeks;
+  - "Walking, 30 min, 3 days a week", with R a Wednesday (e.g. 2026-11-18): 35 final commitments, R − 21, R − 23
+    and R − 26 Failed, R − 44, R − 47 and R − 49 Missed: "82% (29 of 35)", current streak 7 commitments, longest 15
+    commitments; R − 2 Pending, R Due. On other weekdays the figures follow from the same rules.
+
+  Every trend of these goals has its full number of bars: 14 for "Walking" and "Screen time", 12 for "Strength
+  training" (11 weeks and the current one).
 
 ### Host, page and integration requirements (outside the AC surface)
 
@@ -584,7 +665,9 @@ example GoalStats card on the visitor Home.
   habit names or figures of a user's report (constitution III).
 - **HP-008**: The hosted demo's smoke check (`tools/HT.SmokeCheck`) MUST also find, signed in as
   `demo4@example.com`, the word "Consistency" and the unit "commitments" on the page of "Reading, 20 min daily",
-  and "Due today" on the Home.
+  and "Due today" on the Home; and, signed in as `demo5@example.com`, the name of each of its demo goals on its
+  Goals page and the unit "weeks" on the page of "Strength training, 2 times a week". Every data parameter of demo
+  report loading's port gets its `SmokeCheckCoverage` entry (slice 3 "Coverage rule").
 - **HP-009**: Derived figures MUST NOT be cached or stored: every figure of this slice is computed on read from the
   stored records, settings versions and the supplied time (D-4; ARCHITECTURE §9;
   [ADR 0020](../../docs/adr/0020-derived-figures-on-read.md), extending ADR 0018). Within one read, a use case may
@@ -592,8 +675,16 @@ example GoalStats card on the visitor Home.
 - **HP-010**: `CONTEXT.md` MUST get the terms of this slice, each with a NOT-boundary (constitution I): Consistency
   (final results only, per goal, never a band), Streak (current and longest, strict, in the goal's unit), Report
   range, Recent results and Trend (amounts, not verdicts), Dashboard (the signed-in Home's Today view; in-app only,
-  not a reminder). The Pending entry gains "and never extends one" (D-1); the Upcoming entry stays, and the Home
-  now shows it (D-2).
+  not a reminder), and Demo report loading. The Pending entry gains "and never extends one" (D-1); the Upcoming
+  entry stays, and the Home now shows it (D-2); Demo account names `demo5@example.com`, created by demo report
+  loading; Demo refresh lists demo report loading among the tasks that run again.
+- **HP-011**: The host MUST run demo report loading at every start, after demo history loading, and log its
+  results as demo history loading's are logged (slice 5 HP-007): an account line for `demo5@example.com`, then for
+  a created account a "Demo goals …" and a "Demo records …" line, each with the demo email and the result text
+  only. A fault in it is logged without secrets and does not stop the start (ADR 0007). The deployment's success
+  check (ADR 0015) also requires its result. The order and the amended "later slices" rule of ADR 0007 and ADR
+  0018 are recorded in [ADR 0021](../../docs/adr/0021-demo-report-loading.md). The daily scheduled refresh (slice 5
+  HP-009) re-creates `demo5` with the rest of the demo data, so its figures stay as FR-032 gives them.
 
 ### Slice 4 and 5 requirements and tests this slice changes
 
@@ -606,8 +697,14 @@ example GoalStats card on the visitor Home.
 - Slice 2 HP-012 and `design/pages/PageHomeVisitor` "Slice 2 state" ("No GoalStats card yet (it needs demo goals,
   slice 6)"): amended by HP-004.
 - Slice 4 HP-018 and slice 5 HP-008 (smoke check): extended by HP-008.
+- Slice 5 HP-007 and ADR 0007's startup tasks (administrator creation, demo loading, demo history loading):
+  extended by HP-011 with demo report loading as the fourth task. Tests: the host's startup tests
+  (`tests/HT.UiTests/Host/StartupLogTests.cs`, `tests/HT.UiTests/Operator/StartupTasksDemoTests.cs`) compare the
+  "Demo " lines exactly; they change to expect `demo5@example.com`'s lines after `demo4@example.com`'s, which stay
+  as they are.
 - The locked acceptance criteria of slices 1, 2, 4 and 5 (`tests/HT.AcceptanceTests/Features/F001`, `F002`, `F004`,
-  `F005`) are not changed and must keep passing (FR-016, FR-030, FR-031).
+  `F005`) are not changed and must keep passing (FR-016, FR-030, FR-031); `demo5` comes from a separate task
+  because F005 AC-051 and AC-059 let demo history loading name `demo4` only.
 
 ### Design changes before build
 
@@ -619,7 +716,8 @@ Constitution IV and ADR 0008 require `design/` to change first:
   cells and legend entries.
 - `design/components/TrendChart`: the bar kinds of FR-006 with their titles and sub lines (for example "Minutes
   per day · last 14 days", "Times per week · last 12 weeks", "Days done per week · last 12 weeks"), an empty bar
-  for no value, no paused bars until slice 7.
+  for no value, no paused bars until slice 7; its rule "Use weeks for weekly and commitment-based goals" becomes
+  "weeks for per-week goals and commitment-based yes/no goals; commitments or days otherwise".
 - `design/pages/PageGoals` and `components/GoalListItem`: a slice-6 state without Tabs, the meta line of HP-002
   (no "missed Tue"), and the footnote without "excused and paused".
 - `design/pages/PageHomeSignedIn`, `components/CommitmentRow` and `StatTile`: a slice-6 state with the rows and
@@ -663,7 +761,8 @@ user.
   an anonymous visitor, and none returns another account's goal, result, note or figure (constitution III).
 - **SC-006**: On the hosted demo, on any day until 2027-01-31, `demo4@example.com` shows a consistency with its
   count, a non-zero current streak and a longest streak above 10 for at least one goal, and a Today list with Due
-  and Pending results; the smoke check confirms it after every deployment.
+  and Pending results, and `demo5@example.com` shows every trend with its full number of bars (14 or 12); the smoke
+  check confirms it after every deployment.
 - **SC-007**: The goal page, the Goals page and the Home each render their reports for a goal with a year of daily
   results in under 2 seconds on the hosted demo.
 - **SC-008**: Every page of this slice passes the accessibility rules of constitution IV (HP-006).
@@ -692,19 +791,25 @@ owner on 2026-11-20 (see `## Clarifications`).
     it.
 - **Roadmap decision R3** ("Reports before excusals and pauses", due before slice 6): decided "Yes" by the owner
   on 2026-11-20; the roadmap's R3 row records it.
+- **Decided in `/speckit-clarify`** (2026-11-20):
+  - **D-5** (FR-032, HP-011; constitution VI, ADR 0007, 0013, 0018): longer demo history. Decided: a new account
+    `demo5@example.com` with 12 weeks of history, created by a fourth startup task, demo report loading. Rejected:
+    keeping only `demo4` (short trends); unlocking F005 so that demo history loading creates `demo5`. It amends
+    ADR 0007's and ADR 0018's "later slices" rule (extend demo loading or demo history loading), so it is
+    recorded in [ADR 0021](../../docs/adr/0021-demo-report-loading.md).
 
 ## Assumptions
 
 - Excused and Paused (slice 7), goal changes, ended goals and earlier attempts (slice 8), and community views
   (slice 9) are out of scope; their parts of the pages are absent (ADR 0008). Slice 7 extends FR-001, FR-003 and
   FR-005 with the excluded states.
-- The report range is the goal's current attempt, as the design's "This attempt" says; consistency is not limited
-  to a rolling window (the 30-day window of SPEC §7 belongs to the community views).
-- Consistency percentages are rounded down to a whole number, so a goal shows "100%" only when every counted
-  result is Met and never appears to reach a band threshold it has not reached.
+- The report range (the whole current attempt), the rounding of percentages and "Missed this week" are decided in
+  `## Clarifications` (Session 2026-11-20 (clarify)).
 - "This week" on the Home is the account's Monday-to-Sunday week, as evaluation periods are.
 - The dashboard's goal summaries list every goal; the Home page shows at most 5 of them.
-- Demo history loading and demo loading do not change (FR-030, FR-031); their existing data already shows
-  non-trivial consistency and streaks, Pending, Due and Missed results, partial amounts and notes.
+- Demo history loading and demo loading do not change (FR-030, FR-031). Demo report loading (FR-032) adds
+  `demo5@example.com` for the longer history that trends and streaks need (constitution VI).
+- A local database keeps `demo5`'s history relative to the day it was first created, as `demo4`'s (ADR 0018);
+  only the hosted demo is refreshed daily.
 - No account is deactivated yet (slice 11); no rule for a deactivated owner's reports.
 - Reports are in-app only; nothing is sent by email or any other channel (SPEC §9).
