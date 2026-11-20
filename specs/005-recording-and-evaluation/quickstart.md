@@ -74,9 +74,14 @@ Check by hand:
    - Recent notes shows both notes with their states.
 3. "Record", for today, 12 minutes: the progress reads "12 of 20 min" under the field, the row shows 12 min, and
    it is still "Due today".
-4. After "Show all", "Add record" on the Missed row, with 20 minutes: the row turns Met (a correction). "Edit" on that record, then
-   "Delete record": the row is Missed again.
-5. "Add note" on a Met row with "Test note.": the chip stays Met. Saving it empty removes it.
+4. After "Show all", "Add record" on the Missed row R − 10. The note field holds "Away for the weekend.". Save 20
+   minutes with the field unchanged: the row turns Met (a correction), still with the note, and offers "Edit" only.
+   "Edit", then "Delete record": the row is Missed again, with "Away for the weekend." and "Edit note".
+5. On a Met row, "Edit", type "Test note." and save. The chip stays Met and the note column shows "Test note.".
+   "Edit", clear the field and save: the note is gone. A Met row has no "Add note".
+
+   Steps 4 and 5 amended 2026-11-20, specs/006-note-editing, ADR 0019 (issue #37): step 4 did not check the note,
+   and step 5 added the note with the Met row's "Add note", which rows with a record no longer have.
 6. "Yoga, 3 times a week": one row per week; "Due this week", a Met or Pending week, a Failed week with the note
    "Knee was sore.", and a Missed week.
 7. "Sugar, at most 1 sweet a day": Met with 0 or 1, and Failed with 3 sweet (the unit as stored) and "Birthday cake at work.".

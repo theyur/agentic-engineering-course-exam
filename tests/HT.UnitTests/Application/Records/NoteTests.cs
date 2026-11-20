@@ -142,12 +142,27 @@ public sealed class NoteTests
         Assert.Null(Assert.Single(await _world.HistoryAsync(goal, Mon16, Mon16)).Note);
     }
 
-    // ---- AS3: a note given with a record adds or replaces, and no note leaves it ----
+    // ---- AS3: a note given with a record adds or replaces, an empty one removes, and no note leaves it ----
+    // (amended by specs/006-note-editing D-1: an empty note or one of only spaces now removes the note)
+
+    [Fact]
+    public async Task US4_AS3_a_Yes_with_no_note_keeps_the_weeks_note()
+    {
+        var goal = await GoalAsync(YogaThreeTimesAWeek);
+        _world.At(Wed18TenOClock);
+        Saved(await SaveNoteAsync(goal, Tue17, "Knee was sore."));
+
+        var result = await _world.RecordAsync(goal, Wed18, Yes(null));
+
+        Assert.Equal(RecordWriteOutcome.Recorded, result.Outcome);
+        Assert.Equal("Knee was sore.", result.Entry!.Note);
+        Assert.Equal("Knee was sore.", Assert.Single(await _world.HistoryAsync(goal, Mon16, Sun22)).Note);
+    }
 
     [Theory]
-    [InlineData(null)]
+    [InlineData("")]
     [InlineData("   ")]
-    public async Task US4_AS3_a_Yes_with_no_note_or_a_note_of_only_spaces_keeps_the_weeks_note(string? note)
+    public async Task US4_AS3_a_Yes_with_an_empty_note_or_one_of_only_spaces_removes_the_weeks_note(string note)
     {
         var goal = await GoalAsync(YogaThreeTimesAWeek);
         _world.At(Wed18TenOClock);
@@ -156,8 +171,12 @@ public sealed class NoteTests
         var result = await _world.RecordAsync(goal, Wed18, Yes(note));
 
         Assert.Equal(RecordWriteOutcome.Recorded, result.Outcome);
-        Assert.Equal("Knee was sore.", result.Entry!.Note);
-        Assert.Equal("Knee was sore.", Assert.Single(await _world.HistoryAsync(goal, Mon16, Sun22)).Note);
+        Assert.Single(result.Entry!.Records);
+        Assert.Null(result.Entry.Note);
+        var week = Assert.Single(await _world.HistoryAsync(goal, Mon16, Sun22));
+        Assert.Null(week.Note);
+        Assert.Single(week.Records);
+        Assert.Empty(_world.Records.NotesOfGoal(goal));
     }
 
     [Fact]

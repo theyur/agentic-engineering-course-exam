@@ -31,12 +31,13 @@ internal sealed class RecordStore : IRecordStore
         bool isCommitment,
         DateOnly date,
         RecordValue value,
-        NoteText? note,
+        NoteWrite note,
         int limit,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(note);
         return InGoalTransactionAsync(owner, goal, async () =>
         {
             var inEntry = RecordsOf(goal.Value, entry.FirstDate, entry.LastDate);
@@ -63,11 +64,7 @@ internal sealed class RecordStore : IRecordStore
                 id = new RecordId(row.Id);
             }
 
-            if (note is not null)
-            {
-                await UpsertNoteAsync(goal.Value, entry.Key, note, cancellationToken).ConfigureAwait(false);
-            }
-
+            await ApplyNoteAsync(goal.Value, entry.Key, note, cancellationToken).ConfigureAwait(false);
             return RecordStoreWrite.Written(id, await ReadEntryAsync(goal.Value, entry, cancellationToken).ConfigureAwait(false));
         }, cancellationToken);
     }
@@ -84,11 +81,12 @@ internal sealed class RecordStore : IRecordStore
         RecordId record,
         EntrySpan entry,
         RecordValue value,
-        NoteText? note,
+        NoteWrite note,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(note);
         return InGoalTransactionAsync(owner, goal, async () =>
         {
             if (await SetValueAsync(goal.Value, record.Value, value, cancellationToken).ConfigureAwait(false) == 0)
@@ -96,11 +94,7 @@ internal sealed class RecordStore : IRecordStore
                 return RecordStoreWrite.RecordNotFound;
             }
 
-            if (note is not null)
-            {
-                await UpsertNoteAsync(goal.Value, entry.Key, note, cancellationToken).ConfigureAwait(false);
-            }
-
+            await ApplyNoteAsync(goal.Value, entry.Key, note, cancellationToken).ConfigureAwait(false);
             return RecordStoreWrite.Written(record, await ReadEntryAsync(goal.Value, entry, cancellationToken).ConfigureAwait(false));
         }, cancellationToken);
     }
@@ -126,20 +120,10 @@ internal sealed class RecordStore : IRecordStore
     public Task<RecordStoreWrite> SaveNoteAsync(AccountId owner, GoalId goal, EntrySpan entry, NoteText? note, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
+        var write = note is null ? NoteWrite.Remove : NoteWrite.Replace(note);
         return InGoalTransactionAsync(owner, goal, async () =>
         {
-            if (note is null)
-            {
-                await _db.GoalNotes
-                    .Where(n => n.GoalId == goal.Value && n.EntryDate == entry.Key)
-                    .ExecuteDeleteAsync(cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            else
-            {
-                await UpsertNoteAsync(goal.Value, entry.Key, note, cancellationToken).ConfigureAwait(false);
-            }
-
+            await ApplyNoteAsync(goal.Value, entry.Key, write, cancellationToken).ConfigureAwait(false);
             return RecordStoreWrite.Written(await ReadEntryAsync(goal.Value, entry, cancellationToken).ConfigureAwait(false));
         }, cancellationToken);
     }
@@ -232,6 +216,31 @@ internal sealed class RecordStore : IRecordStore
                     .SetProperty(r => r.Answer, answer)
                     .SetProperty(r => r.Amount, amount),
                 cancellationToken);
+    }
+
+    /// <summary>
+    /// Every note write's one path (specs/006-note-editing research R-03), inside the goal's transaction:
+    /// <see cref="NoteWriteKind.Keep"/> writes nothing, <see cref="NoteWriteKind.Remove"/> deletes the entry's note if
+    /// there is one, and <see cref="NoteWriteKind.Replace"/> adds or replaces it.
+    /// </summary>
+    private async Task ApplyNoteAsync(Guid goal, DateOnly key, NoteWrite note, CancellationToken cancellationToken)
+    {
+        switch (note.Kind)
+        {
+            case NoteWriteKind.Keep:
+                break;
+            case NoteWriteKind.Remove:
+                await _db.GoalNotes
+                    .Where(n => n.GoalId == goal && n.EntryDate == key)
+                    .ExecuteDeleteAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                break;
+            case NoteWriteKind.Replace:
+                await UpsertNoteAsync(goal, key, note.Text!, cancellationToken).ConfigureAwait(false);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(note), "Not a kind of note write.");
+        }
     }
 
     /// <summary>Adds or replaces the entry's note; safe without a merge because every note write holds the goal lock.</summary>

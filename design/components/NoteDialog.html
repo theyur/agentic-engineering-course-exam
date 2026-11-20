@@ -12,7 +12,7 @@
   <div class="ht-dialog__foot"><button class="ht-btn ht-btn--primary">Save note</button><button class="ht-btn ht-btn--secondary">Cancel</button></div>
 </div></div>
 </div>
-<!-- Slice 5 state (HP-003): opened from a History row's "Add note" (empty) or from the row's note (filled). The title is "Add note · " and the goal's name, with or without a note; the sub line is the row's date and its state word. The note has at most 500 characters. "Save note" saves it; saved empty it removes the note. A note never changes the result. -->
+<!-- Slice 5 state (HP-003): opened only from a History row without a record, by its "Add note" (empty) or its "Edit note" (filled). The title is fixed when the dialog opens: "Add note · " and the goal's name when the row has no note, "Edit note · " and the goal's name when it has one. Amended 2026-11-20, specs/006-note-editing, ADR 0019: it was opened from a History row's "Add note" or from the row's note (filled), always titled "Add note · "; a row with a record changes its note only in the RecordDialog. The sub line is the row's date and its state word. The note has at most 500 characters. "Save note" saves it; saved empty it removes the note. A note never changes the result. -->
 <div class="ht" style="padding:16px" aria-label="Slice 5 state">
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;align-items:start">
 <div><div class="ht-eyebrow" style="margin:24px 0 8px">Slice 5 state · from "Add note" on a Missed commitment</div>
@@ -21,10 +21,10 @@
   <div class="ht-dialog__body"><label class="ht-field"><span class="ht-field__label">Note</span><textarea class="ht-input ht-textarea"></textarea><span class="ht-field__help">Notes are private. They do not change the result.</span></label></div>
   <div class="ht-dialog__foot"><button type="button" class="ht-btn ht-btn--primary">Save note</button><button type="button" class="ht-btn ht-btn--secondary">Cancel</button></div>
 </div></div>
-<div><div class="ht-eyebrow" style="margin:24px 0 8px">Slice 5 state · from the note of a Failed week</div>
+<div><div class="ht-eyebrow" style="margin:24px 0 8px">Slice 5 state · from "Edit note" on a Missed week</div>
 <div class="ht-dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-s5-edit-t">
-  <div class="ht-dialog__head"><div><h2 id="dlg-s5-edit-t">Add note · Yoga, 3 times a week</h2><div class="ht-dialog__sub">27 Jul – 2 Aug · Failed</div></div><button type="button" class="ht-dialog__close" aria-label="Close">×</button></div>
-  <div class="ht-dialog__body"><label class="ht-field"><span class="ht-field__label">Note</span><textarea class="ht-input ht-textarea">Knee was sore.</textarea><span class="ht-field__help">Notes are private. They do not change the result.</span></label></div>
+  <div class="ht-dialog__head"><div><h2 id="dlg-s5-edit-t">Edit note · Yoga, 3 times a week</h2><div class="ht-dialog__sub">27 Jul – 2 Aug · Missed</div></div><button type="button" class="ht-dialog__close" aria-label="Close">×</button></div>
+  <div class="ht-dialog__body"><label class="ht-field"><span class="ht-field__label">Note</span><textarea class="ht-input ht-textarea">Away on a work trip.</textarea><span class="ht-field__help">Notes are private. They do not change the result.</span></label></div>
   <div class="ht-dialog__foot"><button type="button" class="ht-btn ht-btn--primary">Save note</button><button type="button" class="ht-btn ht-btn--secondary">Cancel</button></div>
 </div></div>
 </div>

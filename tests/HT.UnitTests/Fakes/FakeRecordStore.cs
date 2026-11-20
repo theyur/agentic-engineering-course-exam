@@ -9,7 +9,8 @@ namespace HT.UnitTests.Fakes;
 /// A hand-written in-memory <see cref="IRecordStore"/> (ADR 0006), owner-scoped like the real one, with the outcomes
 /// of research R-05. Every member checks the owner against the goals of a <see cref="FakeGoalStore"/>, so another
 /// owner's goal and no goal look the same. Records are kept per goal with a stored order; a commitment's record is
-/// replaced in place; a period takes no record past the limit; notes are upserted and removed under the entry key.
+/// replaced in place; a period takes no record past the limit; notes are upserted and removed under the entry key, and
+/// a record's write applies its <see cref="NoteWrite"/> only after its own checks pass, so a refusal leaves the note.
 /// <see cref="Calls"/> names every member called, so a test can prove that a refusal made no store call. Shared with
 /// HT.UiTests by a link. Safe to call from parallel tasks; the goal store's lock is never held while this one is.
 /// </summary>
@@ -91,12 +92,13 @@ public sealed class FakeRecordStore : IRecordStore
         bool isCommitment,
         DateOnly date,
         RecordValue value,
-        NoteText? note,
+        NoteWrite note,
         int limit,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(note);
         var owned = Owns(owner, goal);
         lock (_gate)
         {
@@ -126,11 +128,7 @@ public sealed class FakeRecordStore : IRecordStore
                 records.Add(new StoredRecord(new GoalRecord(id, date, value), ++_sequence));
             }
 
-            if (note is not null)
-            {
-                NotesOf(goal)[entry.Key] = note;
-            }
-
+            ApplyNote(goal, entry.Key, note);
             return Task.FromResult(RecordStoreWrite.Written(id, EntryOf(goal, entry)));
         }
     }
@@ -157,11 +155,12 @@ public sealed class FakeRecordStore : IRecordStore
         RecordId record,
         EntrySpan entry,
         RecordValue value,
-        NoteText? note,
+        NoteWrite note,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(note);
         var owned = Owns(owner, goal);
         lock (_gate)
         {
@@ -179,11 +178,7 @@ public sealed class FakeRecordStore : IRecordStore
             }
 
             records[position] = records[position] with { Record = records[position].Record with { Value = value } };
-            if (note is not null)
-            {
-                NotesOf(goal)[entry.Key] = note;
-            }
-
+            ApplyNote(goal, entry.Key, note);
             return Task.FromResult(RecordStoreWrite.Written(record, EntryOf(goal, entry)));
         }
     }
@@ -275,6 +270,24 @@ public sealed class FakeRecordStore : IRecordStore
 
     /// <summary>Read before this store's lock is taken, so the goal store's lock is never held inside it.</summary>
     private bool Owns(AccountId owner, GoalId goal) => _goals.Goals.Any(g => g.Id == goal && g.Owner == owner);
+
+    /// <summary>A record's note write, as the real store applies it: Keep leaves the note, Remove drops the key, Replace sets it.</summary>
+    private void ApplyNote(GoalId goal, DateOnly key, NoteWrite note)
+    {
+        switch (note.Kind)
+        {
+            case NoteWriteKind.Keep:
+                break;
+            case NoteWriteKind.Remove:
+                NotesOf(goal).Remove(key);
+                break;
+            case NoteWriteKind.Replace:
+                NotesOf(goal)[key] = note.Text!;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(note), "Not a kind of note write.");
+        }
+    }
 
     private StoredEntry EntryOf(GoalId goal, EntrySpan entry) =>
         new(Ordered(RecordsOf(goal), entry.FirstDate, entry.LastDate), NotesOf(goal).GetValueOrDefault(entry.Key));

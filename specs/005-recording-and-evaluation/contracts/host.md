@@ -44,7 +44,7 @@ No route is added. `/goals/{Id:guid}` changes:
   - **Recorded**: each record by `RecordingText`, for example "12 min", "Yes" or "3 sweet" (the unit as stored). A period's records sit
     side by side, each a button with its value. The cell is "—" without a record.
   - **Accessible names** of the repeated row controls. Each starts with its visible text (WCAG 2.5.3) and names its
-    row ({date}: "Tue 17 Nov" or "10 – 16 Aug"):
+    row ({date}: `RecordingText.EntryDate`, "Tue 17 Nov" or "10 – 16 Aug"):
 
     | Control | Accessible name |
     |---|---|
@@ -52,20 +52,40 @@ No route is added. `/goals/{Id:guid}` changes:
     | "Add record" | "Add record for {date}" |
     | "Edit" | "Edit record of {date}" |
     | "Add note" | "Add note for {date}" |
-    | a note button | the note's text, then ", edit note of {date}" |
+    | "Edit note" | "Edit note of {date}" |
+
+    Amended 2026-11-20, specs/006-note-editing, ADR 0019: the last row was "a note button", named by the note's
+    text, then ", edit note of {date}".
   - **Result**: `StatusChip`.
-  - **Note** (US4, T075): on every row, whatever its state, one ghost `ht-btn--sm` button with
-    `aria-haspopup="dialog"`: "Add note" without a note, or the note's text with one, named as the table above
-    says. Both open the NoteDialog for that row (`HistoryCard.OnNote`). After a save the page reads what can be
-    recorded, the history and the recent notes again before the dialog closes, and the focus goes back to the
-    row's Note button (`HistoryCard.FocusNoteAsync`), which now shows the note or "Add note".
-  - **Row actions**, in the empty-headed fifth column: "Add record" on a commitment without a record; "Edit" on a
-    commitment with one; "Add record" on a period with fewer than 50 records. They are offered whatever the state,
-    final included (US3, T066). A period's records are buttons side by side (`ht-inline`) in the Recorded cell, each
-    opening "Edit" of that record; a commitment's record is text. Every row control is a ghost `ht-btn--sm` button
-    with `aria-haspopup="dialog"`. "Add record" opens the RecordDialog's row mode, "Edit" and a record button its
-    "Edit" mode. After a save or a delete the page reads the history again before the dialog closes, and the focus
-    goes back to the record's button while the row still shows it, otherwise to the row's action.
+  - **Note**: the row's note as text, or "—" without one, in a plain `td` with `ht-muted` text (`--ink-muted`, 5.5:1
+    or more, `design/tokens.json`). It is not a control. Amended 2026-11-20, specs/006-note-editing, ADR 0019: the
+    cell held a Note button on every row (US4, T075), "Add note" without a note or the note's text with one, which
+    opened the NoteDialog.
+  - **Row actions**, in the empty-headed fifth column (`td.ht-actions`), offered whatever the state, final included
+    (US3, T066). Every row control is a ghost `ht-btn--sm` button with `aria-haspopup="dialog"`:
+
+    | Row | Controls, in this order |
+    |---|---|
+    | commitment, no record | "Add record", then "Add note" (no note) or "Edit note" (a note) |
+    | commitment, a record | "Edit" |
+    | period, no record | "Add record", then "Add note" or "Edit note" |
+    | period, 1 to 49 records | "Add record" |
+    | period, 50 records | none |
+
+    A period's records are buttons side by side (`ht-inline`) in the Recorded cell, each opening "Edit" of that
+    record; a commitment's record is text. "Add record" opens the RecordDialog's row mode, "Edit" and a record button
+    its "Edit" mode (`HistoryCard.OnAction`). "Add note" and "Edit note" open the NoteDialog for that row
+    (`HistoryCard.OnNote`). After any save or delete the page reads what can be recorded, the history and the recent
+    notes again before the dialog closes. Then the focus goes:
+    - after the RecordDialog, back to the record's button while the row still shows it, otherwise to the row's first
+      action (`HistoryCard.FocusAsync`);
+    - after the NoteDialog, to the row's "Add note" or "Edit note" as it shows after the save
+      (`HistoryCard.FocusNoteAsync`). Nothing gets it if the row has neither.
+
+    On the next read after a row's first record, its note control is gone. After its last record is deleted, it is
+    back ("Edit note" when the row still has its note). Amended 2026-11-20, specs/006-note-editing, ADR 0019: the
+    note controls were the Note column's button on every row; a row with a record now changes its note only in the
+    RecordDialog.
 - **Recent notes card** (right column, after Settings; `RecentNotesCard`, T074, T075): `GetRecentNotesAsync`, read
   after the history and only for a goal with a current date. An `HtCard` titled "Recent notes", then each note,
   newest first, as an `ht-goal` item: the note in quotes and its `StatusChip` on the top line (`ht-goal__top`,
@@ -114,29 +134,56 @@ No route is added. `/goals/{Id:guid}` changes:
     - for a Reduce goal, the help text (`RecordingText.ReduceHelp`): "At most 2 cups. Enter 0 if you had none: an
       empty day cannot prove you stayed under the limit." for count and duration, and "Choose No if you avoided it:
       an empty day cannot prove you stayed under the limit." for yes/no (FR-013);
-    - "Note (optional)", empty, with the placeholder "What happened? Only you can see notes." and the help "An empty
-      field keeps the existing note.".
+    - "Note (optional)", with the placeholder "What happened? Only you can see notes.". It opens with the current
+      note of the commitment or period that "For" names, or empty without one, in every mode:
+      - from the page head: the first entry of what can be recorded. Choosing another entry in "For" replaces the
+        field's content, typed text included, with that entry's note. Choosing another "Date" of the same week
+        leaves it alone;
+      - from a row's "Add record": that row's note, also on a row without a record that has a note (its first
+        record);
+      - "Edit" of one record: the note of the record's commitment or period.
+
+      Its help is `RecordingText.NoteHelp(history)`, one text per goal, tied to the field with `aria-describedby`:
+
+      | Goal | Help |
+      |---|---|
+      | commitment-based | "Clear the field to remove the note." |
+      | per-day period | "This note is for the whole day. Clear the field to remove it." |
+      | per-week period | "This note is for the whole week. Clear the field to remove it." |
+
+      Amended 2026-11-20, specs/006-note-editing, ADR 0019: the field was empty on open, also for "Edit", with the
+      help "An empty field keeps the existing note.".
   - **Buttons**: "Save record" and "Cancel". "Edit" opens the same dialog for one record, with its date fixed and
-    its value filled, and adds "Delete record". There is no "Excuse instead" (slice 7).
+    its value filled, and adds "Delete record". There is no "Excuse instead" (slice 7). "Save record" sends the
+    field's content as `RecordInput.Note`, never null: an empty field removes the note, and an unchanged one keeps
+    it (FR-007). "Delete record" ignores the field: the note stays.
+    Amended 2026-11-20, specs/006-note-editing, ADR 0019: an empty field kept the note.
   - **Refusals**: the result's `Message`, under the field it is about, one at a time: a value refusal under the
-    field, "The note can have at most 500 characters." under the note, and the date, limit and record refusals under
-    "For".
+    field, "The note can have at most 500 characters." under the note in place of its help (`TextArea`), and the
+    date, limit and record refusals under "For". A refusal changes neither the record nor the note, and the dialog
+    stays open with the message.
   - **Focus**: on open it moves to the first field: "For" from the head; from a row, the week's "Date" select or else
     the value (the chosen Yes or No, or Yes while none is chosen; the Stepper's number). Esc and × close the dialog,
     and focus returns to the opener (constitution IV).
 - **NoteDialog** (HP-003):
-  - opened from a row's note or "Add note";
-  - its title is the design's "Add note · {goal name}", with or without a note (the design has no other title);
+  - opened only from a History row without a record, by "Add note" or "Edit note". A row with a record changes its
+    note only in the RecordDialog;
+  - its title is fixed when the dialog opens: "Add note · {goal name}" when the row has no note, and the field
+    starts empty; "Edit note · {goal name}" when it has one, and the field starts with the note, so saving without a
+    change keeps it;
   - its sub line is the date and the state ("Tue 27 Oct · Missed");
   - a TextArea "Note" of at most 500 characters, with the design's help "Notes are private. They do not change the
-    result.". Opened from a row's note it starts with that note, so saving without a change keeps it; from "Add
-    note" it starts empty. The limit is the use case's (there is no `maxlength`, so a note trimmed to 500 characters
-    is never cut short): a longer note gives "The note can have at most 500 characters." under the field, in place
-    of the help, and changes nothing;
+    result.". The limit is the use case's (there is no `maxlength`, so a note trimmed to 500 characters is never cut
+    short): a longer note gives "The note can have at most 500 characters." under the field, in place of the help,
+    and changes nothing;
   - buttons: "Save note" and "Cancel". "Save note" calls `SaveNoteAsync` with the row's first date (a week's
     Monday, which names the week). Saving it empty removes the note;
-  - **Focus**: on open it moves to the TextArea (`TextArea.FocusAsync`); Esc and × close the dialog, and focus
-    returns to the row's Note button (constitution IV).
+  - **Focus**: on open it moves to the TextArea (`TextArea.FocusAsync`); Esc, × and "Cancel" close the dialog, and
+    focus returns to the row's "Add note" or "Edit note", after a save the one the save left
+    (`HistoryCard.FocusNoteAsync`; constitution IV).
+
+  Amended 2026-11-20, specs/006-note-editing, ADR 0019: it was opened from a row's note or "Add note", on any row,
+  always titled "Add note · {goal name}", and focus returned to the row's Note button.
 
 ## StatusChip (HP-004)
 

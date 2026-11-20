@@ -42,7 +42,8 @@ public sealed class RecordReadTests(DatabaseFixture database)
     }
 
     private Task<RecordStoreWrite> AddAsync(AccountId owner, GoalId goal, EntrySpan entry, bool isCommitment, DateOnly date, RecordValue value, NoteText? note = null) =>
-        WithStoreAsync(s => s.AddAsync(owner, goal, entry, isCommitment, date, value, note, RecordLimits.MaxRecordsPerPeriod, None));
+        WithStoreAsync(s => s.AddAsync(
+            owner, goal, entry, isCommitment, date, value, note is null ? NoteWrite.Keep : NoteWrite.Replace(note), RecordLimits.MaxRecordsPerPeriod, None));
 
     private static NoteText Note(string text)
     {

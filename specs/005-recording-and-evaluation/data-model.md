@@ -51,7 +51,7 @@ is a `DateOnly`. No type here reads a clock, a machine time zone or the current 
 
 | Type | Members |
 |---|---|
-| `RecordInput` | `sealed record`: `Answer` (`YesNoAnswer?`), `Amount` (`int?`), `Note` (`string?`). Values that do not belong to the goal's measurement are dropped (FR-004). |
+| `RecordInput` | `sealed record`: `Answer` (`YesNoAnswer?`), `Amount` (`int?`), `Note` (`string?`). Values that do not belong to the goal's measurement are dropped (FR-004). `Note`: null keeps the entry's note; a text that is empty after trimming removes it; any other text, trimmed, becomes the note (FR-007). The page always sends the field's content, so it never sends null. Amended 2026-11-20, specs/006-note-editing, ADR 0019: an empty `Note` kept the note. |
 | `RecordView` | `sealed record (RecordId Id, DateOnly Date, YesNoAnswer? Answer, int? Amount)`. |
 | `HistoryEntry` | `FirstDate`, `LastDate`, `Starts`, `Ends`, `State` (`EvaluationState`), `GraceEnds` (`DateTimeOffset?`, set only while Due or Pending), `Records` (`IReadOnlyList<RecordView>`, date order and then stored order), `Progress`, `Note` (`string?`), `IsCorrection` (`bool`: a change now would be a correction). |
 | `GoalHistory` | `GoalId`, `GoalScheduleKind`, `Period` (`SchedulePeriod?`), `BuildOrReduce`, `Measurement`, `Amount`, `CountUnit`, `DurationUnit`, `Times`, `CurrentDate` (`DateOnly?`), `Target` (`GoalTarget`: the target of the settings version of `CurrentDate`, or of the start date when there is none; only `RecordPreview` and `RecordingText` read it; in this slice every version has the same target, FR-015), `ReadAt` (`DateTimeOffset`: the instant the use case read the clock, so the pages format "N h left" without reading one), `Entries` (`IReadOnlyList<HistoryEntry>`: date order from `GetHistoryAsync`; newest first from `GetRecordableAsync`). No goal or habit name (T022). |
@@ -98,6 +98,7 @@ inflected ("3 sweet").
 | `ForLabel(HistoryEntry entry, DateOnly currentDate, DateTimeOffset now)` | "Today, Fri 30 Oct" for the Due entry whose single date is `currentDate`; otherwise `EntryDate`; a Pending entry adds " · Pending, N h left", N the whole hours to `GraceEnds`, rounded up. Called with `GoalHistory.CurrentDate` and `ReadAt`. |
 | `TargetLine(GoalHistory history)` | The sub line, from `GoalHistory.Target`: "Reduce · " and `GoalText.TargetText`; "Build · at least {AmountText} · {schedule part}"; "Build · {schedule part}" for yes/no. The schedule part is "every day", the day groups of `GoalText.ScheduleText`, "N times a day", "once a week" or "N times a week". |
 | `PartialNote(GoalHistory history)` | `string?`: the partial-progress sentence of a Build count or duration goal by schedule kind ("Partial time is kept. Below 20 min the day counts as Failed when it is finalized."); null for yes/no and Reduce. |
+| `NoteHelp(GoalHistory history)` | The note field's help (HP-002): "Clear the field to remove the note." for a commitment-based goal; "This note is for the whole day. Clear the field to remove it." for a per-day period; "This note is for the whole week. Clear the field to remove it." for a per-week period. The texts are `design/`'s. Added 2026-11-20, specs/006-note-editing, ADR 0019. |
 
 `RecordPreview` (static, T028) gives the RecordDialog's live progress, so no component evaluates FR-014:
 `Progress(GoalHistory history, HistoryEntry entry, RecordId? replacing, YesNoAnswer? answer, int? amount)` rebuilds
@@ -133,10 +134,10 @@ FirstDate, DateOnly LastDate)`.
 
 | Member | Result |
 |---|---|
-| `AddAsync(owner, goal, EntrySpan entry, bool isCommitment, DateOnly date, RecordValue value, NoteText? note, int limit)` | `RecordStoreWrite`: `GoalNotFound`; `LimitReached` (a period at `limit` records; nothing written); or `Written` with the `RecordId` (a commitment's existing record keeps its identifier and gets the value) and the entry's `StoredEntry`. A note with text is upserted under `entry.Key`. One transaction under the goal row's update lock. |
+| `AddAsync(owner, goal, EntrySpan entry, bool isCommitment, DateOnly date, RecordValue value, NoteWrite note, int limit)` | `RecordStoreWrite`: `GoalNotFound`; `LimitReached` (a period at `limit` records; nothing written); or `Written` with the `RecordId` (a commitment's existing record keeps its identifier and gets the value) and the entry's `StoredEntry`. In the same transaction as the record, under the goal row's update lock: `Keep` leaves the note, `Remove` deletes it, and `Replace` adds or replaces it under `entry.Key`. `GoalNotFound` and `LimitReached` write nothing, the note included. Amended 2026-11-20, specs/006-note-editing, ADR 0019: `note` was `NoteText?`, and a note with text was upserted. |
 | `FindRecordDateAsync(owner, goal, RecordId record)` | The record's date, or null when the goal has no such record (another goal's, another account's or none). |
-| `ChangeAsync(owner, goal, RecordId record, EntrySpan entry, RecordValue value, NoteText? note)` | `GoalNotFound`, `RecordNotFound`, or `Written` with the `StoredEntry`. |
-| `DeleteAsync(owner, goal, RecordId record, EntrySpan entry)` | `GoalNotFound`, `RecordNotFound`, or `Written` with the `StoredEntry`. |
+| `ChangeAsync(owner, goal, RecordId record, EntrySpan entry, RecordValue value, NoteWrite note)` | `GoalNotFound`, `RecordNotFound`, or `Written` with the `StoredEntry`. The same three note cases as `AddAsync`. `GoalNotFound` and `RecordNotFound` write nothing, the note included. Amended 2026-11-20, specs/006-note-editing, ADR 0019: `note` was `NoteText?`. |
+| `DeleteAsync(owner, goal, RecordId record, EntrySpan entry)` | `GoalNotFound`, `RecordNotFound`, or `Written` with the `StoredEntry`. It never changes the note, also when it deletes the only record (FR-007; stated 2026-11-20, specs/006-note-editing, ADR 0019). |
 | `SaveNoteAsync(owner, goal, EntrySpan entry, NoteText? note)` | `GoalNotFound`, or `Written` with the `StoredEntry`. No note deletes it (FR-007). |
 | `ReadAsync(owner, goal, DateOnly from, DateOnly to)` | `StoredEntries`: the records with dates from `from` to `to`, in date order and then stored order, and the notes with keys from `from` to `to`. Callers pass the first entry's `FirstDate` and the last entry's `LastDate`, so the notes are exactly those of the entries read (research R-05). Empty for another owner's goal. |
 | `ReadRecentNoteKeysAsync(owner, goal, int count)` | The keys of the `count` notes with the latest keys, newest first. |
@@ -151,6 +152,29 @@ for `Written` from add and change) and `Entry` (`StoredEntry?`: set for `Written
 `Written(RecordId, StoredEntry)` (add, change) and `Written(StoredEntry)` (delete, save note). Every member also takes
 a `CancellationToken` last; `FindRecordDateAsync` gives `DateOnly?` and `ReadRecentNoteKeysAsync`
 `IReadOnlyList<DateOnly>`.
+
+`NoteWrite` (`HT.Application.Records`) is what a record's write does to its entry's note (FR-007). Added 2026-11-20,
+specs/006-note-editing, ADR 0019.
+
+| Member | Rule |
+|---|---|
+| `Kind` | `NoteWriteKind`: `Keep`, `Remove`, `Replace`. |
+| `Text` | `NoteText?`: the note to store; set only when `Kind` is `Replace`. |
+| `Keep` | static property: leave the note as it is. |
+| `Remove` | static property: delete the note, if there is one. |
+| `Replace(NoteText text)` | static factory: store `text` as the note, adding or replacing it. Throws `ArgumentNullException` for null. |
+
+It is a sealed class with a private constructor, like `RecordStoreWrite`. `ToString` is not overridden, so a note never
+reaches a log or a message (HP-006). `RecordingService` builds it from `RecordInput.Note`:
+
+| `RecordInput.Note` | `NoteWrite` |
+|---|---|
+| null (no note given) | `Keep` |
+| `""` or only spaces | `Remove` |
+| text of 1 to 500 characters after trimming | `Replace` with the trimmed text |
+| more than 500 characters after trimming | none: the use case refuses with `NoteTooLong` and writes nothing |
+
+`SaveNoteAsync` keeps `NoteText?`, where null deletes the note.
 
 ### `IDemoHistoryStore` (`HT.Application.Operator`, new)
 
@@ -204,4 +228,15 @@ final = Missed   when it has no record
 
 A record added, changed or deleted after the entry is final changes the final state at once (a correction,
 FR-006). Adding a record to a Missed entry gives Met or Failed. Deleting the only record of a final entry gives
-Missed. A note never changes the state (FR-007).
+Missed, with its note if it had one. A note never changes the state (FR-007).
+
+What a write does to the note (FR-007; amended 2026-11-20, specs/006-note-editing, ADR 0019):
+
+```text
+record or change, no note given   -> note unchanged
+record or change, empty note      -> no note
+record or change, note with text  -> that note (trimmed)
+delete a record (any, the last one included) -> note unchanged
+save the note on its own          -> that note, or no note when empty
+refused write (any step)          -> records and note unchanged
+```

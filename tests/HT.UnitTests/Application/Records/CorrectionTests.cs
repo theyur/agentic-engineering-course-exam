@@ -480,19 +480,34 @@ public sealed class CorrectionTests
         Assert.Equal("Finished the chapter.", Assert.Single(_world.Records.NotesOfGoal(goal)).Value.Value);
     }
 
+    // Amended by specs/006-note-editing D-1: no note keeps the note, and an empty note or one of only spaces removes it.
+    [Fact]
+    public async Task FR_007_a_change_without_a_note_leaves_the_entrys_note()
+    {
+        var goal = await GoalAsync(Reading20MinDaily);
+        var record = await RecordAtAsync(goal, Mon16, Minutes(12, "Back was tired."), Mon16TenOClock);
+
+        var entry = Changed(await _world.ChangeAsync(goal, record, Minutes(25, null)), record);
+
+        Assert.Equal("Back was tired.", entry.Note);
+        Assert.Equal(25, Assert.Single(entry.Records).Amount);
+        Assert.Equal("Back was tired.", Assert.Single(_world.Records.NotesOfGoal(goal)).Value.Value);
+    }
+
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task FR_007_a_change_without_a_note_or_with_only_spaces_leaves_the_entrys_note(string? note)
+    public async Task FR_007_US1_AS3_a_change_with_an_empty_note_or_one_of_only_spaces_removes_the_entrys_note(string note)
     {
         var goal = await GoalAsync(Reading20MinDaily);
         var record = await RecordAtAsync(goal, Mon16, Minutes(12, "Back was tired."), Mon16TenOClock);
 
         var entry = Changed(await _world.ChangeAsync(goal, record, Minutes(25, note)), record);
 
-        Assert.Equal("Back was tired.", entry.Note);
+        Assert.Null(entry.Note);
         Assert.Equal(25, Assert.Single(entry.Records).Amount);
+        Assert.Equal(25, Assert.Single(_world.Records.RecordsOfGoal(goal)).Value.Amount);
+        Assert.Empty(_world.Records.NotesOfGoal(goal));
     }
 
     [Fact]

@@ -17,7 +17,7 @@ The form to record what happened for one commitment or period; the field depends
 
 ## Slice 5 state
 
-The last part of the preview shows the dialog as slice 5 builds it (HP-002, ADR 0008): opened from "Record", as "Edit" of one record, and for a per-week goal from "Record" and from a History row. `RecordForms.md` has the other measurements. The texts below are the ones the code uses (`RecordingText`, `RecordTexts`); the examples are written as they appear.
+The last part of the preview shows the dialog as slice 5 builds it (HP-002, ADR 0008): opened from "Record", as "Edit" of one record, and for a per-week goal from "Record" and from a History row. The "Edit" and the History-row examples have a note, so their note field opens filled. `RecordForms.md` has the other measurements. The texts below are the ones the code uses (`RecordingText`, `RecordTexts`); the examples are written as they appear.
 
 ### Title and sub line
 
@@ -89,7 +89,21 @@ Durations are always in minutes; a goal in hours compares with the amount × 60 
 
 ### Note, buttons and refusals
 
-- "Note (optional)", a TextArea, always empty on open (also for "Edit"), with the placeholder "What happened? Only you can see notes." and the help "An empty field keeps the existing note." (FR-007).
+- "Note (optional)", a TextArea with the placeholder "What happened? Only you can see notes.". It opens with the current note of the commitment or period that "For" names, or empty without one, in every mode:
+  - from the page head's "Record": the note of the first entry of "For". Choosing another entry in "For" replaces the field's content, typed text included, with that entry's note. Choosing another "Date" of the same week leaves the field alone (the note belongs to the week);
+  - from a row's "Add record": that row's note, also on a row without a record that has a note;
+  - "Edit" of one record: the note of the record's commitment or period.
+- The note's help (`ht-field__help`, tied to the TextArea with `aria-describedby`), one text per goal:
+
+  | Goal | Help |
+  |---|---|
+  | commitment-based | "Clear the field to remove the note." |
+  | period-based, per day | "This note is for the whole day. Clear the field to remove it." |
+  | period-based, per week | "This note is for the whole week. Clear the field to remove it." |
+
+  A refusal of the note ("The note can have at most 500 characters.") takes the help's place.
+- "Save record" stores what the field shows: an unchanged field keeps the note, an empty field (or one of only spaces) removes it. "Delete record" ignores the field: the note stays.
+- Amended 2026-11-20, specs/006-note-editing, ADR 0019: the field was always empty on open (also for "Edit"), with the help "An empty field keeps the existing note."; both go.
 - Footer: primary "Save record" and secondary "Cancel". "Edit" adds the ghost "Delete record", pushed right (`ht-spacer`). No "Excuse instead" (slice 7).
 - Refusals sit under the field they are about (`ht-field__error`), one at a time, with the result's message as it is.
 - Focus moves to the first field on open; Esc and × close the dialog, and focus returns to the button that opened it.

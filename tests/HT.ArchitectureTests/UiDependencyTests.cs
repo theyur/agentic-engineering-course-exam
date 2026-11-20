@@ -77,8 +77,8 @@ public sealed class UiDependencyTests
     public void NoUiTypeMayDependOnTheRecordStorePort()
     {
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
-            .Should().NotDependOnAny(Types(true).That().Are(typeof(IRecordStore)))
-            .Because("records and notes are private; pages reach them only through RecordingService, which scopes every call to the acting user and the goal (constitution III, slice 5 research R-13)")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IRecordStore), typeof(NoteWrite)))
+            .Because("records and notes are private; pages reach them only through RecordingService, which scopes every call to the acting user and the goal, and NoteWrite is the port's plumbing (constitution III, slice 5 research R-13, specs/006-note-editing research R-11)")
             .Check(ArchitectureModel.Architecture);
     }
 
