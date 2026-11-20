@@ -237,20 +237,20 @@ Missed with "Edit note"; then "Add record" and see the note in the field (spec U
 
 ### Tests for User Story 2
 
-- [ ] T027 [P] [US2] Add to `tests/HT.UnitTests/Application/Records/NoteTests.cs` (after Phase 2):
+- [X] T027 [P] [US2] Add to `tests/HT.UnitTests/Application/Records/NoteTests.cs` (after Phase 2):
   - the first record of a Missed commitment with "Away for the weekend.": with that same note it has the record and the note; with `""`, and with `"   "`, it has the record and no note; with no note (null) it has the record and the note (US2-AS3; slice 5 US4-AS9, AC-071);
   - deleting the only record of a commitment with a note leaves no record and the note, both before and after its grace period ends (US2-AS4; slice 5 US4-AS8, AC-070).
 
 ### Implementation for User Story 2
 
-- [ ] T028 [US2] Change `src/HT.Ui/Components/Records/HistoryCard.razor` (research R-08; contracts/host.md "History card"):
+- [X] T028 [US2] Change `src/HT.Ui/Components/Records/HistoryCard.razor` (research R-08; contracts/host.md "History card"):
   - the Note column: the note as text, or "—", in a plain `td` with `ht-muted`; the Note button and its `_noteButtons` entry for that column go;
   - the actions column: "Add record", then "Add note" (no note) or "Edit note" (a note) on a commitment or period without a record; "Edit" only on a commitment with a record; "Add record" only on a period with 1 to 49 records; nothing on a period with 50. A period's records stay buttons in the Recorded cell;
   - the record control ("Add record" or "Edit") is always the first button of `td.ht-actions`, rendered at the same place in the markup whether or not a note control follows it, so Blazor keeps its element (and its element reference) when the row gets its first record and the note control disappears. `FocusAsync` keeps working as in slice 5;
   - "Add note" and "Edit note": ghost `ht-btn--sm`, `aria-haspopup="dialog"`, accessible names "Add note for {date}" and "Edit note of {date}" with `{date}` from `RecordingText.EntryDate`; they raise `OnNote` with the row;
   - `FocusNoteAsync(DateOnly row)` gives the focus to the row's "Add note" or "Edit note" as it shows after the read, and does nothing when the row has neither;
   - the header comment describes the new columns.
-- [ ] T029 [US2] Update `tests/HT.UiTests/Components/Records/HistoryCardTests.cs` (after T028; research R-10):
+- [X] T029 [US2] Update `tests/HT.UiTests/Components/Records/HistoryCardTests.cs` (after T028; research R-10):
   - line 172: the Note cell is "—" as text, not "Add note";
   - lines 173 to 178: a row without a record has two controls ("Add record", then the note control), every other row at most one;
   - the helper `Action` (line 250), now `Assert.Single` over `td.ht-actions > button`: it returns the row's record control, the first button of `td.ht-actions` ("Add record" or "Edit"), and asserts that any second button is the row's note control. A new helper `NoteControl(cut, date)` returns that note control, or asserts there is none. This keeps the four tests that use `Action` asserting what they asserted before: `US3_AS8_a_commitment_row_offers_Add_record_without_a_record_and_Edit_with_one_whatever_its_state` (lines 284 to 297), `US3_AS8_a_period_row_offers_Add_record_and_each_record_as_a_button_that_opens_Edit_final_rows_included` (lines 300 to 317), `The_row_controls_raise_the_row_and_for_Edit_the_record` (line 340) and `FocusAsync_gives_the_focus_to_the_record_button_while_the_row_shows_it_and_otherwise_to_the_rows_action` (line 361);
@@ -262,10 +262,10 @@ Missed with "Edit note"; then "Add record" and see the note in the field (spec U
     - `The_Note_cells_buttons_raise_their_row` (line 409): renamed (for example `The_note_controls_raise_their_row`); `OnNote` is raised by the "Add note" and "Edit note" of rows without a record;
     - `FocusNoteAsync_gives_the_focus_to_the_rows_Note_button_and_nothing_for_a_row_not_shown` (line 424): renamed (for example `FocusNoteAsync_gives_the_focus_to_the_rows_note_control_and_nothing_for_a_row_without_one`); the focus goes to the row's "Add note" or "Edit note", and nothing for a row with a record or not shown;
   - new theory (SC-002, US1-AS7, US2-AS2): over a commitment and a period, with no record, one record and 50 records (period), with and without a note, and every state the card shows (Due, Pending, Missed, Met, Failed), it counts the controls that change the note on their own: none with a record, exactly one without, named as above; the Note cell shows the note or "—" and has no control.
-- [ ] T030 [P] [US2] Change `src/HT.Ui/Components/Records/NoteDialog.razor` (research R-09; contracts/host.md "NoteDialog"): when it opens, capture whether `Row.Note` is set; the title is "Edit note · " plus the goal name when it is and "Add note · " plus the goal name when it is not, not recomputed while open. `TitlePrefix` becomes two constants. Sub line, help, "Save note", the 500-character refusal and focus stay. The header comment says it opens only from a row without a record
-- [ ] T031 [US2] Update `tests/HT.UiTests/Components/Records/NoteDialogTests.cs` (after T030): line 156, a row with a note, expects "Edit note · {goal name}"; lines 124 and 140, rows without a note, keep "Add note · "; new: a save that removes the note keeps the title "Edit note · " until the dialog closes (HP-004)
-- [ ] T032 [P] [US2] Change the header comment of `src/HT.Ui/Components/Records/GoalDetailBody.razor`: "A History row's 'Add note' or note opens the NoteDialog" becomes "'Add note' or 'Edit note' of a row without a record opens the NoteDialog" (plan Work order 4). No code change
-- [ ] T033 [US2] Update `tests/HT.UiTests/Components/Pages/GoalDetailPageTests.cs` (after T025, T028, T030, T032; research R-10):
+- [X] T030 [P] [US2] Change `src/HT.Ui/Components/Records/NoteDialog.razor` (research R-09; contracts/host.md "NoteDialog"): when it opens, capture whether `Row.Note` is set; the title is "Edit note · " plus the goal name when it is and "Add note · " plus the goal name when it is not, not recomputed while open. `TitlePrefix` becomes two constants. Sub line, help, "Save note", the 500-character refusal and focus stay. The header comment says it opens only from a row without a record
+- [X] T031 [US2] Update `tests/HT.UiTests/Components/Records/NoteDialogTests.cs` (after T030): line 156, a row with a note, expects "Edit note · {goal name}"; lines 124 and 140, rows without a note, keep "Add note · "; new: a save that removes the note keeps the title "Edit note · " until the dialog closes (HP-004)
+- [X] T032 [P] [US2] Change the header comment of `src/HT.Ui/Components/Records/GoalDetailBody.razor`: "A History row's 'Add note' or note opens the NoteDialog" becomes "'Add note' or 'Edit note' of a row without a record opens the NoteDialog" (plan Work order 4). No code change
+- [X] T033 [US2] Update `tests/HT.UiTests/Components/Pages/GoalDetailPageTests.cs` (after T025, T028, T030, T032; research R-10):
   - `US3_a_Missed_rows_Add_record_and_then_Edit_open_the_RecordDialog_for_that_row_and_give_the_focus_back_to_it` (lines 219 to 265) keeps its assertions: the focus returns to the same element across "Add record", "Edit" and "Add record" again, which T028's first-button rule keeps. Its `td.ht-actions > button` selector takes the first button, and its comment "The row keeps its one action button" becomes "The row's record control stays its first button". If it fails, T028's markup is wrong, not the test;
   - lines 286 to 317: "Add note" in the actions column of the Missed row; after "Save note", the row shows the note as text and "Edit note", and the focus is on "Edit note"; the "…, edit note of {date}" assertion goes;
   - new: "Add record" on a Missed row with a note opens the RecordDialog with the note in its field (US2-AS5);
@@ -286,7 +286,7 @@ that it is for the whole week or day.
 
 ### Tests for User Story 3
 
-- [ ] T034 [US3] Add period cases to `tests/HT.UiTests/Components/Records/RecordDialogTests.cs` (after T026; HP-003, US3-AS1, US3-AS2):
+- [X] T034 [US3] Add period cases to `tests/HT.UiTests/Components/Records/RecordDialogTests.cs` (after T026; HP-003, US3-AS1, US3-AS2):
   - a per-week goal whose week has "Knee was sore." and records: "Add record" for the week, and "Edit" of any of its records (opened as the record buttons in the Recorded cell open it), show "Knee was sore." with "This note is for the whole week. Clear the field to remove it.";
   - a per-day goal ("Sugar, at most 1 sweet a day") whose day has "Birthday cake at work.": "Add record" and "Edit" of its record show that note with "This note is for the whole day. Clear the field to remove it.";
   - saving one record of the week with "Better today." through `FakeRecordStore` makes it the week's note, and a cleared field leaves the week with no note (US3-AS3);
@@ -303,7 +303,7 @@ that it is for the whole week or day.
 **Purpose**: the API and analyzer comparisons, the documents against what shipped, the accessibility sweep and the
 manual quickstart.
 
-- [ ] T035 Compare the public API of `HT.Domain`, `HT.Application` and `HT.Persistence` with T002's baseline. The only differences allowed are the four of research R-11: `IRecordStore.AddAsync` and `ChangeAsync` taking `NoteWrite`, and the new `NoteWrite`, `NoteWriteKind` and `RecordingText.NoteHelp`. Report any other difference as a defect (FR-007)
+- [X] T035 Compare the public API of `HT.Domain`, `HT.Application` and `HT.Persistence` with T002's baseline. The only differences allowed are the four of research R-11: `IRecordStore.AddAsync` and `ChangeAsync` taking `NoteWrite`, and the new `NoteWrite`, `NoteWriteKind` and `RecordingText.NoteHelp`. Report any other difference as a defect (FR-007)
 - [ ] T036 [P] Run `roslynator analyze HabitTracker.slnx --projects HT.Domain HT.Application HT.Persistence`, and `jb inspectcode HabitTracker.slnx --stdout -f=Text -e=WARNING --caches-home=<scratchpad>/jbcache --no-updates`. Compare both with T002's analyzer baselines (the same commands before any code change), and fix real findings only, that is, diagnostics this feature added; the documented false positives stay. Never point either tool at `tests/HT.AcceptanceTests`
 - [ ] T037 [P] Check that the texts that shipped (the help texts, accessible names, titles and the order of the row controls) match `design/`, this feature's spec.md (HP-002 to HP-004), contracts/host.md, data-model.md, research.md (R-07 to R-09) and quickstart.md, and slice 5's amended contracts/host.md, data-model.md and quickstart.md (T003 to T010). Fix the document that disagrees with the design; fix the code only where it disagrees with the design
 - [ ] T038 [P] Sweep the History card, the RecordDialog and the NoteDialog for constitution IV and HP-006: tokens and `ht-` classes only, with no literal colors; the note text in `ht-muted`; visible focus; the help tied to the field with `aria-describedby`; the dialogs' focus handling; the accessible names of contracts/host.md; sentence case per `design/brand-book.md`. Then rerun `DesignSyncTests`

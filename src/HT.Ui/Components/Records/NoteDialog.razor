@@ -9,7 +9,7 @@
    change keeps it). The title is "Add note · {goal name}" when the row has no note and "Edit note · {goal name}" when it
    has one, fixed when the dialog opens, so a save that removes the note does not retitle the closing dialog; the sub
    line is the row's date and its state word as the StatusChip writes it ("Tue 27 Oct · Missed", "27 Jul – 2 Aug ·
-   Failed"); then the TextArea "Note" with the help "Notes are private. They do not change the result.", and "Save note"
+   Missed"); then the TextArea "Note" with the help "Notes are private. They do not change the result.", and "Save note"
    and "Cancel". The 500-character limit is the use case's: a longer note gives its refusal under the field and changes
    nothing. Saving it empty, or with only spaces, removes the note. The dialog reads no clock and decides nothing: "Save
    note" calls SaveNoteAsync for the row's first date (a week's Monday, which names the week) in a scope of its own and

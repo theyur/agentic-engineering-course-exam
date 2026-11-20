@@ -742,4 +742,117 @@ public sealed class RecordDialogTests : BunitContext
         Assert.Equal(error.TextContent, Field(cut, "Amount").QuerySelector(".ht-field__error")!.TextContent);
         Assert.Empty(_saved);
     }
+
+    // ---- specs/006-note-editing US3: a period's one note in the record dialog (HP-003) ----
+
+    private const string WeekHelp = "This note is for the whole week. Clear the field to remove it.";
+
+    private static GoalTargetFields SugarAtMost1SweetADay => new()
+    {
+        BuildOrReduce = BuildOrReduce.Reduce, Measurement = Measurement.Count, Amount = 1, CountUnit = "sweets",
+        ScheduleKind = ScheduleKind.Times, Times = 1, Period = SchedulePeriod.Day,
+    };
+
+    private static RecordValue Yes => RecordValue.FromAnswer(YesNoAnswer.Yes);
+
+    /// <summary>
+    /// The note field shows <paramref name="note"/> and has <paramref name="help"/> as its one help text, which it names
+    /// with aria-describedby.
+    /// </summary>
+    private static void AssertNoteWithHelp(IRenderedComponent<RecordDialog> cut, string note, string help)
+    {
+        Assert.Equal(note, NoteShown(cut));
+        var field = Field(cut, "Note");
+        var shown = Assert.Single(field.QuerySelectorAll(".ht-field__help"));
+        Assert.Equal(help, shown.TextContent);
+        Assert.False(string.IsNullOrEmpty(shown.Id));
+        Assert.Equal(shown.Id, field.QuerySelector("textarea")!.GetAttribute("aria-describedby"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task US3_AS1_a_weeks_Add_record_and_Edit_of_any_of_its_records_show_the_weeks_note_with_the_week_help(int? editing)
+    {
+        // At 10:00 on Friday 20 November the week of 16 November has a Yes on Monday 16 and on Wednesday 18, and its one
+        // note under its first date. "Edit" opens with the row and the record, as the record buttons of the Recorded cell do.
+        var (cut, _, row) = await OpenRowAsync(YogaThreeTimesAWeek, Utc(20, 10), Mon16, editing, g =>
+        {
+            _records.Seed(g, Mon16, Yes);
+            _records.Seed(g, new DateOnly(2026, 11, 18), Yes);
+            SeedNote(g, Mon16, "Knee was sore.");
+        }, "Yoga, 3 times a week");
+        Assert.Equal(2, row.Records.Count);
+
+        AssertNoteWithHelp(cut, "Knee was sore.", WeekHelp);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    public async Task US3_AS2_a_days_Add_record_and_Edit_of_its_record_show_the_days_note_with_the_day_help(int? editing)
+    {
+        // At 10:00 on Friday 20 November Monday 16 has one record of 1 sweet and the note "Birthday cake at work.".
+        var (cut, _, row) = await OpenRowAsync(SugarAtMost1SweetADay, Utc(20, 10), Mon16, editing, g =>
+        {
+            _records.Seed(g, Mon16, RecordValue.FromAmount(1));
+            SeedNote(g, Mon16, "Birthday cake at work.");
+        }, "Sugar, at most 1 sweet a day");
+        Assert.Single(row.Records);
+
+        AssertNoteWithHelp(cut, "Birthday cake at work.", "This note is for the whole day. Clear the field to remove it.");
+    }
+
+    [Theory]
+    [InlineData("Better today.", "Better today.")]
+    [InlineData("", null)]
+    public async Task US3_AS3_a_Yes_for_another_date_of_the_week_with_a_note_makes_it_the_weeks_note_and_with_an_empty_field_removes_it(
+        string typed, string? stored)
+    {
+        // At 10:00 on Wednesday 18 November the week of 16 November has a Yes on Monday 16 and the note "Knee was sore.";
+        // its "Add record" records a Yes for Tuesday 17.
+        var (cut, goal, _) = await OpenRowAsync(YogaThreeTimesAWeek, Utc(18, 10), Mon16, arrange: g =>
+        {
+            _records.Seed(g, Mon16, Yes);
+            SeedNote(g, Mon16, "Knee was sore.");
+        }, name: "Yoga, 3 times a week");
+        Assert.Equal("Knee was sore.", NoteShown(cut));
+
+        cut.Find("select").Change("2026-11-17");
+        cut.FindAll(".ht-seg button")[0].Click();
+        cut.Find("textarea").Input(typed);
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(stored, Assert.Single(_saved).Note);
+        Assert.Equal(stored, StoredNote(goal, Mon16));
+        Assert.Equal(stored is null ? 0 : 1, _records.NotesOfGoal(goal).Count);
+        Assert.Equal([Mon16, new DateOnly(2026, 11, 17)], _records.RecordsOfGoal(goal).Select(r => r.Date));
+    }
+
+    [Fact]
+    public async Task Edge_case_Edit_of_one_record_of_a_week_with_50_records_shows_the_weeks_note_with_the_week_help_and_saving_replaces_it()
+    {
+        // At 10:00 on Wednesday 18 November the week of 16 November has 50 Yes records and the note "Knee was sore.": it
+        // offers no "Add record", but each record's "Edit" still edits the week's note.
+        var (cut, goal, row) = await OpenRowAsync(YogaThreeTimesAWeek, Utc(18, 10), Mon16, editing: 49, arrange: g =>
+        {
+            for (var i = 0; i < 50; i++)
+            {
+                _records.Seed(g, Mon16, Yes);
+            }
+
+            SeedNote(g, Mon16, "Knee was sore.");
+        }, name: "Yoga, 3 times a week");
+        Assert.Equal(50, row.Records.Count);
+
+        AssertNoteWithHelp(cut, "Knee was sore.", WeekHelp);
+
+        cut.Find("textarea").Input("Better today.");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("Better today.", Assert.Single(_saved).Note);
+        Assert.Equal("Better today.", StoredNote(goal, Mon16));
+        Assert.Equal(50, _records.RecordsOfGoal(goal).Count);
+    }
 }
