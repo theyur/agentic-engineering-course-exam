@@ -402,10 +402,11 @@ One PR for slice 5a. Each checkpoint is a commit on the feature branch.
 
 - [P] tasks touch different files, and start once the tasks they name as dependencies are done (Format).
 - The AC project, its features, the locks and the run records are never edited.
-- The five points of plan.md "Decided in the plan" are implemented as stated: "Add record" before the note control
+- The five points of plan.md "Decided in the plan" were implemented as stated: "Add record" before the note control
   (T003, T028); the NoteDialog's title fixed on open (T030); the page sends `""`, never null (T025);
   `SaveNoteAsync` keeps accepting entries with records (unchanged, so AC-035, AC-036 and AC-039 hold); "For"
-  replaces the note and "Date" keeps it (T025).
+  replaces the note and "Date" keeps it (T025). The owner later reversed the first point: the note control now comes
+  before "Add record" (see the amendment at the end of these notes). The other four stand as stated.
 - The task order follows the plan's Work order, with two moves:
   - the plan's step 4 (pages) is split over the stories: the RecordDialog in US1, the History card, NoteDialog and
     goal page in US2, the period cases in US3;
@@ -414,7 +415,8 @@ One PR for slice 5a. Each checkpoint is a commit on the feature branch.
     stay whole without it.
 - These details were settled while reviewing the tasks ([critic-tasks-pass-1.md](critic-tasks-pass-1.md)):
   - the History card's record control stays the first button of its row, so the existing `Action` helper, its four
-    tests and the goal page's focus test keep their meaning (MAJOR-1; T028, T029, T033);
+    tests and the goal page's focus test keep their meaning (MAJOR-1; T028, T029, T033). The owner's later reversal
+    made it the last button, and those tests now find it there (see the amendment below);
   - the planning work is committed on its own before any code (T001; MINOR-8);
   - a failed `Remove` rolls back the record with it, tested through the `GoalNotes` fault trigger alone, so the record's write succeeds before the note's delete faults (T020; MINOR-6, pass 2 MINOR-1);
   - a wording that `design/` changes is changed in this feature's spec too, as the spec says, and in every document that repeats it (Conventions, T037; pass 1 MINOR-2, pass 2 MINOR-2);
