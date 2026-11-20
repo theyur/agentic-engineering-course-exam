@@ -23,6 +23,7 @@ public sealed class FakeGoalStore : IGoalStore
     private readonly Dictionary<AccountId, int> _revisions = [];
     private int _timeZoneChangesToReport;
     private int _timeZoneConflictsToReport;
+    private int _lookups;
 
     /// <summary>Takes the fakes it reads, and sets <see cref="FakeCustomHabitStore.Goals"/> to itself.</summary>
     public FakeGoalStore(FakeAccountStore accounts, FakeCatalogHabitStore catalogHabits, FakeCustomHabitStore customHabits)
@@ -63,6 +64,21 @@ public sealed class FakeGoalStore : IGoalStore
 
     /// <summary>Calls of <see cref="TryChangeTimeZoneAsync"/> that wrote the change.</summary>
     public int TimeZoneChangeCount { get; private set; }
+
+    /// <summary>
+    /// Calls of <see cref="FindAsync"/> and <see cref="ListAsync"/>, so a test can prove that a refusal looked up no goal
+    /// (FR-015's check order).
+    /// </summary>
+    public int Lookups
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _lookups;
+            }
+        }
+    }
 
     /// <summary>
     /// The owner's goal revision: incremented by every created goal and every time-zone change (research R-08); 0 before
@@ -253,6 +269,7 @@ public sealed class FakeGoalStore : IGoalStore
     {
         lock (_gate)
         {
+            _lookups++;
             return Task.FromResult<IReadOnlyList<StoredGoal>>(_goals.Where(g => g.Goal.Owner == owner).Select(Current).ToList());
         }
     }
@@ -261,6 +278,7 @@ public sealed class FakeGoalStore : IGoalStore
     {
         lock (_gate)
         {
+            _lookups++;
             var stored = _goals.FirstOrDefault(g => g.Goal.Owner == owner && g.Goal.Id == id);
             return Task.FromResult(stored is null ? null : Current(stored));
         }

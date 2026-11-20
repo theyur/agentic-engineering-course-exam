@@ -18,7 +18,9 @@ namespace HT.UiTests.Host;
 /// and the custom habit's name. The owner has a goal with its own name on a catalog habit and a goal with the derived
 /// name on a custom habit. Slice 5 (US6, FR-017, HP-006): another registered user and an administrator who open the
 /// page of a goal with records and notes get the same Not found page with 404, and its HTML holds none of the owner's
-/// notes or recorded values. Shared database: own prefixes ("ui-gp-", "Ui-Gp").
+/// notes or recorded values. Slice 6 (US7, FR-014, FR-015): that Not found page has no GoalStats and no trend, B's Goals
+/// page and Home hold none of A's goal names, and an administrator's Home has no tile and no row. Shared database: own
+/// prefixes ("ui-gp-", "Ui-Gp").
 /// </summary>
 [Collection(HostCollection.Name)]
 public sealed class GoalPrivacyHostTests(HostFixture host)
@@ -149,5 +151,93 @@ public sealed class GoalPrivacyHostTests(HostFixture host)
             new[] { "Uigpnotemark", goalName }.Any(value =>
                 entry.Message.Contains(value, StringComparison.OrdinalIgnoreCase)
                 || (entry.Exception?.ToString().Contains(value, StringComparison.OrdinalIgnoreCase) ?? false)));
+    }
+
+    [Fact]
+    public async Task Slice_6_US7_reports_of_As_goal_reach_neither_B_nor_an_administrator()
+    {
+        // A's goal and B's goal start 2 days before today (UTC, at the host's clock), every day, 20 min, each with 25 min on
+        // its first day, so each owner's goal page has the GoalStats and TrendChart cards and each Home has tiles and rows.
+        var aGoalName = Unique("Ui-Gp A report goal");
+        var bGoalName = Unique("Ui-Gp B report goal");
+        var habitName = Unique("Ui-Gp Reports");
+        var habit = await host.ArrangeCatalogHabitAsync(Definition(habitName));
+        var (aBrowser, a) = await host.SignedInAccountAsync(Email("reports-a"), Role.RegisteredUser);
+        var (bBrowser, b) = await host.SignedInAccountAsync(Email("reports-b"), Role.RegisteredUser);
+        GoalId aGoal;
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            var services = scope.ServiceProvider;
+            var first = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow()).AddDays(-2);
+            aGoal = await StoreGoalWithARecordAsync(services, a, habit, aGoalName, first);
+            await StoreGoalWithARecordAsync(services, b, habit, bGoalName, first);
+        }
+
+        var address = $"/goals/{aGoal.Value}";
+        using (aBrowser)
+        {
+            var (status, html) = await aBrowser.GetPageAsync(address);
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            Assert.Contains("<div class=\"ht-stats\">", html, StringComparison.Ordinal);
+            Assert.Contains("class=\"ht-bars\"", html, StringComparison.Ordinal);
+        }
+
+        using var administrator = await host.SignedInBrowserAsync(Email("reports-admin"), Role.Administrator);
+        using (bBrowser)
+        {
+            // Another account's goal page is still the Not found page, with no GoalStats and no trend.
+            foreach (var browser in new[] { bBrowser, administrator })
+            {
+                var (status, html) = await browser.GetPageAsync(address);
+
+                Assert.Equal(HttpStatusCode.NotFound, status);
+                Assert.Contains("Page not found", html, StringComparison.Ordinal);
+                Assert.DoesNotContain("ht-stats", html, StringComparison.Ordinal);
+                Assert.DoesNotContain("ht-bars", html, StringComparison.Ordinal);
+                Assert.DoesNotContain(aGoalName, html, StringComparison.OrdinalIgnoreCase);
+            }
+
+            // B's Goals page and Home hold B's goal and none of A's.
+            foreach (var page in new[] { "/goals", "/" })
+            {
+                var (status, html) = await bBrowser.GetPageAsync(page);
+
+                Assert.Equal(HttpStatusCode.OK, status);
+                Assert.Contains(bGoalName, html, StringComparison.Ordinal);
+                Assert.DoesNotContain(aGoalName, html, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain($"{aGoal.Value}", html, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        // An administrator's Home has no tile and no row.
+        var (homeStatus, home) = await administrator.GetPageAsync("/");
+        Assert.Equal(HttpStatusCode.OK, homeStatus);
+        Assert.DoesNotContain("ht-tile", home, StringComparison.Ordinal);
+        Assert.DoesNotContain("<div class=\"ht-row\">", home, StringComparison.Ordinal);
+        Assert.DoesNotContain(aGoalName, home, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// A goal of at least 20 min every day of <paramref name="owner"/> with its own <paramref name="name"/>, stored through
+    /// the host's goal store from <paramref name="first"/> in UTC, with 25 min recorded on that day.
+    /// </summary>
+    private static async Task<GoalId> StoreGoalWithARecordAsync(IServiceProvider services, AccountId owner, HabitId habit, string name, DateOnly first)
+    {
+        Assert.True(GoalTarget.TryCreate(new GoalTargetFields
+        {
+            BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 20, DurationUnit = DurationUnit.Minutes,
+            ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+        }, out var target, out _));
+        Assert.True(GoalName.TryCreate(name, out var goalName, out _));
+        var created = await services.GetRequiredService<IGoalStore>().CreateAsync(
+            owner, new NewGoal(new GoalHabit(habit, HabitKind.Catalog), first, goalName, target), NamedTimeZone.Utc, NamedTimeZone.Utc, CancellationToken.None);
+        Assert.Equal(GoalWriteOutcomeKind.Created, created.Kind);
+        var goal = created.Id!.Value;
+        var written = await services.GetRequiredService<IRecordStore>().AddAsync(
+            owner, goal, new EntrySpan(first, first, first), true, first, RecordValue.FromAmount(25), NoteWrite.Keep,
+            RecordLimits.MaxRecordsPerPeriod, CancellationToken.None);
+        Assert.Equal(RecordStoreWriteOutcome.Written, written.Outcome);
+        return goal;
     }
 }
