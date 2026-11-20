@@ -317,6 +317,51 @@ public sealed class GoalDetailPageTests : BunitContext
     }
 
     [Fact]
+    public async Task Slice_6_US3_FR_008_a_record_saved_for_a_Missed_day_shows_the_new_consistency_without_a_reload()
+    {
+        // As in Slice_6_US1_AS8: Reading, 20 min daily, from Tuesday 10 November in UTC; at 10:00 on Tuesday 17 November
+        // 10, 11 and 13 are Met, 12 Failed and Saturday 14 Missed ("60% (3 of 5)", streak 0, longest 2). Saving 20 minutes
+        // for Saturday 14 makes it Met ("80% (4 of 5)", streak 2); deleting that record makes it Missed again.
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 10);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        foreach (var (day, minutes) in new[] { (10, 20), (11, 20), (12, 10), (13, 20) })
+        {
+            _records.Seed(goal.Id, new DateOnly(2026, 11, day), RecordValue.FromAmount(minutes));
+        }
+
+        var cut = RenderGoal(goal.Id);
+        List<(string Label, string Value)> Stats() =>
+            cut.FindAll(".ht-stats .ht-stat").Select(s => (s.QuerySelector(".ht-stat__label")!.TextContent, s.QuerySelector(".ht-stat__value")!.TextContent)).ToList();
+        AngleSharp.Dom.IElement RecordControl() =>
+            cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov")
+                .QuerySelector("td.ht-actions > button:last-of-type")!;
+        Assert.Equal([("Consistency", "60% (3 of 5)"), ("Streak, commitments", "0"), ("Longest, commitments", "2")], Stats());
+        var buttonId = RecordControl().GetAttribute("blazor:elementReference");
+
+        await RecordControl().ClickAsync(new MouseEventArgs());
+        cut.Find(".ht-stepper input").Change("20");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal([("Consistency", "80% (4 of 5)"), ("Streak, commitments", "2"), ("Longest, commitments", "2")], Stats());
+        Assert.Equal("Last 7 commitments: 4 met, 1 failed, 2 pending", cut.Find(".ht-strip").GetAttribute("aria-label"));
+        var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
+        Assert.Equal(buttonId, focused[1]);
+
+        await RecordControl().ClickAsync(new MouseEventArgs());
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[2].ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal([("Consistency", "60% (3 of 5)"), ("Streak, commitments", "0"), ("Longest, commitments", "2")], Stats());
+    }
+
+    [Fact]
     public async Task US4_a_Missed_rows_Add_note_opens_the_NoteDialog_and_a_save_shows_the_note_in_the_row_and_in_Recent_notes()
     {
         // Reading, 20 min daily, from Tuesday 10 November in UTC; at 10:00 on Tuesday 17 November Saturday 14's grace

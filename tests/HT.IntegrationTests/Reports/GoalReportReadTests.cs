@@ -143,6 +143,50 @@ public sealed class GoalReportReadTests(DatabaseFixture database)
         Assert.Null(refused.Report);
     }
 
+    [Fact]
+    public async Task FR_008_SC_004_a_Missed_day_corrected_through_RecordAsync_changes_the_next_reports_consistency_and_streaks()
+    {
+        // 20 minutes on 2, 3 and 4 November and on 6 and 7, recorded at 12:00Z each day; nothing on Thursday 5. At 10:00Z
+        // on Tuesday 10 November Saturday 7 is final (its grace period ended at 00:00Z), so Thursday 5 is Missed: Met × 3,
+        // Missed, Met × 2. Then 20 minutes are recorded for Thursday 5 at that time, a correction.
+        var suffix = Suffix();
+        var clock = new FakeTimeProvider(ClockStart);
+        await using var services = BuildServices(clock);
+        var user = await HabitAccounts.RegisteredUserAsync(services, database.ConnectionString, $"it-rep-fix-{suffix}@example.com");
+        var habit = await CatalogHabitAsync(services, $"It-Rep Correction {suffix}");
+        var goal = await CreateGoalAsync(services, user, habit);
+        var thursday5 = Mon2.AddDays(3);
+
+        var recorded = new List<(DateOnly Date, int Minutes)>();
+        for (var day = 0; day < 6; day++)
+        {
+            clock.SetUtcNow(ClockStart.AddDays(day).AddHours(4));
+            var date = Mon2.AddDays(day);
+            if (date != thursday5)
+            {
+                await RecordAsync(services, user, goal, date, new RecordInput { Amount = 20 });
+                recorded.Add((date, 20));
+            }
+        }
+
+        clock.SetUtcNow(new DateTimeOffset(2026, 11, 10, 10, 0, 0, TimeSpan.Zero));
+        var before = await ReportAsync(services, user, goal);
+
+        Assert.Equal(EvaluationState.Missed, before.Recent.Results.Single(result => result.FirstDate == thursday5).State);
+        Assert.Equal("83% (5 of 6)", before.Stats.ConsistencyText);
+        Assert.Equal((2, 3), (before.Stats.CurrentStreak, before.Stats.LongestStreak));
+
+        await RecordAsync(services, user, goal, thursday5, new RecordInput { Amount = 20 });
+        recorded.Add((thursday5, 20));
+        var after = await ReportAsync(services, user, goal);
+        var onTime = await FakeReportAsync(services, clock, user, goal, recorded.OrderBy(record => record.Date).ToList());
+
+        Assert.Equal(EvaluationState.Met, after.Recent.Results.Single(result => result.FirstDate == thursday5).State);
+        Assert.Equal("100% (6 of 6)", after.Stats.ConsistencyText);
+        Assert.Equal((6, 6), (after.Stats.CurrentStreak, after.Stats.LongestStreak));
+        AssertSameReport(onTime, after);
+    }
+
     private static async Task<GoalId> CreateGoalAsync(IServiceProvider services, ActingUser user, HabitId habit)
     {
         await using var scope = services.CreateAsyncScope();

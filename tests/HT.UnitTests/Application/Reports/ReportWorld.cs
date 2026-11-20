@@ -6,6 +6,7 @@ using HT.Domain.Accounts;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
+using HT.Domain.Time;
 using HT.UnitTests.Application.Goals;
 using HT.UnitTests.Application.Records;
 using HT.UnitTests.Fakes;
@@ -85,6 +86,27 @@ public sealed class ReportWorld
         var result = await _recording.RecordAsync(goal, date, input, user);
         Assert.Equal(RecordWriteOutcome.Recorded, result.Outcome);
         return result.RecordId!.Value;
+    }
+
+    /// <summary>
+    /// Stores a goal of <paramref name="owner"/> directly, with one settings version per entry of
+    /// <paramref name="versions"/>, as later time-zone changes would leave it (<see cref="RecordWorld.AddGoal"/>).
+    /// </summary>
+    public GoalId AddGoal(ActingUser owner, GoalTarget target, params (DateOnly From, NamedTimeZone Zone)[] versions) =>
+        _recording.AddGoal(owner, target, versions);
+
+    /// <summary>Changes a record for <see cref="User"/> (or <paramref name="user"/>) at the clock's time, and expects it changed.</summary>
+    public async Task ChangeAsync(GoalId goal, RecordId record, RecordInput input, ActingUser? user = null)
+    {
+        var result = await _recording.ChangeAsync(goal, record, input, user);
+        Assert.Equal(RecordWriteOutcome.Changed, result.Outcome);
+    }
+
+    /// <summary>Deletes a record for <see cref="User"/> (or <paramref name="user"/>) at the clock's time, and expects it deleted.</summary>
+    public async Task DeleteAsync(GoalId goal, RecordId record, ActingUser? user = null)
+    {
+        var result = await _recording.DeleteAsync(goal, record, user);
+        Assert.Equal(RecordWriteOutcome.Deleted, result.Outcome);
     }
 
     /// <summary>Stores a duration or count record directly, with no clock or ownership check.</summary>
