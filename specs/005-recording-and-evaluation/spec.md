@@ -69,7 +69,9 @@ Answered by the owner after critic pass 1 of this spec; the technical rows are r
   (FR-010, HP-010).
 - Q: When a record is saved with no note, or an empty one, what happens to the note already on that commitment
   or period? → A: It stays. A note given with a record adds or replaces the note only when it has text; a note
-  is removed only by saving it empty on its own (FR-007).
+  is removed only by saving it empty on its own (FR-007). *Amended on 2026-11-20 (Session 2026-11-20 (note
+  editing) below; [ADR 0019](../../docs/adr/0019-note-editing.md)): with no note it still stays, but an empty
+  note given with a record now removes it.*
 
 ### Session 2026-11-18 (plan)
 
@@ -95,6 +97,25 @@ Details the spec's words left open, found by `/speckit-plan` and accepted by the
   history loading's (HP-008).
 - Q: What is the progress of a commitment without a record, and of a yes/no commitment? → A: No value while it has
   no record; for yes/no, "Yes" counts 1 and "No" 0, against 1 (FR-014).
+
+### Session 2026-11-20 (note editing)
+
+Amended in place after this slice shipped, by
+[`specs/006-note-editing`](../006-note-editing/spec.md) ([issue #37](https://github.com/theyur/agentic-engineering-course-exam/issues/37);
+[ADR 0019](../../docs/adr/0019-note-editing.md)). Slice 5's manual quickstart (T097) found that the RecordDialog's
+note field always opened empty, also in "Edit", so it did not show the note it would replace. Decided by the owner
+on 2026-11-20:
+
+- Q: What does a note given with a record do? → A: It is the note: one with text after trimming adds or replaces
+  the note, and one that is empty after trimming removes it. A record saved with no note at all leaves the note
+  unchanged. This replaces the critic-revision answer above, which kept the note on an empty one (FR-007,
+  US4-AS3, US4-AS9, US4-AS10).
+- Q: What does deleting a record do to the note? → A: Nothing, also when it was the only record (FR-007,
+  US4-AS8).
+- Q: Where does the page edit a note? → A: A row with a record changes its note only together with a record, in
+  the RecordDialog, which opens with the current note; a row without a record has "Add note" or "Edit note" and
+  the NoteDialog. Those page rules are `specs/006-note-editing` HP-001 to HP-004, which HP-001 to HP-003 here
+  refer to. Decisions D-1 to D-9 of this spec keep their numbers.
 
 ## Decisions this slice cites
 
@@ -321,8 +342,9 @@ with the state unchanged.
 2. **Given** a commitment with a note, **When** the owner saves an empty note or one of only spaces on its own,
    **Then** the note is removed.
 3. **Given** a per-week period with the note "Knee was sore.", **When** the owner records "Yes" for another date
-   of that week with no note, or with a note of only spaces, **Then** the week's note is still "Knee was
-   sore."; with the note "Better today." it becomes "Better today." (FR-007).
+   of that week with no note, **Then** the week's note is still "Knee was sore."; with a note of only spaces, or
+   an empty one, the week has no note; with the note "Better today." it becomes "Better today."; the same holds
+   when the owner changes one of the week's records (FR-007; amended 2026-11-20, ADR 0019).
 4. **Given** a note of 501 characters, **Then** the result is "The note can have at most 500 characters." and
    nothing changes; 500 characters are accepted.
 5. **Given** a per-week period, **When** the owner writes a note for any date of that week that has begun,
@@ -330,9 +352,19 @@ with the state unchanged.
    cannot record a day that has not begun.".
 6. **Given** a goal with notes on 7 commitments, **When** its owner reads its recent notes, **Then** the 5 with
    the latest dates are returned, newest first, each with its date and state.
-7. *(page)* **Given** the History table, **Then** each row shows its note; the Recent notes card shows the recent
-   notes, each with its date and state; the NoteDialog says that notes are private and do not change the result
-   (HP-003).
+7. *(page)* **Given** the History table, **Then** each row shows its note as plain text, a row with a record
+   changes it in the RecordDialog and a row without one with "Add note" or "Edit note" (`specs/006-note-editing`
+   HP-001 to HP-004); the Recent notes card shows the recent notes, each with its date and state; the NoteDialog
+   says that notes are private and do not change the result (HP-003). *Amended 2026-11-20.*
+8. **Given** a commitment with one record and the note "Fell asleep early.", **When** the owner deletes the
+   record, **Then** the commitment has no record and still has the note "Fell asleep early." (FR-007; added
+   2026-11-20).
+9. **Given** a Missed commitment without a record and with the note "Away for the weekend.", **When** the owner
+   records an amount for it with the note "Away for the weekend.", **Then** it has the record and that note; with
+   an empty note it has the record and no note; with no note at all it has the record and the note (FR-007; added
+   2026-11-20).
+10. **Given** a commitment with a record and no note, **When** the owner changes the record with the note "Back
+    was tired.", **Then** the commitment has the note "Back was tired." (FR-007; added 2026-11-20).
 
 ---
 
@@ -489,12 +521,15 @@ as the demo account with history and read its goals' histories.
   trimmed; longer than 500 characters it gives "The note can have at most 500 characters." and changes nothing.
   A note can be saved on its own, or given with a record (recording or changing one):
   - saved on its own, a note replaces the existing note, and one that is empty after trimming removes it;
-  - given with a record, a note that has text after trimming adds or replaces the note; no note, or one that is
-    empty after trimming, leaves the existing note unchanged.
+  - given with a record, a note that has text after trimming adds or replaces the note, and one that is empty
+    after trimming removes it; a record saved with no note at all leaves the existing note unchanged;
+  - deleting a record never changes the note, also when it was the only record.
 
   A note is saved on its own for a date that passes FR-002's checks, whatever the state of its commitment or
   period, including after it is final; for a per-week period, any such date of the week names the period. A note
-  never changes the state.
+  never changes the state. *The second and third bullets were amended on 2026-11-20 by `specs/006-note-editing`
+  ([ADR 0019](../../docs/adr/0019-note-editing.md)); before, an empty note given with a record left the note
+  unchanged, and deleting a record had no stated rule.*
 - **FR-008**: Reading a goal's recent notes MUST return at most 5 notes, those of the commitments or periods with
   the latest first dates (a per-week period: its Monday), newest first, each with its date (a per-week period: its first and last date), the note and
   the state at the supplied time.
@@ -619,7 +654,9 @@ as the demo account with history and read its goals' histories.
   - a commitment row: "Add record" without a record, "Edit" with one (it opens that one record);
   - a period row: "Add record" while it has fewer than 50 records, and each of its records in the Recorded cell
     opens with "Edit"; so a final period takes a missing record as a correction (US3-AS4);
-  - every row: "Add note" without a note, the note itself with one (HP-003).
+  - the Note column and the note controls: as `specs/006-note-editing` HP-001 and HP-002 give them (the note as
+    plain text or "—"; "Add note" or "Edit note" only on a row without a record), which govern. *Amended
+    2026-11-20; before, every row had "Add note" without a note and the note itself with one.*
 - **HP-002**: The RecordDialog (`design/components/RecordDialog`, `RecordForms`) MUST follow the design. Opened
   from the page head, its "For" select lists FR-011's entries ("Pending, N h left" on Pending ones, N being the whole hours from the supplied time to
   the grace end, rounded up), and the
@@ -628,12 +665,15 @@ as the demo account with history and read its goals' histories.
   dates up to the current date). Then: the field for the measurement ("Did you do it?" Yes | No with nothing
   pre-selected; a Stepper with the unit; minutes), the target in the sub line, the progress under the field,
   the partial-progress sentence, for Reduce goals the help text asking for an explicit number or "No" because an
-  unrecorded day is Missed (FR-013), and "Note (optional)", empty, whose help says that an empty field keeps the
-  existing note (FR-007). "Save record" and Cancel; no "Excuse instead" (slice 7). Refusals sit under their
+  unrecorded day is Missed (FR-013), and "Note (optional)" as `specs/006-note-editing` HP-003 gives it (filled
+  with the current note, its help text per kind), which governs (*amended 2026-11-20; before, it opened empty with
+  the help that an empty field keeps the existing note*). "Save record" and Cancel; no "Excuse instead" (slice 7). Refusals sit under their
   field, one at a time. "Edit" opens the same dialog for that one record, with its date fixed, and "Delete
   record".
-- **HP-003**: The NoteDialog (`design/components/NoteDialog`) MUST open from the History row's note and from
-  "Add note": its title names the goal ("Add note · Reading, 20 min daily"), its sub line the date and the state
+- **HP-003**: The NoteDialog (`design/components/NoteDialog`) MUST open and be titled as `specs/006-note-editing`
+  HP-004 gives it (only from a row without a record, by "Add note" or "Edit note"), which governs (*amended
+  2026-11-20; before, it opened from the History row's note and from "Add note"*): its title names the goal ("Add
+  note · Reading, 20 min daily"), its sub line the date and the state
   ("Tue 27 Oct · Missed"), as `design/components/NoteDialog.html` shows, and its help text says that notes are
   private and do not change the result.
 - **HP-004**: StatusChips MUST use the words of FR-010: "Met", "Failed", "Missed", "Pending", and for Due "Due
@@ -718,12 +758,15 @@ Constitution IV and ADR 0008 require `design/` to change first:
 - `design/components/RecordDialog` and `RecordForms`: without "Excuse instead" (slice 7); the "Provisional"
   mark removed from the Reduce rule, which FR-013 confirms (the "Excuse instead" rule keeps its mark until slice
   7); the "For" select for a per-week goal and fixed to the row when opened from History; the note help "An
-  empty field keeps the existing note."; "Edit" for one record, with "Delete record".
+  empty field keeps the existing note." (*superseded 2026-11-20 by `specs/006-note-editing`, "Design changes
+  before build"*); "Edit" for one record, with "Delete record".
 - `design/pages/PageGoalDetail`: History row actions per HP-001 ("Add record" on period rows, "Edit" per
-  record, "Add note"), and the Recent notes card with each note's date and state.
+  record, "Add note"), and the Recent notes card with each note's date and state. (*The "Add note" row action is
+  superseded 2026-11-20 by `specs/006-note-editing`, "Design changes before build".*)
 - `design/components/StatusChip`: "Met" for Reduce goals too, instead of "Within limit" (constitution I); "Due
   this week" for a per-week period.
-- `design/components/NoteDialog`: the "Add note" entry from the History row; `NoteDialog.md` says, as the HTML
+- `design/components/NoteDialog`: the "Add note" entry from the History row (*its openers and title superseded
+  2026-11-20 by `specs/006-note-editing`, "Design changes before build"*); `NoteDialog.md` says, as the HTML
   shows, that the title names the goal and the sub line the date and state (not "the habit, date and state").
 - `design/components/RecordDialog.md`: its "For" rule "today plus every commitment still Pending" becomes
   FR-011's entries (every Due and every Pending one; no "today" on an unscheduled day).

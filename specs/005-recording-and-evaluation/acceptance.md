@@ -103,7 +103,7 @@ Conventions used by every item:
 | FR-004 | AC-001, AC-008, AC-009, AC-014, AC-064 | |
 | FR-005 | AC-007, AC-008, AC-010, AC-032, AC-033, AC-038, AC-064 | "Not a whole number" is checked with numbers outside the range only; the spec gives no input type in which a fraction could be passed. |
 | FR-006 | AC-001, AC-024, AC-025, AC-026, AC-027, AC-028, AC-029, AC-031, AC-064 | |
-| FR-007 | AC-011, AC-035, AC-036, AC-037, AC-038, AC-039, AC-064 | |
+| FR-007 | AC-011, AC-035, AC-036, AC-037, AC-038, AC-039, AC-064, AC-070, AC-071, AC-072 | |
 | FR-008 | AC-040, AC-041, AC-056 | |
 | FR-009 | AC-001, AC-003, AC-004, AC-034, AC-042, AC-043 | |
 | FR-010 | AC-001, AC-012, AC-013, AC-042, AC-065 | |
@@ -154,7 +154,10 @@ Conventions used by every item:
 | US4-AS4 | AC-038 | |
 | US4-AS5 | AC-039 | |
 | US4-AS6 | AC-040 | |
-| US4-AS7 | — | Not testable through the API: the History table's note cells, the Recent notes card and the NoteDialog's text (page, HP-003). |
+| US4-AS7 | — | Not testable through the API: the History table's note cells and note controls, the Recent notes card and the NoteDialog's text (page, HP-003; `specs/006-note-editing` HP-001 to HP-004). |
+| US4-AS8 | AC-070 | |
+| US4-AS9 | AC-071 | |
+| US4-AS10 | AC-072 | |
 | US5-AS1 | AC-042 | |
 | US5-AS2 | AC-044 | |
 | US5-AS3 | AC-045, AC-046, AC-067 | |
@@ -754,25 +757,27 @@ Examples:
 | 03 | "New note." | the note "New note." |
 | 04 | "  New note.  " | the note "New note." |
 
-### AC-037 (FR-007; US4-AS3) A note given with a record replaces the note only when it has text
+### AC-037 (FR-007; US4-AS3) A note given with a record is the note; no note leaves it unchanged
 
 - Given the registered user `f5.ac037.user.<n>@example.com`, who created the custom habit `Yoga`
 - And at `2026-11-16T08:00:00Z` `f5.ac037.user.<n>@example.com` created a goal on their custom habit `Yoga` with Build, yes/no, 3 times per week and the start date 2026-11-16
 - And at `2026-11-18T10:00:00Z` `f5.ac037.user.<n>@example.com` recorded Yes for 2026-11-16 and saved the note "Knee was sore." for 2026-11-16
 - When `f5.ac037.user.<n>@example.com` <action>
 - Then it succeeds with the state Due, not a correction
-- And reading the history of the goal from 2026-11-16 to 2026-11-22 gives the entry 2026-11-16 to 2026-11-22 with the note <note>
+- And reading the history of the goal from 2026-11-16 to 2026-11-22 gives the entry 2026-11-16 to 2026-11-22 with <note>
 
 Examples:
 
 | n | action | note |
 |---|---|---|
-| 01 | records Yes for 2026-11-18 | "Knee was sore." |
-| 02 | records Yes for 2026-11-18 with the note `"   "` | "Knee was sore." |
-| 03 | records Yes for 2026-11-18 with the note `""` | "Knee was sore." |
-| 04 | records Yes for 2026-11-18 with the note "Better today." | "Better today." |
-| 05 | changes the record of 2026-11-16 to No | "Knee was sore." |
-| 06 | changes the record of 2026-11-16 to No with the note "Better today." | "Better today." |
+| 01 | records Yes for 2026-11-18 | the note "Knee was sore." |
+| 02 | records Yes for 2026-11-18 with the note `"   "` | no note |
+| 03 | records Yes for 2026-11-18 with the note `""` | no note |
+| 04 | records Yes for 2026-11-18 with the note "Better today." | the note "Better today." |
+| 05 | changes the record of 2026-11-16 to No | the note "Knee was sore." |
+| 06 | changes the record of 2026-11-16 to No with the note "Better today." | the note "Better today." |
+| 07 | changes the record of 2026-11-16 to No with the note `""` | no note |
+| 08 | changes the record of 2026-11-16 to No with the note "Knee was sore." | the note "Knee was sore." |
 
 ### AC-038 (FR-005; FR-007; US4-AS4) A note has at most 500 characters
 
@@ -1278,3 +1283,46 @@ Examples:
 | 02 | `examples` | 8 characters, no digit | its result is "demo password does not meet the password rule", and no other result, and demo history loading run afterwards with the demo password `example2026` gives "created" for `demo4@example.com` |
 | 03 | `abc` | 3 characters, no digit | its result is "demo password does not meet the password rule", and no other result, and demo history loading run afterwards with the demo password `example2026` gives "created" for `demo4@example.com` |
 | 04 | `exampl12` | 8 characters, with a digit | its results are, in this order, "created", "demo goals added" and "demo records added", each for `demo4@example.com`, and sign-in with `demo4@example.com` and `exampl12` succeeds |
+
+### AC-070 (FR-007; US4-AS8) Deleting the only record of a commitment keeps its note
+
+- Given the registered user `f5.ac070.user.<n>@example.com`, who created the custom habit `Reading`
+- And `f5.ac070.user.<n>@example.com` created a goal on their custom habit `Reading` with Build, duration 20 minutes, fixed days on all seven days and the start date 2026-11-18
+- And `f5.ac070.user.<n>@example.com` recorded 12 for 2026-11-18 with the note "Fell asleep early."
+- When at <time> `f5.ac070.user.<n>@example.com` deletes the record of 2026-11-18
+- Then <result>
+- And reading the history of the goal from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, <state>, no record, note "Fell asleep early."
+
+Examples:
+
+| n | time | result | state |
+|---|---|---|---|
+| 01 | `2026-11-18T12:00:00Z` | deleting succeeds with the state Due, not a correction | Due |
+| 02 | `2026-11-22T10:00:00Z` | deleting succeeds with the state Missed, a correction | Missed |
+
+### AC-071 (FR-007; US4-AS9) The first record of a Missed commitment that has a note: the note given is the note, no note keeps it
+
+- Given the registered user `f5.ac071.user.<n>@example.com`, who created the custom habit `Reading`
+- And `f5.ac071.user.<n>@example.com` created a goal on their custom habit `Reading` with Build, duration 20 minutes, fixed days on all seven days and the start date 2026-11-18
+- And at `2026-11-22T10:00:00Z` `f5.ac071.user.<n>@example.com` saved the note "Away for the weekend." for 2026-11-18
+- When at `2026-11-22T10:00:00Z` `f5.ac071.user.<n>@example.com` <action>
+- Then recording succeeds with the state Met, a correction
+- And reading the history of the goal from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, Met, records (2026-11-18, 20), <note>
+
+Examples:
+
+| n | action | note |
+|---|---|---|
+| 01 | records 20 for 2026-11-18 with the note "Away for the weekend." | note "Away for the weekend." |
+| 02 | records 20 for 2026-11-18 with the note `""` | no note |
+| 03 | records 20 for 2026-11-18 with the note `"   "` | no note |
+| 04 | records 20 for 2026-11-18 | note "Away for the weekend." |
+
+### AC-072 (FR-007; US4-AS10) Changing the record of a commitment without a note, with a note, adds the note
+
+- Given the registered user `f5.ac072.user@example.com`, who created the custom habit `Reading`
+- And `f5.ac072.user@example.com` created a goal on their custom habit `Reading` with Build, duration 20 minutes, fixed days on all seven days and the start date 2026-11-18
+- And `f5.ac072.user@example.com` recorded 15 for 2026-11-18
+- When `f5.ac072.user@example.com` changes the record of 2026-11-18 to 20 with the note "Back was tired."
+- Then changing succeeds with the state Due, not a correction
+- And reading the history of the goal from 2026-11-18 to 2026-11-18 gives the entry 2026-11-18, Due, records (2026-11-18, 20), note "Back was tired."
