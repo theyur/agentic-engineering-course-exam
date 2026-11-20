@@ -10,7 +10,8 @@ using static HT.UnitTests.Domain.Time.Instants;
 namespace HT.UnitTests.Application.Records;
 
 /// <summary>
-/// Notes (US4-AS1 to AS5, FR-007): <c>SaveNoteAsync</c>, and the note given with <c>RecordAsync</c>, over the fakes of
+/// Notes (US4-AS1 to AS5, AS8, AS9, FR-007): <c>SaveNoteAsync</c>, the note given with <c>RecordAsync</c>, and the note
+/// a <c>DeleteRecordAsync</c> leaves, over the fakes of
 /// <see cref="RecordWorld"/>. The user has no stored time zone, so the goals are in UTC and start on Monday 16 November
 /// 2026, created at 08:00Z that day. A day runs from 00:00Z to 00:00Z the next day and its grace period ends 48 hours
 /// later, so Monday 16's ends at 2026-11-19T00:00:00Z. Every instant is worked out by hand.
@@ -193,6 +194,64 @@ public sealed class NoteTests
         var week = Assert.Single(await _world.HistoryAsync(goal, Mon16, Sun22));
         Assert.Equal("Better today.", week.Note);
         Assert.Equal(Mon16, Assert.Single(_world.Records.NotesOfGoal(goal)).Key);
+    }
+
+    // ---- AS8 and AS9 (added by specs/006-note-editing US2-AS3 and US2-AS4): the note of a commitment without a record
+    // moves into its first record, and stays when its only record is deleted ----
+
+    [Theory]
+    [InlineData("Away for the weekend.", "Away for the weekend.")]
+    [InlineData("", null)]
+    [InlineData("   ", null)]
+    [InlineData(null, "Away for the weekend.")]
+    public async Task US4_AS9_the_first_record_of_a_Missed_commitment_keeps_its_note_with_that_note_or_none_and_an_empty_note_removes_it(
+        string? given, string? expected)
+    {
+        var goal = await GoalAsync(Reading20MinDaily);
+        _world.At(Fri20TenOClock);
+        Saved(await SaveNoteAsync(goal, Mon16, "Away for the weekend."));
+        Assert.Equal(EvaluationState.Missed, Assert.Single(await _world.HistoryAsync(goal, Mon16, Mon16)).State);
+
+        var result = await _world.RecordAsync(goal, Mon16, Minutes(20, given));
+
+        Assert.Equal(RecordWriteOutcome.Recorded, result.Outcome);
+        Assert.Equal(20, Assert.Single(result.Entry!.Records).Amount);
+        Assert.Equal(expected, result.Entry.Note);
+        var read = Assert.Single(await _world.HistoryAsync(goal, Mon16, Mon16));
+        Assert.Single(read.Records);
+        Assert.Equal(expected, read.Note);
+        Assert.Single(_world.Records.RecordsOfGoal(goal));
+        Assert.Equal(expected, _world.Records.NotesOfGoal(goal).Values.SingleOrDefault()?.Value);
+    }
+
+    /// <summary>
+    /// Monday 16 is recorded at 10:00Z that day with 12 min and "Fell asleep early.". At 10:00Z on Wednesday 18 its grace
+    /// period (to 2026-11-19T00:00:00Z) has not ended, so without a record it is Pending; at 10:00Z on Friday 20 it has,
+    /// so it is Missed.
+    /// </summary>
+    [Theory]
+    [InlineData("2026-11-18T10:00:00Z", EvaluationState.Pending)]
+    [InlineData("2026-11-20T10:00:00Z", EvaluationState.Missed)]
+    public async Task US4_AS8_deleting_the_only_record_of_a_commitment_with_a_note_leaves_no_record_and_the_note(
+        string deletedAt, EvaluationState state)
+    {
+        var goal = await GoalAsync(Reading20MinDaily);
+        _world.At(Mon16TenOClock);
+        var recorded = await _world.RecordAsync(goal, Mon16, Minutes(12, "Fell asleep early."));
+        Assert.Equal(RecordWriteOutcome.Recorded, recorded.Outcome);
+        _world.At(Utc(deletedAt));
+
+        var result = await _world.DeleteAsync(goal, recorded.RecordId!.Value);
+
+        Assert.Equal(RecordWriteOutcome.Deleted, result.Outcome);
+        Assert.Empty(result.Entry!.Records);
+        Assert.Equal(state, result.Entry.State);
+        Assert.Equal("Fell asleep early.", result.Entry.Note);
+        var read = Assert.Single(await _world.HistoryAsync(goal, Mon16, Mon16));
+        Assert.Empty(read.Records);
+        Assert.Equal("Fell asleep early.", read.Note);
+        Assert.Empty(_world.Records.RecordsOfGoal(goal));
+        Assert.Equal("Fell asleep early.", Assert.Single(_world.Records.NotesOfGoal(goal)).Value.Value);
     }
 
     // ---- AS4: at most 500 characters ----

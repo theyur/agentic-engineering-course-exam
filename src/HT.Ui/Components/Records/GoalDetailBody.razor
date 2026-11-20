@@ -20,8 +20,8 @@
    with no begun entry, shows no History card and has the design's layout for that case: the Settings card alone in
    ht-grid-2. A goal with no current date shows no "Record". "Record" opens the RecordDialog with what can be recorded
    now; a History row's "Add record", "Edit" or record button opens it for that row or record, with the history's
-   settings (US3, HP-001). A History row's "Add note" or note opens the NoteDialog for that row (US4, HP-003). The recent
-   notes are read after the history, and only for a goal with a current date. After a save or a delete, what can be
+   settings (US3, HP-001). "Add note" or "Edit note" of a row without a record opens the NoteDialog for that row (US4,
+   HP-003; specs/006-note-editing HP-002, HP-004). The recent notes are read after the history, and only for a goal with a current date. After a save or a delete, what can be
    recorded, the history and the recent notes are read again before the dialog closes, so the closing render already
    has the new rows and notes, and the focus goes back to the head's "Record" or to the row's control as the card now
    shows it. Every use case runs in its own scope. *@

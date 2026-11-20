@@ -3,9 +3,11 @@
 @using HT.Domain.Goals
 @using HT.Ui.Habits
 @inject UseCaseScope UseCases
-@* design/components/NoteDialog, slice 5 state (HP-003, US4-AS7, contracts/host.md "Dialogs"): the private note of one
-   History row, opened from the row's "Add note" (the field starts empty) or from its note (the field starts with that
-   note, so saving without a change keeps it). The title is "Add note · {goal name}", with or without a note; the sub
+@* design/components/NoteDialog, slice 5 state amended by specs/006-note-editing (HP-003, US4-AS7; 006 HP-004;
+   contracts/host.md "NoteDialog"): the private note of one History row, opened only from a row without a record, by
+   its "Add note" (the field starts empty) or its "Edit note" (the field starts with the note, so saving without a
+   change keeps it). The title is "Add note · {goal name}" when the row has no note and "Edit note · {goal name}" when it
+   has one, fixed when the dialog opens, so a save that removes the note does not retitle the closing dialog; the sub
    line is the row's date and its state word as the StatusChip writes it ("Tue 27 Oct · Missed", "27 Jul – 2 Aug ·
    Failed"); then the TextArea "Note" with the help "Notes are private. They do not change the result.", and "Save note"
    and "Cancel". The 500-character limit is the use case's: a longer note gives its refusal under the field and changes
@@ -14,7 +16,7 @@
    raises OnSaved with the entry after the write. Focus moves to the TextArea on open; Esc and × close the dialog, and
    focus returns to the opener. *@
 <HtDialog Open="Open" OnClose="OnClose" ReturnFocus="ReturnFocus" FocusOnOpen="FocusNoteAsync" FocusOnClose="FocusOnClose">
-    <Title>@TitlePrefix@GoalName</Title>
+    <Title>@(_hadNote ? EditTitlePrefix : AddTitlePrefix)@GoalName</Title>
     <Subtitle>@SubLine</Subtitle>
     <ChildContent>
         <TextArea @ref="_field" Id="@_id" Label="Note" Help="Notes are private. They do not change the result." Error="@_error"
@@ -27,8 +29,11 @@
 </HtDialog>
 
 @code {
-    /// <summary>The design's only title: "Add note · " and the goal's name, with or without a note.</summary>
-    private const string TitlePrefix = "Add note · ";
+    /// <summary>The title of a row without a note: "Add note · " and the goal's name (HP-004).</summary>
+    private const string AddTitlePrefix = "Add note · ";
+
+    /// <summary>The title of a row with a note: "Edit note · " and the goal's name (HP-004).</summary>
+    private const string EditTitlePrefix = "Edit note · ";
 
     private const string Separator = " · ";
 
@@ -38,6 +43,9 @@
     private string? _error;
     private bool _saving;
     private bool _wasOpen;
+
+    /// <summary>Whether the row had a note when the dialog opened; it picks the title and is not recomputed while open.</summary>
+    private bool _hadNote;
 
     /// <summary>Whether the dialog is shown; the page owns this value.</summary>
     [Parameter]
@@ -53,7 +61,7 @@
 
     /// <summary>
     /// Gives the focus back when the dialog closes, in place of <see cref="ReturnFocus"/>: for a History row, whose
-    /// button the closing render may have replaced ("Add note" becomes the note).
+    /// note control the closing render may have changed ("Add note" becomes "Edit note", or the reverse).
     /// </summary>
     [Parameter]
     public Func<ValueTask>? FocusOnClose { get; set; }
@@ -70,7 +78,7 @@
     [Parameter, EditorRequired]
     public GoalHistory History { get; set; } = default!;
 
-    /// <summary>The History row the dialog was opened from; its note, if any, fills the field.</summary>
+    /// <summary>The History row without a record the dialog was opened from; its note, if any, fills the field.</summary>
     [Parameter, EditorRequired]
     public HistoryEntry Row { get; set; } = default!;
 
@@ -91,6 +99,7 @@
         if (Open && !_wasOpen)
         {
             _note = Row.Note;
+            _hadNote = Row.Note is not null;
             _error = null;
             _saving = false;
         }
