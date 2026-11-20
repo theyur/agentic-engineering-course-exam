@@ -151,6 +151,25 @@ public static class RecordingText
     }
 
     /// <summary>
+    /// The help under the RecordDialog's note field (HP-003, research R-07), from the goal's schedule kind and period:
+    /// "Clear the field to remove the note." for a commitment-based goal; "This note is for the whole day. Clear the
+    /// field to remove it." for a per-day period; "This note is for the whole week. Clear the field to remove it." for
+    /// a per-week period.
+    /// </summary>
+    public static string NoteHelp(GoalHistory history)
+    {
+        ArgumentNullException.ThrowIfNull(history);
+        return history.GoalScheduleKind switch
+        {
+            GoalScheduleKind.CommitmentBased => "Clear the field to remove the note.",
+            GoalScheduleKind.PeriodBased => history.Period == SchedulePeriod.Week
+                ? "This note is for the whole week. Clear the field to remove it."
+                : "This note is for the whole day. Clear the field to remove it.",
+            _ => throw new ArgumentOutOfRangeException(nameof(history), "The schedule kind is not defined."),
+        };
+    }
+
+    /// <summary>
     /// A "For" label of the RecordDialog (FR-011), called with <see cref="GoalHistory.CurrentDate"/> and
     /// <see cref="GoalHistory.ReadAt"/>: "Today, Fri 30 Oct" for the Due entry whose single date is the current date,
     /// otherwise the entry's date ("Wed 28 Oct", "26 Oct – 1 Nov"), then for a Pending entry " · Pending, N h left",

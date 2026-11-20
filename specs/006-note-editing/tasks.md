@@ -197,24 +197,24 @@ save, and read the row with no note (spec US1).
 
 ### Tests for User Story 1
 
-- [ ] T022 [P] [US1] Add to `tests/HT.UnitTests/Application/Records/CorrectionTests.cs` (after Phase 2):
+- [X] T022 [P] [US1] Add to `tests/HT.UnitTests/Application/Records/CorrectionTests.cs` (after Phase 2):
   - a change with "Slept badly." on a commitment with "Fell asleep early." gives "Slept badly." (US1-AS2), if no existing test covers it;
   - a change with the note the entry already has leaves it unchanged (US1-AS4; AC-037 row 08);
   - a change of the record of a commitment without a note, with "Back was tired.", adds that note (US1-AS5; slice 5 US4-AS10, AC-072);
   - a change refused for its value, and one refused for a note of 501 characters, leave the record and the note as they were (US1-AS6, FR-003);
   - a change of a final (Met) commitment's record with its unchanged value and only a new note reports a correction, keeps the state Met and replaces the note (spec edge cases).
-- [ ] T023 [P] [US1] Add `NoteHelp` tests to `tests/HT.UnitTests/Application/Records/RecordingTextTests.cs` (after T024): the three literal texts for a commitment-based goal, a per-day period and a per-week period (HP-003)
+- [X] T023 [P] [US1] Add `NoteHelp` tests to `tests/HT.UnitTests/Application/Records/RecordingTextTests.cs` (after T024): the three literal texts for a commitment-based goal, a per-day period and a per-week period (HP-003)
 
 ### Implementation for User Story 1
 
-- [ ] T024 [US1] Add `RecordingText.NoteHelp(GoalHistory history)` to `src/HT.Application/Records/RecordingText.cs` (research R-07): "Clear the field to remove the note." for a commitment-based goal, "This note is for the whole day. Clear the field to remove it." for a per-day period, "This note is for the whole week. Clear the field to remove it." for a per-week period, with the texts as T004 confirmed them. It reads the schedule kind and period from `GoalHistory`, as `ReduceHelp` does
-- [ ] T025 [US1] Change `src/HT.Ui/Components/Records/RecordDialog.razor` (after T024; research R-05, R-06; contracts/host.md "RecordDialog"):
+- [X] T024 [US1] Add `RecordingText.NoteHelp(GoalHistory history)` to `src/HT.Application/Records/RecordingText.cs` (research R-07): "Clear the field to remove the note." for a commitment-based goal, "This note is for the whole day. Clear the field to remove it." for a per-day period, "This note is for the whole week. Clear the field to remove it." for a per-week period, with the texts as T004 confirmed them. It reads the schedule kind and period from `GoalHistory`, as `ReduceHelp` does
+- [X] T025 [US1] Change `src/HT.Ui/Components/Records/RecordDialog.razor` (after T024; research R-05, R-06; contracts/host.md "RecordDialog"):
   - `Reset` sets `_note = entry.Note ?? string.Empty` for the entry the dialog records for, in every mode: the first entry of what can be recorded from the page head, `Row` from a row's "Add record", the record's commitment or period in "Edit";
   - choosing another entry in "For" sets `_note` to that entry's note, replacing typed text; choosing another "Date" of the same week leaves it;
   - the `TextArea`'s `Help` is `RecordingText.NoteHelp(Recordable)` (the dialog's `GoalHistory` parameter), in place of the literal "An empty field keeps the existing note."; a note refusal still replaces it through `Error`;
   - "Save record" sends `Note = _note ?? string.Empty`, never null; "Delete record" is unchanged and ignores the field;
   - the header comment (line 20) describes the filled field and its help.
-- [ ] T026 [US1] Update `tests/HT.UiTests/Components/Records/RecordDialogTests.cs` (after T025; research R-10):
+- [X] T026 [US1] Update `tests/HT.UiTests/Components/Records/RecordDialogTests.cs` (after T025; research R-10):
   - remove the constant `NoteHelp` (line 27) and assert the help through the literal texts;
   - rename `The_note_is_optional_empty_and_says_that_an_empty_field_keeps_the_existing_note` (line 216) to state the new rule (for example `HP_003_the_note_is_optional_and_says_that_clearing_the_field_removes_the_note`), and assert "Clear the field to remove the note.";
   - the field opens with the entry's note in each of the three modes, and empty for an entry without one (US1-AS1, US2-AS5; SC-001);

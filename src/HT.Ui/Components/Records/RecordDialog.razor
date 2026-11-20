@@ -17,7 +17,10 @@
    - "Edit" of one record (Row and Editing): "For" fixed to the record's date, the value filled, and "Delete record";
      focus moves to the value.
    Then the field of the goal's measurement with the live progress line and bar, the partial-progress sentence or the
-   Reduce help; "Note (optional)", empty, whose help says that an empty field keeps the existing note; "Save record" and
+   Reduce help; "Note (optional)", which opens with the current note of the entry "For" names (empty without one) in
+   every mode, with RecordingText.NoteHelp's help for the goal (specs/006-note-editing HP-003, ADR 0019); choosing
+   another entry in "For" replaces the field's content with that entry's note, another "Date" of the same week leaves
+   it; the note is saved as the field shows it, never null, so an empty field removes the note; "Save record" and
    "Cancel", and no "Excuse instead" (slice 7). Every text comes from RecordingText and DateTexts, and the live progress
    is RecordPreview's (in "Edit" with that record as the one replaced), so the dialog counts and evaluates nothing
    itself; "N h left" is formatted at the instant the use case read the clock, so it reads no clock. The result's
@@ -84,7 +87,7 @@
                 }
             </RecordFields>
             <TextArea Id="@NoteId" Label="Note" Optional="true" Placeholder="What happened? Only you can see notes."
-                      Help="An empty field keeps the existing note." Error="@ErrorOf(RecordFieldKind.Note)"
+                      Help="@RecordingText.NoteHelp(Recordable)" Error="@ErrorOf(RecordFieldKind.Note)"
                       Value="@_note" ValueChanged="v => _note = v" />
         }
     </ChildContent>
@@ -215,7 +218,7 @@
         _date = Editing?.Date ?? (entry is null ? default : DatesOf(entry)[0]);
         _answer = Editing?.Answer;
         _amount = Editing?.Amount;
-        _note = null;
+        _note = entry?.Note ?? string.Empty;
         _error = null;
         _saving = false;
     }
@@ -254,6 +257,7 @@
         {
             _entry = chosen;
             _date = DatesOf(chosen)[0];
+            _note = chosen.Note ?? string.Empty;
             _error = null;
         }
     }
@@ -291,7 +295,7 @@
             return;
         }
 
-        var input = new RecordInput { Answer = _answer, Amount = _amount, Note = _note };
+        var input = new RecordInput { Answer = _answer, Amount = _amount, Note = _note ?? string.Empty };
         if (Editing is { } editing)
         {
             var record = editing.Id;

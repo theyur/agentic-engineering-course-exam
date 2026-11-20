@@ -24,8 +24,6 @@ namespace HT.UiTests.Components.Records;
 /// </summary>
 public sealed class RecordDialogTests : BunitContext
 {
-    private const string NoteHelp = "An empty field keeps the existing note.";
-
     private static readonly DateOnly Mon16 = new(2026, 11, 16);
 
     private readonly FakeCatalogHabitStore _catalog;
@@ -66,10 +64,15 @@ public sealed class RecordDialogTests : BunitContext
         return result.History!;
     }
 
-    /// <summary>Creates the goal, moves the clock to <paramref name="at"/> and renders the open dialog with what can be recorded then.</summary>
-    private async Task<(IRenderedComponent<RecordDialog> Cut, GoalId Goal)> OpenAsync(GoalTargetFields target, DateTimeOffset at, string name = "Reading, 20 min daily")
+    /// <summary>
+    /// Creates the goal, lets <paramref name="arrange"/> seed its records and notes, moves the clock to
+    /// <paramref name="at"/> and renders the open dialog with what can be recorded then.
+    /// </summary>
+    private async Task<(IRenderedComponent<RecordDialog> Cut, GoalId Goal)> OpenAsync(
+        GoalTargetFields target, DateTimeOffset at, string name = "Reading, 20 min daily", Action<GoalId>? arrange = null)
     {
         var goal = await GoalAsync(target);
+        arrange?.Invoke(goal);
         _clock.SetUtcNow(at);
         var recordable = await RecordableAsync(goal);
         var cut = Render<RecordDialog>(p => p
@@ -111,6 +114,18 @@ public sealed class RecordDialogTests : BunitContext
 
     private static AngleSharp.Dom.IElement Field(IRenderedComponent<RecordDialog> cut, string label) =>
         cut.FindAll(".ht-field").Single(f => f.QuerySelector(".ht-field__label")!.TextContent.StartsWith(label, StringComparison.Ordinal));
+
+    /// <summary>What the note field shows: the textarea's bound value, which bUnit renders as its value attribute.</summary>
+    private static string NoteShown(IRenderedComponent<RecordDialog> cut) => cut.Find("textarea").GetAttribute("value") ?? string.Empty;
+
+    private void SeedNote(GoalId goal, DateOnly key, string text)
+    {
+        Assert.True(NoteText.TryCreate(text, out var note, out _));
+        _records.SeedNote(goal, key, note!);
+    }
+
+    private string? StoredNote(GoalId goal, DateOnly key) =>
+        _records.NotesOfGoal(goal).TryGetValue(key, out var note) ? note.Value : null;
 
     [Fact]
     public async Task US1_AS9_the_dialog_has_the_goals_title_its_target_the_For_select_the_field_and_no_Excuse_instead()
@@ -213,7 +228,7 @@ public sealed class RecordDialogTests : BunitContext
     }
 
     [Fact]
-    public async Task The_note_is_optional_empty_and_says_that_an_empty_field_keeps_the_existing_note()
+    public async Task HP_003_the_note_is_optional_and_says_that_clearing_the_field_removes_the_note()
     {
         var (cut, _) = await OpenAsync(Reading20MinDaily, Utc(16, 10));
 
@@ -222,7 +237,176 @@ public sealed class RecordDialogTests : BunitContext
         var area = note.QuerySelector("textarea.ht-input.ht-textarea")!;
         Assert.True(string.IsNullOrEmpty(area.GetAttribute("value")) && string.IsNullOrEmpty(area.TextContent));
         Assert.Equal("What happened? Only you can see notes.", area.GetAttribute("placeholder"));
-        Assert.Equal(NoteHelp, note.QuerySelector(".ht-field__help")!.TextContent);
+        var help = Assert.Single(note.QuerySelectorAll(".ht-field__help"));
+        Assert.Equal("Clear the field to remove the note.", help.TextContent);
+        Assert.False(string.IsNullOrEmpty(help.Id));
+        Assert.Equal(help.Id, area.GetAttribute("aria-describedby"));
+        Assert.Null(area.GetAttribute("aria-invalid"));
+    }
+
+    // ---- specs/006-note-editing US1: the field shows the entry's note and saving stores what it shows (HP-003) ----
+
+    [Fact]
+    public async Task US1_AS1_from_the_page_head_the_field_opens_with_the_first_entrys_note()
+    {
+        var (cut, _) = await OpenAsync(Reading20MinDaily, Utc(16, 10), arrange: g => SeedNote(g, Mon16, "Fell asleep early."));
+
+        Assert.Equal("Fell asleep early.", NoteShown(cut));
+    }
+
+    [Fact]
+    public async Task US2_AS5_from_a_rows_Add_record_the_field_opens_with_the_rows_note_and_saving_it_unchanged_keeps_it()
+    {
+        // At 10:00 on Friday 20 November Monday 16 is Missed, with a note and no record.
+        var (cut, goal, row) = await OpenRowAsync(Reading20MinDaily, Utc(20, 10), Mon16, arrange: g => SeedNote(g, Mon16, "Away for the weekend."));
+        Assert.Empty(row.Records);
+
+        Assert.Equal("Away for the weekend.", NoteShown(cut));
+
+        cut.Find(".ht-stepper input").Change("20");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("Away for the weekend.", Assert.Single(_saved).Note);
+        Assert.Equal("Away for the weekend.", StoredNote(goal, Mon16));
+        Assert.Single(_records.RecordsOfGoal(goal));
+    }
+
+    [Fact]
+    public async Task US1_AS1_Edit_opens_with_the_note_of_the_records_commitment()
+    {
+        var (cut, _, _) = await OpenRowAsync(Reading20MinDaily, Utc(20, 10), Mon16, editing: 0, arrange: g =>
+        {
+            _records.Seed(g, Mon16, RecordValue.FromAmount(12));
+            SeedNote(g, Mon16, "Fell asleep early.");
+        });
+
+        Assert.Equal("Fell asleep early.", NoteShown(cut));
+    }
+
+    [Fact]
+    public async Task Choosing_another_entry_in_For_replaces_the_typed_text_with_that_entrys_note_or_empties_it()
+    {
+        // At 02:00 on Wednesday 18 November "For" lists Wed 18 (Due), then Tue 17 and Mon 16 (Pending); only Tue 17 has a note.
+        var (cut, _) = await OpenAsync(Reading20MinDaily, Utc(18, 2), arrange: g => SeedNote(g, new DateOnly(2026, 11, 17), "Back was tired."));
+        Assert.Equal(string.Empty, NoteShown(cut));
+
+        cut.Find("textarea").Input("Typed first.");
+        Field(cut, "For").QuerySelector("select")!.Change("2026-11-17");
+        Assert.Equal("Back was tired.", NoteShown(cut));
+
+        cut.Find("textarea").Input("Typed second.");
+        Field(cut, "For").QuerySelector("select")!.Change("2026-11-16");
+        Assert.Equal(string.Empty, NoteShown(cut));
+    }
+
+    [Fact]
+    public async Task Choosing_another_Date_of_the_same_week_keeps_the_fields_content()
+    {
+        var (cut, _) = await OpenAsync(YogaThreeTimesAWeek, Utc(18, 10), "Yoga, 3 times a week", g => SeedNote(g, Mon16, "Knee was sore."));
+        Assert.Equal("Knee was sore.", NoteShown(cut));
+
+        cut.FindAll(".ht-field-pair select")[1].Change("2026-11-17");
+        Assert.Equal("Knee was sore.", NoteShown(cut));
+
+        cut.Find("textarea").Input("Typed.");
+        cut.FindAll(".ht-field-pair select")[1].Change("2026-11-16");
+        Assert.Equal("Typed.", NoteShown(cut));
+    }
+
+    [Fact]
+    public async Task HP_003_a_note_of_501_characters_is_refused_in_place_of_the_help_and_changes_neither_the_record_nor_the_note()
+    {
+        var (cut, goal, _) = await OpenRowAsync(Reading20MinDaily, Utc(20, 10), Mon16, editing: 0, arrange: g =>
+        {
+            _records.Seed(g, Mon16, RecordValue.FromAmount(12));
+            SeedNote(g, Mon16, "Fell asleep early.");
+        });
+        cut.Find(".ht-stepper input").Change("25");
+        cut.Find("textarea").Input(new string('a', 501));
+
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        var note = Field(cut, "Note");
+        var error = Assert.Single(cut.FindAll(".ht-field__error"));
+        Assert.Equal("The note can have at most 500 characters.", error.TextContent);
+        Assert.Equal(error.Id, note.QuerySelector(".ht-field__error")!.Id);
+        Assert.Empty(note.QuerySelectorAll(".ht-field__help"));
+        Assert.Equal(error.Id, note.QuerySelector("textarea")!.GetAttribute("aria-describedby"));
+        Assert.Empty(_saved);
+        Assert.Equal(12, Assert.Single(_records.RecordsOfGoal(goal)).Value.Amount);
+        Assert.Equal("Fell asleep early.", StoredNote(goal, Mon16));
+    }
+
+    [Fact]
+    public async Task US1_AS3_SC_003_saving_a_cleared_field_removes_the_note()
+    {
+        var (cut, goal, _) = await OpenRowAsync(Reading20MinDaily, Utc(20, 10), Mon16, editing: 0, arrange: g =>
+        {
+            _records.Seed(g, Mon16, RecordValue.FromAmount(12));
+            SeedNote(g, Mon16, "Fell asleep early.");
+        });
+        Assert.Equal("Fell asleep early.", NoteShown(cut));
+
+        cut.Find("textarea").Input(string.Empty);
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Null(Assert.Single(_saved).Note);
+        Assert.Empty(_records.NotesOfGoal(goal));
+        Assert.Equal(12, Assert.Single(_records.RecordsOfGoal(goal)).Value.Amount);
+    }
+
+    [Fact]
+    public async Task US1_AS4_saving_an_unchanged_field_keeps_the_note()
+    {
+        var (cut, goal, _) = await OpenRowAsync(Reading20MinDaily, Utc(20, 10), Mon16, editing: 0, arrange: g =>
+        {
+            _records.Seed(g, Mon16, RecordValue.FromAmount(12));
+            SeedNote(g, Mon16, "Fell asleep early.");
+        });
+
+        cut.Find(".ht-stepper input").Change("25");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("Fell asleep early.", Assert.Single(_saved).Note);
+        Assert.Equal("Fell asleep early.", StoredNote(goal, Mon16));
+        Assert.Equal(25, Assert.Single(_records.RecordsOfGoal(goal)).Value.Amount);
+    }
+
+    [Fact]
+    public async Task US1_AS2_saving_a_changed_field_replaces_the_note()
+    {
+        var (cut, goal, _) = await OpenRowAsync(Reading20MinDaily, Utc(20, 10), Mon16, editing: 0, arrange: g =>
+        {
+            _records.Seed(g, Mon16, RecordValue.FromAmount(12));
+            SeedNote(g, Mon16, "Fell asleep early.");
+        });
+
+        cut.Find("textarea").Input("Slept badly.");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("Slept badly.", Assert.Single(_saved).Note);
+        Assert.Equal("Slept badly.", StoredNote(goal, Mon16));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Slept badly.")]
+    public async Task FR_004_Delete_record_leaves_the_note_whatever_the_field_shows(string shown)
+    {
+        var (cut, goal, _) = await OpenRowAsync(Reading20MinDaily, Utc(20, 10), Mon16, editing: 0, arrange: g =>
+        {
+            _records.Seed(g, Mon16, RecordValue.FromAmount(12));
+            SeedNote(g, Mon16, "Fell asleep early.");
+        });
+        cut.Find("textarea").Input(shown);
+
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[2].ClickAsync(new MouseEventArgs());
+
+        var saved = Assert.Single(_saved);
+        Assert.Empty(saved.Records);
+        Assert.Equal("Fell asleep early.", saved.Note);
+        Assert.Empty(_records.RecordsOfGoal(goal));
+        Assert.Equal("Fell asleep early.", StoredNote(goal, Mon16));
     }
 
     [Fact]
@@ -406,6 +590,7 @@ public sealed class RecordDialogTests : BunitContext
         Assert.Empty(cut.FindAll("select"));
         Assert.Equal(["Save record", "Cancel"], cut.FindAll(".ht-dialog__foot .ht-btn").Select(b => b.TextContent));
         Assert.Equal(cut.Find(".ht-stepper input").GetAttribute("blazor:elementReference"), FocusedId(JSInterop));
+        Assert.Equal(string.Empty, NoteShown(cut));
 
         cut.Find(".ht-stepper input").Change("20");
         Assert.Equal("20 of 20 min", Text(cut.Find(".ht-target")));
@@ -468,7 +653,7 @@ public sealed class RecordDialogTests : BunitContext
         Assert.Equal(["ht-btn", "ht-btn--ghost"], delete.ClassList.ToArray());
         Assert.Equal("ht-spacer", delete.PreviousElementSibling!.ClassName);
         Assert.Equal(input.GetAttribute("blazor:elementReference"), FocusedId(JSInterop));
-        Assert.True(string.IsNullOrEmpty(cut.Find("textarea").TextContent));
+        Assert.Equal(string.Empty, NoteShown(cut));
 
         cut.Find(".ht-stepper input").Change("12");
         Assert.Equal("12 of 20 min", Text(cut.Find(".ht-target")));

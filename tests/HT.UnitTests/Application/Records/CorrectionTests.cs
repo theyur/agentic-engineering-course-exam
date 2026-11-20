@@ -511,6 +511,79 @@ public sealed class CorrectionTests
     }
 
     [Fact]
+    public async Task US1_AS4_a_change_with_the_note_the_entry_already_has_leaves_it_unchanged()
+    {
+        var goal = await GoalAsync(Reading20MinDaily);
+        var record = await RecordAtAsync(goal, Mon16, Minutes(12, "Fell asleep early."), Mon16TenOClock);
+
+        var entry = Changed(await _world.ChangeAsync(goal, record, Minutes(15, "Fell asleep early.")), record);
+
+        Assert.Equal("Fell asleep early.", entry.Note);
+        Assert.Equal(15, Assert.Single(entry.Records).Amount);
+        var note = Assert.Single(_world.Records.NotesOfGoal(goal));
+        Assert.Equal(Mon16, note.Key);
+        Assert.Equal("Fell asleep early.", note.Value.Value);
+    }
+
+    [Fact]
+    public async Task US1_AS5_a_change_of_the_record_of_a_commitment_without_a_note_with_a_note_adds_it()
+    {
+        var goal = await GoalAsync(Reading20MinDaily);
+        var record = await RecordAtAsync(goal, Mon16, Minutes(12), Mon16TenOClock);
+        Assert.Empty(_world.Records.NotesOfGoal(goal));
+
+        var entry = Changed(await _world.ChangeAsync(goal, record, Minutes(12, "Back was tired.")), record);
+
+        Assert.Equal("Back was tired.", entry.Note);
+        Assert.Equal(12, Assert.Single(entry.Records).Amount);
+        var note = Assert.Single(_world.Records.NotesOfGoal(goal));
+        Assert.Equal(Mon16, note.Key);
+        Assert.Equal("Back was tired.", note.Value.Value);
+    }
+
+    [Fact]
+    public async Task US1_AS6_FR_003_a_change_refused_for_its_value_or_for_a_note_of_501_characters_leaves_the_record_and_the_note()
+    {
+        var goal = await GoalAsync(Reading20MinDaily);
+        var record = await RecordAtAsync(goal, Mon16, Minutes(12, "Fell asleep early."), Mon16TenOClock);
+
+        AssertRefused(
+            await _world.ChangeAsync(goal, record, Minutes(1441, "Slept badly.")),
+            RecordWriteOutcome.DurationOutOfRange,
+            DurationOutOfRange);
+        AssertRefused(
+            await _world.ChangeAsync(goal, record, Minutes(25, new string('a', 501))),
+            RecordWriteOutcome.NoteTooLong,
+            NoteTooLong);
+
+        AssertNothingWritten();
+        Assert.Equal(12, Assert.Single(_world.Records.RecordsOfGoal(goal)).Value.Amount);
+        Assert.Equal("Fell asleep early.", Assert.Single(_world.Records.NotesOfGoal(goal)).Value.Value);
+        var entry = Assert.Single(await _world.HistoryAsync(goal, Mon16, Mon16));
+        Assert.Equal("Fell asleep early.", entry.Note);
+        Assert.Equal(12, Assert.Single(entry.Records).Amount);
+    }
+
+    [Fact]
+    public async Task A_change_of_a_Met_commitments_record_with_its_value_and_only_a_new_note_is_a_correction_that_keeps_Met_and_replaces_the_note()
+    {
+        var goal = await GoalAsync(Reading20MinDaily);
+        var record = await RecordAtAsync(goal, Mon16, Minutes(20, "Fell asleep early."), Mon16TenOClock);
+        _world.At(Fri20TenOClock);
+        Assert.Equal(EvaluationState.Met, Assert.Single(await _world.HistoryAsync(goal, Mon16, Mon16)).State);
+
+        var result = await _world.ChangeAsync(goal, record, Minutes(20, "Slept badly."));
+
+        var entry = Changed(result, record);
+        Assert.True(result.IsCorrection);
+        Assert.True(entry.IsCorrection);
+        Assert.Equal(EvaluationState.Met, entry.State);
+        Assert.Equal(new RecordView(record, Mon16, null, 20), Assert.Single(entry.Records));
+        Assert.Equal("Slept badly.", entry.Note);
+        Assert.Equal("Slept badly.", Assert.Single(_world.Records.NotesOfGoal(goal)).Value.Value);
+    }
+
+    [Fact]
     public async Task FR_007_a_delete_leaves_the_entrys_note()
     {
         var goal = await GoalAsync(Reading20MinDaily);
