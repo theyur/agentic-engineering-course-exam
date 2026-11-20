@@ -102,6 +102,7 @@ public static class ReportText
     public static string TargetLine(TrendKind kind, int target);        // "Target 20 min" (Minutes) | "Target 3"
     public static string StripLabel(IReadOnlyList<EvaluationState> strip, StreakUnit unit); // "Last 28 commitments: 24 met, 1 failed, 1 missed, 2 pending"
     public static string TrendLabel(TrendView trend);                   // "Minutes per day, last 14 days; target 20"
+    public static string BarTitle(TrendView trend, TrendBar bar);       // "Wed 4 Nov: 20 of 20 min" | "week of 2 Nov: 2 of 2" | "Sat 7 Nov: no record" (added in T046: a bar's tooltip)
 }
 ```
 

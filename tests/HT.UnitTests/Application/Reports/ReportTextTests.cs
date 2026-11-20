@@ -329,6 +329,31 @@ public sealed class ReportTextTests
         Assert.Equal("Pages per day, last 14 commitments; target 5; Wed 4 Nov: 4 of 6", ReportText.TrendLabel(view));
     }
 
+    // Bar tooltips (design/components/TrendChart.md, "Target line, tooltips and accessible name")
+
+    [Fact]
+    public void BarTitle_names_the_date_the_value_and_the_bars_own_target_with_min_for_minutes()
+    {
+        var minutes = View("Minutes per day", "Last 14 days", TrendSpan.Commitment, 20) with { Kind = TrendKind.Minutes, Measurement = Measurement.Duration };
+        var weeks = View("Days done per week", "Last 12 weeks", TrendSpan.Week, 3);
+        var counts = View("Pages per day", "Last 14 commitments", TrendSpan.Commitment, 5) with { Kind = TrendKind.Count, Measurement = Measurement.Count };
+
+        Assert.Equal("Wed 4 Nov: 20 of 20 min", ReportText.BarTitle(minutes, new TrendBar(new DateOnly(2026, 11, 4), new DateOnly(2026, 11, 4), 20, 20)));
+        Assert.Equal("Fri 6 Nov: 45 of 20 min", ReportText.BarTitle(minutes, new TrendBar(new DateOnly(2026, 11, 6), new DateOnly(2026, 11, 6), 45, 20)));
+        Assert.Equal("week of 2 Nov: 2 of 2", ReportText.BarTitle(weeks, new TrendBar(new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 8), 2, 2)));
+        Assert.Equal("Wed 4 Nov: 0 of 5", ReportText.BarTitle(counts, new TrendBar(new DateOnly(2026, 11, 4), new DateOnly(2026, 11, 4), 0, 5)));
+    }
+
+    [Fact]
+    public void BarTitle_of_a_bar_with_no_record_says_no_record()
+    {
+        var minutes = View("Minutes per day", "Last 14 days", TrendSpan.Day, 20) with { Kind = TrendKind.Minutes, Measurement = Measurement.Duration };
+        var weeks = View("Times per week", "Last 12 weeks", TrendSpan.Week, 3);
+
+        Assert.Equal("Sat 7 Nov: no record", ReportText.BarTitle(minutes, new TrendBar(new DateOnly(2026, 11, 7), new DateOnly(2026, 11, 7), null, 20)));
+        Assert.Equal("week of 9 Nov: no record", ReportText.BarTitle(weeks, new TrendBar(new DateOnly(2026, 11, 9), new DateOnly(2026, 11, 15), null, 3)));
+    }
+
     // Culture (constitution II)
 
     [Fact]

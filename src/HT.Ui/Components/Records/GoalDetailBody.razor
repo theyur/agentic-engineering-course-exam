@@ -13,12 +13,13 @@
 @inject UseCaseScope UseCases
 @inject ActingUserAccessor ActingUsers
 @inject NavigationManager Navigation
-@* design/pages/PageGoalDetail, slice 5 state with slice 6's GoalStats card (HP-001, research R-12, contracts/host.md
-   "Goal page"): the interactive part of the goal page, prerendered, with the goal identifier as its only parameter.
-   Slice 4's head ("← Goals", the name, the tags and the attempt line), with the primary action "Record" when something
-   can be recorded now (FR-011) and no other action; slice 4's Notice for a habit no longer in the catalog; then the
-   page's two columns: on the left the GoalStats card ("This attempt", "Consistency and streaks", with the strip of the
-   latest 30 ended results), shown only when the goal's report has a begun entry, above the History card; on the right
+@* design/pages/PageGoalDetail, slice 5 state with slice 6's GoalStats and TrendChart cards (HP-001, research R-12,
+   contracts/host.md "Goal page"): the interactive part of the goal page, prerendered, with the goal identifier as its
+   only parameter. Slice 4's head ("← Goals", the name, the tags and the attempt line), with the primary action "Record"
+   when something can be recorded now (FR-011) and no other action; slice 4's Notice for a habit no longer in the
+   catalog; then the page's two columns: on the left the GoalStats card ("This attempt", "Consistency and streaks", with
+   the strip of the latest 30 ended results), then the TrendChart card of the report's trend, both shown only when the
+   goal's report has a begun entry, above the History card; on the right
    the Settings card, then the Recent notes card (US4). The history is read after what can be recorded now, from 365
    days before that result's current date D to D, and the goal's report (slice 6 FR-007) after the history. A goal
    with no current date, or with no begun entry, shows no History card and has the design's layout for that case: the
@@ -60,6 +61,7 @@
                 @if (_report is { HasBegunEntry: true } report)
                 {
                     <GoalStats View="report.Stats" Strip="StripOf(report)" Unit="report.Stats.Unit" Eyebrow="This attempt" Title="Consistency and streaks" />
+                    <TrendChart Trend="report.Trend" />
                 }
                 <HistoryCard @ref="_historyCard" History="_history!" OnAction="OpenRow" OnNote="OpenNote" />
             </div>

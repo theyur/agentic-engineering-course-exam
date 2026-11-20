@@ -205,13 +205,32 @@ public static class ReportText
         var label = trend.Title + ", " + LowerFirst(trend.SubLine) + "; target " + Number(trend.Target);
         foreach (var bar in trend.Bars.Where(bar => bar.Target != trend.Target))
         {
-            var date = trend.Span == TrendSpan.Week ? "week of " + DateTexts.DayMonth(bar.FirstDate) : DateTexts.ShortDate(bar.FirstDate);
             var value = bar.Value is { } recorded ? Number(recorded) : "no record";
-            label += "; " + date + ": " + value + " of " + Number(bar.Target);
+            label += "; " + BarDate(trend.Span, bar) + ": " + value + " of " + Number(bar.Target);
         }
 
         return label;
     }
+
+    /// <summary>
+    /// A TrendChart bar's tooltip (<c>design/components/TrendChart.md</c>, "Target line, tooltips and accessible name"):
+    /// "{date}: {value} of {target}", with " min" after the target when the bars are minutes ("Wed 4 Nov: 20 of 20
+    /// min", "week of 2 Nov: 2 of 2"), or "{date}: no record" for a bar with no record; {date} is "Wed 4 Nov" for a
+    /// commitment or a day and "week of 2 Nov" for a week. The target is the bar's own.
+    /// </summary>
+    public static string BarTitle(TrendView trend, TrendBar bar)
+    {
+        ArgumentNullException.ThrowIfNull(trend);
+        ArgumentNullException.ThrowIfNull(bar);
+        var date = BarDate(trend.Span, bar);
+        return bar.Value is { } value
+            ? date + ": " + Number(value) + " of " + Number(bar.Target) + (trend.Kind == TrendKind.Minutes ? " min" : string.Empty)
+            : date + ": no record";
+    }
+
+    /// <summary>A bar's date in the TrendChart's texts: "Wed 4 Nov" for a commitment or a day, "week of 2 Nov" for a week.</summary>
+    private static string BarDate(TrendSpan span, TrendBar bar) =>
+        span == TrendSpan.Week ? "week of " + DateTexts.DayMonth(bar.FirstDate) : DateTexts.ShortDate(bar.FirstDate);
 
     private static string Plural(StreakUnit unit) => Unit(unit, 0);
 

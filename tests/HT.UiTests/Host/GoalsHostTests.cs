@@ -250,6 +250,28 @@ public sealed class GoalsHostTests(HostFixture host)
     }
 
     [Fact]
+    public async Task Slice_6_US4_the_owners_prerendered_goal_page_has_the_TrendChart_card_between_GoalStats_and_History()
+    {
+        // As above: 15 min on the first of 5 begun commitments, so 1 bar of 15 against 15 and 4 empty bars.
+        var (browser, goal) = await OwnerWithEveryDayGoalAsync("trend-owner", startInDays: -4, recordFirstDay: true);
+        using (browser)
+        {
+            var (status, html) = await browser.GetPageAsync($"{GoalsAddress}/{goal.Value}");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            var stats = html.IndexOf("<h2 class=\"ht-card__title\">Consistency and streaks</h2>", StringComparison.Ordinal);
+            var trend = html.IndexOf("<h2 class=\"ht-card__title\">Minutes per day</h2>", StringComparison.Ordinal);
+            var history = html.IndexOf("<h2 class=\"ht-card__title\">History</h2>", StringComparison.Ordinal);
+            Assert.True(trend > stats && stats >= 0, "The TrendChart card is missing or not after the GoalStats card.");
+            Assert.True(history > trend, "The TrendChart card is not above the History card.");
+            Assert.Contains("<p class=\"ht-card__sub\">Last 14 days</p>", html, StringComparison.Ordinal);
+            Assert.Contains("<div class=\"ht-bars\" role=\"img\" aria-label=\"Minutes per day, last 14 days; target 15\">", html, StringComparison.Ordinal);
+            Assert.Contains("<span>Target 15 min</span>", html, StringComparison.Ordinal);
+            Assert.Equal(4, html.Split("class=\"ht-bar ht-bar--empty\"").Length - 1);
+        }
+    }
+
+    [Fact]
     public async Task Slice_6_a_goal_not_started_has_neither_the_GoalStats_nor_the_History_card()
     {
         var (browser, goal) = await OwnerWithEveryDayGoalAsync("stats-later", startInDays: 3, recordFirstDay: false);
@@ -261,6 +283,7 @@ public sealed class GoalsHostTests(HostFixture host)
             Assert.Contains("<h2 class=\"ht-card__title\">Settings</h2>", html, StringComparison.Ordinal);
             Assert.DoesNotContain("Consistency and streaks", html, StringComparison.Ordinal);
             Assert.DoesNotContain("ht-stat__label", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("ht-bars", html, StringComparison.Ordinal);
             Assert.DoesNotContain("<h2 class=\"ht-card__title\">History</h2>", html, StringComparison.Ordinal);
         }
     }

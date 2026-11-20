@@ -1,0 +1,49 @@
+@* design/components/TrendChart (slice-6 state, HP-001, HP-006, FR-006): the card's title and sub line from the
+   TrendView, then ht-bars with role="img" and the aria-label TrendView.Label: one ht-bar per bar, oldest first, its
+   height its value's share of the largest of the values and the target, rounded to a whole percentage; a bar with no
+   record drawn as ht-bar--empty (a full-height dotted outline), never as a zero-height bar; each bar's title from
+   ReportText.BarTitle with its own target; the dashed ht-bars__target line at TrendView.Target, labelled
+   TrendView.TargetLine; then the date labels (ht-bars__labels, DateTexts.DayMonth of each bar's first date). The
+   heights are drawing only: every figure and text comes from the view. No paused bar until slice 7. *@
+@using System.Globalization
+@using HT.Application.Accounts
+@using HT.Application.Reports
+@using HT.Domain.Reports
+<section class="ht-card">
+    <h2 class="ht-card__title">@Trend.Title</h2>
+    <p class="ht-card__sub">@Trend.SubLine</p>
+    <div class="ht-bars" role="img" aria-label="@Trend.Label">
+        @foreach (var bar in Trend.Bars)
+        {
+            @if (bar.Value is { } value)
+            {
+                <i class="ht-bar" style="@Height(value)" title="@ReportText.BarTitle(Trend, bar)"></i>
+            }
+            else
+            {
+                <i class="ht-bar ht-bar--empty" title="@ReportText.BarTitle(Trend, bar)"></i>
+            }
+        }
+        <div class="ht-bars__target" style="@("bottom:" + Percent(Trend.Target))"><span>@Trend.TargetLine</span></div>
+    </div>
+    <div class="ht-bars__labels">
+        @foreach (var bar in Trend.Bars)
+        {
+            <span>@DateTexts.DayMonth(bar.FirstDate)</span>
+        }
+    </div>
+</section>
+
+@code {
+    /// <summary>The goal's trend with its texts, as the goal report gives it.</summary>
+    [Parameter, EditorRequired]
+    public TrendView Trend { get; set; } = null!;
+
+    /// <summary>The largest of the values and the target, the 100% of the chart; at least 1, so a chart of zeros draws.</summary>
+    private int Scale => Math.Max(1, Trend.Bars.Select(bar => bar.Value ?? 0).Append(Trend.Target).Max());
+
+    private string Height(int value) => "height:" + Percent(value);
+
+    private string Percent(int value) =>
+        ((int)Math.Round(value * 100.0 / Scale, MidpointRounding.AwayFromZero)).ToString(CultureInfo.InvariantCulture) + "%";
+}
