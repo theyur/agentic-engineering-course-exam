@@ -31,9 +31,9 @@ The second part of the preview shows the page as slice 4 builds it (HP-004, ADR 
 
 The last part of the preview shows the page as slice 5 builds it (HP-001, US3-AS8, US4-AS7, US5-AS5, ADR 0008). Today is Tue 17 Nov 2026 in the first two examples and Tue 18 Aug 2026 in the per-week one.
 
-Amended 2026-11-20, specs/006-note-editing, ADR 0019 (note editing, HP-001 and HP-002 there): the Note cell shows the note as plain text, and a row's note control ("Add note" or "Edit note") is in the actions column, after "Add record", on rows without a record only. A row with a record changes its note only in the RecordDialog, which opens with the note filled in.
+Amended 2026-11-20, specs/006-note-editing, ADR 0019 (note editing, HP-001 and HP-002 there): the Note cell shows the note as plain text, and a row's note control ("Add note" or "Edit note") is in the actions column, before "Add record", on rows without a record only, so the record control is always the rightmost. A row with a record changes its note only in the RecordDialog, which opens with the note filled in.
 
-Amended 2026-11-20 (owner's decision after implementation): the note control now comes before "Add record", so the record control is always the rightmost. It came after "Add record" before, because recording is the row's main action.
+That order is the owner's decision after implementation (2026-11-20). The first version of this amendment put the note control after "Add record", because recording is the row's main action.
 
 - Page head: slice 4's "← Goals", name, tags and attempt line, then `ht-spacer` and the primary action "Record" (`aria-haspopup="dialog"`), which opens the RecordDialog with its "For" select (`components/RecordDialog.md`, "Slice 5 state"). No other action (Edit settings, Pause and End goal are slices 7 and 8). "Record" is absent when nothing can be recorded now (no Due and no Pending commitment or period).
 - Under the head: slice 4's Notice for a habit no longer in the catalog, unchanged.
