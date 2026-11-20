@@ -67,6 +67,8 @@ public sealed class ReportWorld
 
     public RecordingService Recording => _recording.Service;
 
+    public GoalService GoalService => _recording.GoalService;
+
     /// <summary>A registered user stored with <paramref name="timeZone"/>.</summary>
     public ActingUser UserIn(string timeZone) => _recording.UserIn(timeZone);
 
@@ -79,6 +81,19 @@ public sealed class ReportWorld
     /// </summary>
     public Task<GoalId> CreateGoalAsync(GoalTargetFields target, DateOnly start, DateTimeOffset at, ActingUser? user = null) =>
         _recording.CreateGoalAsync(target, start, at, user);
+
+    /// <summary>
+    /// Creates a goal with its own <paramref name="name"/>, as <see cref="CreateGoalAsync"/> does, so the goal order's
+    /// name comparison can be tested (FR-011).
+    /// </summary>
+    public async Task<GoalId> CreateNamedGoalAsync(string name, GoalTargetFields target, DateOnly start, DateTimeOffset at, ActingUser? user = null)
+    {
+        At(at);
+        var result = await GoalService.CreateAsync(
+            user ?? User, GoalInputs.Input(GoalInputs.Catalog(Habit), start, target, name), CancellationToken.None);
+        Assert.Equal(GoalCreateOutcome.Created, result.Outcome);
+        return result.GoalId!.Value;
+    }
 
     /// <summary>Records for <see cref="User"/> (or <paramref name="user"/>) at the clock's time, and expects it recorded.</summary>
     public async Task<RecordId> RecordAsync(GoalId goal, DateOnly date, RecordInput input, ActingUser? user = null)
@@ -118,6 +133,15 @@ public sealed class ReportWorld
     /// <summary>The report of a goal of <see cref="User"/> (or <paramref name="user"/>) at the clock's time.</summary>
     public Task<GoalReportResult> ReadAsync(GoalId goal, ActingUser? user = null) =>
         Service.GetGoalReportAsync(user ?? User, goal, CancellationToken.None);
+
+    /// <summary>The goals overview of <see cref="User"/> (or <paramref name="user"/>) at the clock's time, expected found.</summary>
+    public async Task<GoalsOverview> OverviewAsync(ActingUser? user = null)
+    {
+        var result = await Service.GetGoalsOverviewAsync(user ?? User, CancellationToken.None);
+        Assert.Equal(GoalsOverviewOutcome.Found, result.Outcome);
+        Assert.Null(result.Message);
+        return result.Overview!;
+    }
 
     /// <summary>The report of a goal of <see cref="User"/> (or <paramref name="user"/>) at the clock's time, expected found.</summary>
     public async Task<GoalReport> ReportAsync(GoalId goal, ActingUser? user = null)

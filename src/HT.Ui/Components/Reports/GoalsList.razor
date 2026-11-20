@@ -1,0 +1,78 @@
+@rendermode InteractiveServer
+@using HT.Application.Accounts
+@using HT.Application.Records
+@using HT.Application.Reports
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Ui.Account
+@using HT.Ui.Components.Records
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@* design/pages/PageGoals, slice 6 state (HP-002, research R-12, contracts/host.md "Goals page"): the interactive part
+   of the Goals page, prerendered, with no parameter. It reads the goals overview itself, through UseCaseScope, and
+   renders one full GoalItem per goal in the overview's order (FR-011). An item's "Record" opens slice 5's RecordDialog
+   in its page-head mode, with the goal's Recordable and its "For" select (slice 5 HP-002, research R-07). After a save
+   the overview is read again before the dialog closes, so the closing render already has the new figures. When the
+   dialog closes, saved or not, the focus goes back to that goal's "Record", found by its goal identifier after the
+   re-read, or to its name link when the goal has nothing left to record (constitution IV). *@
+@if (_overview is { } overview)
+{
+    <div class="ht-list">
+        @foreach (var goal in overview.Goals)
+        {
+            <GoalItem @key="goal.Item.Id" @ref="_items[goal.Item.Id]" Goal="goal" Today="overview.Today" OnRecord="OpenRecord" />
+        }
+    </div>
+    @if (DialogGoal is { } dialogGoal)
+    {
+        <RecordDialog Open="_recordOpen" OnClose="CloseRecord" FocusOnClose="FocusItemAsync"
+                      GoalId="dialogGoal.Item.Id" GoalName="@dialogGoal.Item.Name" Recordable="dialogGoal.Recordable"
+                      ActingUser="_actingUser" OnSaved="SavedAsync" />
+    }
+}
+
+@code {
+    private readonly Dictionary<GoalId, GoalItem> _items = [];
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private GoalsOverview? _overview;
+    private bool _recordOpen;
+
+    /// <summary>The goal whose "Record" opened the dialog; kept after it closes, so the focus can go back to it.</summary>
+    private GoalId? _recording;
+
+    /// <summary>The goal the dialog records for, as the latest read gives it; none before a "Record" was chosen.</summary>
+    private OverviewGoal? DialogGoal =>
+        _recording is { } id ? _overview?.Goals.FirstOrDefault(goal => goal.Item.Id == id) : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _actingUser = await ActingUsers.GetAsync();
+        await ReadAsync();
+    }
+
+    private async Task ReadAsync()
+    {
+        var result = await UseCases.RunAsync<ReportService, GoalsOverviewResult>(
+            (service, token) => service.GetGoalsOverviewAsync(_actingUser, token), CancellationToken.None);
+        _overview = result.Overview;
+    }
+
+    private void OpenRecord(OverviewGoal goal)
+    {
+        _recording = goal.Item.Id;
+        _recordOpen = true;
+    }
+
+    private void CloseRecord() => _recordOpen = false;
+
+    /// <summary>Reads again first, so the render that closes the dialog has the new items to give the focus back to.</summary>
+    private async Task SavedAsync(HistoryEntry entry)
+    {
+        await ReadAsync();
+        _recordOpen = false;
+    }
+
+    private ValueTask FocusItemAsync() =>
+        _recording is { } id && _items.TryGetValue(id, out var item) ? item.FocusAsync() : ValueTask.CompletedTask;
+}

@@ -1,13 +1,21 @@
 using Bunit;
 using HT.Application.Goals;
+using HT.Application.Records;
+using HT.Application.Reports;
+using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Records;
+using HT.Domain.Reports;
 using HT.Ui.Components.Shared;
 using static HT.Ui.Components.Shared.HabitCard;
 
 namespace HT.UiTests.Components.Shared;
 
-/// <summary>The slice-2 shared components, with their slice-4 states, against their design files (constitution IV).</summary>
+/// <summary>
+/// The slice-2 shared components, with their slice-4 states and slice 6's full GoalItem (design/components/GoalListItem,
+/// "Slice 6 state"), against their design files (constitution IV).
+/// </summary>
 public sealed class HabitComponentTests : BunitContext
 {
     private IRenderedComponent<HabitCard> Card(HabitCardVariant variant, string? start = "20 pages, 3 times a week", string? description = "Books.") =>
@@ -246,14 +254,89 @@ public sealed class HabitComponentTests : BunitContext
     /// <summary>Wednesday 18 November 2026, the list's today in the GoalItem tests.</summary>
     private static readonly DateOnly GoalToday = new(2026, 11, 18);
 
-    private IRenderedComponent<GoalItem> RenderGoal(GoalListItem item) =>
-        Render<GoalItem>(p => p.Add(x => x.Item, item).Add(x => x.Today, GoalToday));
+    /// <summary>10:00Z on Wednesday 18 November 2026, the instant the GoalItem tests' overview was read at.</summary>
+    private static readonly DateTimeOffset GoalReadAt = new(2026, 11, 18, 10, 0, 0, TimeSpan.Zero);
+
+    private static readonly GoalId ItemId = new(Guid.Parse("4b1d0c9e-0000-4000-8000-000000000001"));
+
+    private IRenderedComponent<GoalItem> RenderGoal(OverviewGoal goal, Action<OverviewGoal>? onRecord = null) =>
+        Render<GoalItem>(p => p
+            .Add(x => x.Goal, goal)
+            .Add(x => x.Today, GoalToday)
+            .Add(x => x.OnRecord, (OverviewGoal g) => onRecord?.Invoke(g)));
+
+    private IRenderedComponent<GoalItem> RenderGoal(GoalListItem item) => RenderGoal(OverviewOf(item));
+
+    /// <summary>
+    /// The goal of <paramref name="item"/> as the overview gives it: "90% (18 of 20)", a streak of 6 commitments, the
+    /// last 15 ended results (Met × 5, Missed, Met × 7, Pending × 2), and <paramref name="recordable"/> as what can be
+    /// recorded now ("Reading, 20 min daily", newest first), from which a Pending result and "Record" follow.
+    /// </summary>
+    private static OverviewGoal OverviewOf(GoalListItem item, params HistoryEntry[] recordable)
+    {
+        EvaluationState[] strip =
+        [
+            .. Enumerable.Repeat(EvaluationState.Met, 5), EvaluationState.Missed, .. Enumerable.Repeat(EvaluationState.Met, 7),
+            EvaluationState.Pending, EvaluationState.Pending,
+        ];
+        return new OverviewGoal
+        {
+            Item = item,
+            Stats = new GoalStatsView
+            {
+                Consistency = new Consistency(18, 20), ConsistencyText = "90% (18 of 20)", Unit = StreakUnit.Commitments,
+                CurrentStreak = 6, CurrentStreakText = "6 commitments", LongestStreak = 11, LongestStreakText = "11 commitments",
+            },
+            Recent = new RecentResults
+            {
+                Results = strip.Select((state, i) => new ResultView
+                {
+                    FirstDate = new DateOnly(2026, 11, 2).AddDays(i), LastDate = new DateOnly(2026, 11, 2).AddDays(i), State = state,
+                    Progress = new Progress(ProgressKind.RecordedValue, state == EvaluationState.Met ? 20 : null, 20),
+                }).ToList(),
+                Counts = new Dictionary<EvaluationState, int>
+                {
+                    [EvaluationState.Met] = 12, [EvaluationState.Failed] = 0, [EvaluationState.Missed] = 1, [EvaluationState.Pending] = 2,
+                },
+            },
+            HasPending = recordable.Any(e => e.State == EvaluationState.Pending),
+            CanRecord = recordable.Length > 0,
+            Recordable = new GoalHistory
+            {
+                GoalId = item.Id, GoalScheduleKind = GoalScheduleKind.CommitmentBased, BuildOrReduce = BuildOrReduce.Build,
+                Measurement = Measurement.Duration, Amount = 20, DurationUnit = DurationUnit.Minutes, CurrentDate = GoalToday,
+                Target = Reading20MinDaily(), ReadAt = GoalReadAt, Entries = recordable,
+            },
+        };
+    }
+
+    private static GoalTarget Reading20MinDaily()
+    {
+        Assert.True(GoalTarget.TryCreate(new GoalTargetFields
+        {
+            BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 20, DurationUnit = DurationUnit.Minutes,
+            ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+        }, out var target, out _));
+        return target;
+    }
+
+    /// <summary>A day of "Reading, 20 min daily" in <paramref name="state"/>, with one record of <paramref name="minutes"/> or none.</summary>
+    private static HistoryEntry Day(DateOnly date, EvaluationState state, int? minutes = null)
+    {
+        var starts = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        return new HistoryEntry
+        {
+            FirstDate = date, LastDate = date, Starts = starts, Ends = starts.AddDays(1), State = state, GraceEnds = starts.AddDays(3),
+            Records = minutes is { } amount ? [new RecordView(new RecordId(Guid.NewGuid()), date, null, amount)] : [],
+            Progress = new Progress(ProgressKind.RecordedValue, minutes, 20), IsCorrection = false,
+        };
+    }
 
     private static GoalListItem GoalAt(
         string schedule, GoalScheduleKind kind, DateOnly? start = null, DateOnly? next = null, DateOnly? firstWeek = null,
         BuildOrReduce side = BuildOrReduce.Build) => new()
     {
-        Id = new GoalId(Guid.Parse("4b1d0c9e-0000-4000-8000-000000000001")),
+        Id = ItemId,
         Name = "Reading, 15 min, 5 days a week",
         HabitName = "Reading",
         HabitKind = HabitKind.Catalog,
@@ -285,21 +368,18 @@ public sealed class HabitComponentTests : BunitContext
 
     [Theory]
     [MemberData(nameof(GoalMetaLines))]
-    public void GoalItem_shows_the_name_link_the_tag_and_the_meta_line(GoalListItem item, string meta)
+    public void GoalItem_shows_the_name_link_the_tag_and_slice_4s_meta_line(GoalListItem item, string meta)
     {
         var cut = RenderGoal(item);
 
         var root = cut.Find("div.ht-goalitem");
-        Assert.Contains("ht-goalitem--reduced", root.ClassList);
+        Assert.DoesNotContain("ht-goalitem--reduced", root.ClassList);
+        Assert.Equal(5, root.Children.Length);
         var link = cut.Find("a.ht-goalitem__name");
         Assert.Equal("Reading, 15 min, 5 days a week", link.TextContent);
         Assert.Equal("/goals/4b1d0c9e-0000-4000-8000-000000000001", link.GetAttribute("href"));
-        Assert.Equal("Build", cut.Find(".ht-goalitem__meta .ht-chip").TextContent);
+        Assert.Equal(["Build"], cut.FindAll(".ht-goalitem__meta .ht-chip").Select(c => c.TextContent));
         Assert.Equal(meta, cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
-        foreach (var absent in new[] { "ht-strip", "ht-goalitem__actions", "Record", "%" })
-        {
-            Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
-        }
     }
 
     [Fact]
@@ -309,6 +389,107 @@ public sealed class HabitComponentTests : BunitContext
 
         Assert.Equal("Reduce", cut.Find(".ht-goalitem__meta .ht-chip").TextContent);
         Assert.Equal("Every day", cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
+    }
+
+    [Fact]
+    public void GoalItem_adds_the_progress_of_a_Due_entry_with_a_record_and_the_Pending_chip()
+    {
+        var cut = RenderGoal(OverviewOf(
+            GoalAt("Every day", GoalScheduleKind.CommitmentBased, next: GoalToday),
+            Day(GoalToday, EvaluationState.Due, 12), Day(new DateOnly(2026, 11, 17), EvaluationState.Pending)));
+
+        var chips = cut.FindAll(".ht-goalitem__meta .ht-chip");
+        Assert.Equal(["Build", "Pending"], chips.Select(c => c.TextContent));
+        Assert.Equal(["ht-chip", "ht-status", "ht-status--pending"], chips[1].ClassList);
+        Assert.Equal("Every day · next today · 12 of 20 min today", cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
+    }
+
+    [Fact]
+    public void GoalItem_keeps_slice_4s_meta_line_for_a_Due_entry_without_a_record_and_has_no_chip_without_a_Pending_result()
+    {
+        var cut = RenderGoal(OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased, next: GoalToday), Day(GoalToday, EvaluationState.Due)));
+
+        Assert.Equal(["Build"], cut.FindAll(".ht-goalitem__meta .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Every day · next today", cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
+    }
+
+    [Fact]
+    public void GoalItem_shows_Consistency_and_Current_streak_as_whole_texts_and_the_mini_strip_of_15()
+    {
+        var cut = RenderGoal(GoalAt("Every day", GoalScheduleKind.CommitmentBased));
+
+        Assert.Equal(
+            [("90% (18 of 20)", "Consistency"), ("6 commitments", "Current streak")],
+            cut.FindAll(".ht-goalitem__value").Select(v => (v.TextContent, v.NextElementSibling!.TextContent)));
+        Assert.Empty(cut.FindAll(".ht-goalitem__value small"));
+        var strip = cut.Find(".ht-strip");
+        Assert.Equal(["ht-strip", "ht-strip--mini"], strip.ClassList);
+        Assert.Equal(("img", "Last 15 commitments: 12 met, 1 missed, 2 pending"), (strip.GetAttribute("role"), strip.GetAttribute("aria-label")));
+        Assert.Equal(15, strip.QuerySelectorAll(".ht-strip__cell").Length);
+        Assert.Equal("ht-cell--missed", strip.QuerySelectorAll(".ht-strip__cell")[5].ClassList[1]);
+        Assert.Empty(cut.FindAll(".ht-legend"));
+    }
+
+    /// <summary>"Record": primary with a Due entry, secondary with only Pending ones, absent with nothing to record (HP-002).</summary>
+    public static TheoryData<string, string?> RecordActions => new()
+    {
+        { "due", "ht-btn--primary" },
+        { "pending", "ht-btn--secondary" },
+        { "none", null },
+    };
+
+    [Theory]
+    [MemberData(nameof(RecordActions))]
+    public void GoalItem_has_Record_as_primary_secondary_or_no_action(string recordable, string? variant)
+    {
+        HistoryEntry[] entries = recordable switch
+        {
+            "due" => [Day(GoalToday, EvaluationState.Due), Day(new DateOnly(2026, 11, 17), EvaluationState.Pending)],
+            "pending" => [Day(new DateOnly(2026, 11, 17), EvaluationState.Pending)],
+            _ => [],
+        };
+
+        var cut = RenderGoal(OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased), entries));
+
+        var actions = cut.Find("div.ht-goalitem__actions");
+        if (variant is null)
+        {
+            Assert.Empty(actions.Children);
+            return;
+        }
+
+        var button = Assert.Single(actions.QuerySelectorAll("button"));
+        Assert.Equal("Record", button.TextContent);
+        Assert.Equal(["ht-btn", variant, "ht-btn--sm"], button.ClassList);
+        Assert.Equal(("button", "dialog", "Record for Reading, 15 min, 5 days a week"),
+            (button.GetAttribute("type"), button.GetAttribute("aria-haspopup"), button.GetAttribute("aria-label")));
+    }
+
+    [Fact]
+    public void GoalItem_Record_raises_OnRecord_with_its_goal()
+    {
+        var goal = OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased), Day(GoalToday, EvaluationState.Due));
+        OverviewGoal? chosen = null;
+        var cut = RenderGoal(goal, g => chosen = g);
+
+        cut.Find(".ht-goalitem__actions button").Click();
+
+        Assert.Same(goal, chosen);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GoalItem_FocusAsync_focuses_Record_or_the_name_link_without_it(bool canRecord)
+    {
+        HistoryEntry[] entries = canRecord ? [Day(GoalToday, EvaluationState.Due)] : [];
+        var cut = RenderGoal(OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased), entries));
+
+        await cut.InvokeAsync(() => cut.Instance.FocusAsync().AsTask());
+
+        var focused = Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(JSInterop.VerifyFocusAsyncInvoke().Arguments[0]);
+        var expected = cut.Find(canRecord ? ".ht-goalitem__actions button" : "a.ht-goalitem__name");
+        Assert.Equal(expected.GetAttribute("blazor:elementReference"), focused.Id);
     }
 
     [Fact]

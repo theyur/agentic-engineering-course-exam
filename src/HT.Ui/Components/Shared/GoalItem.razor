@@ -1,29 +1,82 @@
 @using HT.Application.Accounts
 @using HT.Application.Goals
-@* design/components/GoalListItem, slice 4 state (HP-003): the reduced item, one column. The name links to the goal
-   page; the meta line has the Build or Reduce Tag, then the schedule and at most one of "first week starts …",
-   "starts …" (exactly when the item has a start date, plan "Spec discrepancies" 5), "next today" / "next …". No
-   consistency, streak, strip or action (slices 5 and 6). Named GoalItem, not GoalListItem, so the view
-   HT.Application.Goals.GoalListItem stays unambiguous in the pages. The class ht-goalitem__name is read by the smoke
-   check. *@
-<div class="ht-goalitem ht-goalitem--reduced">
+@using HT.Application.Records
+@using HT.Application.Reports
+@using HT.Domain.Evaluation
+@* design/components/GoalListItem, slice 6 state (HP-002, research R-12): the full item, five columns, which replaces
+   slice 4's reduced item. Column 1: the name linking to the goal page (ht-goalitem__name, read by the smoke check),
+   then the meta line: the Build or Reduce Tag, a Pending StatusChip when the goal has a Pending result, and slice 4's
+   text (the schedule, then " · " and the first variant that applies: "first week starts …", "starts …", "next today" /
+   "next …"), followed by " · " and ReportText.ProgressText of the newest Due entry that has a record ("12 of 20 min
+   today", "1 of 3 this week"). Columns 2 and 3: "Consistency" and "Current streak", each value one whole ReportText
+   text. Column 4: the mini strip of the last 15 ended results. Column 5: "Record", primary when a Due entry exists,
+   secondary when only Pending ones do, absent when nothing can be recorded now (the empty column stays, so the
+   columns line up); it raises OnRecord, and the island opens the RecordDialog. The item computes no figure and builds
+   no figure text. Named GoalItem, not GoalListItem, so the view HT.Application.Goals.GoalListItem stays unambiguous. *@
+<div class="ht-goalitem">
     <div>
-        <a class="ht-goalitem__name" href="@($"/goals/{Item.Id.Value}")">@Item.Name</a>
-        <div class="ht-goalitem__meta"><Tag Text="@Item.BuildOrReduce.ToString()" /><span>@MetaLine</span></div>
+        <a class="ht-goalitem__name" href="@($"/goals/{Item.Id.Value}")" @ref="_nameLink">@Item.Name</a>
+        <div class="ht-goalitem__meta">
+            <Tag Text="@Item.BuildOrReduce.ToString()" />
+            @if (Goal.HasPending)
+            {
+                <StatusChip State="EvaluationState.Pending" ScheduleKind="Item.ScheduleKind" Period="Goal.Recordable.Period" />
+            }
+            <span>@MetaLine</span>
+        </div>
+    </div>
+    <div><div class="ht-goalitem__value">@Goal.Stats.ConsistencyText</div><div class="ht-goalitem__label">Consistency</div></div>
+    <div><div class="ht-goalitem__value">@Goal.Stats.CurrentStreakText</div><div class="ht-goalitem__label">Current streak</div></div>
+    <div><ConsistencyStrip States="Strip" Unit="Goal.Stats.Unit" Mini="true" /></div>
+    <div class="ht-goalitem__actions">
+        @if (Goal.CanRecord)
+        {
+            <button type="button" class="@(HasDue ? "ht-btn ht-btn--primary ht-btn--sm" : "ht-btn ht-btn--secondary ht-btn--sm")"
+                    aria-haspopup="dialog" aria-label="@($"Record for {Item.Name}")" @ref="_recordButton"
+                    @onclick="() => OnRecord.InvokeAsync(Goal)">Record</button>
+        }
     </div>
 </div>
 
 @code {
-    /// <summary>The goal as the list gives it.</summary>
-    [Parameter, EditorRequired]
-    public GoalListItem Item { get; set; } = default!;
+    private ElementReference _nameLink;
+    private ElementReference _recordButton;
 
-    /// <summary>Today in the acting user's time zone, as the list gives it (<see cref="GoalListResult.Today"/>).</summary>
+    /// <summary>The goal as the overview gives it.</summary>
+    [Parameter, EditorRequired]
+    public OverviewGoal Goal { get; set; } = default!;
+
+    /// <summary>Today in the acting user's time zone, as the overview gives it (<see cref="GoalsOverview.Today"/>).</summary>
     [Parameter, EditorRequired]
     public DateOnly Today { get; set; }
 
-    /// <summary>The schedule, then " · " and the first variant that applies, or the schedule alone.</summary>
-    private string MetaLine => Variant is { } variant ? Item.ScheduleText + " · " + variant : Item.ScheduleText;
+    /// <summary>"Record" was chosen: the island opens the RecordDialog with <see cref="OverviewGoal.Recordable"/>.</summary>
+    [Parameter]
+    public EventCallback<OverviewGoal> OnRecord { get; set; }
+
+    private GoalListItem Item => Goal.Item;
+
+    /// <summary>"Record" is primary when the goal has a Due commitment or period.</summary>
+    private bool HasDue => Goal.Recordable.Entries.Any(entry => entry.State == EvaluationState.Due);
+
+    private IReadOnlyList<EvaluationState> Strip => Goal.Recent.Results.Select(result => result.State).ToList();
+
+    /// <summary>
+    /// Gives the focus to the item's "Record", or to its name link when it has none: the island calls it when the
+    /// RecordDialog closes, after it has read the overview again (constitution IV).
+    /// </summary>
+    public ValueTask FocusAsync() => Goal.CanRecord ? _recordButton.FocusAsync() : _nameLink.FocusAsync();
+
+    /// <summary>Slice 4's text, then " · " and the progress of the newest Due entry that has a record.</summary>
+    private string MetaLine => DueProgress is { } progress ? SliceFourText + " · " + progress : SliceFourText;
+
+    private string? DueProgress =>
+        Goal.Recordable.Entries.FirstOrDefault(entry => entry.State == EvaluationState.Due && entry.Records.Count > 0) is { } due
+            ? ReportText.ProgressText(Goal.Recordable, due)
+            : null;
+
+    /// <summary>The schedule, then " · " and the first variant that applies, or the schedule alone (slice 4 HP-003).</summary>
+    private string SliceFourText => Variant is { } variant ? Item.ScheduleText + " · " + variant : Item.ScheduleText;
 
     private string? Variant => Item switch
     {

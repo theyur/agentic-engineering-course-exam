@@ -3,14 +3,17 @@
 @using HT.Application.Goals
 @using HT.Ui.Account
 @using HT.Ui.Components.Goals
+@using HT.Ui.Components.Reports
 @using Microsoft.AspNetCore.Authorization
 @inject GoalService GoalService
 @inject ActingUserAccessor ActingUsers
 @inject NavigationManager Navigation
-@* design/pages/PageGoals, slice 4 state (HP-003, contracts/host.md): "Goals" with no Tabs (Paused and Ended come in
-   slices 7 and 8), one ht-list of GoalItems in the use case's order, or the EmptyState. Static. An administrator gets
-   the Not found page; the use case refuses on its own (FR-021). An anonymous request never gets here: the endpoint's
-   [Authorize] sends it to Sign in. *@
+@* design/pages/PageGoals, slice 6 state (HP-002, contracts/host.md "Goals page"): the static shell. "Goals" with no
+   Tabs (Paused and Ended come in slices 7 and 8); for a user with goals, the GoalsList island, interactive and
+   prerendered, which reads the goals overview itself and lists the full GoalItems in its order (FR-011), then the
+   static footnote; for a user with no goals, slice 4's EmptyState with no footnote. The shell reads slice 4's goal list
+   only to tell these apart. An administrator gets the Not found page; the use case refuses on its own (FR-021). An
+   anonymous request never gets here: the endpoint's [Authorize] sends it to Sign in. *@
 <PageTitle>Goals · Habit Tracker</PageTitle>
 
 @if (_result is { } result)
@@ -23,12 +26,8 @@
         }
         else
         {
-            <div class="ht-list">
-                @foreach (var goal in result.Goals)
-                {
-                    <GoalItem Item="goal" Today="result.Today" />
-                }
-            </div>
+            <GoalsList />
+            <p class="ht-footnote">Each goal is counted on its own. Consistency counts only finalized results; pending ones are left out.</p>
         }
     </div>
 }

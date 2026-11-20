@@ -288,6 +288,102 @@ public sealed class GoalsHostTests(HostFixture host)
         }
     }
 
+    [Fact]
+    public async Task Slice_6_US5_the_prerendered_Goals_page_lists_every_goal_in_the_overviews_order_with_its_figures_and_Record()
+    {
+        // Four goals of 15 min, on new Published habits named "… A" to "… D", in UTC at the host's clock: "… C" every day
+        // from 4 days ago with 15 min on its first day (Met, then Missed, then two Pending, today Due); "… D" only on
+        // yesterday's weekday from yesterday (Pending only); "… B" every day from today (Due only); "… A" every day from 3
+        // days from now (nothing yet). FR-011's order is C, D (Pending, by name), B (Due), A. The first HTML, prerendered,
+        // already has the rows (research R-12).
+        var prefix = $"Ui-Go Ov {Guid.NewGuid():N}"[..22];
+        var (browser, account) = await host.SignedInAccountAsync(Email("overview"), Role.RegisteredUser);
+        using (browser)
+        {
+            GoalId a, b, c, d;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                var today = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow());
+                var everyDay = Enum.GetValues<DayOfWeek>();
+                a = await StoreGoalAsync(services, account, prefix + " A", everyDay, today.AddDays(3), recordFirstDay: false);
+                b = await StoreGoalAsync(services, account, prefix + " B", everyDay, today, recordFirstDay: false);
+                c = await StoreGoalAsync(services, account, prefix + " C", everyDay, today.AddDays(-4), recordFirstDay: true);
+                d = await StoreGoalAsync(services, account, prefix + " D", [today.AddDays(-1).DayOfWeek], today.AddDays(-1), recordFirstDay: false);
+            }
+
+            var (status, html) = await browser.GetPageAsync(GoalsAddress);
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            var positions = new[] { c, d, b, a }.Select(goal => html.IndexOf($"<a class=\"ht-goalitem__name\" href=\"/goals/{goal.Value}\">", StringComparison.Ordinal)).ToList();
+            Assert.True(positions[0] >= 0, "The first goal is missing.");
+            Assert.Equal(positions.Order(), positions);
+            Assert.Equal(4, html.Split("<div class=\"ht-goalitem\">").Length - 1);
+
+            var pending = ItemHtml(html, c);
+            Assert.Contains($">{prefix} C, 15 min daily</a>", pending, StringComparison.Ordinal);
+            Assert.Contains("<span class=\"ht-chip ht-status ht-status--pending\">Pending</span>", pending, StringComparison.Ordinal);
+            Assert.Contains("<div class=\"ht-goalitem__value\">50% (1 of 2)</div><div class=\"ht-goalitem__label\">Consistency</div>", pending, StringComparison.Ordinal);
+            Assert.Contains("<div class=\"ht-goalitem__value\">0 commitments</div><div class=\"ht-goalitem__label\">Current streak</div>", pending, StringComparison.Ordinal);
+            Assert.Contains("<div class=\"ht-strip ht-strip--mini\" role=\"img\" aria-label=\"Last 4 commitments: 1 met, 1 missed, 2 pending\">", pending, StringComparison.Ordinal);
+            Assert.Contains("class=\"ht-btn ht-btn--primary ht-btn--sm\"", pending, StringComparison.Ordinal);
+
+            var pendingOnly = ItemHtml(html, d);
+            Assert.Contains("<span class=\"ht-chip ht-status ht-status--pending\">Pending</span>", pendingOnly, StringComparison.Ordinal);
+            Assert.Contains("class=\"ht-btn ht-btn--secondary ht-btn--sm\"", pendingOnly, StringComparison.Ordinal);
+            Assert.Contains($"aria-label=\"Record for {prefix} D, 15 min, once a week\">Record</button>", pendingOnly, StringComparison.Ordinal);
+
+            var due = ItemHtml(html, b);
+            Assert.DoesNotContain("ht-status--pending", due, StringComparison.Ordinal);
+            Assert.Contains("<div class=\"ht-goalitem__value\">N/A</div>", due, StringComparison.Ordinal);
+            Assert.Contains("class=\"ht-btn ht-btn--primary ht-btn--sm\"", due, StringComparison.Ordinal);
+
+            var notStarted = ItemHtml(html, a);
+            Assert.Contains("aria-label=\"Last 0 commitments\"", notStarted, StringComparison.Ordinal);
+            Assert.Contains("<div class=\"ht-goalitem__actions\"></div>", notStarted, StringComparison.Ordinal);
+            Assert.DoesNotContain(">Record</button>", notStarted, StringComparison.Ordinal);
+
+            Assert.Contains(
+                "<p class=\"ht-footnote\">Each goal is counted on its own. Consistency counts only finalized results; pending ones are left out.</p>",
+                html, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>The HTML of the Goals page's item of <paramref name="goal"/>, up to the next item (or the page's end).</summary>
+    private static string ItemHtml(string html, GoalId goal)
+    {
+        var items = html.Split("<div class=\"ht-goalitem\">");
+        return Assert.Single(items.Skip(1), item => item.Contains($"href=\"/goals/{goal.Value}\"", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A goal of 15 min on <paramref name="days"/> of <paramref name="account"/>, stored through the host's goal store on
+    /// a new Published catalog habit named <paramref name="habitName"/>, from <paramref name="first"/> in UTC, with 15 min
+    /// recorded on that day when <paramref name="recordFirstDay"/> is set.
+    /// </summary>
+    private async Task<GoalId> StoreGoalAsync(
+        IServiceProvider services, AccountId account, string habitName, DayOfWeek[] days, DateOnly first, bool recordFirstDay)
+    {
+        var habit = await host.ArrangeCatalogHabitAsync(Definition(habitName));
+        Assert.True(GoalTarget.TryCreate(new GoalTargetFields
+        {
+            BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 15, DurationUnit = DurationUnit.Minutes,
+            ScheduleKind = ScheduleKind.FixedDays, Days = days.ToHashSet(),
+        }, out var target, out _));
+        var created = await services.GetRequiredService<IGoalStore>().CreateAsync(
+            account, new NewGoal(new GoalHabit(habit, HabitKind.Catalog), first, null, target), NamedTimeZone.Utc, NamedTimeZone.Utc, CancellationToken.None);
+        Assert.Equal(GoalWriteOutcomeKind.Created, created.Kind);
+        var goal = created.Id!.Value;
+        if (recordFirstDay)
+        {
+            var written = await services.GetRequiredService<IRecordStore>().AddAsync(
+                account, goal, new EntrySpan(first, first, first), true, first, RecordValue.FromAmount(15), NoteWrite.Keep, RecordLimits.MaxRecordsPerPeriod, CancellationToken.None);
+            Assert.Equal(RecordStoreWriteOutcome.Written, written.Outcome);
+        }
+
+        return goal;
+    }
+
     /// <summary>
     /// A registered user signed in, with a goal of 15 min on every day stored through the host's goal store on a new
     /// Published catalog habit, starting <paramref name="startInDays"/> days from today in UTC (the account's zone) at

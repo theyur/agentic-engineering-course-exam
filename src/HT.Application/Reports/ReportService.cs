@@ -5,6 +5,7 @@ using HT.Domain.Accounts;
 using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Reports;
+using HT.Domain.Time;
 
 namespace HT.Application.Reports;
 
@@ -20,6 +21,9 @@ public sealed class ReportService
 {
     /// <summary>How many ended results the goal report gives at most (FR-005).</summary>
     private const int GoalReportRecentCount = 30;
+
+    /// <summary>How many ended results each goal of the overview gives at most, the Goals page's mini strip (FR-011).</summary>
+    private const int OverviewRecentCount = 15;
 
     /// <summary>The ended states, each counted in <see cref="RecentResults.Counts"/>, 0 included (FR-005).</summary>
     private static readonly EvaluationState[] EndedStates =
@@ -71,6 +75,50 @@ public sealed class ReportService
         var evaluation = await GoalEvaluation.OfAsync(_records, access.Owner, stored, now, cancellationToken).ConfigureAwait(false);
         return GoalReportResult.Found(ReportOf(evaluation));
     }
+
+    /// <summary>
+    /// Every goal of the acting user with its figures at the supplied time (FR-011, research R-07): slice 4's list item,
+    /// built by the helper <see cref="GoalService.ListAsync"/> uses, so both give the same item; the consistency and
+    /// streaks; the last 15 ended results; whether a Pending result exists; whether something can be recorded now; and
+    /// what can be recorded, as <see cref="RecordingService.GetRecordableAsync"/> gives it at the same instant. The
+    /// goals come in <see cref="GoalOrder"/>'s order: Pending, then Due, then the others, each group by name and then in
+    /// creation order. A user with no goals is found with none (FR-013).
+    /// </summary>
+    public async Task<GoalsOverviewResult> GetGoalsOverviewAsync(ActingUser actingUser, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await CheckAccountAsync(actingUser, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return GoalsOverviewResult.Refused(
+                refusal == AccessRefusal.NotSignedIn ? GoalsOverviewOutcome.NotSignedIn : GoalsOverviewOutcome.NotForAdministrators,
+                access.Message!);
+        }
+
+        var now = _clock.GetUtcNow();
+        var stored = await _goals.ListAsync(access.Owner, cancellationToken).ConfigureAwait(false);
+        var evaluated = new List<(StoredGoal Stored, GoalEvaluation Evaluation)>(stored.Count);
+        foreach (var goal in stored)
+        {
+            evaluated.Add((goal, await GoalEvaluation.OfAsync(_records, access.Owner, goal, now, cancellationToken).ConfigureAwait(false)));
+        }
+
+        var goals = GoalOrder.Of(evaluated, pair => pair.Evaluation)
+            .Select(pair => OverviewGoalOf(pair.Stored, pair.Evaluation))
+            .ToList();
+        return GoalsOverviewResult.Found(new GoalsOverview { Goals = goals, Today = ZoneOf(access.Account!).DateAt(now), ReadAt = now });
+    }
+
+    /// <summary>One goal of the overview (FR-011, research R-07).</summary>
+    private static OverviewGoal OverviewGoalOf(StoredGoal stored, GoalEvaluation evaluation) => new()
+    {
+        Item = GoalListItems.Of(stored, evaluation.Now),
+        Stats = StatsOf(evaluation),
+        Recent = RecentOf(evaluation, OverviewRecentCount),
+        HasPending = evaluation.Pending.Count > 0,
+        CanRecord = evaluation.Due.Count > 0 || evaluation.Pending.Count > 0,
+        Recordable = evaluation.Recordable,
+    };
 
     private static GoalReport ReportOf(GoalEvaluation evaluation) => new()
     {
@@ -153,6 +201,10 @@ public sealed class ReportService
             ? new Access(owner, account, null, null)
             : Access.Refused(AccessRefusal.NotSignedIn, AccountTexts.NotSignedIn);
     }
+
+    /// <summary>The account's stored time zone, or the installation default when none is stored (as <see cref="GoalService"/> reads it).</summary>
+    private NamedTimeZone ZoneOf(Account account) =>
+        NamedTimeZone.TryParse(account.StoredTimeZone, out var zone) ? zone : _defaultZone.Value;
 
     private static GoalReportOutcome GoalReportOutcomeOf(AccessRefusal refusal) => refusal switch
     {
