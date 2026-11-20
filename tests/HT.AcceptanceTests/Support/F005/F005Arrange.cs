@@ -17,8 +17,36 @@ namespace HT.AcceptanceTests.Support.F005;
 /// time the item gives when that is earlier: such setup written before the item's first other step is held until
 /// that step, whose time (the earliest the item gives in every F005 item) then fixes the setup time.
 /// </summary>
-public sealed class F005Arrange(F005Context context, F005Driver driver)
+public sealed class F005Arrange(F005Context context, F005Driver driver, ScenarioContext scenario)
 {
+    // ------------------------------------------------------------ Examples cells
+
+    private const string RowPlaceholder = "<n>";
+
+    private const string RowColumn = "n";
+
+    /// <summary>
+    /// acceptance.md, Conventions, "Examples": every email of such an item contains <c>&lt;n&gt;</c>, the row's value
+    /// in the column <c>n</c>. Reqnroll fills placeholders in step text but not inside an Examples cell, so an actor or
+    /// goal phrase that comes from a cell still holds the literal <c>&lt;n&gt;</c>; it is replaced here by the row's
+    /// <c>n</c> before any account or goal is looked up.
+    /// </summary>
+    public string WithRow(string text)
+    {
+        if (!text.Contains(RowPlaceholder, StringComparison.Ordinal))
+        {
+            return text;
+        }
+
+        var arguments = scenario.ScenarioInfo.Arguments;
+        if (arguments is null || !arguments.Contains(RowColumn) || arguments[RowColumn] is not { } value)
+        {
+            throw new InvalidOperationException($"\"{text}\" holds {RowPlaceholder}, but the scenario has no Examples column `{RowColumn}`.");
+        }
+
+        return text.Replace(RowPlaceholder, Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    }
+
     // ------------------------------------------------------------ time
 
     /// <summary>A Given or When step other than account and habit setup: at its time, or the default or latest time.</summary>
@@ -120,6 +148,7 @@ public sealed class F005Arrange(F005Context context, F005Driver driver)
     /// <summary>The acting user of an email: signed in by a step, or a demo account signed in with the demo password.</summary>
     public async Task<ActingUser> AccountAsync(string email)
     {
+        email = WithRow(email);
         if (context.Accounts.TryGetValue(email, out var known))
         {
             return known;
@@ -133,7 +162,7 @@ public sealed class F005Arrange(F005Context context, F005Driver driver)
     /// <summary>"the anonymous visitor", "the administrator `a`" or "`x`".</summary>
     public async Task<(string? Email, ActingUser User)> ActorAsync(string token)
     {
-        var text = token.Trim();
+        var text = WithRow(token).Trim();
         if (text == F005Text.AnonymousVisitor)
         {
             return (null, ActingUser.Anonymous);
@@ -254,9 +283,12 @@ public sealed class F005Arrange(F005Context context, F005Driver driver)
             : throw new InvalidOperationException($"\"the goal\" is ambiguous: the item created {context.Goals.Count} goals.");
 
     /// <summary>The goal an account created last.</summary>
-    public F005Goal GoalOf(string ownerEmail) =>
-        context.Goals.LastOrDefault(goal => goal.OwnerEmail == ownerEmail)
-        ?? throw new InvalidOperationException($"`{ownerEmail}` created no goal in this scenario.");
+    public F005Goal GoalOf(string ownerEmail)
+    {
+        var owner = WithRow(ownerEmail);
+        return context.Goals.LastOrDefault(goal => goal.OwnerEmail == owner)
+            ?? throw new InvalidOperationException($"`{owner}` created no goal in this scenario.");
+    }
 
     /// <summary>"the first goal" (0) or "the second goal" (1): of the actor, or of the item when the actor has none.</summary>
     public F005Goal NthGoal(string? actorEmail, int index)
@@ -277,7 +309,7 @@ public sealed class F005Arrange(F005Context context, F005Driver driver)
     /// <summary>"the goal", "the goal of `x`", "the first goal", "the second goal" or a demo goal's name in quotes.</summary>
     public async Task<F005Goal> GoalPhraseAsync(string phrase, string? actorEmail)
     {
-        var text = phrase.Trim();
+        var text = WithRow(phrase).Trim();
         Match match;
         if (text == "the goal")
         {
