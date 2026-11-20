@@ -1,3 +1,4 @@
+using System.Globalization;
 using Bunit;
 using HT.Application.Reports;
 using HT.Domain.Evaluation;
@@ -70,6 +71,29 @@ public sealed class GoalStatsTests : BunitContext
         Assert.Equal("Last 5 weeks: 2 met, 1 failed, 1 missed, 1 pending", cut.Find("div.ht-strip").GetAttribute("aria-label"));
         Assert.Equal(["Met", "Failed", "Missed", "Pending"], cut.FindAll("section.ht-card > .ht-legend > span").Select(s => s.TextContent));
         Assert.Empty(cut.FindAll(".ht-strip--mini"));
+    }
+
+    /// <summary>
+    /// US2-AS8: the labels carry the plural unit for every value, 1 and 0 included, and the values are the numbers alone,
+    /// so "1 day" and "0 weeks" never appear in a label or a value.
+    /// </summary>
+    [Theory]
+    [InlineData(StreakUnit.Commitments, 6, 11, "Streak, commitments", "Longest, commitments")]
+    [InlineData(StreakUnit.Commitments, 1, 1, "Streak, commitments", "Longest, commitments")]
+    [InlineData(StreakUnit.Days, 3, 3, "Streak, days", "Longest, days")]
+    [InlineData(StreakUnit.Days, 1, 1, "Streak, days", "Longest, days")]
+    [InlineData(StreakUnit.Weeks, 0, 2, "Streak, weeks", "Longest, weeks")]
+    [InlineData(StreakUnit.Weeks, 1, 1, "Streak, weeks", "Longest, weeks")]
+    public void US2_AS8_the_streak_labels_have_the_plural_unit_and_the_values_the_numbers(
+        StreakUnit unit, int current, int longest, string streakLabel, string longestLabel)
+    {
+        var cut = RenderStats(Stats(new Consistency(longest, longest + 1), current, longest, unit), [EvaluationState.Met]);
+
+        var stats = cut.FindAll(".ht-stats > .ht-stat");
+        Assert.Equal(["Consistency", streakLabel, longestLabel], stats.Select(s => s.QuerySelector(".ht-stat__label")!.TextContent));
+        Assert.Equal(
+            [current.ToString(CultureInfo.InvariantCulture), longest.ToString(CultureInfo.InvariantCulture)],
+            stats.Skip(1).Select(s => s.QuerySelector(".ht-stat__value")!.TextContent));
     }
 
     [Fact]

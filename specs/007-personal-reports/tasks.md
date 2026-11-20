@@ -305,8 +305,8 @@ A failing test is fixed in the file whose rule it shows wrong.
 
 ### Tests for User Story 2
 
-- [ ] T039 [P] [US2] Write `tests/HT.UnitTests/Application/Reports/GoalReportStreakTests.cs` with `ReportWorld` (after T034; FR-003, FR-004, FR-008, US2-AS1 to AS7, D-1): Met, Met, Failed, Met, Met, Met gives 3 and 3 "commitments"; Met × 11, Missed, Met × 6 gives 6 and 11; a latest Failed or Missed gives 0; Met, Met, Pending, Due gives 2; a Pending day with a record that reaches the target gives 2 at `2026-11-12T23:59:59Z` and 3 at `2026-11-13T00:00:00Z` (Conventions); a Pending day without a record gives 0 once its grace period ends, with nothing else done; the units and their singular forms ("1 day", "1 week", "1 commitment", "0 weeks"); no final result gives 0 and 0 in the unit
-- [ ] T040 [P] [US2] Add to `tests/HT.UiTests/Components/Shared/GoalStatsTests.cs` (after T036; HP-001, US2-AS8): the labels "Streak, commitments" and "Longest, commitments", "Streak, days", "Streak, weeks", always plural, with their values
+- [X] T039 [P] [US2] Write `tests/HT.UnitTests/Application/Reports/GoalReportStreakTests.cs` with `ReportWorld` (after T034; FR-003, FR-004, FR-008, US2-AS1 to AS7, D-1): Met, Met, Failed, Met, Met, Met gives 3 and 3 "commitments"; Met × 11, Missed, Met × 6 gives 6 and 11; a latest Failed or Missed gives 0; Met, Met, Pending, Due gives 2; a Pending day with a record that reaches the target gives 2 at `2026-11-12T23:59:59Z` and 3 at `2026-11-13T00:00:00Z` (Conventions); a Pending day without a record gives 0 once its grace period ends, with nothing else done; the units and their singular forms ("1 day", "1 week", "1 commitment", "0 weeks"); no final result gives 0 and 0 in the unit
+- [X] T040 [P] [US2] Add to `tests/HT.UiTests/Components/Shared/GoalStatsTests.cs` (after T036; HP-001, US2-AS8): the labels "Streak, commitments" and "Longest, commitments", "Streak, days", "Streak, weeks", always plural, with their values
 
 **Checkpoint**: the full suite passes. Commit.
 
