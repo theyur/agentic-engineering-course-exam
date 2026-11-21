@@ -1,3 +1,4 @@
+using System.Reflection;
 using HT.Domain.Time;
 
 namespace HT.UnitTests.Domain.Time;
@@ -53,5 +54,26 @@ public class NamedTimeZonesTests
             Assert.True(NamedTimeZone.TryParse(id, out var zone), id);
             Assert.Equal(id, zone.Id);
         });
+    }
+
+    /// <summary>
+    /// <see cref="NamedTimeZones.Choices"/> builds its list once per process, inside whichever test reads it first, so
+    /// the tests above check one cached list. This test builds a fresh one with the private factory behind the cache,
+    /// so the whole contract is checked on every build (ADR 0022: Stryker credits the build to one test only).
+    /// </summary>
+    [Fact]
+    public void A_fresh_build_keeps_the_whole_contract()
+    {
+        var build = typeof(NamedTimeZones).GetMethod("Build", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(build);
+        var choices = Assert.IsType<IReadOnlyList<string>>(build.Invoke(null, null), exactMatch: false);
+
+        Assert.Equal("UTC", choices[0]);
+        Assert.Single(choices, id => id == "UTC");
+        Assert.Contains("Europe/Berlin", choices);
+        var rest = choices.Skip(1).ToList();
+        Assert.Equal(rest.Order(StringComparer.Ordinal), rest);
+        Assert.All(choices, id => Assert.True(NamedTimeZone.TryParse(id, out _), id));
+        Assert.Equal(NamedTimeZones.Choices, choices);
     }
 }

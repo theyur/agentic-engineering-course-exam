@@ -34,6 +34,11 @@ public class GoalTextTests
             "4 days a week", "Yes/no · fixed days Mon–Wed, Sat"
         },
         { YesNoDays(BuildOrReduce.Build, DayOfWeek.Saturday, DayOfWeek.Sunday), "2 days a week", "Yes/no · fixed days Sat, Sun" },
+        { YesNoDays(BuildOrReduce.Build, DayOfWeek.Tuesday, DayOfWeek.Thursday), "2 days a week", "Yes/no · fixed days Tue, Thu" },
+        {
+            CountDays(20, "pages", BuildOrReduce.Build, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday),
+            "20 pages, 4 days a week", "Count · fixed days Mon–Thu"
+        },
         { YesNoDays(BuildOrReduce.Reduce, Weekdays), "avoided on Mon–Fri", "Yes/no · fixed days Mon–Fri" },
         { YesNoDays(BuildOrReduce.Reduce, DayOfWeek.Saturday, DayOfWeek.Sunday), "avoided on Sat, Sun", "Yes/no · fixed days Sat, Sun" },
         { YesNoDays(BuildOrReduce.Reduce, AllDays), "avoided every day", "Yes/no · fixed days every day" },
