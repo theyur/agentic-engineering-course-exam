@@ -122,6 +122,16 @@ public class GoalTimelineEntriesThroughTests
     }
 
     [Fact]
+    public void A_goal_that_starts_on_a_Monday_has_its_start_date_through_its_start_date()
+    {
+        // The first window starts on the start date itself, which is also the last date.
+        var monday = Date(2026, 11, 16);
+
+        Assert.Equal([monday], GoalTimeline.EntriesThrough(Goal(PerDay(), monday, Kyiv), monday).Select(entry => entry.FirstDate));
+        Assert.Equal([monday], GoalTimeline.EntriesThrough(Goal(OnDays(MonWedFri), monday, Kyiv), monday).Select(entry => entry.FirstDate));
+    }
+
+    [Fact]
     public void The_entry_that_contains_the_last_date_is_included()
     {
         var goal = Goal(OnDays(MonWedFri), Date(2026, 11, 16), Kyiv);

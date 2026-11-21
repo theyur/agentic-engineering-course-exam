@@ -154,6 +154,17 @@ public class GoalTests
     }
 
     [Fact]
+    public void Equal_yes_no_targets_have_the_same_hash_code()
+    {
+        // A yes/no target has no count unit, so the hash code must not hash a null unit.
+        var a = Target(YesNoDays(BuildOrReduce.Build, DayOfWeek.Monday, DayOfWeek.Friday));
+        var b = Target(YesNoDays(BuildOrReduce.Build, DayOfWeek.Friday, DayOfWeek.Monday));
+
+        Assert.Equal(a, b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [Fact]
     public void A_stored_target_is_rebuilt_from_its_fields()
     {
         var target = Target(DurationTimes(30, DurationUnit.Minutes, 1, SchedulePeriod.Day, BuildOrReduce.Reduce));

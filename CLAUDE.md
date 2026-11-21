@@ -23,6 +23,7 @@ C# / .NET 10, Blazor Interactive Server, EF Core + SQL Server (only provider —
 - Run UI: `dotnet run --project src/HT.Ui --launch-profile https`, then open `https://localhost:7194` (the session cookie is `Secure`). The operator values are User Secrets of `HT.Ui` (`Operator:AdministratorEmail`, `Operator:AdministratorPassword`, `Operator:DemoPassword`); never read or print their values.
 - Changed `.claude/hooks/architecture-gate.ps1`? Run `pwsh tools/guard-oracle/oracle.ps1` — it must print `PASSED` (see `tools/guard-oracle/README.md`).
 - Changed `tools/hosting/`? Run `pwsh -NoProfile -File tools/hosting/selftest.ps1` — it must print `PASSED`.
+- Mutation testing (ADR 0022): from `tests/HT.UnitTests`, `dotnet stryker --project HT.Domain.csproj` (or `HT.Application.csproj`); config in that folder. `--since:<branch or full SHA>` finds nothing in a git worktree, so in worktree sessions run the whole project or use a clone. Fix a surviving mutant with a test; a `// Stryker disable` comment only for an equivalent mutant, with its reason.
 - `TreatWarningsAsErrors` is on — any warning fails the build; fix it, don't suppress it.
 - `TargetFramework`, `Nullable`, `ImplicitUsings` live in root `Directory.Build.props`; don't repeat them in `.csproj` files.
 

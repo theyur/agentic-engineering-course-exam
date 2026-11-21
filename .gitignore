@@ -155,6 +155,9 @@ coverage*.json
 coverage*.xml
 coverage*.info
 
+# Stryker.NET mutation testing reports (ADR 0022)
+StrykerOutput/
+
 # Visual Studio code coverage results
 *.coverage
 *.coveragexml
