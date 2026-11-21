@@ -76,8 +76,8 @@ public static partial class PageReader
     /// Every goal item on the Goals page with its meta text, in document order (smoke check 8, slice 7 HP-011): the name
     /// of each <c>&lt;a class="ht-goalitem__name"&gt;</c>, as <see cref="ReadGoalNames"/> reads it, paired with the text of
     /// the first <c>&lt;div class="ht-goalitem__meta"&gt;</c> after it and before the next goal item's name, up to that
-    /// div's <c>&lt;/div&gt;</c>, without its chips (every element whose class list holds <c>ht-chip</c>: the Build or
-    /// Reduce Tag and a StatusChip): tags removed, entities decoded and every run of white space made one space, such as
+    /// div's <c>&lt;/div&gt;</c>, without its chips (every <c>&lt;span&gt;</c> whose class list holds <c>ht-chip</c>: the
+    /// Build or Reduce Tag and a StatusChip): tags removed, entities decoded and every run of white space made one space, such as
     /// "Paused until Sun 22 Nov" or "Every day · next today". Null when the item has no meta line.
     /// </summary>
     public static IReadOnlyList<GoalMeta> ReadGoalMetas(string html)
@@ -256,7 +256,7 @@ public static partial class PageReader
     [GeneratedRegex("""<div\b[^>]*\bclass="(?:[^"]*\s)?ht-goalitem__meta(?:\s[^"]*)?"[^>]*>""", RegexOptions.IgnoreCase)]
     private static partial Regex GoalMetaPattern();
 
-    [GeneratedRegex("""<(?<tag>[a-z][a-z0-9]*)\b[^>]*\bclass="(?:[^"]*\s)?ht-chip(?:\s[^"]*)?"[^>]*>.*?</\k<tag>\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    [GeneratedRegex("""<span\b[^>]*\bclass="(?:[^"]*\s)?ht-chip(?:\s[^"]*)?"[^>]*>.*?</span\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex ChipPattern();
 
     [GeneratedRegex("""<section\b[^>]*\bclass="(?:[^"]*\s)?ht-card(?:\s[^"]*)?"[^>]*>""", RegexOptions.IgnoreCase)]
