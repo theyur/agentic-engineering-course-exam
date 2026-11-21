@@ -1,6 +1,6 @@
 # 0022 — Mutation testing: Stryker.NET on each PR's changes, report only
 
-**Status:** Proposed, 2026-11-21. Adds a mutation-testing tool, which ARCHITECTURE §6 and §9 do not choose,
+**Status:** Accepted, 2026-11-21. Adds a mutation-testing tool, which ARCHITECTURE §6 and §9 do not choose,
 and a CI workflow next to the PR gates of ADR 0001, which stay unchanged.
 
 ## Context
