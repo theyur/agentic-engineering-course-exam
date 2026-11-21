@@ -44,6 +44,11 @@ $sonar = @(
         r = "^Workflow ended 'failure'; .* waiting until 12:02:30 UTC .* BUILD_FAILED" }
     @{ n = 'sonar job passed, gate on its way';     runs = @((Run $job -CompletedAt $recent));                       e = 'PENDING'
         r = '^Workflow finished; waiting for the SonarQube Cloud app' }
+    # Any other completed conclusion (e.g. neutral) is neither a build failure nor a red gate.
+    @{ n = 'sonar job neutral, gate may still come'; runs = @((Run $job -Conclusion neutral -CompletedAt $recent)); e = 'PENDING'
+        r = "^Workflow ended 'neutral'; waiting until 12:02:30 UTC for the gate check\.$" }
+    @{ n = 'sonar job neutral, no gate check';      runs = @((Run $job -Conclusion neutral));                        e = 'INFRA_FAILED'
+        r = "^Workflow ended 'neutral' without a quality gate check\.$" }
     @{ n = 'sonar cancelled';              runs = @((Run $job -Conclusion cancelled));                               e = 'INFRA_FAILED' }
     @{ n = 'sonar timed out';              runs = @((Run $job -Conclusion timed_out), (Run $sq -Id 2));              e = 'INFRA_FAILED' }
     @{ n = 'sonar gate check running';     runs = @((Run $job), (Run $sq 'in_progress' -Id 2));                      e = 'PENDING' }
