@@ -66,7 +66,7 @@ public sealed class ConsistencyStripTests : BunitContext
         Assert.Equal(["Met", "Failed", "Missed", "Pending"], entries.Select(e => e.TextContent).ToArray());
         Assert.Equal(
             ["ht-cell--met", "ht-cell--failed", "ht-cell--missed", "ht-cell--pending"],
-            entries.Select(e => e.QuerySelector("i.ht-strip__cell")!.ClassList.Last()).ToArray());
+            entries.Select(e => e.QuerySelector("i.ht-strip__cell")!.ClassList).Select(c => c[c.Length - 1]).ToArray());
         Assert.DoesNotContain("Excused", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Paused", cut.Markup, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll(".ht-cell--excused, .ht-cell--paused"));

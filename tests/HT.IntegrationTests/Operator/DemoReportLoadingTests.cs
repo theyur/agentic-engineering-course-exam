@@ -27,6 +27,7 @@ public sealed class DemoReportLoadingTests(SeedDatabaseFixture database)
 
     private static readonly DateOnly Start = new(2026, 8, 22);
     private static readonly DateOnly RunDate = new(2026, 11, 14);
+    private static readonly string[] DemoHabits = ["Walking", "Strength training", "Screen time"];
 
     private static readonly ActingUser Administrator = ActingUser.ForAccount(new AccountId(Guid.NewGuid()), Role.Administrator);
 
@@ -82,7 +83,7 @@ public sealed class DemoReportLoadingTests(SeedDatabaseFixture database)
         await LoadDemoReportAsync(services);
 
         var expected = DemoReport.For(RunDate);
-        foreach (var (habit, goal) in new[] { "Walking", "Strength training", "Screen time" }.Zip(expected))
+        foreach (var (habit, goal) in DemoHabits.Zip(expected))
         {
             // The stored order is the list's: by date, as the store wrote them one at a time.
             var rows = await Sql.QueryAsync(

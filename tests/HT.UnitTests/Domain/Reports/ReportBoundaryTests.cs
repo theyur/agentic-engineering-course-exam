@@ -53,7 +53,7 @@ public class ReportBoundaryTests
         public Goal Goal { get; } = GoalSamples.Goal(Target, Start, NamedTimeZone.Utc);
 
         /// <summary>"before, at, after": the three instants around a grace end.</summary>
-        public DateTimeOffset Moment(string literals, string moment)
+        public static DateTimeOffset Moment(string literals, string moment)
         {
             var parts = literals.Split(", ");
             return moment switch
@@ -70,7 +70,7 @@ public class ReportBoundaryTests
 
     private static Level Failed(params RecordValue[] records) => new(records, EvaluationState.Failed);
 
-    private static IReadOnlyDictionary<string, Level> Levels(Level below, Level at, Level above) =>
+    private static Dictionary<string, Level> Levels(Level below, Level at, Level above) =>
         new Dictionary<string, Level>
         {
             [Below] = below,
@@ -181,7 +181,7 @@ public class ReportBoundaryTests
     {
         var boundaryCase = Named(name);
         var records = boundaryCase.Levels[level];
-        var now = boundaryCase.Moment(boundaryCase.GraceEndLiterals, moment);
+        var now = BoundaryCase.Moment(boundaryCase.GraceEndLiterals, moment);
 
         var states = StatesAt(boundaryCase.Goal, new Dictionary<DateOnly, RecordValue[]> { [boundaryCase.Start] = records.Records }, now);
 
@@ -236,14 +236,14 @@ public class ReportBoundaryTests
         string[] levels = [At, At, At, failure, At];
         var records = entries.Zip(levels).ToDictionary(pair => pair.First.FirstDate, pair => boundaryCase.Levels[pair.Second].Records);
 
-        var before = StatesAt(boundaryCase.Goal, records, boundaryCase.Moment(boundaryCase.FifthGraceEndLiterals, BeforeGraceEnd));
+        var before = StatesAt(boundaryCase.Goal, records, BoundaryCase.Moment(boundaryCase.FifthGraceEndLiterals, BeforeGraceEnd));
         Assert.Equal(new Consistency(3, 4), Consistency.Of(before));
         Assert.Equal(75, Consistency.Of(before).Percentage);
         Assert.Equal(new Streaks(0, 3), Streaks.Of(before));
 
         foreach (var moment in new[] { AtGraceEnd, AfterGraceEnd })
         {
-            var states = StatesAt(boundaryCase.Goal, records, boundaryCase.Moment(boundaryCase.FifthGraceEndLiterals, moment));
+            var states = StatesAt(boundaryCase.Goal, records, BoundaryCase.Moment(boundaryCase.FifthGraceEndLiterals, moment));
             Assert.Equal(new Consistency(4, 5), Consistency.Of(states));
             Assert.Equal(80, Consistency.Of(states).Percentage);
             Assert.Equal(new Streaks(1, 3), Streaks.Of(states));
