@@ -54,6 +54,9 @@ jobs:
         with:
           # --since compares against the PR's base commit, so the history must be there.
           fetch-depth: 0
+          # The job runs the PR's code (its tests) and never pushes; --since only reads the history fetched here.
+          # So the token is not left in .git/config, where that code could read it.
+          persist-credentials: false
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
