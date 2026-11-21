@@ -86,6 +86,56 @@ public class ConsistencyTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new Consistency(successful, counted));
     }
 
+    // Slice 7 (FR-013, SC-002): Excused and Paused are skipped like Pending.
+
+    /// <summary>
+    /// Slice 7 US3: Met × 7, Excused, Met, Missed, Met, Paused × 3, Met, Pending × 2, Due (2 to 19 November).
+    /// </summary>
+    internal static readonly EvaluationState[] Slice7Us3 =
+    [
+        .. Enumerable.Repeat(EvaluationState.Met, 7), EvaluationState.Excused, EvaluationState.Met, EvaluationState.Missed,
+        EvaluationState.Met, .. Enumerable.Repeat(EvaluationState.Paused, 3), EvaluationState.Met,
+        EvaluationState.Pending, EvaluationState.Pending, EvaluationState.Due,
+    ];
+
+    /// <summary>Sequences with exempt states, for the SC-002 equality.</summary>
+    public static TheoryData<EvaluationState[]> ExemptSequences() => new()
+    {
+        Slice7Us3,
+        new[] { EvaluationState.Excused, EvaluationState.Met, EvaluationState.Paused, EvaluationState.Failed, EvaluationState.Met },
+        new[] { EvaluationState.Met, EvaluationState.Failed, EvaluationState.Excused, EvaluationState.Met, EvaluationState.Missed, EvaluationState.Paused },
+        new[] { EvaluationState.Paused, EvaluationState.Paused, EvaluationState.Met, EvaluationState.Met, EvaluationState.Excused, EvaluationState.Met },
+        new[] { EvaluationState.Failed, EvaluationState.Excused, EvaluationState.Excused, EvaluationState.Pending, EvaluationState.Paused },
+        new[] { EvaluationState.Excused, EvaluationState.Paused },
+    };
+
+    [Fact]
+    public void Slice_7_US3_AS1_the_sequence_gives_90_of_10_and_11()
+    {
+        var consistency = Consistency.Of(Slice7Us3);
+
+        Assert.Equal(new Consistency(10, 11), consistency);
+        Assert.Equal(90, consistency.Percentage);
+    }
+
+    [Theory]
+    [MemberData(nameof(ExemptSequences))]
+    public void Slice_7_SC_002_the_figures_equal_those_of_the_sequence_without_its_exempt_states(EvaluationState[] states)
+    {
+        var withoutExempt = states.Where(state => state is not (EvaluationState.Excused or EvaluationState.Paused)).ToArray();
+
+        Assert.Equal(Consistency.Of(withoutExempt), Consistency.Of(states));
+    }
+
+    [Fact]
+    public void Slice_7_US3_AS6_only_exempt_states_give_no_percentage()
+    {
+        var consistency = Consistency.Of([EvaluationState.Excused, .. Enumerable.Repeat(EvaluationState.Paused, 6)]);
+
+        Assert.Equal(new Consistency(0, 0), consistency);
+        Assert.Null(consistency.Percentage);
+    }
+
     [Fact]
     public void An_undefined_state_is_refused()
     {

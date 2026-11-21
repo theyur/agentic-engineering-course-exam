@@ -41,5 +41,22 @@
 </div></div>
 </div>
 </div>
+<!-- Slice 7 state (HP-003, D-2, D-3, FR-005, FR-009): slice 5's dialog with two changes. "Excuse instead" (ghost, pushed right with ht-spacer, aria-haspopup="dialog") shows only for a commitment-based goal whose selected "For" entry is Due or Pending with no record; it follows the selection, and it opens the Excuse dialog for that commitment in the RecordDialog's place. "For" lists no Excused or Paused entry. "Edit" of one record never shows it (the commitment has a record). -->
+<div class="ht" style="padding:16px" aria-label="Slice 7 state">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;align-items:start">
+<div><div class="ht-eyebrow" style="margin:24px 0 8px">Slice 7 state · a commitment-based goal, opened from "Record": the Due entry is chosen, so "Excuse instead" shows (Fri 13 Nov 2026, 07:00; Mon 9 Nov is Missed and not listed)</div>
+<div class="ht-dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-s7-record-t">
+  <div class="ht-dialog__head"><div><h2 id="dlg-s7-record-t">Record · Yoga, 3 days a week</h2><div class="ht-dialog__sub">Build · Mon · Wed · Fri</div></div><button type="button" class="ht-dialog__close" aria-label="Close">×</button></div>
+  <div class="ht-dialog__body"><label class="ht-field"><span class="ht-field__label">For</span><select class="ht-input"><option>Today, Fri 13 Nov</option><option>Wed 11 Nov · Pending, 17 h left</option></select></label><div class="ht-field"><span class="ht-field__label">Did you do it?</span><div class="ht-seg" role="group" aria-label="Did you do it?"><button type="button" aria-pressed="false">Yes</button><button type="button" aria-pressed="false">No</button></div></div><label class="ht-field"><span class="ht-field__label">Note <span class="ht-muted">(optional)</span></span><textarea class="ht-input ht-textarea" placeholder="What happened? Only you can see notes." aria-describedby="dlg-s7-record-note-help"></textarea><span class="ht-field__help" id="dlg-s7-record-note-help">Clear the field to remove the note.</span></label></div>
+  <div class="ht-dialog__foot"><button type="button" class="ht-btn ht-btn--primary">Save record</button><button type="button" class="ht-btn ht-btn--secondary">Cancel</button><span class="ht-spacer"></span><button type="button" class="ht-btn ht-btn--ghost" aria-haspopup="dialog">Excuse instead</button></div>
+</div></div>
+<div><div class="ht-eyebrow" style="margin:24px 0 8px">Slice 7 state · a paused goal counted per day, opened from "Record": "For" leaves out the Paused today; no "Excuse instead" for a period (Mon 16 Nov 2026, 10:00; paused Mon 16 – Sun 22 Nov)</div>
+<div class="ht-dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-s7-paused-t">
+  <div class="ht-dialog__head"><div><h2 id="dlg-s7-paused-t">Record · Drinking water, 8 glasses a day</h2><div class="ht-dialog__sub">Build · at least 8 glasses · every day</div></div><button type="button" class="ht-dialog__close" aria-label="Close">×</button></div>
+  <div class="ht-dialog__body"><label class="ht-field"><span class="ht-field__label">For</span><select class="ht-input"><option>Sun 15 Nov · Pending, 38 h left</option><option>Sat 14 Nov · Pending, 14 h left</option></select></label><div class="ht-field"><span class="ht-field__label">Amount</span><span class="ht-inline"><span class="ht-stepper"><button type="button" aria-label="Less">−</button><input type="number" min="0" value="" aria-label="Amount"><button type="button" aria-label="More">+</button></span><span class="ht-unit">glasses</span></span><span class="ht-field__help">Partial amounts are kept. Without a record of at least 8 glasses the day counts as Failed when it is finalized.</span></div><label class="ht-field"><span class="ht-field__label">Note <span class="ht-muted">(optional)</span></span><textarea class="ht-input ht-textarea" placeholder="What happened? Only you can see notes." aria-describedby="dlg-s7-paused-note-help"></textarea><span class="ht-field__help" id="dlg-s7-paused-note-help">This note is for the whole day. Clear the field to remove it.</span></label></div>
+  <div class="ht-dialog__foot"><button type="button" class="ht-btn ht-btn--primary">Save record</button><button type="button" class="ht-btn ht-btn--secondary">Cancel</button></div>
+</div></div>
+</div>
+</div>
 </body>
 </html>

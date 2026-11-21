@@ -223,7 +223,7 @@ public sealed class RecordableTests
 
         await FoundAsync(goal);
 
-        Assert.Equal([nameof(IRecordStore.ReadAsync)], _world.Records.Calls);
+        Assert.Equal([nameof(IRecordStore.ReadExemptionsAsync), nameof(IRecordStore.ReadAsync)], _world.Records.Calls);
     }
 
     [Fact]

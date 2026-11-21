@@ -423,7 +423,9 @@ public sealed class CorrectionTests
         var entry = Deleted(await _world.DeleteAsync(goal, record));
 
         Assert.Empty(entry.Records);
-        Assert.Equal([nameof(IRecordStore.FindRecordDateAsync), nameof(IRecordStore.DeleteAsync)], _world.Records.Calls);
+        Assert.Equal(
+            [nameof(IRecordStore.FindRecordDateAsync), nameof(IRecordStore.DeleteAsync), nameof(IRecordStore.ReadExemptionsAsync)],
+            _world.Records.Calls);
     }
 
     [Fact]

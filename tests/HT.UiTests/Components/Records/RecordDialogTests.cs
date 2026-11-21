@@ -128,9 +128,16 @@ public sealed class RecordDialogTests : BunitContext
         _records.NotesOfGoal(goal).TryGetValue(key, out var note) ? note.Value : null;
 
     [Fact]
-    public async Task US1_AS9_the_dialog_has_the_goals_title_its_target_the_For_select_the_field_and_no_Excuse_instead()
+    public async Task US1_AS9_the_dialog_has_the_goals_title_its_target_the_For_select_the_field_and_no_Excuse_instead_for_a_period_or_an_entry_with_a_record()
     {
-        var (cut, _) = await OpenAsync(Reading20MinDaily, Utc(18, 2));
+        // Slice 7 (HP-003, D-3): "Excuse instead" is for a Due or Pending commitment without a record, so it is absent
+        // while "For" names Wednesday 18, which has a record, and for a period-based goal, even with the page handling it.
+        var reading = await GoalAsync(Reading20MinDaily);
+        var coffee = await GoalAsync(CoffeeAtMost2Cups);
+        _records.Seed(reading, new DateOnly(2026, 11, 18), RecordValue.FromAmount(5));
+        _clock.SetUtcNow(Utc(18, 2));
+        var cut = RenderExcusable(reading, "Reading, 20 min daily", await RecordableAsync(reading));
+        var period = RenderExcusable(coffee, "Coffee, at most 2 cups a day", await RecordableAsync(coffee));
 
         var dialog = cut.Find("[role=dialog]");
         Assert.Equal("Record · Reading, 20 min daily", dialog.QuerySelector(".ht-dialog__head h2")!.TextContent);
@@ -138,8 +145,105 @@ public sealed class RecordDialogTests : BunitContext
         Assert.Equal(["For", "Time spent", "Note (optional)"], cut.FindAll(".ht-field__label").Select(Text));
         Assert.Equal(["Save record", "Cancel"], cut.FindAll(".ht-dialog__foot .ht-btn").Select(b => b.TextContent));
         Assert.Contains("ht-btn--primary", cut.Find(".ht-dialog__foot .ht-btn").ClassList);
-        Assert.DoesNotContain("Excuse", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Excuse instead", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Delete record", cut.Markup, StringComparison.Ordinal);
+        Assert.Equal(["Save record", "Cancel"], period.FindAll(".ht-dialog__foot .ht-btn").Select(b => b.TextContent));
+        Assert.DoesNotContain("Excuse instead", period.Markup, StringComparison.Ordinal);
+    }
+
+    // ---- slice 7: "Excuse instead" (HP-003, D-2, D-3; design/components/RecordDialog, slice 7 state) ----
+
+    private readonly List<HistoryEntry> _excuseInstead = [];
+
+    /// <summary>The open dialog for <paramref name="recordable"/>, with the page handling "Excuse instead".</summary>
+    private IRenderedComponent<RecordDialog> RenderExcusable(
+        GoalId goal, string name, GoalHistory recordable, HistoryEntry? row = null, RecordView? editing = null) =>
+        Render<RecordDialog>(p => p
+            .Add(x => x.Open, true)
+            .Add(x => x.GoalId, goal)
+            .Add(x => x.GoalName, name)
+            .Add(x => x.Recordable, recordable)
+            .Add(x => x.Row, row)
+            .Add(x => x.Editing, editing)
+            .Add(x => x.ActingUser, _user)
+            .Add(x => x.OnClose, () => _closed++)
+            .Add(x => x.OnSaved, entry => _saved.Add(entry))
+            .Add(x => x.OnExcuseInstead, entry => _excuseInstead.Add(entry)));
+
+    private static GoalTargetFields YogaOnMonWedFri => new()
+    {
+        BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.YesNo, ScheduleKind = ScheduleKind.FixedDays,
+        Days = new HashSet<DayOfWeek> { DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday },
+    };
+
+    [Fact]
+    public async Task Slice_7_HP_003_Excuse_instead_shows_for_a_Due_and_for_a_Pending_commitment_without_a_record_and_follows_the_selection()
+    {
+        // At 02:00 on Wednesday 18 November: Wednesday 18 is Due with a record, Tuesday 17 and Monday 16 are Pending.
+        var reading = await GoalAsync(Reading20MinDaily);
+        _records.Seed(reading, new DateOnly(2026, 11, 18), RecordValue.FromAmount(5));
+        _clock.SetUtcNow(Utc(18, 2));
+        var cut = RenderExcusable(reading, "Reading, 20 min daily", await RecordableAsync(reading));
+        Assert.DoesNotContain("Excuse instead", cut.Markup, StringComparison.Ordinal);
+
+        Field(cut, "For").QuerySelector("select")!.Change("2026-11-17");
+
+        var buttons = cut.FindAll(".ht-dialog__foot > *");
+        Assert.Equal(["Save record", "Cancel", string.Empty, "Excuse instead"], buttons.Select(b => b.TextContent));
+        Assert.Contains("ht-spacer", buttons[2].ClassList);
+        var excuse = buttons[3];
+        Assert.Equal(["ht-btn", "ht-btn--ghost"], excuse.ClassList.ToArray());
+        Assert.Equal("dialog", excuse.GetAttribute("aria-haspopup"));
+        Assert.Equal("button", excuse.GetAttribute("type"));
+
+        Field(cut, "For").QuerySelector("select")!.Change("2026-11-18");
+        Assert.DoesNotContain("Excuse instead", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_003_Excuse_instead_shows_for_the_Due_commitment_of_today()
+    {
+        var yoga = await GoalAsync(YogaOnMonWedFri);
+
+        // 07:00 on Wednesday 18 November: Wednesday 18 is Due, Monday 16 Pending until 00:00 on Thursday 19.
+        _clock.SetUtcNow(Utc(18, 7));
+        var cut = RenderExcusable(yoga, "Yoga, 3 days a week", await RecordableAsync(yoga));
+
+        // The newest entry is chosen on open.
+        Assert.Equal(["Today, Wed 18 Nov", "Mon 16 Nov · Pending, 17 h left"], Options(Field(cut, "For").QuerySelector("select")!));
+        Assert.Equal("Excuse instead", cut.FindAll(".ht-dialog__foot .ht-btn")[^1].TextContent);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_003_choosing_Excuse_instead_raises_the_chosen_commitment_and_saves_nothing()
+    {
+        var yoga = await GoalAsync(YogaOnMonWedFri);
+        _clock.SetUtcNow(Utc(18, 7));
+        var cut = RenderExcusable(yoga, "Yoga, 3 days a week", await RecordableAsync(yoga));
+        Field(cut, "For").QuerySelector("select")!.Change("2026-11-16");
+
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[^1].ClickAsync(new MouseEventArgs());
+
+        var chosen = Assert.Single(_excuseInstead);
+        Assert.Equal((new DateOnly(2026, 11, 16), EvaluationState.Pending), (chosen.FirstDate, chosen.State));
+        Assert.Empty(_saved);
+        Assert.Equal(0, _closed);
+        Assert.Empty(_records.RecordsOfGoal(yoga));
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_003_no_Excuse_instead_in_Edit_of_a_record()
+    {
+        var yoga = await GoalAsync(YogaOnMonWedFri);
+        _records.Seed(yoga, new DateOnly(2026, 11, 16), RecordValue.FromAnswer(YesNoAnswer.No));
+        _clock.SetUtcNow(Utc(18, 7));
+        var recordable = await RecordableAsync(yoga);
+        var row = recordable.Entries.Single(e => e.FirstDate == new DateOnly(2026, 11, 16));
+
+        var cut = RenderExcusable(yoga, "Yoga, 3 days a week", recordable, row, row.Records[0]);
+
+        Assert.Contains("Delete record", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Excuse instead", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]

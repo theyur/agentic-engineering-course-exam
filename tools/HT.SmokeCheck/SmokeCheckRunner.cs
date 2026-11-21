@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
+using HT.Application.Accounts;
 using HT.Application.Operator;
 using HT.Application.Records;
 using HT.Application.Reports;
@@ -49,6 +50,15 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
 
     private const string HomePath = "/";
 
+    /// <summary>The Goals page's Paused tab (slice 7 HP-004), which check 8 reads.</summary>
+    private const string PausedTabPath = "/goals?tab=paused";
+
+    /// <summary>The position of "Meditation, 10 min daily" in <see cref="DemoPauses.GoalNames"/>, whose page check 8 reads.</summary>
+    private const int MeditationIndex = 0;
+
+    /// <summary>The position of "Drinking water, 8 glasses a day" in <see cref="DemoPauses.GoalNames"/>, which check 8 finds on the Paused tab.</summary>
+    private const int DrinkingWaterIndex = 1;
+
     /// <summary>
     /// The goal pages of check 6 and their expected texts, all from <c>HT.Application</c> (slice 5 research R-10): the
     /// History card of "Reading" (<see cref="DemoHistory.GoalNames"/>[0], a daily commitment) holds Met, Failed, Pending,
@@ -81,6 +91,15 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
 
     /// <summary>The StatusChip word check 7 finds on demo5's Home: "Missed" (slice 6 HP-008).</summary>
     private static readonly string MissedChip = ReportText.State(EvaluationState.Missed, GoalScheduleKind.PeriodBased, SchedulePeriod.Day);
+
+    /// <summary>The StatusChip word check 8 finds on "Meditation"'s page: "Excused" (slice 7 HP-011).</summary>
+    private static readonly string ExcusedChip = ReportText.State(EvaluationState.Excused, GoalScheduleKind.CommitmentBased, null);
+
+    /// <summary>
+    /// How the meta text of a paused goal starts, "Paused until " (slice 7 HP-004, HP-011): <see cref="ReportText.PausedUntil"/>
+    /// without its date, so the text is not typed in the tool and the check holds whatever the hosted run date is.
+    /// </summary>
+    private static readonly string PausedUntilPrefix = PausedUntilWithoutDate(new DateOnly(2026, 11, 22));
 
     /// <summary>The pause between two tries of check 1, shortened to the warm-up time that is left.</summary>
     private static readonly TimeSpan RetryPause = TimeSpan.FromSeconds(5);
@@ -120,6 +139,7 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
 
         await WriteCheckAsync(lines, await CheckDemoHistoryAsync().ConfigureAwait(false)).ConfigureAwait(false);
         await WriteCheckAsync(lines, await CheckDemoReportAsync().ConfigureAwait(false)).ConfigureAwait(false);
+        await WriteCheckAsync(lines, await CheckDemoPauseAsync().ConfigureAwait(false)).ConfigureAwait(false);
 
         var laterMilliseconds = later?.Milliseconds;
         var laterRequests = later?.Requests ?? 0;
@@ -468,6 +488,66 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     }
 
     /// <summary>
+    /// Check 8 <c>demo pause &lt;email&gt;</c> (slice 7 HP-011): <see cref="DemoPauseService.DemoEmail"/> signs in on a new
+    /// client with the demo password; the page of "Meditation, 10 min daily" (<see cref="DemoPauses.GoalNames"/>[0]),
+    /// reached through its link on <c>GET /goals</c>, has "Excused" among its status chips; and the Paused tab
+    /// <c>GET /goals?tab=paused</c> shows the goal "Drinking water, 8 glasses a day" ([1]) with a meta text that starts
+    /// "Paused until" in the same goal item: 3 expected texts, the chip and the name matched whole. Every page is read; a
+    /// <c>FAIL</c> names the first part that misses, in that order. No goal name, reason, note, figure, date or goal path
+    /// is printed.
+    /// </summary>
+    private async Task<string> CheckDemoPauseAsync()
+    {
+        var name = $"demo pause {DemoPauseService.DemoEmail}";
+        return await GuardAsync(name, async () =>
+        {
+            using var client = _createClient();
+            if (!await SignInAsync(client, DemoPauseService.DemoEmail, _options.DemoPassword).ConfigureAwait(false))
+            {
+                return $"{FailPrefix}{name}: the sign-in was refused";
+            }
+
+            List<NamesPart> parts = [await CheckExcusedChipAsync(client).ConfigureAwait(false)];
+
+            var pausedGoal = DemoPauses.GoalNames[DrinkingWaterIndex];
+            var (pausedStatus, pausedHtml) = await GetPageAsync(client, PausedTabPath).ConfigureAwait(false);
+            IReadOnlyList<GoalMeta> metas = pausedStatus == HttpStatusCode.OK ? PageReader.ReadGoalMetas(pausedHtml) : [];
+            parts.Add(NamesPart.Of(PausedTabPath, pausedStatus, [.. metas.Select(meta => meta.Name)], [pausedGoal], "goal names on the Paused tab"));
+            parts.Add(metas.Any(meta => meta.Name == pausedGoal && meta.Meta is { } text && text.StartsWith(PausedUntilPrefix, StringComparison.Ordinal))
+                ? new NamesPart(1, 1, null)
+                : new NamesPart(0, 1, "0 of 1 paused goal metas on the Paused tab shown"));
+            return PartsLine(name, parts);
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The first part of check 8: <c>GET /goals</c>, then the page of "Meditation" through its link there, then "Excused"
+    /// among that page's status chips (<see cref="PageReader.ReadStatusChips"/>). The page is named by its position only.
+    /// </summary>
+    private static async Task<NamesPart> CheckExcusedChipAsync(HttpClient client)
+    {
+        var (goalsStatus, goalsHtml) = await GetPageAsync(client, GoalsPath).ConfigureAwait(false);
+        if (goalsStatus != HttpStatusCode.OK)
+        {
+            return new NamesPart(0, 1, $"GET {GoalsPath} gave {StatusText(goalsStatus)}");
+        }
+
+        var position = (MeditationIndex + 1).ToString(CultureInfo.InvariantCulture);
+        var (problem, html) = await GetGoalPageAsync(client, PageReader.ReadGoalLinks(goalsHtml), DemoPauses.GoalNames[MeditationIndex], position)
+            .ConfigureAwait(false);
+        return problem is not null
+            ? new NamesPart(0, 1, problem)
+            : LabelsPart("goal page", HttpStatusCode.OK, () => PageReader.ReadStatusChips(html), [ExcusedChip], $"status chips on goal page {position}");
+    }
+
+    /// <summary>"Paused until Sun 22 Nov" without "Sun 22 Nov": the text before the date, whatever the date is.</summary>
+    private static string PausedUntilWithoutDate(DateOnly lastDay)
+    {
+        var text = ReportText.PausedUntil(lastDay);
+        return text[..^DateTexts.ShortDate(lastDay).Length];
+    }
+
+    /// <summary>
     /// A goal page reached through its link on Goals: the first goal item with <paramref name="goalName"/> whose
     /// <c>href</c> is a path on this site. Gives a reason that names the page by its <paramref name="position"/> only, or
     /// null and the page's HTML.
@@ -601,7 +681,7 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     /// <summary>
     /// Signs in through the sign-in page as a browser does: <c>GET /sign-in</c>, its antiforgery token and the
     /// <c>sign-in</c> form handler, then <c>POST /sign-in</c>. True when the answer is a redirect that does not go back
-    /// to <c>/sign-in</c>; the client then holds the session cookie. Used by checks 4, 5, 6 and 7.
+    /// to <c>/sign-in</c>; the client then holds the session cookie. Used by checks 4, 5, 6, 7 and 8.
     /// </summary>
     private static async Task<bool> SignInAsync(HttpClient client, string email, string password)
     {

@@ -28,7 +28,8 @@ public sealed record Consistency(int Successful, int Counted)
 
     /// <summary>
     /// The consistency of <paramref name="states"/> (FR-001): Met is successful; Met, Failed and Missed are counted;
-    /// Upcoming, Due and Pending are skipped. The order does not matter.
+    /// Upcoming, Due and Pending are skipped, and so are Excused and Paused (slice 7 FR-013), which count neither as
+    /// successful nor in the total. The order does not matter.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">A state is not defined.</exception>
     public static Consistency Of(IEnumerable<EvaluationState> states)
@@ -47,7 +48,8 @@ public sealed record Consistency(int Successful, int Counted)
                 case EvaluationState.Failed or EvaluationState.Missed:
                     counted++;
                     break;
-                case EvaluationState.Upcoming or EvaluationState.Due or EvaluationState.Pending:
+                case EvaluationState.Upcoming or EvaluationState.Due or EvaluationState.Pending
+                    or EvaluationState.Excused or EvaluationState.Paused:
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(states), "A state is not defined.");

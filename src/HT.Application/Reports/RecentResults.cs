@@ -4,7 +4,8 @@ namespace HT.Application.Reports;
 
 /// <summary>
 /// One ended result of a goal (FR-005): its first and last date (equal except for a week, its Monday and its Sunday),
-/// its state (Met, Failed, Missed or Pending) and its progress (slice 5 FR-014).
+/// its state (Met, Failed, Missed or Pending; slice 7 FR-015: or Excused or Paused for an exempt result) and its progress
+/// (slice 5 FR-014).
 /// </summary>
 public sealed record ResultView
 {
@@ -26,6 +27,9 @@ public sealed record RecentResults
     /// <summary>Oldest first.</summary>
     public required IReadOnlyList<ResultView> Results { get; init; }
 
-    /// <summary>The number of each ended state (Met, Failed, Missed, Pending) among <see cref="Results"/>, 0 included.</summary>
+    /// <summary>
+    /// The number of each ended state (Met, Failed, Missed, Pending) among <see cref="Results"/>, 0 included; slice 7
+    /// (FR-015): also Excused and Paused, each only when its number is above 0.
+    /// </summary>
     public required IReadOnlyDictionary<EvaluationState, int> Counts { get; init; }
 }

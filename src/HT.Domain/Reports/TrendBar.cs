@@ -5,4 +5,11 @@ namespace HT.Domain.Reports;
 /// and its own target. <paramref name="Value"/> is null when the bar has no record, and given as recorded otherwise,
 /// 0 and values above the target included.
 /// </summary>
-public sealed record TrendBar(DateOnly FirstDate, DateOnly LastDate, int? Value, int Target);
+public sealed record TrendBar(DateOnly FirstDate, DateOnly LastDate, int? Value, int Target)
+{
+    /// <summary>
+    /// The bar's mark when its commitment, day or week is exempt (slice 7 FR-016, research R-07), else null. A marked
+    /// bar has a null <see cref="Value"/> and keeps its own <see cref="Target"/>.
+    /// </summary>
+    public TrendMark? Mark { get; init; }
+}

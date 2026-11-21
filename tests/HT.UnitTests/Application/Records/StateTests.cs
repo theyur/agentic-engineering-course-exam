@@ -85,8 +85,9 @@ public sealed class StateTests
         Assert.Equal((EvaluationState.Pending, Utc("2026-11-21T00:00:00Z")), (beforeGraceEnd.State, beforeGraceEnd.GraceEnds!.Value));
         Assert.Equal((EvaluationState.Missed, (DateTimeOffset?)null), (atGraceEnd.State, atGraceEnd.GraceEnds));
         Assert.Equal(EvaluationState.Missed, later.State);
-        Assert.All(_world.Records.Calls, call => Assert.Equal(nameof(IRecordStore.ReadAsync), call));
-        Assert.Equal(7, _world.Records.Calls.Count);
+        Assert.Equal(
+            Enumerable.Repeat<string[]>([nameof(IRecordStore.ReadExemptionsAsync), nameof(IRecordStore.ReadAsync)], 7).SelectMany(calls => calls),
+            _world.Records.Calls);
     }
 
     // ---- AS4 to AS10: one representative final case each ----

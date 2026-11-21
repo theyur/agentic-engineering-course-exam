@@ -170,6 +170,21 @@ public sealed class HabitComponentTests : BunitContext
     }
 
     [Fact]
+    public async Task Tabs_FocusAsync_focuses_the_tab_with_those_words_and_ignores_unknown_ones()
+    {
+        var cut = Render<Tabs>(p => p
+            .Add(x => x.Links, true)
+            .Add(x => x.Label, "Goal lists")
+            .Add(x => x.Items, [new Tabs.TabItem("Active", "/goals", null, false), new Tabs.TabItem("Paused", "/goals?tab=paused", null, true)]));
+
+        await cut.InvokeAsync(() => cut.Instance.FocusAsync("Paused").AsTask());
+        await cut.InvokeAsync(() => cut.Instance.FocusAsync("Ended").AsTask());
+
+        var focused = Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(JSInterop.VerifyFocusAsyncInvoke().Arguments[0]);
+        Assert.Equal(cut.FindAll("a.ht-tab")[1].GetAttribute("blazor:elementReference"), focused.Id);
+    }
+
+    [Fact]
     public void Button_tabs_report_the_chosen_tab()
     {
         Tabs.TabItem? chosen = null;
@@ -490,6 +505,89 @@ public sealed class HabitComponentTests : BunitContext
         var focused = Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(JSInterop.VerifyFocusAsyncInvoke().Arguments[0]);
         var expected = cut.Find(canRecord ? ".ht-goalitem__actions button" : "a.ht-goalitem__name");
         Assert.Equal(expected.GetAttribute("blazor:elementReference"), focused.Id);
+    }
+
+    // ---- slice 7: the Paused form (design/components/GoalListItem, "Slice 7 state"; HP-004) ----
+
+    /// <summary>Sunday 22 November 2026, the last day of the paused goal's current pause.</summary>
+    private static readonly DateOnly PausedUntil = new(2026, 11, 22);
+
+    private IRenderedComponent<GoalItem> RenderPaused(OverviewGoal goal, Action<OverviewGoal>? onResume = null, Action<OverviewGoal>? onRecord = null) =>
+        Render<GoalItem>(p => p
+            .Add(x => x.Goal, goal with { PausedUntil = PausedUntil })
+            .Add(x => x.Today, GoalToday)
+            .Add(x => x.OnRecord, g => onRecord?.Invoke(g))
+            .Add(x => x.OnResume, g => onResume?.Invoke(g)));
+
+    [Fact]
+    public void GoalItem_Paused_form_has_Paused_until_alone_as_its_meta_text_the_Pending_chip_its_figures_and_strip()
+    {
+        // A goal with a Pending result from before its pause and a Due entry with a record: neither the schedule, nor
+        // "next today", nor the progress shows.
+        var cut = RenderPaused(OverviewOf(
+            GoalAt("Every day", GoalScheduleKind.CommitmentBased, next: GoalToday),
+            Day(GoalToday, EvaluationState.Due, 12), Day(new DateOnly(2026, 11, 17), EvaluationState.Pending)));
+
+        var root = cut.Find("div.ht-goalitem");
+        Assert.Equal(5, root.Children.Length);
+        Assert.Equal("Reading, 15 min, 5 days a week", cut.Find("a.ht-goalitem__name").TextContent);
+        Assert.Equal(["Build", "Pending"], cut.FindAll(".ht-goalitem__meta .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Paused until Sun 22 Nov", cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
+        Assert.Equal(["90% (18 of 20)", "6 commitments"], cut.FindAll(".ht-goalitem__value").Select(v => v.TextContent));
+        Assert.Equal("Last 15 commitments: 12 met, 1 missed, 2 pending", cut.Find(".ht-strip.ht-strip--mini").GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void GoalItem_Paused_form_has_no_Pending_chip_without_a_Pending_result()
+    {
+        var cut = RenderPaused(OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased)));
+
+        Assert.Equal(["Build"], cut.FindAll(".ht-goalitem__meta .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Paused until Sun 22 Nov", cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void GoalItem_Paused_form_has_one_secondary_Resume_in_place_of_Record(bool canRecord)
+    {
+        HistoryEntry[] entries = canRecord ? [Day(new DateOnly(2026, 11, 17), EvaluationState.Pending)] : [];
+
+        var cut = RenderPaused(OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased), entries));
+
+        var button = Assert.Single(cut.FindAll(".ht-goalitem__actions button"));
+        Assert.Equal("Resume", button.TextContent);
+        Assert.Equal(["ht-btn", "ht-btn--secondary", "ht-btn--sm"], button.ClassList);
+        Assert.Equal(("button", null, "Resume Reading, 15 min, 5 days a week"),
+            (button.GetAttribute("type"), button.GetAttribute("aria-haspopup"), button.GetAttribute("aria-label")));
+        Assert.DoesNotContain("Record", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GoalItem_Resume_raises_OnResume_with_its_goal_and_not_OnRecord()
+    {
+        OverviewGoal? resumed = null;
+        OverviewGoal? recorded = null;
+        var cut = RenderPaused(OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased), Day(GoalToday, EvaluationState.Due)),
+            g => resumed = g, g => recorded = g);
+
+        cut.Find(".ht-goalitem__actions button").Click();
+
+        Assert.NotNull(resumed);
+        Assert.Equal(PausedUntil, resumed.PausedUntil);
+        Assert.Same(cut.Instance.Goal, resumed);
+        Assert.Null(recorded);
+    }
+
+    [Fact]
+    public async Task GoalItem_FocusAsync_of_the_Paused_form_focuses_Resume()
+    {
+        var cut = RenderPaused(OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased), Day(GoalToday, EvaluationState.Due)));
+
+        await cut.InvokeAsync(() => cut.Instance.FocusAsync().AsTask());
+
+        var focused = Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(JSInterop.VerifyFocusAsyncInvoke().Arguments[0]);
+        Assert.Equal(cut.Find(".ht-goalitem__actions button").GetAttribute("blazor:elementReference"), focused.Id);
     }
 
     [Fact]

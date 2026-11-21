@@ -16,6 +16,11 @@ Research R-06. Decides whether a deployment or refresh succeeded (HP-017, SC-005
 > `ReadStatusChips` (slice 6 HP-008, research R-11, `specs/007-personal-reports/contracts/host.md` "Smoke check").
 > Checks 1 to 5 are unchanged.
 
+> **Slice 7 (ADR 0023).** [ADR 0023](../../../docs/adr/0023-demo-pause-loading.md) adds demo pause loading
+> (`demo6@example.com`). This contract gains a check 8 `demo pause demo6@example.com`, the fourth demo data port
+> `IDemoPauseStore` in the coverage rule, and the `PageReader` reader `ReadGoalMetas` with its `GoalMeta` records
+> (slice 7 HP-011, `specs/008-excusals-and-pauses/contracts/host.md` "Smoke check"). Checks 1 to 7 are unchanged.
+
 ## Invocation
 
 ```text
@@ -48,6 +53,7 @@ with its own cookies on every call.
 | 5 | `demo <email>`, one per `DemoDataService.DemoEmails` | the account signs in with the demo password, `GET /custom-habits` shows the name of every habit of `DemoCustomHabits.For(<email>)`, `GET /goals` shows every name of `DemoGoals.DisplayNames(<email>)` (slice 4 HP-018), and for an account with a name (`DemoAccounts.NameFor(<email>)`: demo1, "Demo One") `GET /profile` has that name as its first `h1` |
 | 6 | `demo history demo4@example.com` (slice 5) | `DemoHistoryService.DemoEmail` signs in with the demo password, `GET /goals` shows the 3 names of `DemoHistory.GoalNames`, the History card of "Reading, 20 min daily" contains "Met", "Failed", "Pending", "Due today", "12 min" and "Fell asleep early.", and the History card of "Yoga, 3 times a week" contains "Failed" and "Missed": 11 expected texts. Slice 6 adds 3: the stat labels "Consistency" and "Streak, commitments" among the stat labels of "Reading, 20 min daily"'s page, and "Due now" among the tile labels of `GET /`: 14 expected texts |
 | 7 | `demo report demo5@example.com` (slice 6) | `DemoReportService.DemoEmail` signs in with the demo password, `GET /goals` shows the 3 names of `DemoReport.GoalNames`, the page of "Strength training, 2 times a week" has the stat label "Streak, weeks", and `GET /` has "Missed this week" among its tile labels and "Missed" among its status chips: 6 expected texts |
+| 8 | `demo pause demo6@example.com` (slice 7) | `DemoPauseService.DemoEmail` signs in with the demo password, the page of "Meditation, 10 min daily", reached through its link on `GET /goals`, has "Excused" among its status chips, and `GET /goals?tab=paused` shows the goal "Drinking water, 8 glasses a day" with a meta text that starts "Paused until" in the same goal item: 3 expected texts |
 
 - Sign-in: `GET /sign-in`, read the antiforgery token and the `sign-in` handler, `POST /sign-in` with
   `Input.Email` and `Input.Password`, and expect a redirect that is not back to `/sign-in`.
@@ -86,6 +92,18 @@ with its own cookies on every call.
     (`PageReader.ReadStatusChips`: the text of every element with the class `ht-status`). On the Home only the
     Today rows carry status chips; GoalSummary and Recent notes have none.
   - Every expected text is matched whole and ordinally, as in checks 1 to 6.
+- Check 8 (slice 7 HP-011):
+  - The goal names come from `DemoPauses.GoalNames`, "Excused" from `ReportText.State`, and "Paused until" from
+    `ReportText.PausedUntil` without its date (`DateTexts.ShortDate`), so no text is typed in the tool and the check
+    holds whatever the hosted run date is.
+  - The page of "Meditation, 10 min daily" (position 1 in `DemoPauses.GoalNames`) is reached as checks 6 and 7 reach
+    their goal pages, from `GET /goals` (the Active tab, where the goal is listed). "Excused" must equal one of its
+    status chips' words (`PageReader.ReadStatusChips`); R − 2 is Excused on any weekday, so it lies in the History
+    card's first rows.
+  - On the Paused tab, `PageReader.ReadGoalMetas` pairs each `a.ht-goalitem__name` with the text of the first
+    `div.ht-goalitem__meta` after it and before the next goal item, without its chips (the Build or Reduce Tag and a
+    Pending StatusChip). "Drinking water, 8 glasses a day" must equal one of those names, and its own meta text must
+    start with "Paused until" (ordinal), so "Paused until" on another item does not count.
 - Timings, reported for SC-001 and never failing a check (one sample is not SC-001's 9 of 10):
   - `first`: the duration of the first request of check 1, from sending to the full response, whether it
     succeeded or not; when it did not succeed and a retry was needed, the line says `first <ms> ms (retried)`
@@ -95,12 +113,12 @@ with its own cookies on every call.
     every stylesheet and script the page links (`<link rel="stylesheet" href>`, `<script src>`), fetched one
     after another with that account's cookie, as a signed-in browser without a cache does (slice 1 research
     R-09: no-store, one security-stamp lookup per request). It does not include opening the interactive
-    circuit. Checks 6 and 7 do not measure it.
+    circuit. Checks 6, 7 and 8 do not measure it.
 
 ## Coverage rule
 
 All demo data is written through the demo data ports `IDemoDataStore` (ADR 0013, slice 2 research R-09),
-`IDemoHistoryStore` (slice 5, ADR 0018) and `IDemoReportStore` (slice 6, ADR 0021). Every data parameter of every method of each port (all parameters but
+`IDemoHistoryStore` (slice 5, ADR 0018), `IDemoReportStore` (slice 6, ADR 0021) and `IDemoPauseStore` (slice 7, ADR 0023). Every data parameter of every method of each port (all parameters but
 the `CancellationToken`) has an entry in the smoke check's public coverage map `SmokeCheckCoverage`, keyed by
 port, method name, parameter name and parameter type, with the check that verifies it:
 
@@ -120,8 +138,12 @@ port, method name, parameter name and parameter type, with the check that verifi
 | `IDemoReportStore` | `CreateDemoReportAccountAsync` | `password` | `string` | 7 demo report: the sign-in |
 | `IDemoReportStore` | `CreateDemoReportAccountAsync` | `profile` | `DemoAccountProfile` | 7 demo report: the sign-in |
 | `IDemoReportStore` | `CreateDemoReportAccountAsync` | `goals` | `IReadOnlyList<DemoHistoryGoal>` | 7 demo report: the goal names on Goals, the weeks streak label on a goal page, and a Missed result this week on the Home |
+| `IDemoPauseStore` | `CreateDemoPauseAccountAsync` | `email` | `Email` | 8 demo pause: the sign-in |
+| `IDemoPauseStore` | `CreateDemoPauseAccountAsync` | `password` | `string` | 8 demo pause: the sign-in |
+| `IDemoPauseStore` | `CreateDemoPauseAccountAsync` | `profile` | `DemoAccountProfile` | 8 demo pause: the sign-in |
+| `IDemoPauseStore` | `CreateDemoPauseAccountAsync` | `goals` | `IReadOnlyList<DemoPauseGoal>` | 8 demo pause: an Excused result on a goal page, and the paused goal with its Paused until meta on the Paused tab |
 
-That is 14 entries (10 until slice 5). A test (research R-11) reflects over every port and fails when a method or a data parameter has no entry, or an
+That is 18 entries (10 until slice 5, 14 until slice 6). A test (research R-11) reflects over every port and fails when a method or a data parameter has no entry, or an
 entry no longer matches a parameter of its port. A slice that adds demo data adds a method or a parameter to a
 port, adds a port, or changes a parameter's type, so its build of this test fails until it extends the check (a
 new port is also added to the test's list of ports). A slice that ships before this slice is implemented is
@@ -130,7 +152,7 @@ covered by the tasks gate instead (plan, Gates): the test does not exist yet the
 ## Output
 
 One line per check, in order. Every check runs, also after an earlier one failed (a failed `home` does not stop
-checks 2–7):
+checks 2–8):
 
 - a check with a list of expected names (`catalog`, `demo <email>`): `PASS <name> (<found> of <expected>)` or
   `FAIL <name>: <reason>`, where `<found>` counts the expected names present on the page, not the cards shown;
@@ -163,6 +185,17 @@ checks 2–7):
   - `GET / gave status <code>`, `0 of 1 tile labels on the Home shown`, or `0 of 1 status chips on the Home shown`.
 
   No goal name, note, figure, goal path, label read from a page or other page content is printed;
+- `demo pause demo6@example.com` (slice 7), in check 7's form: `PASS demo pause demo6@example.com (3 of 3)` when every
+  expected text is found, otherwise `FAIL demo pause demo6@example.com: <reason>`. Every page that can be reached is
+  still read; the reason is the first failing part's, in this order:
+  - `the sign-in was refused`;
+  - `GET /goals gave status <code>`, `no link for goal page 1`, `GET goal page 1 gave status <code>`, or
+    `0 of 1 status chips on goal page 1 shown`;
+  - `GET /goals?tab=paused gave status <code>`, `0 of 1 goal names on the Paused tab shown`, or
+    `0 of 1 paused goal metas on the Paused tab shown`.
+
+  No goal name, reason, note, figure, date, goal path, chip or meta text read from a page or other page content is
+  printed;
 - a check without a list (`home`, `https-redirect`, `administrator`): `PASS <name>` or `FAIL <name>: <reason>`;
 - check 2 with `--skip-http-redirect`: `SKIP https-redirect`;
 - a check that signs in and gets no response fails with `no response (<error>)` or `no response in time`.
@@ -198,7 +231,8 @@ starting a process:
   line, the timings and `Passed`);
 - `PageReader`, with `ReadGoalLinks(html)`, which returns `GoalLink` records (name, `href` or null), and
   `ReadCardText(html, title)` (slice 5); `ReadStatLabels(html)`, `ReadTileLabels(html)` and `ReadStatusChips(html)`
-  (slice 6), each the decoded texts of its leaf elements in document order;
+  (slice 6), each the decoded texts of its leaf elements in document order; `ReadGoalMetas(html)` (slice 7), which
+  returns `GoalMeta` records (the goal item's name, and its meta text without chips or null);
 - `SmokeCheckCoverage`, whose `Entries` are `CoverageEntry` records (port type, method, parameter, parameter
   type, check).
 

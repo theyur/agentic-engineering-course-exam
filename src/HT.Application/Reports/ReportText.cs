@@ -59,10 +59,23 @@ public static class ReportText
 
     /// <summary>
     /// The StatusChip's word (constitution I, research R-12): "Upcoming" for Upcoming, and slice 5's
-    /// <see cref="RecordingText.State"/> for every other state.
+    /// <see cref="RecordingText.State"/> for every other state, "Excused" and "Paused" included (slice 7 HP-006, HP-008).
     /// </summary>
     public static string State(EvaluationState state, GoalScheduleKind kind, SchedulePeriod? period) =>
         state == EvaluationState.Upcoming ? "Upcoming" : RecordingText.State(state, kind, period);
+
+    /// <summary>
+    /// Slice 7 (HP-001, HP-004, HP-008): the meta line and Notice text of a paused goal, "Paused until Sun 22 Nov", with
+    /// <paramref name="lastDay"/>, the last day of its current pause, as <see cref="DateTexts.ShortDate"/> gives it.
+    /// </summary>
+    public static string PausedUntil(DateOnly lastDay) => "Paused until " + DateTexts.ShortDate(lastDay);
+
+    /// <summary>Slice 7 (HP-004): the Goals page's footnote, worded as the spec gives it.</summary>
+    public const string GoalsFootnote =
+        "Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out.";
+
+    /// <summary>Slice 7 (HP-004): the Goals page's empty Paused tab.</summary>
+    public const string NoPausedGoals = "No paused goals.";
 
     /// <summary>
     /// The progress of a Due entry with a record in a meta line (HP-002, HP-003), followed by " today" for a commitment
@@ -153,16 +166,17 @@ public static class ReportText
         "Target " + Number(target) + (kind == TrendKind.Minutes ? " min" : string.Empty);
 
     /// <summary>
-    /// The ConsistencyStrip's accessible name (HP-006, <c>design/components/ConsistencyStrip.md</c>, "Slice 6 state"):
-    /// "Last 28 commitments: 24 met, 1 failed, 1 missed, 2 pending", the number of cells with the unit (singular for
-    /// exactly 1), then each state in the order met, failed, missed, pending, a state with 0 left out; "Last 0
-    /// commitments" with no cell.
+    /// The ConsistencyStrip's accessible name (HP-006, <c>design/components/ConsistencyStrip.md</c>, "Slice 6 state" and
+    /// "Slice 7 state"): "Last 17 commitments: 10 met, 1 missed, 1 excused, 3 paused, 2 pending", the number of cells
+    /// with the unit (singular for exactly 1), then each state in the order met, failed, missed, excused, paused,
+    /// pending, a state with 0 left out, so a strip without exempt results keeps slice 6's label; "Last 0 commitments"
+    /// with no cell.
     /// </summary>
     /// <exception cref="ArgumentException">A state that is not ended (Due or Upcoming), which has no cell.</exception>
     public static string StripLabel(IReadOnlyList<EvaluationState> strip, StreakUnit unit)
     {
         ArgumentNullException.ThrowIfNull(strip);
-        int met = 0, failed = 0, missed = 0, pending = 0;
+        int met = 0, failed = 0, missed = 0, excused = 0, paused = 0, pending = 0;
         foreach (var state in strip)
         {
             switch (state)
@@ -176,6 +190,12 @@ public static class ReportText
                 case EvaluationState.Missed:
                     missed++;
                     break;
+                case EvaluationState.Excused:
+                    excused++;
+                    break;
+                case EvaluationState.Paused:
+                    paused++;
+                    break;
                 case EvaluationState.Pending:
                     pending++;
                     break;
@@ -184,10 +204,12 @@ public static class ReportText
             }
         }
 
-        var parts = new List<string>(4);
+        var parts = new List<string>(6);
         AddCount(parts, met, "met");
         AddCount(parts, failed, "failed");
         AddCount(parts, missed, "missed");
+        AddCount(parts, excused, "excused");
+        AddCount(parts, paused, "paused");
         AddCount(parts, pending, "pending");
         var label = "Last " + Streak(strip.Count, unit);
         return parts.Count == 0 ? label : label + ": " + string.Join(", ", parts);
@@ -198,12 +220,26 @@ public static class ReportText
     /// lower-case first letter}; target {n}" ("Minutes per day, last 14 days; target 20"), then for each bar whose own
     /// target differs from the line's "; {date}: {value} of {target}" or "; {date}: no record of {target}", {date}
     /// being "Wed 4 Nov" for a commitment or a day and "week of 2 Nov" for a week.
+    /// <para>
+    /// Slice 7 (FR-016, HP-006; <c>design/components/TrendChart.md</c>, "Slice 7 state"): the marked bars are counted
+    /// after the target, "; {a} excused, {b} paused", a count of 0 left out, and nothing is added with no marked bar
+    /// ("Minutes per day, last 14 days; target 10; 1 excused, 3 paused"). Bars with no record are not counted, and a
+    /// marked bar is never listed among the bars whose own target differs.
+    /// </para>
     /// </summary>
     public static string TrendLabel(TrendView trend)
     {
         ArgumentNullException.ThrowIfNull(trend);
         var label = trend.Title + ", " + LowerFirst(trend.SubLine) + "; target " + Number(trend.Target);
-        foreach (var bar in trend.Bars.Where(bar => bar.Target != trend.Target))
+        var marks = new List<string>(2);
+        AddCount(marks, trend.Bars.Count(bar => bar.Mark == TrendMark.Excused), "excused");
+        AddCount(marks, trend.Bars.Count(bar => bar.Mark == TrendMark.Paused), "paused");
+        if (marks.Count > 0)
+        {
+            label += "; " + string.Join(", ", marks);
+        }
+
+        foreach (var bar in trend.Bars.Where(bar => bar.Mark is null && bar.Target != trend.Target))
         {
             var value = bar.Value is { } recorded ? Number(recorded) : "no record";
             label += "; " + BarDate(trend.Span, bar) + ": " + value + " of " + Number(bar.Target);
@@ -216,13 +252,20 @@ public static class ReportText
     /// A TrendChart bar's tooltip (<c>design/components/TrendChart.md</c>, "Target line, tooltips and accessible name"):
     /// "{date}: {value} of {target}", with " min" after the target when the bars are minutes ("Wed 4 Nov: 20 of 20
     /// min", "week of 2 Nov: 2 of 2"), or "{date}: no record" for a bar with no record; {date} is "Wed 4 Nov" for a
-    /// commitment or a day and "week of 2 Nov" for a week. The target is the bar's own.
+    /// commitment or a day and "week of 2 Nov" for a week. The target is the bar's own. Slice 7 (FR-016, HP-006): a marked
+    /// bar says its mark in place of a value, "{date}: Excused" or "{date}: Paused" ("Mon 9 Nov: Excused", "week of 21
+    /// Sep: Paused").
     /// </summary>
     public static string BarTitle(TrendView trend, TrendBar bar)
     {
         ArgumentNullException.ThrowIfNull(trend);
         ArgumentNullException.ThrowIfNull(bar);
         var date = BarDate(trend.Span, bar);
+        if (bar.Mark is { } mark)
+        {
+            return date + ": " + (mark == TrendMark.Excused ? "Excused" : "Paused");
+        }
+
         return bar.Value is { } value
             ? date + ": " + Number(value) + " of " + Number(bar.Target) + (trend.Kind == TrendKind.Minutes ? " min" : string.Empty)
             : date + ": no record";

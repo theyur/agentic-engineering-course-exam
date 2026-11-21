@@ -333,7 +333,7 @@ public sealed class RecordTests
         var result = await _world.RecordAsync(goal, Mon16, Minutes(12, new string('a', 501)));
 
         AssertRefused(result, RecordWriteOutcome.NoteTooLong, NoteTooLong);
-        Assert.Empty(_world.Records.Calls);
+        Assert.Equal([nameof(IRecordStore.ReadExemptionsAsync)], _world.Records.Calls);
     }
 
     [Fact]

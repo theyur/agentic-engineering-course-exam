@@ -19,7 +19,14 @@
    and names its row ("Add note for {date}", "Edit note of {date}").
    The card raises OnAction for a record and OnNote for a note; the page opens the RecordDialog or the NoteDialog and,
    when it closes, gives the focus back through FocusAsync or FocusNoteAsync. With no begun entry the card is not
-   rendered. *@
+   rendered.
+   Slice 7 (HP-001, FR-017; design/pages/PageGoalDetail, slice 7 state): an Excused row shows its reason after the
+   StatusChip (ht-muted, in an ht-inline group with it), keeps its note control, never has "Add record", and has the ghost
+   "Remove excusal" ("Remove excusal of {date}", no aria-haspopup, as it acts at once) as its last control while
+   CanRemoveExcusal. The card raises OnRemoveExcusal; the page removes the excusal, reads everything again and gives the
+   focus to FocusRecordOrNoteAsync. A refusal the page passes as Refusal shows under the card head with role="alert".
+   A Paused row (FR-009) has its StatusChip and its note control, never "Add record"; a commitment's record kept on it
+   keeps its "Edit", and a period's kept records stay their own buttons. *@
 @if (_rows.Count > 0)
 {
     <section class="ht-card">
@@ -28,6 +35,10 @@
             <span class="ht-spacer"></span>
             <p class="ht-card__sub">Corrections are evaluated with the rules of that date.</p>
         </div>
+        @if (Refusal is not null)
+        {
+            <p class="ht-field__error" role="alert">@Refusal</p>
+        }
         <DataTable Columns="Columns" Label="History">
             @foreach (var entry in ShownRows)
             {
@@ -58,7 +69,16 @@
                             </span>
                         }
                     </td>
-                    <td><StatusChip State="entry.State" ScheduleKind="History.GoalScheduleKind" Period="History.Period" /></td>
+                    <td>
+                        @if (entry.ExcusalReason is { } reason)
+                        {
+                            <span class="ht-inline"><StatusChip State="entry.State" ScheduleKind="History.GoalScheduleKind" Period="History.Period" /><span class="ht-muted">@reason</span></span>
+                        }
+                        else
+                        {
+                            <StatusChip State="entry.State" ScheduleKind="History.GoalScheduleKind" Period="History.Period" />
+                        }
+                    </td>
                     <td class="ht-muted">@(entry.Note ?? NoNote)</td>
                     <td class="ht-actions">
                         @* The note control comes first and the record control last, so the record control is always the
@@ -73,15 +93,27 @@
                                     @ref="_noteButtons[entry.FirstDate]"
                                     @onclick="() => OnNote.InvokeAsync(entry)">@(hasNote ? EditNote : AddNote)</button>
                         }
-                        @if (IsCommitment)
+                        @if (entry.State == EvaluationState.Excused)
                         {
+                            @* An Excused commitment never has a record (D-3) and takes none (FR-005): "Remove excusal" takes
+                               the place of the record control while its grace period is open (design, settled in T003). It
+                               acts at once, so it has no aria-haspopup. *@
+                            if (entry.CanRemoveExcusal)
+                            {
+                                <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-label="@(RemoveExcusal + " of " + date)"
+                                        @onclick="() => OnRemoveExcusal.InvokeAsync(entry)">@RemoveExcusal</button>
+                            }
+                        }
+                        else if (IsCommitment && HasRecordControl(entry))
+                        {
+                            @* A Paused commitment takes no new record (FR-009), so it keeps only the "Edit" of a record kept on it. *@
                             var record = entry.Records.Count == 0 ? null : entry.Records[0];
                             <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog"
                                     aria-label="@(record is null ? AddRecord + " for " + date : "Edit record of " + date)"
                                     @ref="_actionButtons[entry.FirstDate]"
                                     @onclick="() => OnAction.InvokeAsync(new RowAction(entry, record))">@(record is null ? AddRecord : "Edit")</button>
                         }
-                        else if (TakesRecord(entry))
+                        else if (!IsCommitment && HasRecordControl(entry))
                         {
                             <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog" aria-label="@(AddRecord + " for " + date)"
                                     @ref="_actionButtons[entry.FirstDate]"
@@ -114,6 +146,8 @@
 
     private const string EditNote = "Edit note";
 
+    private const string RemoveExcusal = "Remove excusal";
+
     private static readonly IReadOnlyList<string> Columns = ["Date", "Recorded", "Result", "Note", string.Empty];
 
     private readonly Dictionary<DateOnly, ElementReference> _actionButtons = [];
@@ -133,6 +167,20 @@
     /// <summary>The "Add note" or "Edit note" of a row without a record was chosen: the row whose note the NoteDialog opens for.</summary>
     [Parameter]
     public EventCallback<HistoryEntry> OnNote { get; set; }
+
+    /// <summary>
+    /// The "Remove excusal" of an Excused row was chosen (slice 7 HP-001, FR-004): the row whose excusal the page removes
+    /// through <c>RemoveExcusalAsync</c>, then reads everything again.
+    /// </summary>
+    [Parameter]
+    public EventCallback<HistoryEntry> OnRemoveExcusal { get; set; }
+
+    /// <summary>
+    /// A refusal of "Remove excusal" ("This excusal can no longer be removed."), shown under the card head as an alert;
+    /// null for none (design/pages/PageGoalDetail, slice 7 state).
+    /// </summary>
+    [Parameter]
+    public string? Refusal { get; set; }
 
     /// <summary>Whether the card is rendered for <paramref name="history"/>: it has at least one begun entry.</summary>
     public static bool HasRows(GoalHistory? history) => history is not null && RowsOf(history).Any();
@@ -154,10 +202,19 @@
             return recordButton.FocusAsync();
         }
 
-        return (IsCommitment || TakesRecord(entry)) && _actionButtons.TryGetValue(row, out var action)
+        return HasRecordControl(entry) && _actionButtons.TryGetValue(row, out var action)
             ? action.FocusAsync()
             : ValueTask.CompletedTask;
     }
+
+    /// <summary>
+    /// After "Remove excusal" of <paramref name="row"/> and the page's re-read: the focus goes to the row's "Add record",
+    /// or, when the row has none (a pause covers it), to its note control (design/pages/PageGoalDetail, slice 7 state).
+    /// </summary>
+    public ValueTask FocusRecordOrNoteAsync(DateOnly row) =>
+        ShownRows.FirstOrDefault(entry => entry.FirstDate == row) is { } shown && HasRecordControl(shown)
+            ? FocusAsync(row, null)
+            : FocusNoteAsync(row);
 
     /// <summary>
     /// Gives the focus back to the note control of <paramref name="row"/>, as the card shows it now ("Add note" or "Edit
@@ -178,6 +235,19 @@
 
     /// <summary>A period takes another record while it has fewer than 50 (HP-001, FR-005).</summary>
     private static bool TakesRecord(HistoryEntry entry) => entry.Records.Count < RecordLimits.MaxRecordsPerPeriod;
+
+    /// <summary>
+    /// Whether the row has a record control ("Add record" or "Edit"): not an Excused row, which takes no record (slice 7
+    /// FR-005); on a Paused row only the "Edit" of a commitment's kept record, as a Paused commitment or period takes no
+    /// new record and a period's kept records stay their own buttons (slice 7 FR-009); otherwise a commitment always, a
+    /// period while it takes another record.
+    /// </summary>
+    private bool HasRecordControl(HistoryEntry entry) => entry.State switch
+    {
+        EvaluationState.Excused => false,
+        EvaluationState.Paused => IsCommitment && entry.Records.Count > 0,
+        _ => IsCommitment || TakesRecord(entry),
+    };
 
     /// <summary>
     /// Only a row without a record changes its note on its own; a row with a record changes it in the RecordDialog

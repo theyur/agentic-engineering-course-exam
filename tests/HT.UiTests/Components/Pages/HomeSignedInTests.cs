@@ -1,6 +1,7 @@
 using Bunit;
 using Bunit.TestDoubles;
 using HT.Application.Accounts;
+using HT.Application.Exemptions;
 using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Domain.Accounts;
@@ -217,6 +218,51 @@ public sealed class HomeSignedInTests : BunitContext
         var note = right.QuerySelector(".ht-card:last-child .ht-goal")!;
         Assert.Equal("\"Easy start.\"", note.FirstChild!.TextContent);
         Assert.Equal("Hs Reading, once a day · Tue 17 Nov", note.QuerySelector(".ht-goal__meta")!.TextContent);
+    }
+
+    /// <summary>Pauses <paramref name="goal"/> through the PauseService at 10:00 on Tuesday 17, from that day until Sunday 22 November.</summary>
+    private async Task PauseAsync(Guid accountId, GoalId goal)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var paused = await scope.ServiceProvider.GetRequiredService<PauseService>().PauseAsync(
+            ActingUser.ForAccount(new AccountId(accountId), Role.RegisteredUser), goal, new DateOnly(2026, 11, 17), new DateOnly(2026, 11, 22),
+            null, CancellationToken.None);
+        Assert.Equal(PauseOutcome.Paused, paused.Outcome);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_005_a_paused_goal_is_missing_from_the_Active_goals_card_and_the_tile_counts_1()
+    {
+        var accountId = _authorization.SignIn("RegisteredUser");
+        var active = await CreateGoalAsync(accountId);
+        var paused = await CreateGoalAsync(accountId);
+        await PauseAsync(accountId, paused);
+
+        var cut = Render<Home>();
+
+        Assert.Equal(["1", "0", "0", "1"], cut.FindAll(".ht-home__panel .ht-tile__value").Select(v => v.TextContent));
+        Assert.Equal("Active goals", cut.FindAll(".ht-home__panel .ht-tile__label")[3].TextContent);
+        var card = cut.Find(".ht-home > .ht-stack > .ht-card");
+        Assert.Equal("Active goals", card.QuerySelector(".ht-card__title")!.TextContent);
+        Assert.Equal([$"/goals/{active.Value}"], card.QuerySelectorAll("a.ht-goal__name").Select(a => a.GetAttribute("href")));
+        Assert.DoesNotContain($"/goals/{paused.Value}", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_005_a_user_whose_goals_are_all_paused_keeps_the_dashboard_with_0_active_goals()
+    {
+        var accountId = _authorization.SignIn("RegisteredUser");
+        var paused = await CreateGoalAsync(accountId);
+        await PauseAsync(accountId, paused);
+
+        var cut = Render<Home>();
+
+        Assert.Equal(["ht-page-head", "ht-home"], cut.Find(".ht-container").Children.Select(c => c.ClassName));
+        Assert.Equal(["0", "0", "0", "0"], cut.FindAll(".ht-home__panel .ht-tile__value").Select(v => v.TextContent));
+        var card = cut.Find(".ht-home > .ht-stack > .ht-card");
+        Assert.Empty(card.QuerySelectorAll(".ht-goal"));
+        Assert.Equal("All goals →", card.QuerySelector("a.ht-card__link")!.TextContent);
+        Assert.DoesNotContain("No goals yet", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]

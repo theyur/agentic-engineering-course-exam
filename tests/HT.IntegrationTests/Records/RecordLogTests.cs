@@ -4,6 +4,7 @@ using HT.Application;
 using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Domain.Accounts;
+using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
@@ -616,5 +617,36 @@ public sealed class RecordLogTests(DatabaseFixture database)
 
         public Task<IReadOnlyList<DateOnly>> ReadRecentNoteKeysAsync(AccountId owner, GoalId goal, int count, CancellationToken cancellationToken) =>
             inner.ReadRecentNoteKeysAsync(owner, goal, count, cancellationToken);
+
+        public Task<GoalExemptions> ReadExemptionsAsync(AccountId owner, GoalId goal, CancellationToken cancellationToken) =>
+            inner.ReadExemptionsAsync(owner, goal, cancellationToken);
+
+        public Task<ExemptionStoreWrite> ExcuseAsync(
+            AccountId owner, GoalId goal, DateOnly date, ExemptionReason? reason, CancellationToken cancellationToken) =>
+            faults.Member == nameof(ExcuseAsync)
+                ? Task.FromResult(ExemptionStoreWrite.PauseNotFound)
+                : inner.ExcuseAsync(owner, goal, date, reason, cancellationToken);
+
+        public Task<ExemptionStoreWrite> RemoveExcusalAsync(AccountId owner, GoalId goal, DateOnly date, CancellationToken cancellationToken) =>
+            faults.Member == nameof(RemoveExcusalAsync)
+                ? Task.FromResult(ExemptionStoreWrite.PauseNotFound)
+                : inner.RemoveExcusalAsync(owner, goal, date, cancellationToken);
+
+        public Task<ExemptionStoreWrite> AddPauseAsync(
+            AccountId owner, GoalId goal, DateOnly firstDay, DateOnly lastDay, ExemptionReason? reason, CancellationToken cancellationToken) =>
+            faults.Member == nameof(AddPauseAsync)
+                ? Task.FromResult(ExemptionStoreWrite.NotExcused)
+                : inner.AddPauseAsync(owner, goal, firstDay, lastDay, reason, cancellationToken);
+
+        public Task<ExemptionStoreWrite> SetPauseLastDayAsync(
+            AccountId owner, GoalId goal, PauseId pause, DateOnly lastDay, CancellationToken cancellationToken) =>
+            faults.Member == nameof(SetPauseLastDayAsync)
+                ? Task.FromResult(ExemptionStoreWrite.NotExcused)
+                : inner.SetPauseLastDayAsync(owner, goal, pause, lastDay, cancellationToken);
+
+        public Task<ExemptionStoreWrite> DeletePauseAsync(AccountId owner, GoalId goal, PauseId pause, CancellationToken cancellationToken) =>
+            faults.Member == nameof(DeletePauseAsync)
+                ? Task.FromResult(ExemptionStoreWrite.NotExcused)
+                : inner.DeletePauseAsync(owner, goal, pause, cancellationToken);
     }
 }

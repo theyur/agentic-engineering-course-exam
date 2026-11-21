@@ -1,4 +1,5 @@
 using HT.Domain.Accounts;
+using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
@@ -14,7 +15,7 @@ namespace HT.Persistence;
 
 /// <summary>
 /// Identity's user tables (no role tables, research R-02), the habit tables of slice 2, the goal tables of slice 4 and
-/// the record and note tables of slice 5.
+/// the record and note tables of slice 5 and the excusal and pause tables of slice 7.
 /// </summary>
 internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
     : IdentityUserContext<HtUser, Guid>(options)
@@ -38,6 +39,10 @@ internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
     public DbSet<GoalRecordRow> GoalRecords => Set<GoalRecordRow>();
 
     public DbSet<GoalNoteRow> GoalNotes => Set<GoalNoteRow>();
+
+    public DbSet<GoalExcusalRow> GoalExcusals => Set<GoalExcusalRow>();
+
+    public DbSet<GoalPauseRow> GoalPauses => Set<GoalPauseRow>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -176,6 +181,29 @@ internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
             note.HasOne<GoalRow>().WithMany().HasForeignKey(n => n.GoalId).OnDelete(DeleteBehavior.Cascade);
             note.Property(n => n.EntryDate).HasColumnType("date");
             note.Property(n => n.Text).HasMaxLength(RecordLimits.MaxNoteLength).IsRequired();
+        });
+
+        // Slice 7 (data-model.md "Tables", research R-04): dates and reasons only, no column for a time or a state
+        // (FR-025); no check constraints, the store re-checks under the goal lock.
+        builder.Entity<GoalExcusalRow>(excusal =>
+        {
+            excusal.ToTable("GoalExcusals");
+            excusal.HasKey(e => new { e.GoalId, e.Date });
+            excusal.HasOne<GoalRow>().WithMany().HasForeignKey(e => e.GoalId).OnDelete(DeleteBehavior.Cascade);
+            excusal.Property(e => e.Date).HasColumnType("date");
+            excusal.Property(e => e.Reason).HasMaxLength(ExemptionLimits.MaxReasonLength);
+        });
+
+        builder.Entity<GoalPauseRow>(pause =>
+        {
+            pause.ToTable("GoalPauses");
+            pause.HasKey(p => p.Id);
+            pause.Property(p => p.Id).ValueGeneratedNever();
+            pause.HasOne<GoalRow>().WithMany().HasForeignKey(p => p.GoalId).OnDelete(DeleteBehavior.Cascade);
+            pause.HasIndex(p => new { p.GoalId, p.FirstDay }).HasDatabaseName("IX_GoalPauses_GoalId_FirstDay");
+            pause.Property(p => p.FirstDay).HasColumnType("date");
+            pause.Property(p => p.LastDay).HasColumnType("date");
+            pause.Property(p => p.Reason).HasMaxLength(ExemptionLimits.MaxReasonLength);
         });
     }
 }

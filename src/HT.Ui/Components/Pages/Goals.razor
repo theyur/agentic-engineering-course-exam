@@ -1,6 +1,7 @@
 @page "/goals"
 @attribute [Authorize]
 @using HT.Application.Goals
+@using HT.Application.Reports
 @using HT.Ui.Account
 @using HT.Ui.Components.Goals
 @using HT.Ui.Components.Reports
@@ -8,12 +9,13 @@
 @inject GoalService GoalService
 @inject ActingUserAccessor ActingUsers
 @inject NavigationManager Navigation
-@* design/pages/PageGoals, slice 6 state (HP-002, contracts/host.md "Goals page"): the static shell. "Goals" with no
-   Tabs (Paused and Ended come in slices 7 and 8); for a user with goals, the GoalsList island, interactive and
-   prerendered, which reads the goals overview itself and lists the full GoalItems in its order (FR-011), then the
-   static footnote; for a user with no goals, slice 4's EmptyState with no footnote. The shell reads slice 4's goal list
-   only to tell these apart. An administrator gets the Not found page; the use case refuses on its own (FR-021). An
-   anonymous request never gets here: the endpoint's [Authorize] sends it to Sign in. *@
+@* design/pages/PageGoals, slice 7 state (HP-004, contracts/host.md "Goals page"): the static shell. "Goals"; for a user
+   with goals, the GoalsList island, interactive and prerendered, which reads the goals overview itself and shows the
+   Tabs "Active" and "Paused" with their lists (FR-011, FR-018); the shell passes it only the address's tab value
+   (?tab=paused), never a view (slice 6 research R-12). Then the static footnote (ReportText.GoalsFootnote), under
+   either tab. For a user with no goals, slice 4's EmptyState in place of the tabs, with no footnote. The shell reads
+   slice 4's goal list only to tell these apart. An administrator gets the Not found page; the use case refuses on its
+   own (FR-021). An anonymous request never gets here: the endpoint's [Authorize] sends it to Sign in. *@
 <PageTitle>Goals · Habit Tracker</PageTitle>
 
 @if (_result is { } result)
@@ -26,14 +28,18 @@
         }
         else
         {
-            <GoalsList />
-            <p class="ht-footnote">Each goal is counted on its own. Consistency counts only finalized results; pending ones are left out.</p>
+            <GoalsList Tab="@Tab" />
+            <p class="ht-footnote">@ReportText.GoalsFootnote</p>
         }
     </div>
 }
 
 @code {
     private GoalListResult? _result;
+
+    /// <summary>The selected tab from the address: "paused" for the Paused tab; any other value, or none, is Active.</summary>
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string? Tab { get; set; }
 
     protected override async Task OnInitializedAsync()
     {

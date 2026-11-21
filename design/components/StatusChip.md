@@ -56,3 +56,23 @@ The last part of the preview shows the chips slice 6 uses (HP-002, HP-003, const
 - Only the Home's Today list shows Upcoming; the goal page and the Goals page list only what has begun.
 - Excused and Paused come with slice 7.
 - The word comes from `ReportText.State` ("Upcoming" for Upcoming, slice 5's word for every other state). No new class.
+
+## Slice 7 state
+
+The last part of the preview shows the chips slice 7 uses (HP-001, HP-006, constitution I, ADR 0008): on the goal page's History and Recent notes cards, the Goals page's Pending chip and the Home's Today rows.
+
+| State | Text | Classes |
+|---|---|---|
+| Met | Met | `ht-chip ht-status ht-status--met` |
+| Failed | Failed | `ht-chip ht-status ht-status--failed` |
+| Missed | Missed | `ht-chip ht-status ht-status--missed` |
+| Excused | Excused | `ht-chip ht-status ht-status--excused` |
+| Paused | Paused | `ht-chip ht-status ht-status--paused` |
+| Pending | Pending | `ht-chip ht-status ht-status--pending` |
+| Due, a commitment or a per-day period | Due today | `ht-chip ht-status ht-status--due` |
+| Due, a per-week period | Due this week | `ht-chip ht-status ht-status--due` |
+| Upcoming | Upcoming | `ht-chip ht-status ht-status--due` |
+
+- Excused and Paused are exemptions in place of an evaluation state (`CONTEXT.md` Evaluation state), shown with the same chip and always with their word: the Excused chip has a dashed border, the Paused chip a grey fill, so neither relies on colour alone.
+- Where they appear: the goal page's History rows and Recent notes items (FR-017, FR-020). The Home's Today rows and the Goals page's items never show them, because an Excused or Paused entry is not listed as Due, Pending or Missed (FR-019); the Goals page shows only the Pending chip, and a paused goal says "Paused until …" in its meta line (`components/GoalListItem.md`, "Slice 7 state").
+- The word comes from `ReportText.State`, which takes slice 5's word from `RecordingText.State` ("Excused", "Paused"; HP-008). No new class: both classes are in the full design.

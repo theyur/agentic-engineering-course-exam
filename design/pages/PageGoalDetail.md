@@ -97,3 +97,39 @@ The last part of the preview shows the page as slice 6 builds it (HP-001, US1-AS
 - A goal with no begun entry (not started yet, or a per-week goal's days before its first week) keeps the slice 5 page without these two cards: no "Record", no History, no Recent notes, no GoalStats and no TrendChart (the last example of the "Slice 5 state").
 - No Excused or Paused cell, no paused bar, no Pauses card, no earlier attempts, no Edit settings, Pause or End goal (slices 7 and 8).
 - The full preview's trend title "Days done per week" (a commitment-based yes/no goal) replaces "Sessions per week", as the TrendChart's title table gives it.
+
+## Slice 7 state
+
+The last part of the preview shows the page as slice 7 builds it (HP-001, US1, US2-AS14, US3-AS8, contracts/host.md "Goal page", ADR 0008). Three examples: "Meditation, 10 min daily" (spec US3) on Thu 19 Nov 2026, 12:00, not paused, with an upcoming and a past pause; the History card of "Yoga, 3 days a week" (spec US1) on Fri 13 Nov 2026, 07:00, with two Excused rows; and "Drinking water, 8 glasses a day" (specs US2 and US4) on Mon 16 Nov 2026, 10:00, paused from that day, with a record kept on the paused day.
+
+Changed 2026-11-21 in the full preview, whose texts disagreed with the spec: the Pauses card listed its pauses oldest first as "10 – 16 Aug" and "21 Sep – 4 Oct", each with a "Paused" StatusChip; it now lists them latest first as "Mon 21 Sep – Sun 4 Oct" and "Mon 10 Aug – Sun 16 Aug", with no chip (FR-012, HP-001; a StatusChip is for evaluation states, `components/StatusChip.md`).
+
+- Everything of slice 6 stays: the page head with "Record", the GoalStats, TrendChart, History, Settings and Recent notes cards (the "Slice 6 state" above). The additions:
+- **Page head**: the secondary action "Pause" (`ht-btn--secondary`, `aria-haspopup="dialog"`), before "Record", both in an `ht-inline` group after `ht-spacer`. It opens the PauseDialog (`components/PauseDialog.md`, "Slice 7 state"). It is absent while the goal is paused (a pause is current). "Record" keeps slice 5's rule: a paused goal can still have Pending entries from before its pause.
+- **Notice**, directly under the page head, while the goal is paused: `ht-notice` (the invitation style, which may hold one button) with "Paused until Sun 22 Nov" (`ReportText.PausedUntil`), a separator "·" (`aria-hidden="true"`) and the button "Resume now" (`ht-btn--primary ht-btn--sm`), which resumes the goal (FR-010). A refusal ("This goal is not paused.") is shown in the Notice's place, as an `ht-field__error` paragraph with `role="alert"` directly under the page head (settled here, T064). While the goal is paused and something can still be recorded, the head keeps slice 5's markup, `ht-spacer` then "Record" alone; with "Pause" shown, both buttons sit in the `ht-inline` group (settled here, T064). After "Resume now" (Notice or Pauses card) or "Cancel pause", and after their refusals, the page reads everything again and the focus goes to "Pause", or, while a pause is still current, to the Notice's "Resume now" (settled here, T064). When the goal also has slice 4's Notice "This habit is no longer in the public catalog. Your goal keeps working.", the paused Notice comes first and the catalog Notice second (settled here, T003; `css/ht-components.css` spaces the second one).
+- **Pauses card**, in the right column after Settings (before Recent notes); absent when the goal has no pause:
+  - the title "Pauses" (`h2.ht-card__title`);
+  - one `ht-goal` item per pause (FR-012), the latest first day first: on its top line (`ht-goal__top`) the range "Mon 16 Nov – Sun 22 Nov" (`PauseView.RangeText`, `ht-goal__name`), then `ht-spacer` and its action; under it, when it has one, the reason (`ht-goal__meta ht-muted`, "Family visit.");
+  - the action: "Resume now" on the current pause, "Cancel pause" on an upcoming one (FR-011), none on a past one. Both are ghost `ht-btn--sm` buttons without `aria-haspopup` (they act at once), with the accessible names "Resume now, {range}" and "Cancel pause, {range}" ("Cancel pause, Mon 23 Nov – Sun 29 Nov"; settled here, T003). No timing word or chip: the action tells a current or upcoming pause from a past one;
+  - a refusal of "Resume now" or "Cancel pause" shows as an `ht-field__error` paragraph with `role="alert"` under the card title (settled here, T003).
+- **History card**, the rows of slice 5 and 6, with:
+  - the Result cell: the StatusChips "Excused" and "Paused" (`components/StatusChip.md`, "Slice 7 state"); an Excused row shows its reason after the chip (`span.ht-muted` in an `ht-inline` group with the chip: "Excused  Ill"); with no reason, the chip alone;
+  - the actions column (`td.ht-actions`), in this order:
+
+    | Row | Controls |
+    |---|---|
+    | an Excused commitment whose grace period is open | "Add note" (no note) or "Edit note" (a note), then "Remove excusal" |
+    | an Excused commitment whose grace period has ended | "Add note" or "Edit note" |
+    | a Paused commitment or period without a record | "Add note" or "Edit note" |
+    | a Paused commitment with a record | "Edit" (it opens that one record) |
+    | a Paused period with records | none: each record stays its own button in the Recorded cell, which opens it in the RecordDialog |
+
+    No "Add record" on an Excused or Paused row (FR-005). An Excused commitment never has a record (D-3). A record kept on a Paused row keeps its edit control (FR-009), and its note is changed in the RecordDialog, as on any row with a record (slice 5). "Remove excusal" takes the place of the record control, as the rightmost control (settled here, T003).
+  - "Remove excusal" is a ghost `ht-btn--sm` button without `aria-haspopup`: it removes the excusal at once (FR-004), and the page reads everything again. Its accessible name is "Remove excusal of {date}" ("Remove excusal of Wed 11 Nov"). After it, the focus goes to the row's "Add record", or, when the row has none (a pause covers it), to its note control (settled here, T003). A refusal ("This excusal can no longer be removed.") shows as an `ht-field__error` paragraph with `role="alert"` under the card head.
+  - The Note cell, the dates and the other rows are slice 5's. The preview's first example shows Paused commitments without a record (Fri 13 to Sun 15 Nov, "Add note" only); its Excused Mon 9 Nov is the eleventh row, behind "Show all 18 →". The second shows Excused rows with and without a reason and with and without a note. The third shows a Paused day with a kept record ("8 glasses", no action) and the Pending days before the pause.
+- **GoalStats**: the strip's Excused and Paused cells and the legend Met, Failed, Missed, Excused, Paused, Pending (`components/GoalStats.md`, "Slice 7 state"); the figures leave both out ("90% (10 of 11)", streak 2, longest 8).
+- **TrendChart**: marked bars (`components/TrendChart.md`, "Slice 7 state"): Mon 9 Nov Excused, Fri 13 to Sun 15 Nov Paused, with "{date}: Excused" or "{date}: Paused" titles and "; 1 excused, 3 paused" in the chart's `aria-label`.
+- **Recent notes**: unchanged; a note of an Excused or Paused commitment or period carries the "Excused" or "Paused" chip (FR-020).
+- After any write in a dialog or card (pause, resume, cancel a pause, excuse, remove an excusal, record, note), the page reads everything again, so the Notice, the head's "Pause", the cards and the figures agree.
+- Still no Edit settings, End goal or earlier attempts (slice 8). A goal with no begun entry keeps the slice 5 page, now with "Pause" in its head (a goal that has not started can be paused from the account's today, FR-006) and the Pauses card when it has a pause (settled here, T003).
+- Every text comes from `ReportText`, `ExcusalTexts` and `PauseTexts` (HP-008); the page builds none.

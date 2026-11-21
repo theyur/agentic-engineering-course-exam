@@ -57,7 +57,7 @@ Every page follows layout A: TopNav, a page head, content centered at `container
 ## Dialogs (on Today and Goal detail)
 - RecordDialog: "For" (every Due and every Pending commitment or period), the measure field (Yes/No, count Stepper, minutes Stepper with progress), optional note, Save record / Cancel, "Excuse instead" for commitment-based goals.
 - NoteDialog: a private note on one date; it does not change the result.
-- Excuse, Pause and End goal use the same Dialog and explain the effect before the confirm button.
+- Excuse, Pause and End goal use the same Dialog and explain the effect before the confirm button. The Excuse dialog has its own guide, `components/ExcuseDialog` (slice 7).
 
 ## Goals (`PageGoals`)
 1. `heading-1` "Goals" (New goal stays in the TopNav).
@@ -172,3 +172,24 @@ What slice 6 builds of the pages above, on top of slices 1, 2, 4 and 5. A page s
 - Home, visitor (`PageHomeVisitor`): the hero gains the GoalStats card labelled "Example goal" ("Yoga, 3 days a week", "90% (18 of 20)", streak 6 and longest 11 commitments, a strip of 21 fixed results with its legend). Its figures are fixed examples that belong to no account; it shows with or without Published habits. The rest is slice 2's.
 - StatusChip (`components/StatusChip`): slice 5's chips plus "Upcoming" (`ht-status--due`) on the Home's Upcoming rows.
 - The other pages and dialogs: unchanged in slice 6.
+
+## Slice 7 (excusals and pauses)
+
+What slice 7 builds of the pages and dialogs above, on top of slices 1, 2 and 4 to 6. A page shows only the sections and links whose slice has shipped (ADR 0008); the full previews stay as they are, and each preview's "Slice 7 state" block shows the built state. Texts that disagreed with the spec were replaced in the full previews too: the RecordDialog's "Excuse instead" is confirmed (no longer provisional) and offered only while the commitment is Due or Pending with no record (D-2, D-3); the PauseDialog's title, effect and Notice example follow HP-002 ("Pause · {goal name}", "Paused days are not counted. Your streak stays as it is. Final results do not change.", no sub line, help or placeholder); the Dialog preview's Excuse content follows HP-003 ("Excuse · {goal name}", "Excuse commitment"); the goal page's Pauses card lists its pauses latest first as "Mon 21 Sep – Sun 4 Oct", with no StatusChip. In every slice-7 state the words "Excused" and "Paused" are StatusChip words, and the strip's legend lists Met, Failed, Missed, Excused, Paused, Pending.
+
+- Goal page (`PageGoalDetail`, `/goals/{id}`): slice 6's page, with:
+  1. the secondary "Pause" before "Record" in the page head (absent while the goal is paused), which opens the PauseDialog;
+  2. under the head, while the goal is paused, the Notice "Paused until Sun 22 Nov · Resume now", "Resume now" a button;
+  3. in the right column after Settings, the "Pauses" card: each pause as "Mon 16 Nov – Sun 22 Nov", latest first, its reason in `ht-muted`, "Resume now" on the current pause, "Cancel pause" on an upcoming one, nothing on a past one; absent with no pause;
+  4. in the History card, the StatusChips "Excused" (with its reason after the chip, and the ghost "Remove excusal" while its grace period is open) and "Paused"; neither row has "Add record"; a record kept on a Paused row keeps its edit control; both keep their note actions;
+  5. in the GoalStats card, Excused and Paused cells and the six-entry legend; in the TrendChart, the dashed Paused and Excused bars, told apart in their `title` and in the chart's `aria-label`.
+
+  Still no Edit settings, End goal or earlier attempts.
+- Goals (`PageGoals`, `/goals`): the link Tabs "Active" (`/goals`) and "Paused" (`/goals?tab=paused`), no "Ended" and no counts. Active lists the goals that are not paused, as slice 6 does. Paused lists the paused goals in the same order, each with the meta "Paused until Sun 22 Nov", the Pending StatusChip when it has a Pending result, its figures and mini strip, and the secondary "Resume"; an empty Paused tab says "No paused goals.". The footnote reads "Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out.". No goals: slice 4's EmptyState in place of the tabs.
+- Home, signed in (`PageHomeSignedIn`): the ghost "Excuse" after "Record" on Pending rows of commitment-based goals with no record, which opens the Excuse dialog; the "Active goals" tile and card count and list only goals that are not paused. Excused and Paused entries are not rows and are not counted in the tiles. Nothing else changes.
+- Home, visitor (`PageHomeVisitor`): the example GoalStats card's legend lists the six entries, through the shared component; its strip, figures and label are slice 6's.
+- PauseDialog (`components/PauseDialog`): the title "Pause · {goal name}"; the effect first; "From" (the page's current date by default, `min` today), "Until" (required) and "Reason (optional)"; "Pause goal" and "Cancel"; one refusal at a time under its field: "Choose the first and the last day." (the empty field), "A pause cannot start before today." ("From"), "The last day cannot be before the first day." and "This goal already has a pause on these dates." ("Until"), "Keep the reason to 200 characters or fewer." ("Reason").
+- Excuse dialog (`components/ExcuseDialog`, new, a guide of its own; `Dialog.md` links to it): the title "Excuse · {goal name}"; the sub line with the date and state ("Wed 11 Nov · Pending, 22 h left", "Today, Fri 13 Nov"); the effect "An excused commitment is not counted. Your streak stays as it is."; "Reason (optional)"; "Excuse commitment" and "Cancel"; a refusal of the reason under the field, any other above it. It opens from the Home's "Excuse" and the RecordDialog's "Excuse instead".
+- RecordDialog (`components/RecordDialog`): "For" lists no Excused or Paused entry; the ghost "Excuse instead", pushed right, shows only for a commitment-based goal whose selected "For" entry is Due or Pending with no record, and opens the Excuse dialog in the RecordDialog's place.
+- StatusChip, ConsistencyStrip, GoalStats, GoalListItem, CommitmentRow and TrendChart (`components/`): each has a "Slice 7 state" block: the chips "Excused" (`ht-status--excused`) and "Paused" (`ht-status--paused`); the cells `ht-cell--excused` and `ht-cell--paused` with their shapes and the strip label that counts them ("Last 17 commitments: 10 met, 1 missed, 1 excused, 3 paused, 2 pending"); the item's Paused form; the row's "Excuse"; the marked bars and the new `ht-bar--excused` class in `css/ht-components.css`.
+- The other pages and dialogs: unchanged in slice 7.

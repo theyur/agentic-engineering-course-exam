@@ -110,12 +110,21 @@ public sealed class UiDependencyTests
     }
 
     [Fact]
+    public void NoUiTypeMayDependOnTheDemoPauseStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IDemoPauseStore)))
+            .Because("the port writes private demo records, notes, excusals and pauses without an acting user; the host reaches it only through DemoPauseService (ADR 0010, ADR 0013, ADR 0023, slice 7 research R-08)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
     public void OnlyTheHostsOperatorTypesMayDependOnTheOperatorServices()
     {
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
             .And().DoNotResideInNamespaceMatching(@"^HT\.Ui\.Operator(\..*)?$")
-            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService), typeof(DemoDataService), typeof(DemoHistoryService), typeof(DemoReportService)))
-            .Because("no page offers administrator creation, demo loading, demo history loading or demo report loading; only the startup tasks run them (FR-014, FR-016, research R-13, slice 5 research R-13, slice 6 research R-14)")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService), typeof(DemoDataService), typeof(DemoHistoryService), typeof(DemoReportService), typeof(DemoPauseService)))
+            .Because("no page offers administrator creation, demo loading, demo history loading, demo report loading or demo pause loading; only the startup tasks run them (FR-014, FR-016, research R-13, slice 5 research R-13, slice 6 research R-14, slice 7 research R-08)")
             .Check(ArchitectureModel.Architecture);
     }
 }

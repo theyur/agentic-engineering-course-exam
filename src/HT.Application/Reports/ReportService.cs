@@ -31,6 +31,9 @@ public sealed class ReportService
     private static readonly EvaluationState[] EndedStates =
         [EvaluationState.Met, EvaluationState.Failed, EvaluationState.Missed, EvaluationState.Pending];
 
+    /// <summary>Slice 7's exempt states, counted in <see cref="RecentResults.Counts"/> only when above 0 (FR-015, FR-023).</summary>
+    private static readonly EvaluationState[] ExemptStates = [EvaluationState.Excused, EvaluationState.Paused];
+
     private readonly IGoalStore _goals;
     private readonly IRecordStore _records;
     private readonly IAccountStore _accounts;
@@ -105,10 +108,11 @@ public sealed class ReportService
             evaluated.Add((goal, await GoalEvaluation.OfAsync(_records, access.Owner, goal, now, cancellationToken).ConfigureAwait(false)));
         }
 
+        var today = ZoneOf(access.Account!).DateAt(now);
         var goals = GoalOrder.Of(evaluated, pair => pair.Evaluation)
-            .Select(pair => OverviewGoalOf(pair.Stored, pair.Evaluation))
+            .Select(pair => OverviewGoalOf(pair.Stored, pair.Evaluation, today))
             .ToList();
-        return GoalsOverviewResult.Found(new GoalsOverview { Goals = goals, Today = ZoneOf(access.Account!).DateAt(now), ReadAt = now });
+        return GoalsOverviewResult.Found(new GoalsOverview { Goals = goals, Today = today, ReadAt = now });
     }
 
     /// <summary>
@@ -184,11 +188,27 @@ public sealed class ReportService
             })
             .ToList();
 
+        var goals = ordered
+            .Select(evaluation => new DashboardGoal
+            {
+                GoalId = evaluation.Goal.Id,
+                Name = evaluation.Name,
+                Stats = StatsOf(evaluation),
+                PausedUntil = evaluation.PausedUntil(today),
+            })
+            .ToList();
+
         return DashboardResult.Found(new Dashboard
         {
-            Counts = new DashboardCounts { Due = due.Count, Pending = pending.Count, MissedThisWeek = missedThisWeek.Count, Goals = ordered.Count },
+            Counts = new DashboardCounts
+            {
+                Due = due.Count,
+                Pending = pending.Count,
+                MissedThisWeek = missedThisWeek.Count,
+                Goals = goals.Count(goal => goal.PausedUntil is null),
+            },
             Today = [.. pending, .. due, .. missedThisWeek, .. upcoming],
-            Goals = ordered.Select(evaluation => new DashboardGoal { GoalId = evaluation.Goal.Id, Name = evaluation.Name, Stats = StatsOf(evaluation) }).ToList(),
+            Goals = goals,
             Notes = notes,
             AccountToday = today,
             WeekStarts = weekStarts,
@@ -210,8 +230,11 @@ public sealed class ReportService
         Entry = entry,
     };
 
-    /// <summary>One goal of the overview (FR-011, research R-07).</summary>
-    private static OverviewGoal OverviewGoalOf(StoredGoal stored, GoalEvaluation evaluation) => new()
+    /// <summary>
+    /// One goal of the overview (FR-011, research R-07), with slice 7's <see cref="OverviewGoal.PausedUntil"/> at the
+    /// pause date (<paramref name="accountToday"/> for a goal that has not started; research R-03, FR-018).
+    /// </summary>
+    private static OverviewGoal OverviewGoalOf(StoredGoal stored, GoalEvaluation evaluation, DateOnly accountToday) => new()
     {
         Item = GoalListItems.Of(stored, evaluation.Now),
         Stats = StatsOf(evaluation),
@@ -219,6 +242,7 @@ public sealed class ReportService
         HasPending = evaluation.Pending.Count > 0,
         CanRecord = evaluation.Due.Count > 0 || evaluation.Pending.Count > 0,
         Recordable = evaluation.Recordable,
+        PausedUntil = evaluation.PausedUntil(accountToday),
     };
 
     private static GoalReport ReportOf(GoalEvaluation evaluation) => new()
@@ -231,7 +255,7 @@ public sealed class ReportService
         Stats = StatsOf(evaluation),
         Recent = RecentOf(evaluation, GoalReportRecentCount),
         Trend = TrendOf(evaluation),
-        HasBegunEntry = evaluation.Entries.Any(entry => entry.State != EvaluationState.Upcoming),
+        HasBegunEntry = evaluation.Entries.Any(entry => entry.Starts <= evaluation.Now),
         ReadAt = evaluation.Now,
     };
 
@@ -247,7 +271,11 @@ public sealed class ReportService
         LongestStreakText = ReportText.Streak(evaluation.Streaks.Longest, evaluation.Unit),
     };
 
-    /// <summary>The latest <paramref name="count"/> ended results, oldest first, with the count of each ended state (FR-005).</summary>
+    /// <summary>
+    /// The latest <paramref name="count"/> ended results, oldest first, with the count of each ended state (FR-005).
+    /// Slice 7 (FR-015, FR-023): the exempt results are among them, and the keys Excused and Paused are added only when
+    /// their count is above 0, so a goal without exemptions keeps slice 6's four keys.
+    /// </summary>
     private static RecentResults RecentOf(GoalEvaluation evaluation, int count)
     {
         var results = evaluation.Ended
@@ -255,6 +283,15 @@ public sealed class ReportService
             .Select(entry => new ResultView { FirstDate = entry.FirstDate, LastDate = entry.LastDate, State = entry.State, Progress = entry.Progress })
             .ToList();
         var counts = EndedStates.ToDictionary(state => state, state => results.Count(result => result.State == state));
+        foreach (var exempt in ExemptStates)
+        {
+            var number = results.Count(result => result.State == exempt);
+            if (number > 0)
+            {
+                counts[exempt] = number;
+            }
+        }
+
         return new RecentResults { Results = results, Counts = counts };
     }
 

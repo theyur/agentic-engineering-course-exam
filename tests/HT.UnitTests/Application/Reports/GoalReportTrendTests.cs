@@ -1,8 +1,10 @@
+using HT.Application.Exemptions;
 using HT.Application.Reports;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
 using HT.Domain.Reports;
+using HT.UnitTests.Application.Exemptions;
 using static HT.UnitTests.Domain.Goals.GoalSamples;
 using static HT.UnitTests.Domain.Time.Instants;
 
@@ -21,6 +23,8 @@ public sealed class GoalReportTrendTests
     private static readonly DateTimeOffset Mon2Morning = Utc("2026-11-02T08:00:00Z");
 
     private readonly ReportWorld _world = new();
+
+    private readonly ExemptionWorld _exemptions = new();
 
     private static GoalTargetFields Reading20MinDaily => DurationDays(20, DurationUnit.Minutes, BuildOrReduce.Build, AllDays);
 
@@ -260,5 +264,216 @@ public sealed class GoalReportTrendTests
         Assert.Empty(report.Trend.Bars);
         Assert.Equal(0, report.Trend.Target);
         Assert.False(report.HasBegunEntry);
+    }
+
+    // Slice 7 (T067; FR-016, US3-AS4; design/components/TrendChart.md, "Slice 7 state"): marked bars, over the fakes of
+    // ExemptionWorld. Excusals and pauses are made through ExcusalService and PauseService while they are current.
+
+    private static TrendBar Excused(TrendBar bar) => bar with { Mark = TrendMark.Excused };
+
+    private static TrendBar Paused(TrendBar bar) => bar with { Mark = TrendMark.Paused };
+
+    private static GoalTargetFields YogaOnMonWedFri => YesNoDays(BuildOrReduce.Build, MonWedFri);
+
+    private static async Task ExcuseAsync(ExemptionWorld world, GoalId goal, DateTimeOffset at, params int[] days)
+    {
+        world.At(at);
+        foreach (var day in days)
+        {
+            Assert.Equal(ExcuseOutcome.Excused, (await world.ExcuseAsync(goal, Date(2026, 11, day))).Outcome);
+        }
+    }
+
+    private static async Task PauseAsync(ExemptionWorld world, GoalId goal, DateTimeOffset at, int firstDay, int lastDay)
+    {
+        world.At(at);
+        Assert.Equal(PauseOutcome.Paused, (await world.PauseAsync(goal, Date(2026, 11, firstDay), Date(2026, 11, lastDay))).Outcome);
+    }
+
+    [Fact]
+    public async Task US3_AS4_Meditation_10_min_daily_marks_the_excused_and_paused_days_without_a_value()
+    {
+        // Spec US3's goal: 10 minutes on each date from 2 to 16 November except 9, 11 and 13 to 15; 9 November excused on
+        // Tuesday 10 November at 08:00Z; paused on Friday 13 November at 08:00Z from that day until Sunday 15 November;
+        // read on Thursday 19 November at 12:00Z, when Thursday 19 is Due.
+        var goal = await _exemptions.CreateGoalAsync(DurationDays(10, DurationUnit.Minutes, BuildOrReduce.Build, AllDays), Mon2, Mon2Morning);
+        foreach (var day in new[] { 2, 3, 4, 5, 6, 7, 8, 10, 12, 16 })
+        {
+            _exemptions.SeedAmount(goal, Date(2026, 11, day), 10);
+        }
+
+        await ExcuseAsync(_exemptions, goal, Utc("2026-11-10T08:00:00Z"), 9);
+        await PauseAsync(_exemptions, goal, Utc("2026-11-13T08:00:00Z"), 13, 15);
+        _exemptions.At(Utc("2026-11-19T12:00:00Z"));
+
+        var trend = (await _exemptions.ReportAsync(goal)).Trend;
+
+        Assert.Equal(
+            [
+                Day(11, 6, 10, 10), Day(11, 7, 10, 10), Day(11, 8, 10, 10), Excused(Day(11, 9, null, 10)), Day(11, 10, 10, 10),
+                Day(11, 11, null, 10), Day(11, 12, 10, 10), Paused(Day(11, 13, null, 10)), Paused(Day(11, 14, null, 10)),
+                Paused(Day(11, 15, null, 10)), Day(11, 16, 10, 10), Day(11, 17, null, 10), Day(11, 18, null, 10), Day(11, 19, null, 10),
+            ],
+            trend.Bars);
+        Assert.Equal(10, trend.Target);
+        AssertTexts(trend, "Minutes per day", "Last 14 days", "Target 10 min", "Minutes per day, last 14 days; target 10; 1 excused, 3 paused");
+    }
+
+    [Fact]
+    public async Task FR_016_a_yes_no_week_counts_only_its_commitments_that_are_neither_excused_nor_paused()
+    {
+        // Monday, Wednesday and Friday from Monday 2 November. "Yes" on 2, 4 and 6 November, on Monday 9 and on Friday 13
+        // (stored before the pause, so it is kept) and on Monday 16. Wednesday 11 is excused on Thursday 12 at 08:00Z;
+        // the goal is paused on Friday 13 at 08:00Z for that day only. Read on Wednesday 18 November at 10:00Z: the week
+        // of 9 November has one countable commitment (Monday 9) and its "Yes"; the "Yes" of the Paused Friday 13 is not
+        // counted. The week of 16 November counts its Upcoming Friday 20.
+        var goal = await _exemptions.CreateGoalAsync(YogaOnMonWedFri, Mon2, Mon2Morning);
+        foreach (var day in new[] { 2, 4, 6, 9, 13, 16 })
+        {
+            _exemptions.SeedAnswer(goal, Date(2026, 11, day), YesNoAnswer.Yes);
+        }
+
+        await ExcuseAsync(_exemptions, goal, Utc("2026-11-12T08:00:00Z"), 11);
+        await PauseAsync(_exemptions, goal, Utc("2026-11-13T08:00:00Z"), 13, 13);
+        _exemptions.At(Utc("2026-11-18T10:00:00Z"));
+
+        var trend = (await _exemptions.ReportAsync(goal)).Trend;
+
+        Assert.Equal([Week(Mon2, 3, 3), Week(Date(2026, 11, 9), 1, 1), Week(Date(2026, 11, 16), 1, 3)], trend.Bars);
+        Assert.Equal(3, trend.Target);
+        AssertTexts(trend, "Days done per week", "Last 12 weeks", "Target 3", "Days done per week, last 12 weeks; target 3; week of 9 Nov: 1 of 1");
+    }
+
+    [Fact]
+    public async Task FR_016_a_yes_no_week_whose_only_records_sit_on_paused_commitments_has_no_value_not_0()
+    {
+        // "Yes" on Monday 16 November, stored before the goal is paused on Monday 16 at 08:00Z for that day only. Read on
+        // Monday 23 November at 10:00Z: the week of 16 November counts Wednesday 18 and Friday 20, neither recorded.
+        var goal = await _exemptions.CreateGoalAsync(YogaOnMonWedFri, Mon2, Mon2Morning);
+        _exemptions.SeedAnswer(goal, Date(2026, 11, 16), YesNoAnswer.Yes);
+        await PauseAsync(_exemptions, goal, Utc("2026-11-16T08:00:00Z"), 16, 16);
+        _exemptions.At(Utc("2026-11-23T10:00:00Z"));
+
+        var trend = (await _exemptions.ReportAsync(goal)).Trend;
+
+        Assert.Equal(
+            [Week(Mon2, null, 3), Week(Date(2026, 11, 9), null, 3), Week(Date(2026, 11, 16), null, 2), Week(Date(2026, 11, 23), null, 3)],
+            trend.Bars);
+        Assert.Equal("Days done per week, last 12 weeks; target 3; week of 16 Nov: no record of 2", trend.Label);
+    }
+
+    [Fact]
+    public async Task FR_016_an_all_exempt_past_week_is_marked_Paused_when_one_commitment_is_paused_and_Excused_otherwise()
+    {
+        // "Yes" on 2, 4 and 6 November. The week of 9 November: Monday 9 excused on Tuesday 10 at 08:00Z, then the goal
+        // paused on Wednesday 11 at 08:00Z from that day until Sunday 15. The week of 16 November: Monday 16 and Wednesday
+        // 18 excused on Wednesday 18 at 10:00Z, Friday 20 on Friday 20 at 10:00Z. Read on Monday 23 November at 10:00Z,
+        // when Monday 23 is Due and the week's Wednesday 25 and Friday 27 are Upcoming.
+        var goal = await _exemptions.CreateGoalAsync(YogaOnMonWedFri, Mon2, Mon2Morning);
+        foreach (var day in new[] { 2, 4, 6 })
+        {
+            _exemptions.SeedAnswer(goal, Date(2026, 11, day), YesNoAnswer.Yes);
+        }
+
+        await ExcuseAsync(_exemptions, goal, Utc("2026-11-10T08:00:00Z"), 9);
+        await PauseAsync(_exemptions, goal, Utc("2026-11-11T08:00:00Z"), 11, 15);
+        await ExcuseAsync(_exemptions, goal, Utc("2026-11-18T10:00:00Z"), 16, 18);
+        await ExcuseAsync(_exemptions, goal, Utc("2026-11-20T10:00:00Z"), 20);
+        _exemptions.At(Utc("2026-11-23T10:00:00Z"));
+
+        var trend = (await _exemptions.ReportAsync(goal)).Trend;
+
+        Assert.Equal(
+            [
+                Week(Mon2, 3, 3), Paused(Week(Date(2026, 11, 9), null, 0)), Excused(Week(Date(2026, 11, 16), null, 0)),
+                Week(Date(2026, 11, 23), null, 3),
+            ],
+            trend.Bars);
+        Assert.Equal(3, trend.Target);
+        Assert.Equal("Days done per week, last 12 weeks; target 3; 1 excused, 1 paused", trend.Label);
+    }
+
+    [Fact]
+    public async Task T036_a_current_week_whose_begun_commitment_is_excused_and_upcoming_ones_paused_is_marked_Paused()
+    {
+        // "Yes" on every commitment of the weeks of 2 and 9 November. On Monday 16 November at 10:00Z (Monday 16 Due)
+        // Monday 16 is excused and the goal paused from Tuesday 17 until Sunday 22, so Wednesday 18 and Friday 20, both
+        // Upcoming, are Paused. The line stays at the week of 9 November's target.
+        var goal = await _exemptions.CreateGoalAsync(YogaOnMonWedFri, Mon2, Mon2Morning);
+        foreach (var day in new[] { 2, 4, 6, 9, 11, 13 })
+        {
+            _exemptions.SeedAnswer(goal, Date(2026, 11, day), YesNoAnswer.Yes);
+        }
+
+        var mon16 = Utc("2026-11-16T10:00:00Z");
+        await ExcuseAsync(_exemptions, goal, mon16, 16);
+        await PauseAsync(_exemptions, goal, mon16, 17, 22);
+
+        var trend = (await _exemptions.ReportAsync(goal)).Trend;
+
+        Assert.Equal([Week(Mon2, 3, 3), Week(Date(2026, 11, 9), 3, 3), Paused(Week(Date(2026, 11, 16), null, 0))], trend.Bars);
+        Assert.Equal(3, trend.Target);
+        AssertTexts(trend, "Days done per week", "Last 12 weeks", "Target 3", "Days done per week, last 12 weeks; target 3; 1 paused");
+    }
+
+    [Fact]
+    public async Task T036_a_current_week_with_an_upcoming_commitment_that_is_not_paused_is_not_marked()
+    {
+        // As above, but the pause is Wednesday 18 November only: the Upcoming Friday 20 is countable, so the week of 16
+        // November is unmarked with the target 1 and no value; the line is drawn at its target.
+        var goal = await _exemptions.CreateGoalAsync(YogaOnMonWedFri, Mon2, Mon2Morning);
+        foreach (var day in new[] { 2, 4, 6, 9, 11, 13 })
+        {
+            _exemptions.SeedAnswer(goal, Date(2026, 11, day), YesNoAnswer.Yes);
+        }
+
+        var mon16 = Utc("2026-11-16T10:00:00Z");
+        await ExcuseAsync(_exemptions, goal, mon16, 16);
+        await PauseAsync(_exemptions, goal, mon16, 18, 18);
+
+        var trend = (await _exemptions.ReportAsync(goal)).Trend;
+
+        Assert.Equal([Week(Mon2, 3, 3), Week(Date(2026, 11, 9), 3, 3), Week(Date(2026, 11, 16), null, 1)], trend.Bars);
+        Assert.Equal(1, trend.Target);
+        AssertTexts(
+            trend, "Days done per week", "Last 12 weeks", "Target 1",
+            "Days done per week, last 12 weeks; target 1; week of 2 Nov: 3 of 3; week of 9 Nov: 3 of 3");
+    }
+
+    [Fact]
+    public async Task FR_016_a_per_week_goal_marks_a_week_with_a_paused_date_and_gives_it_no_value_despite_its_records()
+    {
+        // Three times a week: "Yes" on 2, 4 and 6 November and on Monday 9 and Tuesday 10. Paused on Monday 9 at 08:00Z
+        // from Thursday 12 until Friday 13. Read on Wednesday 18 November at 10:00Z.
+        var goal = await _exemptions.CreateGoalAsync(YesNoTimes(3, SchedulePeriod.Week), Mon2, Mon2Morning);
+        foreach (var day in new[] { 2, 4, 6, 9, 10 })
+        {
+            _exemptions.SeedAnswer(goal, Date(2026, 11, day), YesNoAnswer.Yes);
+        }
+
+        await PauseAsync(_exemptions, goal, Utc("2026-11-09T08:00:00Z"), 12, 13);
+        _exemptions.At(Utc("2026-11-18T10:00:00Z"));
+
+        var trend = (await _exemptions.ReportAsync(goal)).Trend;
+
+        Assert.Equal([Week(Mon2, 3, 3), Paused(Week(Date(2026, 11, 9), null, 3)), Week(Date(2026, 11, 16), null, 3)], trend.Bars);
+        Assert.Equal(3, trend.Target);
+        Assert.Equal("Times per week, last 12 weeks; target 3; 1 paused", trend.Label);
+    }
+
+    [Fact]
+    public async Task FR_016_with_every_bar_marked_the_line_is_drawn_at_0()
+    {
+        // Three times a week, paused when it is created, on Monday 2 November at 08:00Z, for its whole first week; read
+        // that day at 10:00Z.
+        var goal = await _exemptions.CreateGoalAsync(YesNoTimes(3, SchedulePeriod.Week), Mon2, Mon2Morning);
+        await PauseAsync(_exemptions, goal, Mon2Morning, 2, 8);
+        _exemptions.At(Utc("2026-11-02T10:00:00Z"));
+
+        var trend = (await _exemptions.ReportAsync(goal)).Trend;
+
+        Assert.Equal([Paused(Week(Mon2, null, 3))], trend.Bars);
+        Assert.Equal(0, trend.Target);
+        AssertTexts(trend, "Times per week", "Last 12 weeks", "Target 0", "Times per week, last 12 weeks; target 0; 1 paused");
     }
 }

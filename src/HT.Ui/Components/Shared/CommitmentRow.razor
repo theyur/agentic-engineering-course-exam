@@ -10,8 +10,9 @@
    Missed: "{date} · no record"; Upcoming: the date; {date} as the History writes it); the progress bar of a Due count or
    duration entry with a record; the StatusChip; then one action, never primary: "Record" (a Due or Pending period, or
    a commitment without a record) and "Edit" (a commitment with a record), secondary; "Add note" or "Edit note" (Missed),
-   ghost; none for Upcoming. Each action's accessible name starts with its text and names the row. The row raises
-   OnAction; the island opens the dialog. Every text and value comes from ReportText, RecordingText and the entry; the
+   ghost; none for Upcoming. Slice 7 (HP-005, design/components/CommitmentRow, slice 7 state): a Pending commitment
+   without a record gets the ghost "Excuse" after "Record" ("Excuse {goal name}, {date}"). Each action's accessible
+   name starts with its text and names the row. The row raises OnAction; the island opens the dialog. Every text and value comes from ReportText, RecordingText and the entry; the
    row computes no figure. *@
 <div class="ht-row">
     <div class="ht-row__main">
@@ -37,17 +38,27 @@
                 aria-haspopup="dialog" aria-label="@AccessibleName(action)" @ref="_action"
                 @onclick="() => OnAction.InvokeAsync(action)">@ActionText(action)</button>
     }
+    @if (CanExcuse)
+    {
+        <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog" aria-label="@($"Excuse {Entry.GoalName}, {Date}")"
+                @ref="_excuse" @onclick="() => OnAction.InvokeAsync(ActionKind.Excuse)">Excuse</button>
+    }
 </div>
 
 @code {
     private ElementReference _action;
+    private ElementReference _excuse;
 
-    /// <summary>What a row's action opens: the RecordDialog for a new record or for the row's record, or the NoteDialog.</summary>
+    /// <summary>
+    /// What a row's action opens: the RecordDialog for a new record or for the row's record, the NoteDialog, or (slice 7)
+    /// the Excuse dialog.
+    /// </summary>
     public enum ActionKind
     {
         Record,
         Edit,
         Note,
+        Excuse,
     }
 
     /// <summary>The entry as the dashboard gives it.</summary>
@@ -64,6 +75,15 @@
 
     /// <summary>Gives the focus to the row's action; an Upcoming row has none, so nothing happens.</summary>
     public ValueTask FocusAsync() => Action is null ? ValueTask.CompletedTask : _action.FocusAsync();
+
+    /// <summary>Gives the focus to the row's "Excuse", or to its action when it has no "Excuse" (slice 7 HP-007).</summary>
+    public ValueTask FocusExcuseAsync() => CanExcuse ? _excuse.FocusAsync() : FocusAsync();
+
+    /// <summary>
+    /// Slice 7 (HP-005, D-2, D-3): "Excuse" on a Pending commitment without a record; a Due one is excused from the
+    /// RecordDialog's "Excuse instead".
+    /// </summary>
+    private bool CanExcuse => State == EvaluationState.Pending && IsCommitment && !Entry.HasRecord;
 
     private EvaluationState State => Entry.Entry.State;
 

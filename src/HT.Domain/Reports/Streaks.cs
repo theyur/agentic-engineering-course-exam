@@ -23,7 +23,8 @@ public sealed record Streaks(int Current, int Longest)
     /// <summary>
     /// The streaks of <paramref name="statesInDateOrder"/> (a per-week period by its first date): Met adds 1 to the
     /// run, Failed or Missed ends it, and Upcoming, Due and Pending are skipped, so they neither extend nor reset a
-    /// run, also when their records already reach the target (D-1).
+    /// run, also when their records already reach the target (D-1). Excused and Paused are skipped the same way
+    /// (slice 7 FR-014).
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">A state is not defined.</exception>
     public static Streaks Of(IEnumerable<EvaluationState> statesInDateOrder)
@@ -42,7 +43,8 @@ public sealed record Streaks(int Current, int Longest)
                 case EvaluationState.Failed or EvaluationState.Missed:
                     current = 0;
                     break;
-                case EvaluationState.Upcoming or EvaluationState.Due or EvaluationState.Pending:
+                case EvaluationState.Upcoming or EvaluationState.Due or EvaluationState.Pending
+                    or EvaluationState.Excused or EvaluationState.Paused:
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(statesInDateOrder), "A state is not defined.");

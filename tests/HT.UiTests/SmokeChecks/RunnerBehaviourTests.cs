@@ -13,8 +13,8 @@ namespace HT.UiTests.SmokeChecks;
 /// <see cref="SmokeCheckCommand.RunAsync"/> with no network: check 1 <c>home</c>, check 2 <c>https-redirect</c>,
 /// check 3 <c>catalog</c>, check 4 <c>administrator</c>, check 5 <c>demo &lt;email&gt;</c> (with slice 4's goal names and
 /// account name, HP-018), check 6 <c>demo history demo4@example.com</c> (slice 5 HP-008, research R-10, with slice 6's
-/// stat labels and tile label), check 7 <c>demo report demo5@example.com</c> (slice 6 HP-008, research R-11), the
-/// <c>TIMING</c> line and the result.
+/// stat labels and tile label), check 7 <c>demo report demo5@example.com</c> (slice 6 HP-008, research R-11), check 8
+/// <c>demo pause demo6@example.com</c> (slice 7 HP-011), the <c>TIMING</c> line and the result.
 /// </summary>
 public sealed class RunnerBehaviourTests
 {
@@ -102,8 +102,15 @@ public sealed class RunnerBehaviourTests
     /// <summary>The GoalStats stat labels of "Strength training"'s page, one of which check 7 expects (slice 6 HP-008).</summary>
     private static readonly IReadOnlyList<string> StrengthStatLabels = ["Consistency", "Streak, weeks", "Longest, weeks"];
 
-    /// <summary>The good site's Goals page: every demo goal of checks 5, 6 and 7, then a reviewer's goal.</summary>
-    private static readonly IReadOnlyList<string> AllGoalNames = [.. DemoGoalNames, .. HistoryGoalNames, .. ReportGoalNames, "A reviewer's goal"];
+    /// <summary>The names of demo6's goals: "Meditation", whose page check 8 reads, and the paused "Drinking water" (slice 7 HP-011).</summary>
+    private static readonly IReadOnlyList<string> PauseGoalNames = DemoPauses.GoalNames;
+
+    /// <summary>The meta text of a paused goal item, as <c>GoalItem</c> renders it (slice 7 HP-004).</summary>
+    private const string PausedMeta = "Paused until Sun 22 Nov";
+
+    /// <summary>The good site's Goals page: every demo goal of checks 5, 6, 7 and 8, then a reviewer's goal.</summary>
+    private static readonly IReadOnlyList<string> AllGoalNames =
+        [.. DemoGoalNames, .. HistoryGoalNames, .. ReportGoalNames, .. PauseGoalNames, "A reviewer's goal"];
 
     /// <summary>The goal page paths of "Reading" and "Yoga" on the good site, as <see cref="GoalsPage"/> links them.</summary>
     private static readonly string ReadingPath = GoalPath(DemoGoalNames.Count);
@@ -113,13 +120,18 @@ public sealed class RunnerBehaviourTests
     /// <summary>The goal page path of "Strength training" on the good site.</summary>
     private static readonly string StrengthPath = GoalPath(DemoGoalNames.Count + HistoryGoalNames.Count + 1);
 
+    /// <summary>The goal page path of "Meditation, 10 min daily" on the good site (slice 7).</summary>
+    private static readonly string MeditationPath = GoalPath(DemoGoalNames.Count + HistoryGoalNames.Count + ReportGoalNames.Count);
+
     /// <summary>
     /// The good site: the visitor Home, the redirect, the catalog with every Published seed habit, the sign-in form
     /// (every sign-in is accepted), the admin page, a custom-habits page with every demo custom habit that links one
     /// stylesheet and one script, a Goals page with every demo goal, demo4's and demo5's included, and a reviewer's goal, a
     /// Profile page whose first heading is "Demo One", the goal pages of "Reading" and "Yoga" with their History cards after
-    /// a Settings card, "Reading"'s with its GoalStats stat labels, and the goal page of "Strength training" with its stat
-    /// labels (slice 6).
+    /// a Settings card, "Reading"'s with its GoalStats stat labels, the goal page of "Strength training" with its stat
+    /// labels (slice 6), and the goal page of "Meditation" with an "Excused" status chip in its History card, while the
+    /// Goals page, which also answers <c>?tab=paused</c> (the script ignores the query), shows "Drinking water" with the
+    /// meta "Paused until Sun 22 Nov" (slice 7).
     /// </summary>
     private static ScriptedHandler GoodSite() => new ScriptedHandler()
         .On(HttpMethod.Get, Https, ScriptedHandler.Html(VisitorHome))
@@ -134,6 +146,7 @@ public sealed class RunnerBehaviourTests
         .On(HttpMethod.Get, Https + ReadingPath[1..], ScriptedHandler.Html(GoalPage(["Sat 7", "20 min", .. ReadingTexts, "Show all 28 →"], statLabels: ReadingStatLabels)))
         .On(HttpMethod.Get, Https + YogaPath[1..], ScriptedHandler.Html(GoalPage(["Mon 2", "Yes", .. YogaTexts])))
         .On(HttpMethod.Get, Https + StrengthPath[1..], ScriptedHandler.Html(GoalPage(["Mon 9", "Yes"], statLabels: StrengthStatLabels)))
+        .On(HttpMethod.Get, Https + MeditationPath[1..], ScriptedHandler.Html(GoalPage(["Mon 16", "—"], statusChips: ["Due today", "Pending", "Excused", "Met"])))
         .On(HttpMethod.Get, Stylesheet, ScriptedHandler.Html("body {}"))
         .On(HttpMethod.Get, Script, ScriptedHandler.Html("// script"));
 
@@ -164,24 +177,30 @@ public sealed class RunnerBehaviourTests
                 // Slice 6 HP-008: 3 goal names, "Streak, weeks" on Strength training's page, and on the Home the "Missed
                 // this week" tile label and the "Missed" status chip.
                 "PASS demo report demo5@example.com (6 of 6)",
+
+                // Slice 7 HP-011: "Excused" on Meditation's page, and on the Paused tab the paused goal with its meta.
+                "PASS demo pause demo6@example.com (3 of 3)",
             ],
-            lines.Take(9));
-        Assert.Matches(FirstTiming, lines[9]);
-        Assert.Equal("RESULT PASS", lines[10]);
-        Assert.Equal(11, lines.Count);
+            lines.Take(10));
+        Assert.Matches(FirstTiming, lines[10]);
+        Assert.Equal("RESULT PASS", lines[11]);
+        Assert.Equal(12, lines.Count);
         Assert.Single(site.Requests, r => r == "GET " + Stylesheet);
         Assert.Single(site.Requests, r => r == "GET " + Script);
-        Assert.Equal(5, site.Requests.Count(r => r == "GET " + Https + "goals"));
+        Assert.Equal(6, site.Requests.Count(r => r == "GET " + Https + "goals"));
+        Assert.Single(site.Requests, r => r == "GET " + Https + "goals?tab=paused");
         Assert.Equal(1, site.Requests.Count(r => r == "GET " + Https + "profile"));
         Assert.Single(site.Requests, r => r == "GET " + Https + ReadingPath[1..]);
         Assert.Single(site.Requests, r => r == "GET " + Https + YogaPath[1..]);
         Assert.Single(site.Requests, r => r == "GET " + Https + StrengthPath[1..]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + MeditationPath[1..]);
         Assert.Equal(3, site.Requests.Count(r => r == "GET " + Https));
         Assert.All(
             DemoHabitNames.Concat(PublishedNames).Concat(DemoGoalNames).Append("Demo One"),
             name => Assert.DoesNotContain(name, string.Join('\n', lines), StringComparison.Ordinal));
         AssertNoDemoHistoryContent(lines);
         AssertNoDemoReportContent(lines);
+        AssertNoDemoPauseContent(lines);
     }
 
     [Fact]
@@ -217,17 +236,18 @@ public sealed class RunnerBehaviourTests
     [Fact]
     public async Task Demo_report_fails_when_its_sign_in_is_refused_and_the_other_checks_pass()
     {
-        // The administrator and demo1 to demo4 sign in; demo5, the last sign-in, goes back to Sign in.
+        // The administrator and demo1 to demo4 sign in; demo5 goes back to Sign in; demo6, the last sign-in, signs in.
         var accepted = ScriptedHandler.Redirect(HttpStatusCode.Found, "/");
         var site = GoodSite().On(HttpMethod.Post, Https + "sign-in",
-            accepted, accepted, accepted, accepted, accepted, ScriptedHandler.Redirect(HttpStatusCode.Found, "/sign-in"));
+            accepted, accepted, accepted, accepted, accepted, ScriptedHandler.Redirect(HttpStatusCode.Found, "/sign-in"), accepted);
 
         var (exitCode, lines) = await RunAsync(site);
 
         Assert.Equal(1, exitCode);
         Assert.Equal("PASS demo history demo4@example.com (14 of 14)", lines[7]);
         Assert.Equal("FAIL demo report demo5@example.com: the sign-in was refused", lines[8]);
-        Assert.Matches(FirstTiming, lines[9]);
+        Assert.Equal("PASS demo pause demo6@example.com (3 of 3)", lines[9]);
+        Assert.Matches(FirstTiming, lines[10]);
         Assert.Equal("RESULT FAIL", lines[^1]);
     }
 
@@ -317,6 +337,98 @@ public sealed class RunnerBehaviourTests
     }
 
     [Fact]
+    public async Task Demo_pause_fails_when_its_sign_in_is_refused_and_the_other_checks_pass()
+    {
+        // The administrator and demo1 to demo5 sign in; demo6, the last sign-in, goes back to Sign in.
+        var accepted = ScriptedHandler.Redirect(HttpStatusCode.Found, "/");
+        var site = GoodSite().On(HttpMethod.Post, Https + "sign-in",
+            accepted, accepted, accepted, accepted, accepted, accepted, ScriptedHandler.Redirect(HttpStatusCode.Found, "/sign-in"));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("PASS demo report demo5@example.com (6 of 6)", lines[8]);
+        Assert.Equal("FAIL demo pause demo6@example.com: the sign-in was refused", lines[9]);
+        Assert.Matches(FirstTiming, lines[10]);
+        Assert.Equal("RESULT FAIL", lines[^1]);
+        Assert.DoesNotContain(site.Requests, r => r == "GET " + Https + "goals?tab=paused");
+    }
+
+    public static TheoryData<string, string> DemoPauseGoalPageFailures => new()
+    {
+        { "goals status", "FAIL demo pause demo6@example.com: GET /goals gave status 500" },
+        { "no link", "FAIL demo pause demo6@example.com: no link for goal page 1" },
+        { "page status", "FAIL demo pause demo6@example.com: GET goal page 1 gave status 404" },
+        { "plain chip", "FAIL demo pause demo6@example.com: 0 of 1 status chips on goal page 1 shown" },
+    };
+
+    [Theory]
+    [MemberData(nameof(DemoPauseGoalPageFailures))]
+    public async Task Demo_pause_fails_when_Meditations_page_has_no_Excused_chip_or_cannot_be_reached_and_still_reads_the_Paused_tab(
+        string failure, string expected)
+    {
+        // Goals is one page on this site, which also answers ?tab=paused: checks 5 to 7 read it first (5 times), then
+        // check 8 reads the 6th answer for its Goals page and the 7th for its Paused tab.
+        var good = ScriptedHandler.Html(GoalsPage(AllGoalNames));
+        var site = failure switch
+        {
+            "goals status" => GoodSite().On(HttpMethod.Get, Https + "goals", good, good, good, good, good, ScriptedHandler.Status(HttpStatusCode.InternalServerError), good),
+            "no link" => GoodSite().On(HttpMethod.Get, Https + "goals", good, good, good, good, good,
+                ScriptedHandler.Html(GoalsPage(AllGoalNames).Replace($" href=\"{MeditationPath}\"", string.Empty, StringComparison.Ordinal)), good),
+            "page status" => GoodSite().On(HttpMethod.Get, Https + MeditationPath[1..], ScriptedHandler.Status(HttpStatusCode.NotFound)),
+
+            // "Excused" only in a plain chip and as a part of a longer chip word: neither counts.
+            _ => GoodSite().On(HttpMethod.Get, Https + MeditationPath[1..], ScriptedHandler.Html(GoalPage(["Excused"], statusChips: ["Met", "Excused today"]))),
+        };
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("PASS demo report demo5@example.com (6 of 6)", lines[8]);
+        Assert.Equal(expected, lines[9]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + "goals?tab=paused");
+        AssertNoDemoPauseContent(lines);
+    }
+
+    public static TheoryData<string, string> DemoPauseTabFailures => new()
+    {
+        { "status", "FAIL demo pause demo6@example.com: GET /goals?tab=paused gave status 500" },
+        { "name", "FAIL demo pause demo6@example.com: 0 of 1 goal names on the Paused tab shown" },
+        { "meta", "FAIL demo pause demo6@example.com: 0 of 1 paused goal metas on the Paused tab shown" },
+        { "other item", "FAIL demo pause demo6@example.com: 0 of 1 paused goal metas on the Paused tab shown" },
+    };
+
+    [Theory]
+    [MemberData(nameof(DemoPauseTabFailures))]
+    public async Task Demo_pause_fails_when_the_Paused_tab_misses_the_paused_goal_or_its_meta_or_is_not_shown(string failure, string expected)
+    {
+        // Only the 7th answer of Goals, check 8's Paused tab, is changed.
+        var good = ScriptedHandler.Html(GoalsPage(AllGoalNames));
+        var bad = failure switch
+        {
+            "status" => ScriptedHandler.Status(HttpStatusCode.InternalServerError),
+            "name" => ScriptedHandler.Html(GoalsPage([.. AllGoalNames.Where(n => n != PauseGoalNames[1])])),
+
+            // The meta of the paused goal is slice 6's text; and "Paused until" on another item does not count.
+            "meta" => ScriptedHandler.Html(GoalsPage(AllGoalNames).Replace(PausedMeta, "Every day · next today", StringComparison.Ordinal)),
+            _ => ScriptedHandler.Html(GoalsPage(AllGoalNames)
+                .Replace(PausedMeta, "Every day", StringComparison.Ordinal)
+                .Replace("<span>Every day</span>", $"<span>{PausedMeta}</span>", StringComparison.Ordinal)
+                .Replace($"{WebUtility.HtmlEncode(PauseGoalNames[1])}</a><div class=\"ht-goalitem__meta\"><span class=\"ht-chip\">Build</span><span>{PausedMeta}</span>",
+                    $"{WebUtility.HtmlEncode(PauseGoalNames[1])}</a><div class=\"ht-goalitem__meta\"><span class=\"ht-chip\">Build</span><span>Every day</span>", StringComparison.Ordinal)),
+        };
+        var site = GoodSite().On(HttpMethod.Get, Https + "goals", good, good, good, good, good, good, bad);
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("PASS demo report demo5@example.com (6 of 6)", lines[8]);
+        Assert.Equal(expected, lines[9]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + MeditationPath[1..]);
+        AssertNoDemoPauseContent(lines);
+    }
+
+    [Fact]
     public async Task Demo_history_fails_when_its_sign_in_is_refused_and_the_other_checks_pass()
     {
         // The administrator and demo1 to demo3 sign in; demo4, the last sign-in, goes back to Sign in.
@@ -330,9 +442,10 @@ public sealed class RunnerBehaviourTests
         Assert.Equal("PASS demo demo3@example.com (5 of 5)", lines[6]);
         Assert.Equal("FAIL demo history demo4@example.com: the sign-in was refused", lines[7]);
 
-        // The last scripted answer repeats, so demo5's sign-in, after it, is refused too.
+        // The last scripted answer repeats, so demo5's and demo6's sign-ins, after it, are refused too.
         Assert.Equal("FAIL demo report demo5@example.com: the sign-in was refused", lines[8]);
-        Assert.Matches(FirstTiming, lines[9]);
+        Assert.Equal("FAIL demo pause demo6@example.com: the sign-in was refused", lines[9]);
+        Assert.Matches(FirstTiming, lines[10]);
         Assert.Equal("RESULT FAIL", lines[^1]);
     }
 
@@ -463,7 +576,8 @@ public sealed class RunnerBehaviourTests
         Assert.Equal(1, exitCode);
         Assert.Equal("FAIL demo demo1@example.com: 0 of 2 custom habits shown", lines[4]);
         Assert.Equal("FAIL demo demo2@example.com: 0 of 2 custom habits shown", lines[5]);
-        Assert.Equal(5, site.Requests.Count(r => r == "GET " + Https + "goals"));
+        Assert.Equal(6, site.Requests.Count(r => r == "GET " + Https + "goals"));
+        Assert.Single(site.Requests, r => r == "GET " + Https + "goals?tab=paused");
         Assert.Equal(1, site.Requests.Count(r => r == "GET " + Https + "profile"));
     }
 
@@ -521,9 +635,10 @@ public sealed class RunnerBehaviourTests
                 .. DemoDataService.DemoEmails.Select(e => $"FAIL demo {e}: the sign-in was refused"),
                 "FAIL demo history demo4@example.com: the sign-in was refused",
                 "FAIL demo report demo5@example.com: the sign-in was refused",
+                "FAIL demo pause demo6@example.com: the sign-in was refused",
             ],
-            lines.Skip(4).Take(5));
-        Assert.Matches(NoLaterTiming, lines[9]);
+            lines.Skip(4).Take(6));
+        Assert.Matches(NoLaterTiming, lines[10]);
         Assert.Equal("RESULT FAIL", lines[^1]);
     }
 
@@ -641,11 +756,14 @@ public sealed class RunnerBehaviourTests
          </body></html>
          """;
 
-    /// <summary>A Goals page with one goal item per name, as <c>GoalItem</c> renders it, the i-th linking <see cref="GoalPath"/>(i).</summary>
+    /// <summary>
+    /// A Goals page with one goal item per name, as <c>GoalItem</c> renders it, the i-th linking <see cref="GoalPath"/>(i);
+    /// the meta text is "Every day", or <see cref="PausedMeta"/> for demo6's paused goal (slice 7).
+    /// </summary>
     private static string GoalsPage(IEnumerable<string> names) =>
         $"""
          <!DOCTYPE html><html><body><h1>Goals</h1>
-         {string.Concat(names.Select((n, i) => $"<div class=\"ht-goalitem ht-goalitem--reduced\"><div><a class=\"ht-goalitem__name\" href=\"{GoalPath(i)}\">{WebUtility.HtmlEncode(n)}</a><div class=\"ht-goalitem__meta\"><span>Every day</span></div></div></div>"))}
+         {string.Concat(names.Select((n, i) => $"<div class=\"ht-goalitem ht-goalitem--reduced\"><div><a class=\"ht-goalitem__name\" href=\"{GoalPath(i)}\">{WebUtility.HtmlEncode(n)}</a><div class=\"ht-goalitem__meta\"><span class=\"ht-chip\">Build</span><span>{(n == PauseGoalNames[1] ? PausedMeta : "Every day")}</span></div></div></div>"))}
          </body></html>
          """;
 
@@ -654,10 +772,15 @@ public sealed class RunnerBehaviourTests
     /// <summary>
     /// A goal page as <c>GoalDetail</c> renders it: the GoalStats card with <paramref name="statLabels"/>, each with a
     /// value (slice 6), a Settings card with <paramref name="settings"/>, then the History card (<c>HistoryCard</c>), one
-    /// cell per text of <paramref name="history"/>, then <paramref name="after"/> outside every card.
+    /// cell per text of <paramref name="history"/> and one StatusChip cell per word of <paramref name="statusChips"/>
+    /// (slice 7), then <paramref name="after"/> outside every card.
     /// </summary>
     private static string GoalPage(
-        IEnumerable<string> history, IEnumerable<string>? settings = null, IEnumerable<string>? after = null, IEnumerable<string>? statLabels = null) =>
+        IEnumerable<string> history,
+        IEnumerable<string>? settings = null,
+        IEnumerable<string>? after = null,
+        IEnumerable<string>? statLabels = null,
+        IEnumerable<string>? statusChips = null) =>
         $"""
          <!DOCTYPE html><html><body><h1>Goal</h1>
          <section class="ht-card"><div class="ht-eyebrow">This attempt</div><h2 class="ht-card__title">Consistency and streaks</h2><div class="ht-stats">
@@ -669,7 +792,7 @@ public sealed class RunnerBehaviourTests
          <section class="ht-card">
            <div class="ht-card__head"><h2 class="ht-card__title">History</h2><span class="ht-spacer"></span>
            <p class="ht-card__sub">Corrections are evaluated with the rules of that date.</p></div>
-           <table><tr>{Cells(history)}</tr></table>
+           <table><tr>{Cells(history)}{string.Concat((statusChips ?? []).Select(c => $"<td><span class=\"ht-chip ht-status\">{WebUtility.HtmlEncode(c)}</span></td>\n"))}</tr></table>
          </section>
          {Cells(after ?? [])}
          </body></html>
@@ -693,6 +816,18 @@ public sealed class RunnerBehaviourTests
         var text = string.Join('\n', lines);
         Assert.All(
             [.. ReportGoalNames, DemoReport.WalkingNote, DemoReport.StrengthNote, DemoReport.ScreenTimeNote, StrengthPath, "Streak, weeks", "Missed this week", "Due now", "Consistency"],
+            value => Assert.DoesNotContain(value, text, StringComparison.Ordinal));
+    }
+
+    /// <summary>No line holds a demo6 goal name, reason, note, date, goal path or text read from a page (slice 7 HP-011).</summary>
+    private static void AssertNoDemoPauseContent(IReadOnlyList<string> lines)
+    {
+        var text = string.Join('\n', lines);
+        Assert.All(
+            [
+                .. PauseGoalNames, DemoPauses.TravellingReason, DemoPauses.IllnessReason, DemoPauses.FamilyVisitReason,
+                DemoPauses.OversleptNote, DemoPauses.BusyDayNote, MeditationPath, "Sun 22 Nov", "Excused", "Paused until",
+            ],
             value => Assert.DoesNotContain(value, text, StringComparison.Ordinal));
     }
 

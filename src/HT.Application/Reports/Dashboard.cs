@@ -44,7 +44,7 @@ public sealed record DashboardCounts
     /// <summary>The Missed entries whose grace period ended this week, up to the supplied time.</summary>
     public required int MissedThisWeek { get; init; }
 
-    /// <summary>The number of the user's goals.</summary>
+    /// <summary>The number of the user's goals that are not paused (slice 7 FR-019: no <see cref="DashboardGoal.PausedUntil"/>).</summary>
     public required int Goals { get; init; }
 }
 
@@ -56,6 +56,12 @@ public sealed record DashboardGoal
     public required string Name { get; init; }
 
     public required GoalStatsView Stats { get; init; }
+
+    /// <summary>
+    /// Slice 7 (FR-019, research R-03): the last day of the goal's current pause at the pause date; null when the goal is
+    /// not paused.
+    /// </summary>
+    public DateOnly? PausedUntil { get; init; }
 }
 
 /// <summary>One of the Home's recent notes (FR-012): its goal, its entry's dates, the note and the entry's state.</summary>

@@ -1,4 +1,5 @@
 using HT.Application.Accounts;
+using HT.Application.Exemptions;
 using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Application.Operator;
@@ -25,6 +26,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<DemoDataService>();
         services.AddScoped<DemoHistoryService>();
         services.AddScoped<DemoReportService>();
+        services.AddScoped<DemoPauseService>();
         services.AddScoped<CatalogService>();
         services.AddScoped<CatalogAdministrationService>();
         services.AddScoped<CustomHabitService>();
@@ -32,6 +34,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<ProfileService>();
         services.AddScoped<RecordingService>();
         services.AddScoped<ReportService>();
+        services.AddScoped<ExcusalService>();
+        services.AddScoped<PauseService>();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton(InstallationTimeZone.From(null));
         return services;

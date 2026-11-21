@@ -1,0 +1,65 @@
+@using HT.Application.Exemptions
+@using HT.Domain.Exemptions
+@* design/pages/PageGoalDetail, slice 7 state, the Pauses card (HP-001, FR-011, FR-012; contracts/host.md "Goal page"):
+   the goal's pauses as the page read them, the latest first day first, each an ht-goal item with its range
+   (PauseView.RangeText) and, when it has one, its reason in ht-muted. The current pause has the ghost "Resume now", an
+   upcoming one the ghost "Cancel pause", a past one no action; both act at once (no aria-haspopup), with the accessible
+   names "Resume now, {range}" and "Cancel pause, {range}". A refusal of either shows as an alert under the card title.
+   No card when the goal has no pause. The card decides nothing: its actions raise the page's callbacks. *@
+@if (Pauses.Count > 0)
+{
+    <HtCard Title="Pauses">
+        @if (Refusal is not null)
+        {
+            <p class="ht-field__error" role="alert">@Refusal</p>
+        }
+        @foreach (var pause in Pauses)
+        {
+            <div class="ht-goal" @key="pause.Id">
+                <div class="ht-goal__top">
+                    <span class="ht-goal__name">@pause.RangeText</span>
+                    @if (pause.Timing == PauseTiming.Current)
+                    {
+                        <span class="ht-spacer"></span>
+                        <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-label="@(ResumeLabel + pause.RangeText)"
+                                @onclick="() => OnResume.InvokeAsync(pause)">Resume now</button>
+                    }
+                    else if (pause.Timing == PauseTiming.Upcoming)
+                    {
+                        <span class="ht-spacer"></span>
+                        <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-label="@(CancelLabel + pause.RangeText)"
+                                @onclick="() => OnCancel.InvokeAsync(pause)">Cancel pause</button>
+                    }
+                </div>
+                @if (pause.Reason is { } reason)
+                {
+                    <div class="ht-goal__meta ht-muted">@reason</div>
+                }
+            </div>
+        }
+    </HtCard>
+}
+
+@code {
+    /// <summary>The start of the accessible name of "Resume now": "Resume now, Mon 16 Nov – Sun 22 Nov".</summary>
+    private const string ResumeLabel = "Resume now, ";
+
+    /// <summary>The start of the accessible name of "Cancel pause": "Cancel pause, Mon 23 Nov – Sun 29 Nov".</summary>
+    private const string CancelLabel = "Cancel pause, ";
+
+    /// <summary>The goal's pauses as <c>GetPausesAsync</c> gives them, the latest first day first.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<PauseView> Pauses { get; set; } = [];
+
+    /// <summary>"Resume now" on the current pause: the page resumes the goal (FR-010).</summary>
+    [Parameter]
+    public EventCallback<PauseView> OnResume { get; set; }
+
+    /// <summary>"Cancel pause" on an upcoming pause: the page cancels it (FR-011).</summary>
+    [Parameter]
+    public EventCallback<PauseView> OnCancel { get; set; }
+
+    /// <summary>A refusal of "Resume now" or "Cancel pause", shown under the card title; null for none.</summary>
+    [Parameter]
+    public string? Refusal { get; set; }
+}

@@ -1,4 +1,5 @@
 using HT.Domain.Evaluation;
+using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Records;
 
@@ -17,10 +18,22 @@ internal static class EntryViews
     /// target of the settings version in effect for its first date, its grace end only while it is Due or Pending, its
     /// records as views, its note, and whether a change now is a correction (its grace period has ended, FR-006).
     /// <paramref name="records"/> are the entry's records, in date order and then in the stored order.
+    /// <para>
+    /// Slice 7 (research R-06, FR-003, FR-007, FR-017): the entry's exemption comes from the goal's
+    /// <paramref name="exemptions"/> (<see cref="GoalExemptions.ExemptionOf"/>, with the schedule kind of the entry's
+    /// version). An Excused or Paused entry has that state, its records, progress and note as before, no grace end, and is
+    /// never a correction; an Excused one also has its excusal's reason and whether the excusal can still be removed
+    /// (<paramref name="now"/> before its grace end, FR-004).
+    /// </para>
     /// </summary>
-    internal static HistoryEntry Of(Goal goal, CalendarEntry entry, IReadOnlyList<GoalRecord> records, NoteText? note, DateTimeOffset now)
+    internal static HistoryEntry Of(
+        Goal goal, CalendarEntry entry, IReadOnlyList<GoalRecord> records, NoteText? note, GoalExemptions exemptions, DateTimeOffset now)
     {
-        var evaluation = Evaluator.Evaluate(TargetOf(goal, entry), entry.Starts, entry.Ends, records.Select(record => record.Value).ToList(), now);
+        var target = TargetOf(goal, entry);
+        var exemption = exemptions.ExemptionOf(entry, target.ScheduleKindOf);
+        var evaluation = Evaluator.Evaluate(target, entry.Starts, entry.Ends, records.Select(record => record.Value).ToList(), now, exemption);
+        var graceEnds = GracePeriod.EndOf(entry.Ends);
+        var excused = exemption == EvaluationState.Excused;
         return new HistoryEntry
         {
             FirstDate = entry.FirstDate,
@@ -32,7 +45,9 @@ internal static class EntryViews
             Records = records.Select(record => new RecordView(record.Id, record.Date, record.Value.Answer, record.Value.Amount)).ToList(),
             Progress = evaluation.Progress,
             Note = note?.Value,
-            IsCorrection = now >= GracePeriod.EndOf(entry.Ends),
+            IsCorrection = exemption is null && now >= graceEnds,
+            ExcusalReason = excused ? exemptions.ExcusalOf(entry.Key)?.Reason?.Value : null,
+            CanRemoveExcusal = excused && now < graceEnds,
         };
     }
 

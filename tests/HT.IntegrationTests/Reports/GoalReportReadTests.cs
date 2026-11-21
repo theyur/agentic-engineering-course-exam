@@ -1,13 +1,16 @@
 using HT.Application;
 using HT.Application.Accounts;
+using HT.Application.Exemptions;
 using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Application.Reports;
 using HT.Domain.Accounts;
 using HT.Domain.Evaluation;
+using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
+using HT.Domain.Reports;
 using HT.IntegrationTests.Habits;
 using HT.Persistence;
 using HT.UnitTests.Fakes;
@@ -187,13 +190,177 @@ public sealed class GoalReportReadTests(DatabaseFixture database)
         AssertSameReport(onTime, after);
     }
 
-    private static async Task<GoalId> CreateGoalAsync(IServiceProvider services, ActingUser user, HabitId habit)
+    [Fact]
+    public async Task FR_024_a_report_with_an_excusal_and_a_pause_made_through_the_services_equals_the_report_over_the_fakes()
+    {
+        // Slice 7 US3's facts on "Reading, 20 min daily": 20 minutes recorded at 12:00Z on each date from 2 to 16 November
+        // except 9, 11 and 13 to 15; Monday 9 excused on Tuesday 10 at 08:00Z; the goal paused on Friday 13 at 08:00Z
+        // from that day until Sunday 15. Read on Thursday 19 November at 12:00Z: 2 to 16 November are final.
+        var suffix = Suffix();
+        var clock = new FakeTimeProvider(ClockStart);
+        await using var services = BuildServices(clock);
+        var user = await HabitAccounts.RegisteredUserAsync(services, database.ConnectionString, $"it-rep-exempt-{suffix}@example.com");
+        var habit = await CatalogHabitAsync(services, $"It-Rep Exempt {suffix}");
+        var goal = await CreateGoalAsync(services, user, habit);
+        var mon9 = Mon2.AddDays(7);
+        var fri13 = Mon2.AddDays(11);
+        var sun15 = Mon2.AddDays(13);
+
+        var recorded = new List<(DateOnly Date, int Minutes)>();
+        for (var day = 0; day < 15; day++)
+        {
+            var date = Mon2.AddDays(day);
+            if (day == 8)
+            {
+                clock.SetUtcNow(ClockStart.AddDays(day));
+                await ExcuseAsync(services, user, goal, mon9);
+            }
+
+            if (day == 11)
+            {
+                clock.SetUtcNow(ClockStart.AddDays(day));
+                await PauseAsync(services, user, goal, fri13, sun15);
+            }
+
+            clock.SetUtcNow(ClockStart.AddDays(day).AddHours(4));
+            if (date != mon9 && date != Mon2.AddDays(9) && (date < fri13 || date > sun15))
+            {
+                await RecordAsync(services, user, goal, date, new RecordInput { Amount = 20 });
+                recorded.Add((date, 20));
+            }
+        }
+
+        clock.SetUtcNow(new DateTimeOffset(2026, 11, 19, 12, 0, 0, TimeSpan.Zero));
+        var real = await ReportAsync(services, user, goal);
+        var fake = await FakeReportAsync(services, clock, user, goal, recorded, [mon9], [(fri13, sun15)]);
+
+        Assert.Equal("90% (10 of 11)", real.Stats.ConsistencyText);
+        Assert.Equal((2, 8), (real.Stats.CurrentStreak, real.Stats.LongestStreak));
+        Assert.Equal((1, 3), (real.Recent.Counts[EvaluationState.Excused], real.Recent.Counts[EvaluationState.Paused]));
+        Assert.Equal("Minutes per day, last 14 days; target 20; 1 excused, 3 paused", real.Trend.Label);
+        AssertSameReport(fake, real);
+    }
+
+    [Fact]
+    public async Task FR_024_a_removed_excusal_changes_the_next_report()
+    {
+        // Two goals with 20 minutes recorded at 12:00Z on Monday 2, Tuesday 3 and Thursday 5 November, nothing on
+        // Wednesday 4. Wednesday 4 of both is excused on Friday 6 at 10:00Z (Pending; its grace period ends on Saturday 7
+        // at 00:00Z); the excusal of the second goal is removed at 23:00Z that day. Read on Saturday 7 November at
+        // 10:00Z: 2 to 4 November are final, so the second goal's Wednesday 4 is Missed.
+        var suffix = Suffix();
+        var clock = new FakeTimeProvider(ClockStart);
+        await using var services = BuildServices(clock);
+        var user = await HabitAccounts.RegisteredUserAsync(services, database.ConnectionString, $"it-rep-unexcuse-{suffix}@example.com");
+        var habit = await CatalogHabitAsync(services, $"It-Rep Unexcuse {suffix}");
+        var kept = await CreateGoalAsync(services, user, habit);
+        var removed = await CreateGoalAsync(services, user, habit);
+        var wed4 = Mon2.AddDays(2);
+
+        var recorded = new List<(DateOnly Date, int Minutes)>();
+        foreach (var day in new[] { 0, 1, 3 })
+        {
+            clock.SetUtcNow(ClockStart.AddDays(day).AddHours(4));
+            var date = Mon2.AddDays(day);
+            await RecordAsync(services, user, kept, date, new RecordInput { Amount = 20 });
+            await RecordAsync(services, user, removed, date, new RecordInput { Amount = 20 });
+            recorded.Add((date, 20));
+        }
+
+        clock.SetUtcNow(new DateTimeOffset(2026, 11, 6, 10, 0, 0, TimeSpan.Zero));
+        await ExcuseAsync(services, user, kept, wed4);
+        await ExcuseAsync(services, user, removed, wed4);
+        var excused = await ReportAsync(services, user, removed);
+        clock.SetUtcNow(new DateTimeOffset(2026, 11, 6, 23, 0, 0, TimeSpan.Zero));
+        await using (var scope = services.CreateAsyncScope())
+        {
+            var result = await scope.ServiceProvider.GetRequiredService<ExcusalService>().RemoveExcusalAsync(user, removed, wed4, None);
+            Assert.Equal(RemoveExcusalOutcome.Removed, result.Outcome);
+        }
+
+        clock.SetUtcNow(new DateTimeOffset(2026, 11, 7, 10, 0, 0, TimeSpan.Zero));
+        var keptReport = await ReportAsync(services, user, kept);
+        var removedReport = await ReportAsync(services, user, removed);
+
+        Assert.Equal(EvaluationState.Excused, excused.Recent.Results.Single(result => result.FirstDate == wed4).State);
+        Assert.Equal("100% (2 of 2)", keptReport.Stats.ConsistencyText);
+        Assert.Equal(EvaluationState.Excused, keptReport.Recent.Results.Single(result => result.FirstDate == wed4).State);
+        Assert.Equal("66% (2 of 3)", removedReport.Stats.ConsistencyText);
+        Assert.Equal(EvaluationState.Missed, removedReport.Recent.Results.Single(result => result.FirstDate == wed4).State);
+        Assert.False(removedReport.Recent.Counts.ContainsKey(EvaluationState.Excused));
+        AssertSameReport(await FakeReportAsync(services, clock, user, kept, recorded, [wed4]), keptReport);
+        AssertSameReport(await FakeReportAsync(services, clock, user, removed, recorded), removedReport);
+    }
+
+    [Fact]
+    public async Task FR_024_a_cancelled_pause_changes_the_next_report()
+    {
+        // "Yoga, 3 times a week" (yes/no, per week): "Yes" recorded at 12:00Z on Tuesday 3, Wednesday 4 and Thursday 5
+        // November. On Monday 9 November at 10:00Z the goal is paused from Thursday 12 until Friday 13, an upcoming
+        // pause, so the week of 9 November is Paused and its bar marked. The pause is then cancelled at that time.
+        var suffix = Suffix();
+        var clock = new FakeTimeProvider(ClockStart);
+        await using var services = BuildServices(clock);
+        var user = await HabitAccounts.RegisteredUserAsync(services, database.ConnectionString, $"it-rep-cancel-{suffix}@example.com");
+        var habit = await CatalogHabitAsync(services, $"It-Rep Cancel {suffix}");
+        var target = new GoalTargetFields
+        {
+            BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.YesNo, ScheduleKind = ScheduleKind.Times,
+            Times = 3, Period = SchedulePeriod.Week,
+        };
+        var goal = await CreateGoalAsync(services, user, habit, target);
+        var recorded = new List<DateOnly>();
+        foreach (var day in new[] { 1, 2, 3 })
+        {
+            clock.SetUtcNow(ClockStart.AddDays(day).AddHours(4));
+            await RecordAsync(services, user, goal, Mon2.AddDays(day), new RecordInput { Answer = YesNoAnswer.Yes });
+            recorded.Add(Mon2.AddDays(day));
+        }
+
+        clock.SetUtcNow(new DateTimeOffset(2026, 11, 9, 10, 0, 0, TimeSpan.Zero));
+        var thu12 = Mon2.AddDays(10);
+        var fri13 = Mon2.AddDays(11);
+        var pause = await PauseAsync(services, user, goal, thu12, fri13);
+        var paused = await ReportAsync(services, user, goal);
+        var pausedOnFakes = await FakeReportAsync(services, clock, user, goal, [], paused: [(thu12, fri13)], answers: recorded);
+        await using (var scope = services.CreateAsyncScope())
+        {
+            var result = await scope.ServiceProvider.GetRequiredService<PauseService>().CancelPauseAsync(user, goal, pause, None);
+            Assert.Equal(CancelPauseOutcome.Cancelled, result.Outcome);
+        }
+
+        var cancelled = await ReportAsync(services, user, goal);
+
+        Assert.Equal(TrendMark.Paused, paused.Trend.Bars[^1].Mark);
+        Assert.Equal("Times per week, last 12 weeks; target 3; 1 paused", paused.Trend.Label);
+        Assert.Null(cancelled.Trend.Bars[^1].Mark);
+        Assert.Equal("Times per week, last 12 weeks; target 3", cancelled.Trend.Label);
+        AssertSameReport(pausedOnFakes, paused);
+        AssertSameReport(await FakeReportAsync(services, clock, user, goal, [], answers: recorded), cancelled);
+    }
+
+    private static async Task<GoalId> CreateGoalAsync(IServiceProvider services, ActingUser user, HabitId habit, GoalTargetFields? target = null)
     {
         await using var scope = services.CreateAsyncScope();
         var created = await scope.ServiceProvider.GetRequiredService<GoalService>().CreateAsync(
-            user, new GoalInput { Habit = new GoalHabit(habit, HabitKind.Catalog), Target = Reading20MinDaily, StartDate = Mon2 }, None);
+            user, new GoalInput { Habit = new GoalHabit(habit, HabitKind.Catalog), Target = target ?? Reading20MinDaily, StartDate = Mon2 }, None);
         Assert.Equal(GoalCreateOutcome.Created, created.Outcome);
         return created.GoalId!.Value;
+    }
+
+    private static async Task ExcuseAsync(IServiceProvider services, ActingUser user, GoalId goal, DateOnly date)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<ExcusalService>().ExcuseAsync(user, goal, date, null, None);
+        Assert.Equal(ExcuseOutcome.Excused, result.Outcome);
+    }
+
+    private static async Task<PauseId> PauseAsync(IServiceProvider services, ActingUser user, GoalId goal, DateOnly firstDay, DateOnly lastDay)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<PauseService>().PauseAsync(user, goal, firstDay, lastDay, null, None);
+        Assert.Equal(PauseOutcome.Paused, result.Outcome);
+        return result.Pause!.Id;
     }
 
     private static async Task RecordAsync(IServiceProvider services, ActingUser user, GoalId goal, DateOnly date, RecordInput input)
@@ -213,10 +380,18 @@ public sealed class GoalReportReadTests(DatabaseFixture database)
 
     /// <summary>
     /// The report at the clock's time through a <see cref="ReportService"/> over a <see cref="FakeRecordStore"/> seeded
-    /// with <paramref name="recorded"/>, and the real goal and account stores.
+    /// with <paramref name="recorded"/> (and the "Yes" answers of <paramref name="answers"/>), the excusals of
+    /// <paramref name="excused"/> and the pauses of <paramref name="paused"/>, and the real goal and account stores.
     /// </summary>
     private static async Task<GoalReport> FakeReportAsync(
-        IServiceProvider services, TimeProvider clock, ActingUser user, GoalId goal, IReadOnlyList<(DateOnly Date, int Minutes)> recorded)
+        IServiceProvider services,
+        TimeProvider clock,
+        ActingUser user,
+        GoalId goal,
+        IReadOnlyList<(DateOnly Date, int Minutes)> recorded,
+        IReadOnlyList<DateOnly>? excused = null,
+        IReadOnlyList<(DateOnly FirstDay, DateOnly LastDay)>? paused = null,
+        IReadOnlyList<DateOnly>? answers = null)
     {
         await using var scope = services.CreateAsyncScope();
         var goals = scope.ServiceProvider.GetRequiredService<IGoalStore>();
@@ -230,12 +405,27 @@ public sealed class GoalReportReadTests(DatabaseFixture database)
             fakeRecords.Seed(goal, date, RecordValue.FromAmount(minutes));
         }
 
+        foreach (var date in answers ?? [])
+        {
+            fakeRecords.Seed(goal, date, RecordValue.FromAnswer(YesNoAnswer.Yes));
+        }
+
+        foreach (var date in excused ?? [])
+        {
+            fakeRecords.SeedExcusal(goal, date);
+        }
+
+        foreach (var (firstDay, lastDay) in paused ?? [])
+        {
+            fakeRecords.SeedPause(goal, firstDay, lastDay);
+        }
+
         var service = new ReportService(
             goals, fakeRecords, scope.ServiceProvider.GetRequiredService<IAccountStore>(), clock,
             scope.ServiceProvider.GetRequiredService<InstallationTimeZone>());
         var result = await service.GetGoalReportAsync(user, goal, None);
         Assert.Equal(GoalReportOutcome.Found, result.Outcome);
-        Assert.Equal([nameof(IRecordStore.ReadAsync)], fakeRecords.Calls);
+        Assert.Equal([nameof(IRecordStore.ReadExemptionsAsync), nameof(IRecordStore.ReadAsync)], fakeRecords.Calls);
         return result.Report!;
     }
 

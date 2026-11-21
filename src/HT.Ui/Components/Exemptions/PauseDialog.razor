@@ -1,0 +1,208 @@
+@using System.Globalization
+@using HT.Application.Exemptions
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@* design/components/PauseDialog, slice 7 state (HP-002, HP-007; contracts/host.md "PauseDialog"): pauses one goal for
+   a date range. The title "Pause · {goal name}", no sub line; the effect first; "From" and "Until" side by side
+   (ht-field-pair), both date inputs: "From" by default the page's current date (the pause date the page read with
+   GetPausesAsync, research R-03) with min that date, "Until" empty on open, aria-required and no native required or
+   min; "Reason (optional)", empty on open; the primary "Pause goal" and "Cancel". The dialog reads no clock and decides
+   nothing: "Pause goal" calls PauseAsync in a scope of its own and raises OnSaved on "paused"; a refusal shows with the
+   result's message as it is, one at a time, under the field it is about (aria-invalid and aria-describedby):
+   DaysMissing under the empty field ("From" when "From" is empty, else "Until"), StartsBeforeToday under "From",
+   LastBeforeFirst and Overlaps under "Until", ReasonTooLong under "Reason"; a refusal about no field as an alert above
+   the fields. The fields keep what was entered. Focus moves to "From" on open; Esc, × and Cancel close the dialog, and
+   focus returns to the opener (FocusOnClose, or ReturnFocus). *@
+<HtDialog Open="Open" OnClose="OnClose" ReturnFocus="ReturnFocus" FocusOnOpen="FocusFromAsync" FocusOnClose="FocusOnClose">
+    <Title>@TitlePrefix@GoalName</Title>
+    <ChildContent>
+        <p>Paused days are not counted. Your streak stays as it is. Final results do not change.</p>
+        @if (ErrorFor(Field.None) is { } alert)
+        {
+            <p class="ht-field__error" role="alert">@alert</p>
+        }
+        <div class="ht-field-pair">
+            <label class="ht-field">
+                <span class="ht-field__label">From</span>
+                <input class="ht-input" type="date" id="@FromId" @ref="_fromInput" value="@DateValue(_from)" min="@DateValue(Today)"
+                       @onchange="e => _from = DateOf(e.Value)"
+                       aria-invalid="@Invalid(Field.From)" aria-describedby="@DescribedBy(Field.From)" />
+                @if (ErrorFor(Field.From) is { } fromError)
+                {
+                    <span class="ht-field__error" id="@ErrorId(Field.From)">@fromError</span>
+                }
+            </label>
+            <label class="ht-field">
+                <span class="ht-field__label">Until</span>
+                <input class="ht-input" type="date" id="@UntilId" value="@DateValue(_until)" aria-required="true"
+                       @onchange="e => _until = DateOf(e.Value)"
+                       aria-invalid="@Invalid(Field.Until)" aria-describedby="@DescribedBy(Field.Until)" />
+                @if (ErrorFor(Field.Until) is { } untilError)
+                {
+                    <span class="ht-field__error" id="@ErrorId(Field.Until)">@untilError</span>
+                }
+            </label>
+        </div>
+        <label class="ht-field">
+            <span class="ht-field__label">Reason <span class="ht-muted">(optional)</span></span>
+            <input class="ht-input" type="text" id="@ReasonId" value="@_reason"
+                   @oninput="e => _reason = e.Value?.ToString()"
+                   aria-invalid="@Invalid(Field.Reason)" aria-describedby="@DescribedBy(Field.Reason)" />
+            @if (ErrorFor(Field.Reason) is { } reasonError)
+            {
+                <span class="ht-field__error" id="@ErrorId(Field.Reason)">@reasonError</span>
+            }
+        </label>
+    </ChildContent>
+    <Footer>
+        <HtButton @onclick="PauseAsync" disabled="@_saving">Pause goal</HtButton>
+        <HtButton Variant="HtButton.ButtonVariant.Secondary" @onclick="() => OnClose.InvokeAsync()">Cancel</HtButton>
+    </Footer>
+</HtDialog>
+
+@code {
+    /// <summary>The title: "Pause · " and the goal's name (HP-002).</summary>
+    private const string TitlePrefix = "Pause · ";
+
+    /// <summary>The value format of a date input.</summary>
+    private const string DateFormat = "yyyy-MM-dd";
+
+    private readonly string _id = $"pause-dialog-{Guid.NewGuid():N}";
+    private ElementReference _fromInput;
+    private DateOnly? _from;
+    private DateOnly? _until;
+    private string? _reason;
+    private string? _error;
+    private Field _errorField;
+    private bool _saving;
+    private bool _wasOpen;
+
+    /// <summary>The field a refusal is shown under; <see cref="None"/> for a refusal about no field.</summary>
+    private enum Field
+    {
+        None,
+        From,
+        Until,
+        Reason,
+    }
+
+    /// <summary>Whether the dialog is shown; the page owns this value.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Esc, × or Cancel: the page should close the dialog.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>The control that opened the dialog ("Pause"); it gets the focus back when the dialog closes.</summary>
+    [Parameter]
+    public ElementReference? ReturnFocus { get; set; }
+
+    /// <summary>
+    /// Gives the focus back when the dialog closes, in place of <see cref="ReturnFocus"/>: for an opener that the re-read
+    /// after "paused" may have removed ("Pause" leaves the head while a pause is current).
+    /// </summary>
+    [Parameter]
+    public Func<ValueTask>? FocusOnClose { get; set; }
+
+    /// <summary>The goal to pause.</summary>
+    [Parameter, EditorRequired]
+    public GoalId GoalId { get; set; }
+
+    /// <summary>The goal's name, for the title.</summary>
+    [Parameter, EditorRequired]
+    public string GoalName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The page's current date: the pause date it read (<c>PausesResult.PauseDate</c>, research R-03). "From" starts on
+    /// it and has it as its <c>min</c>.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public DateOnly Today { get; set; }
+
+    /// <summary>The acting user the page read.</summary>
+    [Parameter, EditorRequired]
+    public ActingUser ActingUser { get; set; } = ActingUser.Anonymous;
+
+    /// <summary>The goal was paused: the page reads everything again and closes the dialog.</summary>
+    [Parameter]
+    public EventCallback OnSaved { get; set; }
+
+    private string FromId => _id + "-from";
+
+    private string UntilId => _id + "-until";
+
+    private string ReasonId => _id + "-reason";
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !_wasOpen)
+        {
+            _from = Today;
+            _until = null;
+            _reason = null;
+            _error = null;
+            _errorField = Field.None;
+            _saving = false;
+        }
+
+        _wasOpen = Open;
+    }
+
+    private string ErrorId(Field field) => _id + "-" + field.ToString().ToLowerInvariant() + "-error";
+
+    private string? ErrorFor(Field field) => _error is not null && _errorField == field ? _error : null;
+
+    private string? Invalid(Field field) => ErrorFor(field) is null ? null : "true";
+
+    private string? DescribedBy(Field field) => ErrorFor(field) is null ? null : ErrorId(field);
+
+    private static string? DateValue(DateOnly? date) => date?.ToString(DateFormat, CultureInfo.InvariantCulture);
+
+    private static DateOnly? DateOf(object? value) =>
+        DateOnly.TryParseExact(value?.ToString(), DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null;
+
+    private ValueTask FocusFromAsync() => _fromInput.FocusAsync();
+
+    private async Task PauseAsync()
+    {
+        if (_saving)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var goal = GoalId;
+            var from = _from;
+            var until = _until;
+            var reason = _reason;
+            var result = await UseCases.RunAsync<PauseService, PauseResult>(
+                (service, token) => service.PauseAsync(ActingUser, goal, from, until, reason, token), CancellationToken.None);
+            if (result.Outcome == PauseOutcome.Paused)
+            {
+                _error = null;
+                _errorField = Field.None;
+                await OnSaved.InvokeAsync();
+                return;
+            }
+
+            _error = result.Message;
+            _errorField = result.Outcome switch
+            {
+                PauseOutcome.DaysMissing => from is null ? Field.From : Field.Until,
+                PauseOutcome.StartsBeforeToday => Field.From,
+                PauseOutcome.LastBeforeFirst or PauseOutcome.Overlaps => Field.Until,
+                PauseOutcome.ReasonTooLong => Field.Reason,
+                _ => Field.None,
+            };
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

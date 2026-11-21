@@ -11,7 +11,11 @@
    text. Column 4: the mini strip of the last 15 ended results. Column 5: "Record", primary when a Due entry exists,
    secondary when only Pending ones do, absent when nothing can be recorded now (the empty column stays, so the
    columns line up); it raises OnRecord, and the island opens the RecordDialog. The item computes no figure and builds
-   no figure text. Named GoalItem, not GoalListItem, so the view HT.Application.Goals.GoalListItem stays unambiguous. *@
+   no figure text. Named GoalItem, not GoalListItem, so the view HT.Application.Goals.GoalListItem stays unambiguous.
+   Slice 7 (HP-004; design/components/GoalListItem, slice 7 state): the Paused form, for a goal with PausedUntil. Its
+   meta text is ReportText.PausedUntil alone ("Paused until Sun 22 Nov"), in place of slice 6's whole meta text; the
+   Tag, the Pending StatusChip, the figures and the strip stay; its one action is the secondary "Resume" (no
+   aria-haspopup: it resumes at once, FR-010), in place of "Record", and raises OnResume. *@
 <div class="ht-goalitem">
     <div>
         <a class="ht-goalitem__name" href="@($"/goals/{Item.Id.Value}")" @ref="_nameLink">@Item.Name</a>
@@ -28,7 +32,12 @@
     <div><div class="ht-goalitem__value">@Goal.Stats.CurrentStreakText</div><div class="ht-goalitem__label">Current streak</div></div>
     <div><ConsistencyStrip States="Strip" Unit="Goal.Stats.Unit" Mini="true" /></div>
     <div class="ht-goalitem__actions">
-        @if (Goal.CanRecord)
+        @if (Goal.PausedUntil is not null)
+        {
+            <button type="button" class="ht-btn ht-btn--secondary ht-btn--sm" aria-label="@($"Resume {Item.Name}")" @ref="_resumeButton"
+                    @onclick="() => OnResume.InvokeAsync(Goal)">Resume</button>
+        }
+        else if (Goal.CanRecord)
         {
             <button type="button" class="@(HasDue ? "ht-btn ht-btn--primary ht-btn--sm" : "ht-btn ht-btn--secondary ht-btn--sm")"
                     aria-haspopup="dialog" aria-label="@($"Record for {Item.Name}")" @ref="_recordButton"
@@ -40,6 +49,7 @@
 @code {
     private ElementReference _nameLink;
     private ElementReference _recordButton;
+    private ElementReference _resumeButton;
 
     /// <summary>The goal as the overview gives it.</summary>
     [Parameter, EditorRequired]
@@ -53,6 +63,12 @@
     [Parameter]
     public EventCallback<OverviewGoal> OnRecord { get; set; }
 
+    /// <summary>
+    /// Slice 7 (HP-004): "Resume" of a paused goal was chosen; the island resumes it and reads the overview again.
+    /// </summary>
+    [Parameter]
+    public EventCallback<OverviewGoal> OnResume { get; set; }
+
     private GoalListItem Item => Goal.Item;
 
     /// <summary>"Record" is primary when the goal has a Due commitment or period.</summary>
@@ -61,13 +77,22 @@
     private IReadOnlyList<EvaluationState> Strip => Goal.Recent.Results.Select(result => result.State).ToList();
 
     /// <summary>
-    /// Gives the focus to the item's "Record", or to its name link when it has none: the island calls it when the
-    /// RecordDialog closes, after it has read the overview again (constitution IV).
+    /// Gives the focus to the item's action: "Resume" in the Paused form, otherwise "Record", or the name link when the
+    /// item has no action. The island calls it after it has read the overview again: when the RecordDialog closes, and
+    /// after a "Resume" for the nearest remaining paused item (constitution IV, HP-007).
     /// </summary>
-    public ValueTask FocusAsync() => Goal.CanRecord ? _recordButton.FocusAsync() : _nameLink.FocusAsync();
+    public ValueTask FocusAsync() =>
+        Goal.PausedUntil is not null ? _resumeButton.FocusAsync()
+        : Goal.CanRecord ? _recordButton.FocusAsync()
+        : _nameLink.FocusAsync();
 
-    /// <summary>Slice 4's text, then " · " and the progress of the newest Due entry that has a record.</summary>
-    private string MetaLine => DueProgress is { } progress ? SliceFourText + " · " + progress : SliceFourText;
+    /// <summary>
+    /// The Paused form's "Paused until …" (slice 7 HP-004), otherwise slice 4's text, then " · " and the progress of the
+    /// newest Due entry that has a record.
+    /// </summary>
+    private string MetaLine => Goal.PausedUntil is { } lastDay
+        ? ReportText.PausedUntil(lastDay)
+        : DueProgress is { } progress ? SliceFourText + " · " + progress : SliceFourText;
 
     private string? DueProgress =>
         Goal.Recordable.Entries.FirstOrDefault(entry => entry.State == EvaluationState.Due && entry.Records.Count > 0) is { } due

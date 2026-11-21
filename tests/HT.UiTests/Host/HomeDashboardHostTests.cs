@@ -1,4 +1,6 @@
 using System.Net;
+using HT.Application.Accounts;
+using HT.Application.Exemptions;
 using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Domain.Accounts;
@@ -68,6 +70,73 @@ public sealed class HomeDashboardHostTests(HostFixture host)
     }
 
     [Fact]
+    public async Task Slice_7_HP_005_the_prerendered_Home_has_Excuse_on_a_Pending_commitment_row_and_not_on_the_Due_one()
+    {
+        // A goal of 15 min every day from yesterday (UTC, at the host's clock): yesterday is Pending (its grace period ends
+        // 48 hours after 00:00 today) with no record, today is Due.
+        var habitName = $"Ui-Hd Excuse {Guid.NewGuid():N}"[..28];
+        var (browser, account) = await host.SignedInAccountAsync(Email("excuse"), Role.RegisteredUser);
+        using (browser)
+        {
+            DateOnly today;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                today = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow());
+                await StoreGoalAsync(services, account, habitName, today.AddDays(-1), recordFirstDay: false);
+            }
+
+            var (status, html) = await browser.GetPageAsync("/");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            var text = WebUtility.HtmlDecode(html);
+            var name = habitName + ", 15 min daily";
+            Assert.Equal(1, Count(text, ">Excuse</button>"));
+            Assert.Contains($"aria-label=\"Excuse {name}, {DateTexts.ShortDate(today.AddDays(-1))}\"", text, StringComparison.Ordinal);
+            Assert.DoesNotContain($"aria-label=\"Excuse {name}, {DateTexts.ShortDate(today)}\"", text, StringComparison.Ordinal);
+            Assert.Contains($"aria-label=\"Record for {name}, {DateTexts.ShortDate(today)}\"", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_005_the_prerendered_Home_leaves_a_paused_goal_out_of_the_Active_goals_tile_and_card()
+    {
+        // Two goals of 15 min every day from today (UTC, at the host's clock; today Due): "… P" paused through the host's
+        // PauseService from today, the pause date, for 7 days; "… A" not paused. The tile counts 1, the card lists only "… A",
+        // and "… P" has no Today row.
+        var prefix = $"Ui-Hd Paused {Guid.NewGuid():N}"[..26];
+        var (browser, account) = await host.SignedInAccountAsync(Email("paused"), Role.RegisteredUser);
+        using (browser)
+        {
+            GoalId active, paused;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                var today = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow());
+                active = await StoreGoalAsync(services, account, prefix + " A", today, recordFirstDay: false);
+                paused = await StoreGoalAsync(services, account, prefix + " P", today, recordFirstDay: false);
+                var result = await services.GetRequiredService<PauseService>().PauseAsync(
+                    ActingUser.ForAccount(account, Role.RegisteredUser), paused, today, today.AddDays(6), null, CancellationToken.None);
+                Assert.Equal(PauseOutcome.Paused, result.Outcome);
+            }
+
+            var (status, html) = await browser.GetPageAsync("/");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            var text = WebUtility.HtmlDecode(html);
+            foreach (var (value, label) in new[] { ("1", "Due now"), ("0", "Pending · still can record"), ("0", "Missed this week"), ("1", "Active goals") })
+            {
+                Assert.Contains($"<span class=\"ht-tile__value\">{value}</span><span class=\"ht-tile__label\">{label}</span>", text, StringComparison.Ordinal);
+            }
+
+            Assert.Equal(1, Count(text, "<div class=\"ht-row\">"));
+            Assert.Equal(1, Count(text, "<a class=\"ht-goal__name\""));
+            Assert.Contains($"<a class=\"ht-goal__name\" href=\"/goals/{active.Value}\">{prefix} A, 15 min daily</a>", text, StringComparison.Ordinal);
+            Assert.DoesNotContain($"/goals/{paused.Value}", text, StringComparison.Ordinal);
+            Assert.DoesNotContain($"{prefix} P", text, StringComparison.Ordinal);
+        }
+    }
+    [Fact]
     public async Task A_user_with_no_goals_gets_the_EmptyState_and_no_tile()
     {
         using var browser = await host.SignedInBrowserAsync(Email("empty"), Role.RegisteredUser);
@@ -99,9 +168,9 @@ public sealed class HomeDashboardHostTests(HostFixture host)
     /// <summary>
     /// A goal of 15 min on every day of <paramref name="account"/>, stored through the host's goal store on a new
     /// Published catalog habit named <paramref name="habitName"/>, from <paramref name="first"/> in UTC, with 15 min
-    /// recorded on that day when <paramref name="recordFirstDay"/> is set.
+    /// recorded on that day when <paramref name="recordFirstDay"/> is set. Returns the goal's identifier.
     /// </summary>
-    private async Task StoreGoalAsync(IServiceProvider services, AccountId account, string habitName, DateOnly first, bool recordFirstDay)
+    private async Task<GoalId> StoreGoalAsync(IServiceProvider services, AccountId account, string habitName, DateOnly first, bool recordFirstDay)
     {
         var habit = await host.ArrangeCatalogHabitAsync(Definition(habitName));
         Assert.True(GoalTarget.TryCreate(new GoalTargetFields
@@ -119,5 +188,7 @@ public sealed class HomeDashboardHostTests(HostFixture host)
                 RecordLimits.MaxRecordsPerPeriod, CancellationToken.None);
             Assert.Equal(RecordStoreWriteOutcome.Written, written.Outcome);
         }
+
+        return created.Id!.Value;
     }
 }

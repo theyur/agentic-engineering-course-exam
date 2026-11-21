@@ -22,6 +22,18 @@ public enum RecordWriteOutcome
     Recorded,
     Changed,
     Deleted,
+
+    // Slice 7 (FR-005 steps 4a to 4c, FR-009), checked after DayNotBegun and before the value. Added last, after
+    // Deleted, so the earlier members keep their values, as RecordStoreWriteOutcome.Exempt is.
+
+    /// <summary>FR-005 (4a): the date is in a pause of the goal.</summary>
+    DatePaused,
+
+    /// <summary>FR-005 (4b): the date belongs to a Paused per-week period and is not itself in a pause.</summary>
+    WeekPaused,
+
+    /// <summary>FR-005 (4c): the commitment is excused.</summary>
+    CommitmentExcused,
 }
 
 /// <summary>

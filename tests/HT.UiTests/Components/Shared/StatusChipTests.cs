@@ -7,8 +7,9 @@ using HT.Ui.Components.Shared;
 namespace HT.UiTests.Components.Shared;
 
 /// <summary>
-/// StatusChip (HP-004, design/components/StatusChip slice-5 state): each state's word from RecordingText and the
-/// design's classes, and no other; the word is always there, so colour is never the only signal.
+/// StatusChip (HP-004, design/components/StatusChip slice-5 state; slice 7 HP-006): each state's word from RecordingText
+/// and the design's classes, and no other, "Excused" and "Paused" included; the word is always there, so colour is never
+/// the only signal.
 /// </summary>
 public sealed class StatusChipTests : BunitContext
 {
@@ -27,6 +28,34 @@ public sealed class StatusChipTests : BunitContext
         var chip = cut.Find("span");
         Assert.Equal(text, chip.TextContent);
         Assert.Equal(["ht-chip", "ht-status", modifier], chip.ClassList.ToArray());
+    }
+
+    public static TheoryData<EvaluationState, GoalScheduleKind, SchedulePeriod?> EveryExemption()
+    {
+        var data = new TheoryData<EvaluationState, GoalScheduleKind, SchedulePeriod?>();
+        foreach (var state in new[] { EvaluationState.Excused, EvaluationState.Paused })
+        {
+            data.Add(state, GoalScheduleKind.CommitmentBased, null);
+            data.Add(state, GoalScheduleKind.PeriodBased, SchedulePeriod.Day);
+            data.Add(state, GoalScheduleKind.PeriodBased, SchedulePeriod.Week);
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(EveryExemption))]
+    public void Slice_7_an_Excused_or_Paused_chip_has_its_word_and_the_design_classes(EvaluationState state, GoalScheduleKind kind, SchedulePeriod? period)
+    {
+        // Slice 7 (HP-006, design/components/StatusChip slice-7 state): the word from ReportText.State, never colour alone.
+        var (text, modifier) = state == EvaluationState.Excused ? ("Excused", "ht-status--excused") : ("Paused", "ht-status--paused");
+
+        var cut = Render<StatusChip>(p => p
+            .Add(x => x.State, state)
+            .Add(x => x.ScheduleKind, kind)
+            .Add(x => x.Period, period));
+
+        cut.MarkupMatches($"<span class=\"ht-chip ht-status {modifier}\">{text}</span>");
     }
 
     [Fact]

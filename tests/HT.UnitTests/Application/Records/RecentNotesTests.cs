@@ -117,6 +117,7 @@ public sealed class RecentNotesTests
         Assert.Equal(
             [
                 nameof(IRecordStore.ReadRecentNoteKeysAsync),
+                nameof(IRecordStore.ReadExemptionsAsync),
                 nameof(IRecordStore.ReadAsync),
                 nameof(IRecordStore.ReadAsync),
                 nameof(IRecordStore.ReadAsync),
@@ -187,5 +188,45 @@ public sealed class RecentNotesTests
         Assert.Equal(NotFound, result.Message);
         Assert.Empty(result.Notes);
         Assert.Empty(_world.Records.Calls);
+    }
+
+    [Fact]
+    public async Task Slice_7_FR_020_a_note_of_an_Excused_or_Paused_entry_has_that_state_after_one_exemption_read()
+    {
+        // Tuesday 24 at 10:00Z: Saturday 21 and Friday 20 would be final; Friday 20 is excused and Saturday 21 paused,
+        // with a record kept on it; Sunday 22 is Pending.
+        var goal = await _world.CreateGoalAsync(Reading20MinDaily, Mon16, Mon16Morning);
+        _world.Records.Seed(goal, Sat21, RecordValue.FromAmount(20));
+        _world.Records.SeedExcusal(goal, Fri20);
+        _world.Records.SeedPause(goal, Sat21, Sat21);
+        Note(goal, Fri20, "Ill.");
+        Note(goal, Sat21, "Travelling.");
+        Note(goal, Sun22, "Read in the park.");
+        _world.At(Tue24TenOClock);
+
+        var notes = Found(await RecentNotesAsync(goal));
+
+        Assert.Equal(
+            [
+                Recent(Sun22, Sun22, "Read in the park.", EvaluationState.Pending),
+                Recent(Sat21, Sat21, "Travelling.", EvaluationState.Paused),
+                Recent(Fri20, Fri20, "Ill.", EvaluationState.Excused),
+            ],
+            notes);
+        Assert.Single(_world.Records.Calls, nameof(IRecordStore.ReadExemptionsAsync));
+    }
+
+    [Fact]
+    public async Task Slice_7_FR_020_a_note_of_a_Paused_week_has_the_state_Paused()
+    {
+        var goal = await _world.CreateGoalAsync(YogaThreeTimesAWeek, Mon16, Mon16Morning);
+        _world.Records.Seed(goal, Wed18, RecordValue.FromAnswer(YesNoAnswer.Yes));
+        _world.Records.SeedPause(goal, Sun22, Sun22);
+        Note(goal, Mon16, "Good week.");
+        _world.At(Wed2TenOClock);
+
+        var note = Assert.Single(Found(await RecentNotesAsync(goal)));
+
+        Assert.Equal(Recent(Mon16, Sun22, "Good week.", EvaluationState.Paused), note);
     }
 }

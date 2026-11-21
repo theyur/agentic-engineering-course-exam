@@ -1,8 +1,9 @@
-@* design/components/StatusChip (slice-6 state, HP-002, HP-003): the evaluation state of one commitment or period,
-   always as a word with its colour, never the colour alone. The word comes from ReportText.State ("Upcoming" for
-   Upcoming, slice 5's RecordingText.State word for every other state); the classes are the design's
-   ht-chip ht-status ht-status--{met|failed|missed|pending|due}, and no other. Upcoming shares ht-status--due with
-   Due; its word tells them apart. *@
+@* design/components/StatusChip (slice-6 and slice-7 states, HP-002, HP-003; slice 7 HP-006): the evaluation state of
+   one commitment or period, or the exemption in its place, always as a word with its colour, never the colour alone.
+   The word comes from ReportText.State ("Upcoming" for Upcoming, slice 5's RecordingText.State word for every other
+   state, "Excused" and "Paused" included); the classes are the design's
+   ht-chip ht-status ht-status--{met|failed|missed|excused|paused|pending|due}, and no other. Upcoming shares
+   ht-status--due with Due; its word tells them apart. *@
 @using HT.Application.Reports
 @using HT.Domain.Evaluation
 @using HT.Domain.Goals
@@ -26,8 +27,10 @@
         EvaluationState.Met => "ht-status--met",
         EvaluationState.Failed => "ht-status--failed",
         EvaluationState.Missed => "ht-status--missed",
+        EvaluationState.Excused => "ht-status--excused",
+        EvaluationState.Paused => "ht-status--paused",
         EvaluationState.Pending => "ht-status--pending",
         EvaluationState.Due or EvaluationState.Upcoming => "ht-status--due",
-        _ => throw new InvalidOperationException("The state has no chip in this slice."),
+        _ => throw new InvalidOperationException("The state has no chip."),
     };
 }

@@ -1,20 +1,28 @@
-@* design/components/TrendChart (slice-6 state, HP-001, HP-006, FR-006): the card's title and sub line from the
-   TrendView, then ht-bars with role="img" and the aria-label TrendView.Label: one ht-bar per bar, oldest first, its
+@* design/components/TrendChart (slice-6 and slice-7 states, HP-001, HP-006, FR-006, FR-016): the card's title and
+   sub line from the TrendView, then ht-bars with role="img" and the aria-label TrendView.Label: one ht-bar per bar, oldest first, its
    height its value's share of the largest of the values and the target, rounded to a whole percentage; a bar with no
    record drawn as ht-bar--empty (a full-height dotted outline), never as a zero-height bar; each bar's title from
    ReportText.BarTitle with its own target; the dashed ht-bars__target line at TrendView.Target, labelled
    TrendView.TargetLine; then the date labels (ht-bars__labels, DateTexts.DayMonth of each bar's first date). The
-   heights are drawing only: every figure and text comes from the view. No paused bar until slice 7. *@
+   heights are drawing only: every figure and text comes from the view. Slice 7 (FR-016, HP-006, research R-07): a bar
+   with a Mark has no value and is drawn full height with a dashed outline, ht-bar--excused or ht-bar--paused, its title
+   "{date}: Excused" or "{date}: Paused" from ReportText.BarTitle; the aria-label (ReportText.TrendLabel) counts the
+   marked bars apart from bars with no record; the target line stays at TrendView.Target, the latest unmarked bar's. *@
 @using System.Globalization
 @using HT.Application.Accounts
 @using HT.Application.Reports
+@using HT.Domain.Reports
 <section class="ht-card">
     <h2 class="ht-card__title">@Trend.Title</h2>
     <p class="ht-card__sub">@Trend.SubLine</p>
     <div class="ht-bars" role="img" aria-label="@Trend.Label">
         @foreach (var bar in Trend.Bars)
         {
-            @if (bar.Value is { } value)
+            @if (bar.Mark is { } mark)
+            {
+                <i class="@MarkedClass(mark)" title="@ReportText.BarTitle(Trend, bar)"></i>
+            }
+            else if (bar.Value is { } value)
             {
                 <i class="ht-bar" style="@Height(value)" title="@ReportText.BarTitle(Trend, bar)"></i>
             }
@@ -40,6 +48,10 @@
 
     /// <summary>The largest of the values and the target, the 100% of the chart; at least 1, so a chart of zeros draws.</summary>
     private int Scale => Math.Max(1, Trend.Bars.Select(bar => bar.Value ?? 0).Append(Trend.Target).Max());
+
+    /// <summary>The design's dashed bar of a mark: ht-bar--excused or ht-bar--paused.</summary>
+    private static string MarkedClass(TrendMark mark) =>
+        mark == TrendMark.Excused ? "ht-bar ht-bar--excused" : "ht-bar ht-bar--paused";
 
     private string Height(int value) => "height:" + Percent(value);
 

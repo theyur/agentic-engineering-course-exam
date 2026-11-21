@@ -24,7 +24,7 @@
     [Parameter, EditorRequired]
     public GoalStatsView View { get; set; } = null!;
 
-    /// <summary>The strip's ended results (Met, Failed, Missed or Pending), oldest first.</summary>
+    /// <summary>The strip's ended results (Met, Failed, Missed, Excused, Paused or Pending), oldest first.</summary>
     [Parameter, EditorRequired]
     public IReadOnlyList<EvaluationState> Strip { get; set; } = [];
 

@@ -9,10 +9,11 @@ namespace HT.UiTests.Host;
 /// HP-017, SC-005 (research R-11): the smoke check in process against a real host on database <c>HT-UI-SMOKE</c>,
 /// reset before each case, with check 2 skipped (no HTTP front end). A freshly seeded host passes every check; a
 /// demo password that fails the password rule (no demo accounts, no seed catalog) fails <c>catalog</c>, every
-/// <c>demo</c> check, <c>demo history</c> and <c>demo report</c>; a demo account that lost a custom habit or a goal
-/// fails that account's check only. The output never contains a password, the administrator email, a demo custom-habit
-/// name, a demo goal name, demo1's account name (slice 4 HP-018), demo4's goal names, notes and amounts (slice 5
-/// HP-008), or demo5's goal names and notes (slice 6 HP-008).
+/// <c>demo</c> check, <c>demo history</c>, <c>demo report</c> and <c>demo pause</c>; a demo account that lost a custom
+/// habit or a goal fails that account's check only. The output never contains a password, the administrator email, a
+/// demo custom-habit name, a demo goal name, demo1's account name (slice 4 HP-018), demo4's goal names, notes and amounts
+/// (slice 5 HP-008), demo5's goal names and notes (slice 6 HP-008), or demo6's goal names, reasons and notes (slice 7
+/// HP-011).
 /// </summary>
 [Collection(DerivedDatabaseHostCollection.Name)]
 public sealed partial class SmokeCheckHostTests
@@ -37,6 +38,7 @@ public sealed partial class SmokeCheckHostTests
             [
                 "home", "https-redirect", "catalog", "administrator", .. DemoDataService.DemoEmails.Select(e => "demo " + e),
                 "demo history " + DemoHistoryService.DemoEmail, "demo report " + DemoReportService.DemoEmail,
+                "demo pause " + DemoPauseService.DemoEmail,
             ],
             result.CheckLines.Select(CheckName));
 
@@ -52,6 +54,9 @@ public sealed partial class SmokeCheckHostTests
         // Slice 6 HP-008: demo5's 3 goal names, "Streak, weeks" on Strength training's page, and on the Home the
         // "Missed this week" tile label and a "Missed" status chip.
         Assert.Equal("PASS demo report demo5@example.com (6 of 6)", Line(result, "demo report " + DemoReportService.DemoEmail));
+
+        // Slice 7 HP-011: "Excused" on Meditation's page, and on the Paused tab the paused goal with its "Paused until" meta.
+        Assert.Equal("PASS demo pause demo6@example.com (3 of 3)", Line(result, "demo pause " + DemoPauseService.DemoEmail));
         Assert.Matches(LaterTiming(), result.TimingLine);
         Assert.True(result.LaterRequests >= 1);
     }
@@ -80,6 +85,7 @@ public sealed partial class SmokeCheckHostTests
             Assert.StartsWith($"FAIL demo {email}: ", Line(result, "demo " + email), StringComparison.Ordinal));
         Assert.StartsWith("FAIL demo history demo4@example.com: ", Line(result, "demo history " + DemoHistoryService.DemoEmail), StringComparison.Ordinal);
         Assert.Equal("FAIL demo report demo5@example.com: the sign-in was refused", Line(result, "demo report " + DemoReportService.DemoEmail));
+        Assert.Equal("FAIL demo pause demo6@example.com: the sign-in was refused", Line(result, "demo pause " + DemoPauseService.DemoEmail));
         Assert.EndsWith(", later n/a", result.TimingLine, StringComparison.Ordinal);
     }
 
@@ -151,6 +157,15 @@ public sealed partial class SmokeCheckHostTests
             DemoReport.WalkingNote,
             DemoReport.StrengthNote,
             DemoReport.ScreenTimeNote,
+
+            // Slice 7 HP-011: demo6's goal names, the reasons and notes of FR-031, and the paused goal's meta text.
+            .. DemoPauses.GoalNames,
+            DemoPauses.TravellingReason,
+            DemoPauses.IllnessReason,
+            DemoPauses.FamilyVisitReason,
+            DemoPauses.OversleptNote,
+            DemoPauses.BusyDayNote,
+            "Paused until",
         ];
         Assert.All(forbidden, value => Assert.DoesNotContain(value, text, StringComparison.OrdinalIgnoreCase));
         return (result, text);

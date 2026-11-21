@@ -95,6 +95,45 @@ public class StreaksTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new Streaks(current, longest));
     }
 
+    // Slice 7 (FR-014, SC-002): Excused and Paused neither extend nor reset a run.
+
+    private const EvaluationState Excused = EvaluationState.Excused;
+    private const EvaluationState Paused = EvaluationState.Paused;
+
+    [Fact]
+    public void Slice_7_US3_AS2_the_sequence_gives_2_and_8()
+    {
+        Assert.Equal(new Streaks(2, 8), Streaks.Of(ConsistencyTests.Slice7Us3));
+    }
+
+    [Theory]
+    [MemberData(nameof(ConsistencyTests.ExemptSequences), MemberType = typeof(ConsistencyTests))]
+    public void Slice_7_SC_002_the_streaks_equal_those_of_the_sequence_without_its_exempt_states(EvaluationState[] states)
+    {
+        var withoutExempt = states.Where(state => state is not (Excused or Paused)).ToArray();
+
+        Assert.Equal(Streaks.Of(withoutExempt), Streaks.Of(states));
+    }
+
+    [Fact]
+    public void Slice_7_US3_AS6_only_exempt_states_give_0_and_0()
+    {
+        Assert.Equal(new Streaks(0, 0), Streaks.Of([Excused, .. Many(Paused, 6)]));
+    }
+
+    [Fact]
+    public void Slice_7_an_Excused_state_between_a_Failed_and_a_Met_does_not_join_runs_across_the_Failed()
+    {
+        Assert.Equal(new Streaks(1, 2), Streaks.Of([Met, Met, Failed, Excused, Met]));
+        Assert.Equal(new Streaks(1, 2), Streaks.Of([Met, Met, Excused, Failed, Paused, Met]));
+    }
+
+    [Fact]
+    public void Slice_7_exempt_states_inside_a_run_do_not_break_it()
+    {
+        Assert.Equal(new Streaks(4, 4), Streaks.Of([Met, Excused, Met, Paused, Paused, Met, Excused, Met]));
+    }
+
     [Fact]
     public void An_undefined_state_is_refused()
     {

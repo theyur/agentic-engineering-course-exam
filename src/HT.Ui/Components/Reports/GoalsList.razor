@@ -1,44 +1,125 @@
 @rendermode InteractiveServer
+@using HT.Application.Exemptions
 @using HT.Application.Records
 @using HT.Application.Reports
 @using HT.Domain.Accounts
 @using HT.Domain.Goals
 @using HT.Ui.Account
+@using HT.Ui.Components.Exemptions
 @using HT.Ui.Components.Records
 @using HT.Ui.Habits
 @inject UseCaseScope UseCases
 @inject ActingUserAccessor ActingUsers
 @* design/pages/PageGoals, slice 6 state (HP-002, research R-12, contracts/host.md "Goals page"): the interactive part
-   of the Goals page, prerendered, with no parameter. It reads the goals overview itself, through UseCaseScope, and
-   renders one full GoalItem per goal in the overview's order (FR-011). An item's "Record" opens slice 5's RecordDialog
-   in its page-head mode, with the goal's Recordable and its "For" select (slice 5 HP-002, research R-07). After a save
-   the overview is read again before the dialog closes, so the closing render already has the new figures. When the
-   dialog closes, saved or not, the focus goes back to that goal's "Record", found by its goal identifier after the
-   re-read, or to its name link when the goal has nothing left to record (constitution IV). *@
+   of the Goals page, prerendered. It reads the goals overview itself, through UseCaseScope, and renders one full
+   GoalItem per goal in the overview's order (FR-011). An item's "Record" opens slice 5's RecordDialog in its page-head
+   mode, with the goal's Recordable and its "For" select (slice 5 HP-002, research R-07). After a save the overview is
+   read again before the dialog closes, so the closing render already has the new figures. When the dialog closes,
+   saved or not, the focus goes back to that goal's "Record", found by its goal identifier after the re-read, or to its
+   name link when the goal has nothing left to record (constitution IV).
+   Slice 7 (HP-003; design/components/RecordDialog, slice 7 state): the RecordDialog's "Excuse instead" opens the Excuse
+   dialog for that commitment in its place; after "excused" the overview is read again before it closes, and the focus
+   goes back as for the RecordDialog.
+   Slice 7 (HP-004; design/pages/PageGoals, slice 7 state): the link Tabs "Active" (/goals) and "Paused"
+   (/goals?tab=paused), with no counts and no "Ended". The page passes the address's tab value, the only parameter, so
+   the tab works prerendered: "paused" shows Paused, any other value, or none, Active. Active lists the goals with no
+   PausedUntil, Paused the others, both in the overview's order; an empty Paused tab is a Card with
+   ReportText.NoPausedGoals. A Paused item's "Resume" resumes the goal through UseCaseScope, then the overview is read
+   again, also after a refusal, which shows above the list (role="alert"); the focus goes to the nearest remaining
+   paused item's "Resume" (the next one, else the one before), or to the "Paused" tab when none is left (HP-007). *@
 @if (_overview is { } overview)
 {
-    <div class="ht-list">
-        @foreach (var goal in overview.Goals)
+    <Tabs @ref="_tabs" Links="true" Label="Goal lists" Items="TabItems" />
+    @if (_resumeRefusal is { } refusal)
+    {
+        <p class="ht-field__error" role="alert">@refusal</p>
+    }
+    @if (ShowsPaused)
+    {
+        @if (PausedGoals is { Count: > 0 } paused)
         {
-            <GoalItem @key="goal.Item.Id" @ref="_items[goal.Item.Id]" Goal="goal" Today="overview.Today" OnRecord="OpenRecord" />
+            <div class="ht-list">
+                @foreach (var goal in paused)
+                {
+                    <GoalItem @key="goal.Item.Id" @ref="_items[goal.Item.Id]" Goal="goal" Today="overview.Today" OnResume="ResumeAsync" />
+                }
+            </div>
         }
-    </div>
+        else
+        {
+            <div class="ht-card"><p class="ht-card__sub">@ReportText.NoPausedGoals</p></div>
+        }
+    }
+    else if (ActiveGoals is { Count: > 0 } active)
+    {
+        <div class="ht-list">
+            @foreach (var goal in active)
+            {
+                <GoalItem @key="goal.Item.Id" @ref="_items[goal.Item.Id]" Goal="goal" Today="overview.Today" OnRecord="OpenRecord" />
+            }
+        </div>
+    }
     @if (DialogGoal is { } dialogGoal)
     {
         <RecordDialog Open="_recordOpen" OnClose="CloseRecord" FocusOnClose="FocusItemAsync"
                       GoalId="dialogGoal.Item.Id" GoalName="@dialogGoal.Item.Name" Recordable="dialogGoal.Recordable"
-                      ActingUser="_actingUser" OnSaved="SavedAsync" />
+                      ActingUser="_actingUser" OnSaved="SavedAsync" OnExcuseInstead="OpenExcuse" />
+        @if (_excuseEntry is { } excuseEntry)
+        {
+            <ExcuseDialog Open="_excuseOpen" OnClose="CloseExcuse" FocusOnClose="FocusItemAsync" GoalId="dialogGoal.Item.Id"
+                          Date="excuseEntry.FirstDate" GoalName="@dialogGoal.Item.Name" SubLine="@_excuseSubLine"
+                          ActingUser="_actingUser" OnSaved="ExcusedAsync" />
+        }
     }
 }
 
 @code {
+    /// <summary>The "Paused" tab's words, also used to give it the focus after the last "Resume".</summary>
+    private const string PausedTab = "Paused";
+
     private readonly Dictionary<GoalId, GoalItem> _items = [];
+    private Tabs? _tabs;
     private ActingUser _actingUser = ActingUser.Anonymous;
     private GoalsOverview? _overview;
     private bool _recordOpen;
+    private bool _excuseOpen;
+    private string _excuseSubLine = string.Empty;
+
+    /// <summary>The refusal of the last "Resume", shown above the list; null after a resume.</summary>
+    private string? _resumeRefusal;
+
+    /// <summary>
+    /// After a "Resume", the place the resumed goal had among the paused goals, so the next render can give the focus to
+    /// the nearest remaining one; null otherwise.
+    /// </summary>
+    private int? _focusAfterResume;
+
+    /// <summary>The commitment "Excuse instead" opened the Excuse dialog for; of the goal <see cref="_recording"/>.</summary>
+    private HistoryEntry? _excuseEntry;
 
     /// <summary>The goal whose "Record" opened the dialog; kept after it closes, so the focus can go back to it.</summary>
     private GoalId? _recording;
+
+    /// <summary>
+    /// The tab value of the page's address (<c>?tab=paused</c>; contracts/host.md "Routes"): "paused" shows the Paused
+    /// tab, any other value, or none, the Active tab.
+    /// </summary>
+    [Parameter]
+    public string? Tab { get; set; }
+
+    private bool ShowsPaused => string.Equals(Tab, "paused", StringComparison.Ordinal);
+
+    private IReadOnlyList<Tabs.TabItem> TabItems =>
+    [
+        new Tabs.TabItem("Active", "/goals", null, !ShowsPaused),
+        new Tabs.TabItem(PausedTab, "/goals?tab=paused", null, ShowsPaused),
+    ];
+
+    /// <summary>The goals that are not paused, in the overview's order (the Active tab).</summary>
+    private List<OverviewGoal> ActiveGoals => _overview?.Goals.Where(goal => goal.PausedUntil is null).ToList() ?? [];
+
+    /// <summary>The paused goals, in the overview's order (the Paused tab).</summary>
+    private List<OverviewGoal> PausedGoals => _overview?.Goals.Where(goal => goal.PausedUntil is not null).ToList() ?? [];
 
     /// <summary>The goal the dialog records for, as the latest read gives it; none before a "Record" was chosen.</summary>
     private OverviewGoal? DialogGoal =>
@@ -50,11 +131,51 @@
         await ReadAsync();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusAfterResume is not { } place)
+        {
+            return;
+        }
+
+        _focusAfterResume = null;
+        var paused = PausedGoals;
+        if (paused.Count == 0)
+        {
+            if (_tabs is { } tabs)
+            {
+                await tabs.FocusAsync(PausedTab);
+            }
+
+            return;
+        }
+
+        if (_items.TryGetValue(paused[Math.Min(place, paused.Count - 1)].Item.Id, out var item))
+        {
+            await item.FocusAsync();
+        }
+    }
+
     private async Task ReadAsync()
     {
         var result = await UseCases.RunAsync<ReportService, GoalsOverviewResult>(
             (service, token) => service.GetGoalsOverviewAsync(_actingUser, token), CancellationToken.None);
         _overview = result.Overview;
+    }
+
+    /// <summary>
+    /// A Paused item's "Resume" (FR-010, HP-004): resumes the goal, then reads the overview again, also after a refusal,
+    /// so the goal moves to the Active tab; the render after it gives the focus to the nearest remaining paused item.
+    /// </summary>
+    private async Task ResumeAsync(OverviewGoal goal)
+    {
+        var id = goal.Item.Id;
+        var place = PausedGoals.FindIndex(paused => paused.Item.Id == id);
+        var result = await UseCases.RunAsync<PauseService, ResumeResult>(
+            (service, token) => service.ResumeAsync(_actingUser, id, token), CancellationToken.None);
+        await ReadAsync();
+        _resumeRefusal = result.Outcome == ResumeOutcome.Resumed ? null : result.Message;
+        _focusAfterResume = Math.Max(place, 0);
     }
 
     private void OpenRecord(OverviewGoal goal)
@@ -64,6 +185,32 @@
     }
 
     private void CloseRecord() => _recordOpen = false;
+
+    /// <summary>
+    /// The RecordDialog's "Excuse instead" (slice 7 HP-003): the Excuse dialog opens for the commitment "For" names, in
+    /// the RecordDialog's place; its opener is the goal's "Record". The sub line is that commitment's "For" label.
+    /// </summary>
+    private void OpenExcuse(HistoryEntry entry)
+    {
+        if (DialogGoal is not { } goal)
+        {
+            return;
+        }
+
+        _excuseEntry = entry;
+        _excuseSubLine = RecordingText.ForLabel(entry, goal.Recordable.CurrentDate ?? entry.LastDate, goal.Recordable.ReadAt);
+        _recordOpen = false;
+        _excuseOpen = true;
+    }
+
+    private void CloseExcuse() => _excuseOpen = false;
+
+    /// <summary>"excused": reads the overview again first, so the closing render has the new figures to give the focus back to.</summary>
+    private async Task ExcusedAsync()
+    {
+        await ReadAsync();
+        _excuseOpen = false;
+    }
 
     /// <summary>Reads again first, so the render that closes the dialog has the new items to give the focus back to.</summary>
     private async Task SavedAsync(HistoryEntry entry)

@@ -42,3 +42,14 @@ The last part of the preview shows the signed-in Home as slice 6 builds it (HP-0
 - The second example shows "Missed this week" pressed: the Today card has only the two Missed rows.
 - A registered user with no goals keeps slice 4's EmptyState; an administrator keeps the page head only.
 - No "Excuse" (slice 7) and no reminder of any kind: the tiles and rows are in-app indicators only.
+
+## Slice 7 state
+
+The last part of the preview shows the signed-in Home as slice 7 builds it (HP-005, FR-019, US1-AS12, US4, ADR 0008). Today is Wed 18 Nov 2026, 19:00 in the preview. The user has six goals; "Meditation, 10 min daily" is paused from Mon 16 until Sun 22 Nov.
+
+- Everything of slice 6 stays: the page head, the four StatTiles, the Today card with its order, filters and dialogs, the "Active goals" card and the "Recent notes" card. Two changes:
+  1. Today card: a Pending row of a commitment-based goal whose commitment has no record gets the ghost "Excuse" after its "Record" (`components/CommitmentRow.md`, "Slice 7 state"); it opens the Excuse dialog (`components/ExcuseDialog.md`). After "excused" the row leaves the Today list and the "Pending · still can record" tile drops by 1. In the preview: "Reading, 20 min daily", Mon 16 Nov.
+  2. "Active goals": the tile counts only the goals that are not paused (`Counts.Goals`), and the card lists only those (at most 5, as in slice 6). In the preview the tile says 5, and Meditation is not in the card.
+- Excused and Paused entries are not rows and are not counted in "Due now", "Pending · still can record" or "Missed this week" (FR-019). In the preview Meditation has no row: its days from Mon 16 Nov are Paused. A paused goal's Pending results from before its pause are still listed (spec US4-AS2).
+- The "Recent notes" card is unchanged: a note of an Excused or Paused commitment or period is listed as any other note.
+- A registered user with no goals keeps slice 4's EmptyState; an administrator keeps the page head only. Still no reminder of any kind. A user whose goals are all paused has goals: the dashboard, with "Active goals" at 0 and no goal in the card (settled here, T078).

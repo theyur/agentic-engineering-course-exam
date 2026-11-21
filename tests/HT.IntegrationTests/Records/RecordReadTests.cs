@@ -186,7 +186,7 @@ public sealed class RecordReadTests(DatabaseFixture database)
 
         Assert.Equal(HistoryOutcome.Found, real.Outcome);
         Assert.Equal(HistoryOutcome.Found, fake.Outcome);
-        Assert.Equal([nameof(IRecordStore.ReadAsync)], fakeRecords.Calls);
+        Assert.Equal([nameof(IRecordStore.ReadExemptionsAsync), nameof(IRecordStore.ReadAsync)], fakeRecords.Calls);
         return (real.History!, fake.History!);
     }
 

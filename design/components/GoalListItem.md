@@ -39,3 +39,16 @@ The last part of the preview shows the full item as slice 6 builds it (HP-002, A
   - absent when nothing can be recorded now. The empty column stays, so the columns line up.
 - No "Add time", "+1", "Resume", "Start new attempt" or outcome Tag (slices 7 and 8).
 - Every value comes from `ReportText` through the overview (HP-005); the item computes nothing.
+
+## Slice 7 state
+
+The last part of the preview shows the item as slice 7 builds it (HP-004, ADR 0008): slice 6's full item on the Active tab, and its Paused form on the Paused tab. One Razor component (`GoalItem`) renders both. Today is Mon 16 Nov 2026, 10:00 in the preview.
+
+- Active form: slice 6's item, unchanged ("Slice 6 state" above).
+- Paused form, for a goal whose current pause covers its current date (`PausedUntil`):
+  - column 1: the name link and the meta line (`ht-goalitem__meta`): the Build or Reduce Tag; the Pending StatusChip when the goal has a Pending commitment or period (results from before its pause can still be Pending, spec US4-AS2); then the text "Paused until Sun 22 Nov" (`ReportText.PausedUntil`, the pause's last day). The text replaces slice 6's whole meta text (the schedule, "next …" and the progress), so it starts with "Paused until" (the smoke check reads it, HP-011; settled here, T007);
+  - columns 2 to 4: "Consistency", "Current streak" and the mini strip, as in slice 6; they leave Excused and Paused results out (`components/ConsistencyStrip.md`, "Slice 7 state");
+  - column 5: one action, the secondary "Resume" (`ht-btn--secondary ht-btn--sm`, `aria-label="Resume {goal name}"`), in place of "Record". It resumes the goal at once (FR-010), so it has no `aria-haspopup`. A paused goal's Pending results are recorded from its goal page (settled here, T007: the item keeps one action).
+- After "Resume" the island reads the overview again: the goal leaves the Paused tab for the Active tab. Focus goes to the nearest remaining control, the next item's "Resume", or the "Paused" tab when none is left (HP-007; settled here, T007). A refusal ("This goal is not paused.") shows as an `ht-field__error` paragraph with `role="alert"` above the list.
+- No "Add time", "+1", "Start new attempt" or outcome Tag (slice 8).
+- Every value comes from `ReportText` through the overview (HP-008); the item computes nothing.
