@@ -4,7 +4,6 @@ using HT.Application.Records;
 using HT.Domain.Accounts;
 using HT.Domain.Evaluation;
 using HT.Domain.Goals;
-using HT.Domain.Reports;
 using HT.Domain.Time;
 
 namespace HT.Application.Reports;

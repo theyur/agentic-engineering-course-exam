@@ -33,6 +33,8 @@ internal sealed class DemoAccountWriter
     private readonly UserManager<HtUser> _users;
     private readonly string _failure;
 
+    /// <param name="db">The calling store's context; the account, goals, records and notes are saved through it.</param>
+    /// <param name="users">The calling store's user manager, which creates the account.</param>
     /// <param name="failure">The start of every fault text, such as "Demo history account creation failed"; it names no value.</param>
     public DemoAccountWriter(HtDbContext db, UserManager<HtUser> users, string failure)
     {
