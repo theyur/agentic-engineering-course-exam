@@ -1,0 +1,92 @@
+# Mutation testing with Stryker.NET (ADR 0022).
+#
+# On a pull request it mutates only what the PR changed (--since the PR's base commit): the changed files of
+# HT.Domain and HT.Application, plus the mutants covered by changed unit tests. A manual run mutates both
+# projects in full. Only tests/HT.UnitTests runs against the mutants: the integration tests share one database
+# (ADR 0006), and Stryker runs several test processes at once.
+#
+# Report only: the job never fails on a low score (thresholds.break is 0 in tests/HT.UnitTests/stryker-config.json),
+# and it is not one of the PR gates of ADR 0001. It fails only when Stryker itself fails, for example on a build
+# error. Results: the job summary lists every undetected mutant with file and line; the HTML and JSON reports are
+# the run's artifacts.
+#
+# Needs no secret and no database.
+
+name: Mutation testing
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/HT.Domain/**'
+      - 'src/HT.Application/**'
+      - 'tests/HT.UnitTests/**'
+      - 'Directory.Build.props'
+      - 'dotnet-tools.json'
+      - 'tools/mutation/**'
+      - '.github/workflows/mutation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  mutate:
+    name: Mutation testing (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [HT.Domain, HT.Application]
+    env:
+      PROJECT: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # --since compares against the PR's base commit, so the history must be there.
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Run Stryker
+        # Run from the test project's folder, so Stryker finds stryker-config.json and the test project there.
+        working-directory: tests/HT.UnitTests
+        env:
+          # Empty on a manual run, which then mutates the whole project. A full SHA: Stryker rejects short ones.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          since=()
+          if [ -n "$BASE_SHA" ]; then since=("--since:$BASE_SHA"); fi
+          dotnet stryker --project "$PROJECT.csproj" "${since[@]}" --output "$GITHUB_WORKSPACE/StrykerOutput/$PROJECT"
+
+      - name: Write job summary
+        if: always()
+        shell: pwsh
+        run: |
+          ./tools/mutation/Write-MutationSummary.ps1 `
+            -ReportPath "StrykerOutput/$env:PROJECT/reports/mutation-report.json" `
+            -Project $env:PROJECT >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: mutation-report-${{ matrix.project }}
+          path: StrykerOutput/${{ matrix.project }}/reports/
+          if-no-files-found: ignore
+          retention-days: 14

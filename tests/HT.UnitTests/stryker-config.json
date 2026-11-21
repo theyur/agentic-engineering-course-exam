@@ -1,0 +1,25 @@
+{
+  "stryker-config": {
+    "mutate": [
+      "**/*.cs",
+      "!**/*ServiceCollectionExtensions.cs"
+    ],
+    "ignore-methods": [
+      "*ThrowIfNull",
+      "*ThrowIfNullOrEmpty",
+      "*ThrowIfNullOrWhiteSpace",
+      "*ThrowIfNegative",
+      "*ThrowIfNegativeOrZero",
+      "*ThrowIfZero",
+      "*ThrowIfGreaterThan",
+      "*ThrowIfGreaterThanOrEqual",
+      "*ThrowIfLessThan",
+      "*ThrowIfLessThanOrEqual",
+      "*ThrowIfEqual",
+      "*ThrowIfNotEqual",
+      "*Exception.ctor"
+    ],
+    "reporters": [ "html", "json", "progress" ],
+    "thresholds": { "high": 80, "low": 60, "break": 0 }
+  }
+}

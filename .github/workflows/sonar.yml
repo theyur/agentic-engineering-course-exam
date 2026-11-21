@@ -129,7 +129,7 @@ jobs:
         # .specify/ is vendored Spec Kit tooling, refreshed by the Specify CLI; we don't maintain it.
         # tests/HT.AcceptanceTests/ is written by isolated AC subagents the main agent may not edit (ADR 0003).
         # Coverage is measured for .NET only, so repo scripts (tools/pr-gates/, tools/guard-oracle/,
-        # tools/hosting/, .claude/hooks/) are excluded from the coverage metric (ADR 0001); they are still
+        # tools/hosting/, tools/mutation/, .claude/hooks/) are excluded from the coverage metric (ADR 0001); they are still
         # analyzed for issues and are tested by their own self-tests. The .NET smoke check in
         # tools/HT.SmokeCheck/ is measured like the other .NET code (slice 3 research R-11).
         run: |
@@ -140,7 +140,7 @@ jobs:
             /d:sonar.host.url="https://sonarcloud.io" \
             /d:sonar.qualitygate.wait=true \
             /d:sonar.exclusions=".specify/**,tests/HT.AcceptanceTests/**" \
-            /d:sonar.coverage.exclusions="tools/pr-gates/**,tools/guard-oracle/**,tools/hosting/**,.claude/hooks/**" \
+            /d:sonar.coverage.exclusions="tools/pr-gates/**,tools/guard-oracle/**,tools/hosting/**,tools/mutation/**,.claude/hooks/**" \
             /d:sonar.cs.vscoveragexml.reportsPaths="coverage/coverage.xml" \
             /d:sonar.cs.vstest.reportsPaths="**/TestResults/*.trx"
           dotnet build "$SOLUTION" --configuration Release

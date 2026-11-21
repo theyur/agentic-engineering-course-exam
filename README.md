@@ -54,6 +54,7 @@ tools/                   operational tools, outside the four layers
   HT.SmokeCheck/         smoke check of the hosted demo (.NET console tool, references HT.Application only)
   hosting/               provisioning and teardown scripts of the hosted demo, with selftest.ps1
   pr-gates/              PR review gate scripts (see PR review flow)
+  mutation/              job summary of the mutation-testing workflow (ADR 0022)
   guard-oracle/          tests of the Claude Code commit guard hook
 docs/adr/                architecture decision records (0001-initial-setup.md)
 specs/                   Spec Kit feature folders: spec, plan, tasks (001-accounts-and-access/)
@@ -127,6 +128,10 @@ Two static analyzers run in parallel on every PR revision and on pushes to `mast
 
 The Sonar job also runs the integration and host tests against a SQL Server container. It needs two
 repository secrets: `SONAR_TOKEN` and `CI_SQL_SA_PASSWORD` (a throwaway SA password for that container).
+
+Next to the gates, **Mutation testing** (`.github/workflows/mutation.yml`) runs Stryker.NET on what a PR changed
+in `HT.Domain` and `HT.Application`, with the unit tests. It only reports: the job summary lists each mutant no
+test detected, with file and line, and it never blocks a PR. See [ADR 0022](docs/adr/0022-mutation-testing.md).
 
 Then a human-controlled AI review:
 
