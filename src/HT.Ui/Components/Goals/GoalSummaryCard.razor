@@ -28,7 +28,8 @@
     [Parameter, EditorRequired]
     public GoalFormModel Model { get; set; } = new();
 
-    private GoalSummary Summary { get; set; } = GoalSummaryText.For(null, new(), null, null);
+    // Qualified: the Home's GoalSummary component (slice 6) shares the name in HT.Ui.Components.Shared.
+    private HT.Application.Goals.GoalSummary Summary { get; set; } = GoalSummaryText.For(null, new(), null, null);
 
     private IReadOnlyList<KeyValue.Row> Rows { get; set; } = [];
 

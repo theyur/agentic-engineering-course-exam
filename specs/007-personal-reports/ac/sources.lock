@@ -1,0 +1,11 @@
+{
+  "group": "sources",
+  "feature": "specs/007-personal-reports",
+  "files": {
+    "specs/007-personal-reports/acceptance.md": "a229a870ce36c0600a8d8196ae4ab381092df3801d39ac1c16fd7f0ef756cd5d"
+  },
+  "spec": {
+    "path": "specs/007-personal-reports/spec.md",
+    "sha256": "114f7f2911bd4648d319b5a681928669a4def5a1cecfcfcbb04d066f7ed0a4ae"
+  }
+}

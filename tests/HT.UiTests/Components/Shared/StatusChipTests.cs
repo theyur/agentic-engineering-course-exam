@@ -66,6 +66,22 @@ public sealed class StatusChipTests : BunitContext
         cut.MarkupMatches("<span class=\"ht-chip ht-status ht-status--met\">Met</span>");
     }
 
+    [Theory]
+    [InlineData(GoalScheduleKind.CommitmentBased, null)]
+    [InlineData(GoalScheduleKind.PeriodBased, SchedulePeriod.Day)]
+    [InlineData(GoalScheduleKind.PeriodBased, SchedulePeriod.Week)]
+    public void An_upcoming_chip_reads_Upcoming_with_the_due_class(GoalScheduleKind kind, SchedulePeriod? period)
+    {
+        // Slice 6 (HP-003, design/components/StatusChip slice-6 state): "Upcoming", never "Due Mon"; the date belongs
+        // to the row's meta line, and the word tells it apart from Due, which shares its colour.
+        var cut = Render<StatusChip>(p => p
+            .Add(x => x.State, EvaluationState.Upcoming)
+            .Add(x => x.ScheduleKind, kind)
+            .Add(x => x.Period, period));
+
+        cut.MarkupMatches("<span class=\"ht-chip ht-status ht-status--due\">Upcoming</span>");
+    }
+
     public static TheoryData<EvaluationState, GoalScheduleKind, SchedulePeriod?> EveryShownState()
     {
         var data = new TheoryData<EvaluationState, GoalScheduleKind, SchedulePeriod?>();

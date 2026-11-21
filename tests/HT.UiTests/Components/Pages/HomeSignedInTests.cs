@@ -2,9 +2,11 @@ using Bunit;
 using Bunit.TestDoubles;
 using HT.Application.Accounts;
 using HT.Application.Goals;
+using HT.Application.Records;
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Records;
 using HT.Ui.Components.Pages;
 using HT.UnitTests.Fakes;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +18,8 @@ namespace HT.UiTests.Components.Pages;
 /// <summary>
 /// Slice 1 US6-AS10, HP-013, HP-015, amended by slice 2 HP-013 (US5-AS3) and slice 4 HP-010 (US8-AS5, US11): the signed-in
 /// Home shows the greeting as heading-1 and then today's date, in place of slice 1's "Today"; a registered user with no
-/// goals also gets the Goals page's EmptyState, a registered user with goals and an administrator nothing else. The
+/// goals also gets the Goals page's EmptyState, an administrator nothing else; slice 6 HP-003 gives a registered user with
+/// goals the dashboard (tiles, Today card, "Active goals" and "Recent notes") under the page head. The
 /// clock is 10:00 UTC on Tuesday 17 November 2026, and the fake accounts have the UTC default unless a test stores a zone.
 /// </summary>
 public sealed class HomeSignedInTests : BunitContext
@@ -35,7 +38,7 @@ public sealed class HomeSignedInTests : BunitContext
     private static string Text(AngleSharp.Dom.IElement element) =>
         string.Join(" ", element.TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
-    private async Task CreateGoalAsync(Guid accountId)
+    private async Task<GoalId> CreateGoalAsync(Guid accountId)
     {
         await using var scope = Services.CreateAsyncScope();
         var result = await scope.ServiceProvider.GetRequiredService<GoalService>().CreateAsync(
@@ -52,6 +55,7 @@ public sealed class HomeSignedInTests : BunitContext
             },
             CancellationToken.None);
         Assert.Equal(GoalCreateOutcome.Created, result.Outcome);
+        return result.GoalId!.Value;
     }
 
     private FakeAccountStore Accounts => (FakeAccountStore)Services.GetRequiredService<IAccountStore>();
@@ -158,19 +162,61 @@ public sealed class HomeSignedInTests : BunitContext
     }
 
     [Fact]
-    public async Task US8_AS5_a_registered_user_with_goals_gets_nothing_but_the_page_head()
+    public async Task Slice_6_HP_003_a_registered_user_with_goals_gets_the_dashboard_under_the_page_head()
     {
+        // Slice 4 had only the page head here ("page head only until slice 6"). A yes/no goal once a day from today: Due.
         var accountId = _authorization.SignIn("RegisteredUser");
-        await CreateGoalAsync(accountId);
+        var goal = await CreateGoalAsync(accountId);
 
         var cut = Render<Home>();
 
-        Assert.Equal(["ht-page-head"], cut.Find(".ht-container").Children.Select(c => c.ClassName));
+        Assert.Equal(["ht-page-head", "ht-home"], cut.Find(".ht-container").Children.Select(c => c.ClassName));
         Assert.Equal(MorningHead, PageHead(cut));
-        Assert.Empty(cut.FindAll("h2, h3, p, ul, ol, time, table, .ht-card, .ht-list, .ht-goalitem, .ht-stat, .ht-stats, .ht-hero, .ht-empty"));
-        Assert.DoesNotContain("Hs Reading", cut.Markup, StringComparison.Ordinal);
+        var home = cut.Find(".ht-home");
+        Assert.Equal(["ht-home__panel", "ht-stack"], home.Children.Select(c => c.ClassName));
+        Assert.Equal(
+            ["Due now", "Pending · still can record", "Missed this week", "Active goals"],
+            cut.FindAll(".ht-home__panel .ht-tile__label").Select(l => l.TextContent));
+        Assert.Equal(["1", "0", "0", "1"], cut.FindAll(".ht-home__panel .ht-tile__value").Select(v => v.TextContent));
+        var row = Assert.Single(cut.FindAll(".ht-home__panel .ht-row"));
+        Assert.Equal("Due today", row.QuerySelector(".ht-status")!.TextContent);
+        var right = home.Children[1];
+        Assert.Equal(["Active goals"], right.QuerySelectorAll(".ht-card__title").Select(t => t.TextContent));
+        var link = right.QuerySelector("a.ht-goal__name")!;
+        Assert.Equal(("Hs Reading, once a day", $"/goals/{goal.Value}"), (link.TextContent, link.GetAttribute("href")));
+        Assert.Equal(("N/A", "No finalized days yet"), (right.QuerySelector(".ht-goal__pct")!.TextContent, right.QuerySelector(".ht-goal__meta")!.TextContent));
+        Assert.Equal("All goals →", right.QuerySelector("a.ht-card__link")!.TextContent);
+        Assert.DoesNotContain("Recent notes", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("No goals yet", cut.Markup, StringComparison.Ordinal);
-        Assert.DoesNotContain("Goals come in a later version.", cut.Markup, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll(".ht-hero, .ht-empty"));
+    }
+
+    [Fact]
+    public async Task Slice_6_HP_003_the_right_column_has_at_most_5_goals_and_the_Recent_notes_card_with_a_note()
+    {
+        var accountId = _authorization.SignIn("RegisteredUser");
+        var goals = new List<GoalId>();
+        for (var i = 0; i < 6; i++)
+        {
+            goals.Add(await CreateGoalAsync(accountId));
+        }
+
+        await using (var scope = Services.CreateAsyncScope())
+        {
+            var recorded = await scope.ServiceProvider.GetRequiredService<RecordingService>().RecordAsync(
+                ActingUser.ForAccount(new AccountId(accountId), Role.RegisteredUser), goals[0], new DateOnly(2026, 11, 17),
+                new RecordInput { Answer = YesNoAnswer.Yes, Note = "Easy start." }, CancellationToken.None);
+            Assert.Equal(RecordWriteOutcome.Recorded, recorded.Outcome);
+        }
+
+        var cut = Render<Home>();
+
+        var right = cut.Find(".ht-home > .ht-stack");
+        Assert.Equal(["Active goals", "Recent notes"], right.QuerySelectorAll(".ht-card__title").Select(t => t.TextContent));
+        Assert.Equal(5, right.QuerySelectorAll(".ht-card:first-child a.ht-goal__name").Length);
+        var note = right.QuerySelector(".ht-card:last-child .ht-goal")!;
+        Assert.Equal("\"Easy start.\"", note.FirstChild!.TextContent);
+        Assert.Equal("Hs Reading, once a day · Tue 17 Nov", note.QuerySelector(".ht-goal__meta")!.TextContent);
     }
 
     [Fact]

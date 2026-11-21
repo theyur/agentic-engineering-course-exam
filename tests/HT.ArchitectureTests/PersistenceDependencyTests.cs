@@ -38,4 +38,21 @@ public sealed class PersistenceDependencyTests
         Assert.All(records, t => Assert.False(t.IsPublic, $"{t.FullName} is public."));
         Assert.DoesNotContain(ArchitectureModel.Persistence.GetExportedTypes(), t => t.Namespace == "HT.Persistence.Records");
     }
+
+    /// <summary>
+    /// Slice 6 (research R-09, R-14): the shared demo account writer and the demo report store are internal, so the demo
+    /// report data is written only through <c>IDemoReportStore</c> (ADR 0010, ADR 0013). The named types must exist, so
+    /// a rename cannot make the rule pass on nothing.
+    /// </summary>
+    [Theory]
+    [InlineData("HT.Persistence.Habits.DemoAccountWriter")]
+    [InlineData("HT.Persistence.Habits.DemoReportStore")]
+    public void TheDemoAccountWriterAndTheDemoReportStoreAreInternal(string name)
+    {
+        var type = ArchitectureModel.Persistence.GetType(name);
+
+        Assert.NotNull(type);
+        Assert.False(type.IsPublic, $"{name} is public.");
+        Assert.False(type.IsNestedPublic, $"{name} is public.");
+    }
 }

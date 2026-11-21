@@ -58,6 +58,50 @@
 <div class="ht-page-head"><h1>Goals</h1></div>
 <div class="ht-card ht-empty"><div class="ht-empty__icon"><svg class="ht-icon ht-icon--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17 2 2 4-4" /><path d="m3 7 2 2 4-4" /><path d="M13 6h8" /><path d="M13 12h8" /><path d="M13 18h8" /></svg></div><h3>No goals yet</h3><p>Pick a habit from the catalog or create your own, then set a target and a schedule for it.</p><div class="ht-inline"><a class="ht-btn ht-btn--primary" href="#">Browse the catalog</a><a class="ht-btn ht-btn--secondary" href="#">Create custom habit</a></div></div>
 </div>
+<!-- Slice 6 state (HP-002): "Goals" with no Tabs (Paused and Ended come in slices 7 and 8); one ht-list of full GoalListItems in the overview's order: goals with a Pending result first, then goals with a Due result, then the others, each group by name. Each item: the name link, the Build or Reduce Tag, a Pending StatusChip when the goal has a Pending result, slice 4's meta line plus the progress of a Due entry with a record, "Consistency" and "Current streak" as whole texts, the mini strip of the last 15 ended results, and "Record" (primary with a Due entry, secondary with only Pending ones, absent when nothing can be recorded). Then the footnote. Today is Tue 17 Nov 2026. -->
+<header class="ht-nav"><div class="ht-nav__inner"><a class="ht-nav__brand" href="#">Habit Tracker</a><nav class="ht-nav__links" aria-label="Main"><a href="#">Today</a><a href="#" aria-current="page">Goals</a><a href="#">Catalog</a></nav><div class="ht-nav__end"><a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="#">+ New goal</a><div class="ht-account ht-layer-top"><button type="button" class="ht-avatar ht-avatar-btn" aria-label="Account menu for yuri@example.com" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu">Y</button></div><button class="ht-nav__menu-btn" aria-label="Menu" aria-expanded="false" aria-controls="mobile-menu"><svg class="ht-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg></button></div></div></header>
+<div class="ht-container" aria-label="Slice 6 state">
+<div class="ht-eyebrow" style="padding-top:28px">Slice 6 state · registered user with goals (today is Tue 17 Nov 2026)</div>
+<div class="ht-page-head"><h1>Goals</h1></div>
+<div class="ht-list"><div class="ht-goalitem">
+  <div><a class="ht-goalitem__name" href="#">Coffee, at most 2 cups a day</a><div class="ht-goalitem__meta"><span class="ht-chip">Reduce</span><span class="ht-chip ht-status ht-status--pending">Pending</span><span>Every day · 1 of at most 2 cups today</span></div></div>
+  <div><div class="ht-goalitem__value">71% (5 of 7)</div><div class="ht-goalitem__label">Consistency</div></div>
+  <div><div class="ht-goalitem__value">2 days</div><div class="ht-goalitem__label">Current streak</div></div>
+  <div><div class="ht-strip ht-strip--mini" role="img" aria-label="Last 9 days: 5 met, 1 failed, 1 missed, 2 pending"><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--failed"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--missed"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--pending"></i><i class="ht-strip__cell ht-cell--pending"></i></div></div>
+  <div class="ht-goalitem__actions"><button type="button" class="ht-btn ht-btn--primary ht-btn--sm" aria-haspopup="dialog" aria-label="Record for Coffee, at most 2 cups a day">Record</button></div>
+</div><div class="ht-goalitem">
+  <div><a class="ht-goalitem__name" href="#">Reading, 20 min daily</a><div class="ht-goalitem__meta"><span class="ht-chip">Build</span><span class="ht-chip ht-status ht-status--pending">Pending</span><span>Every day · next today · 12 of 20 min today</span></div></div>
+  <div><div class="ht-goalitem__value">92% (24 of 26)</div><div class="ht-goalitem__label">Consistency</div></div>
+  <div><div class="ht-goalitem__value">7 commitments</div><div class="ht-goalitem__label">Current streak</div></div>
+  <div><div class="ht-strip ht-strip--mini" role="img" aria-label="Last 15 commitments: 12 met, 1 missed, 2 pending"><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--missed"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--pending"></i><i class="ht-strip__cell ht-cell--pending"></i></div></div>
+  <div class="ht-goalitem__actions"><button type="button" class="ht-btn ht-btn--primary ht-btn--sm" aria-haspopup="dialog" aria-label="Record for Reading, 20 min daily">Record</button></div>
+</div><div class="ht-goalitem">
+  <div><a class="ht-goalitem__name" href="#">Running, 2 times a week</a><div class="ht-goalitem__meta"><span class="ht-chip">Build</span><span class="ht-chip ht-status ht-status--pending">Pending</span><span>Flexible · 2 times a week · 1 of 2 this week</span></div></div>
+  <div><div class="ht-goalitem__value">80% (8 of 10)</div><div class="ht-goalitem__label">Consistency</div></div>
+  <div><div class="ht-goalitem__value">2 weeks</div><div class="ht-goalitem__label">Current streak</div></div>
+  <div><div class="ht-strip ht-strip--mini" role="img" aria-label="Last 11 weeks: 8 met, 1 failed, 1 missed, 1 pending"><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--failed"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--missed"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--pending"></i></div></div>
+  <div class="ht-goalitem__actions"><button type="button" class="ht-btn ht-btn--primary ht-btn--sm" aria-haspopup="dialog" aria-label="Record for Running, 2 times a week">Record</button></div>
+</div><div class="ht-goalitem">
+  <div><a class="ht-goalitem__name" href="#">Yoga, 3 days a week</a><div class="ht-goalitem__meta"><span class="ht-chip">Build</span><span class="ht-chip ht-status ht-status--pending">Pending</span><span>Mon · Wed · Fri · next Wed 18 Nov</span></div></div>
+  <div><div class="ht-goalitem__value">90% (18 of 20)</div><div class="ht-goalitem__label">Consistency</div></div>
+  <div><div class="ht-goalitem__value">6 commitments</div><div class="ht-goalitem__label">Current streak</div></div>
+  <div><div class="ht-strip ht-strip--mini" role="img" aria-label="Last 15 commitments: 12 met, 1 failed, 1 missed, 1 pending"><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--missed"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--failed"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--pending"></i></div></div>
+  <div class="ht-goalitem__actions"><button type="button" class="ht-btn ht-btn--secondary ht-btn--sm" aria-haspopup="dialog" aria-label="Record for Yoga, 3 days a week">Record</button></div>
+</div><div class="ht-goalitem">
+  <div><a class="ht-goalitem__name" href="#">Strength training, 2 days a week</a><div class="ht-goalitem__meta"><span class="ht-chip">Build</span><span>Tue · Thu · next today</span></div></div>
+  <div><div class="ht-goalitem__value">83% (5 of 6)</div><div class="ht-goalitem__label">Consistency</div></div>
+  <div><div class="ht-goalitem__value">3 commitments</div><div class="ht-goalitem__label">Current streak</div></div>
+  <div><div class="ht-strip ht-strip--mini" role="img" aria-label="Last 6 commitments: 5 met, 1 failed"><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--failed"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i><i class="ht-strip__cell ht-cell--met"></i></div></div>
+  <div class="ht-goalitem__actions"><button type="button" class="ht-btn ht-btn--primary ht-btn--sm" aria-haspopup="dialog" aria-label="Record for Strength training, 2 days a week">Record</button></div>
+</div><div class="ht-goalitem">
+  <div><a class="ht-goalitem__name" href="#">Meditation, 10 min, 3 days a week</a><div class="ht-goalitem__meta"><span class="ht-chip">Build</span><span>Mon · Wed · Fri · starts Tue 24 Nov</span></div></div>
+  <div><div class="ht-goalitem__value">N/A</div><div class="ht-goalitem__label">Consistency</div></div>
+  <div><div class="ht-goalitem__value">0 commitments</div><div class="ht-goalitem__label">Current streak</div></div>
+  <div><div class="ht-strip ht-strip--mini" role="img" aria-label="Last 0 commitments"></div></div>
+  <div class="ht-goalitem__actions"></div>
+</div></div>
+<p class="ht-footnote">Each goal is counted on its own. Consistency counts only finalized results; pending ones are left out.</p>
+</div>
 <footer class="ht-footer"><div class="ht-footer__inner"><span>Habit Tracker · Agentic Engineering course project</span><span class="ht-spacer"></span><a href="#">Privacy</a><a href="#">Send feedback</a></div></footer>
 </div>
 </body>

@@ -57,7 +57,19 @@ public sealed class ApplicationDependencyTests
     }
 
     [Fact]
-    public void OnlyTheGoalTypesTheThreeHabitServicesTheProfileServiceAndTheRecordingServiceMayDependOnTheGoalStorePort()
+    public void OnlyTheDemoReportServiceMayDependOnTheDemoReportStorePort()
+    {
+        // Nested types (async state machines, closures) belong to their service, so the name allows a nested suffix.
+        Types().That().ResideInAssembly(ArchitectureModel.Application)
+            .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Operator\.DemoReportService([+/].*)?$")
+            .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Operator\.IDemoReportStore$")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IDemoReportStore)))
+            .Because("the demo report port writes private records and notes without an acting user; only demo report loading may use it (ADR 0013, ADR 0021, slice 6 research R-14)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
+    public void OnlyTheGoalTypesTheThreeHabitServicesTheProfileServiceTheRecordingServiceAndTheReportServiceMayDependOnTheGoalStorePort()
     {
         // Nested types (async state machines, closures) belong to their service, so the names allow a nested suffix.
         Types().That().ResideInAssembly(ArchitectureModel.Application)
@@ -65,8 +77,9 @@ public sealed class ApplicationDependencyTests
             .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Habits\.(CatalogService|CatalogAdministrationService|CustomHabitService)([+/].*)?$")
             .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Accounts\.ProfileService([+/].*)?$")
             .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Records\.RecordingService([+/].*)?$")
+            .And().DoNotHaveFullNameMatching(@"^HT\.Application\.Reports\.ReportService([+/].*)?$")
             .Should().NotDependOnAny(Types(true).That().Are(typeof(IGoalStore)))
-            .Because("goals are private and reached only through owner-scoped use cases; the habit services need counts and the delete rule, the profile service the time-zone change, the recording service the owner's goal (constitution III, slice 4 research R-13, slice 5 research R-13)")
+            .Because("goals are private and reached only through owner-scoped use cases; the habit services need counts and the delete rule, the profile service the time-zone change, the recording service the owner's goal, the report service the owner's goals (constitution III, slice 4 research R-13, slice 5 research R-13, slice 6 research R-14)")
             .Check(ArchitectureModel.Architecture);
     }
 

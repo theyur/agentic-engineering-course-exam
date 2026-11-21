@@ -7,7 +7,8 @@ namespace HT.UiTests.SmokeChecks;
 
 /// <summary>
 /// The coverage rule of contracts/smoke-check.md (research R-06, R-11; slice 5 research R-10): every data parameter of
-/// every method of the demo data ports <see cref="IDemoDataStore"/> and <see cref="IDemoHistoryStore"/> has an entry in
+/// every method of the demo data ports <see cref="IDemoDataStore"/>, <see cref="IDemoHistoryStore"/> and
+/// <see cref="IDemoReportStore"/> (slice 6 research R-11) has an entry in
 /// <see cref="SmokeCheckCoverage.Entries"/> with its port, and every entry still matches a parameter of its port. A slice
 /// that adds demo data changes a port, so this test fails until it extends the smoke check.
 /// </summary>
@@ -16,7 +17,7 @@ public sealed class CoverageTests
     private const string Rule = "see specs/003-demo-hosting/contracts/smoke-check.md \"Coverage rule\"";
 
     /// <summary>The demo data ports: every demo write goes through one of them.</summary>
-    private static readonly IReadOnlyList<Type> Ports = [typeof(IDemoDataStore), typeof(IDemoHistoryStore)];
+    private static readonly IReadOnlyList<Type> Ports = [typeof(IDemoDataStore), typeof(IDemoHistoryStore), typeof(IDemoReportStore)];
 
     public static TheoryData<string, string, string> PortParameters()
     {
@@ -92,7 +93,25 @@ public sealed class CoverageTests
         ];
 
         Assert.Equal(expected, SmokeCheckCoverage.Entries.Where(e => e.Port == typeof(IDemoHistoryStore)));
-        Assert.Equal(10, SmokeCheckCoverage.Entries.Count);
+        Assert.Equal(10, SmokeCheckCoverage.Entries.Count(e => e.Port != typeof(IDemoReportStore)));
+    }
+
+    [Fact]
+    public void Slice_6_adds_the_demo_report_port_with_check_7()
+    {
+        // Slice 6 contracts/host.md "Smoke check": the 4 data parameters of CreateDemoReportAccountAsync, 14 entries in all.
+        const string method = nameof(IDemoReportStore.CreateDemoReportAccountAsync);
+        CoverageEntry[] expected =
+        [
+            new(typeof(IDemoReportStore), method, "email", typeof(Email), "7 demo report: the sign-in"),
+            new(typeof(IDemoReportStore), method, "password", typeof(string), "7 demo report: the sign-in"),
+            new(typeof(IDemoReportStore), method, "profile", typeof(DemoAccountProfile), "7 demo report: the sign-in"),
+            new(typeof(IDemoReportStore), method, "goals", typeof(IReadOnlyList<DemoHistoryGoal>),
+                "7 demo report: the goal names on Goals, the weeks streak label on a goal page, and a Missed result this week on the Home"),
+        ];
+
+        Assert.Equal(expected, SmokeCheckCoverage.Entries.Where(e => e.Port == typeof(IDemoReportStore)));
+        Assert.Equal(14, SmokeCheckCoverage.Entries.Count);
     }
 
     /// <summary>Every parameter of every method of each demo data port, except the <see cref="CancellationToken"/>.</summary>

@@ -22,6 +22,9 @@ public static class GoalTimeline
     /// <summary>The scan for the next commitment looks at most this many days ahead.</summary>
     private const int NextCommitmentScanDays = 15;
 
+    /// <summary>The window of <see cref="EntriesThrough"/>, in days: 52 whole weeks, within <see cref="MaxCalendarDays"/>.</summary>
+    private const int ReportWindowDays = 364;
+
     /// <summary>
     /// The version in effect for <paramref name="date"/>: the one with the greatest <see cref="GoalSettingsVersion.AppliesFrom"/>
     /// on or before it. A date before the start date gets the first version.
@@ -133,6 +136,38 @@ public static class GoalTimeline
             ? calendar.Commitments.Select(c => new CalendarEntry(c.Date, c.Date, c.Starts, c.Ends)).ToArray()
             : calendar.Periods.Select(p => new CalendarEntry(p.FirstDate, p.LastDate, p.Starts, p.Ends)).ToArray();
         return true;
+    }
+
+    /// <summary>
+    /// Every commitment or evaluation period of the goal from its start date (a per-week goal: from its first week) to
+    /// the entry that contains <paramref name="last"/>, in date order, with no range cap (slice 6 FR-001, research
+    /// R-02). Read through <see cref="TryCalendar"/> in windows of 364 days that each start on a Monday, so a week never
+    /// straddles two windows and nothing is listed twice or left out. Empty when <paramref name="last"/> is before the
+    /// first entry.
+    /// </summary>
+    public static IReadOnlyList<CalendarEntry> EntriesThrough(Goal goal, DateOnly last)
+    {
+        ArgumentNullException.ThrowIfNull(goal);
+        var entries = new List<CalendarEntry>();
+        var first = MondayOnOrBefore(goal.StartDate);
+        while (first <= last)
+        {
+            var lastWindow = last.DayNumber - first.DayNumber < ReportWindowDays;
+            var windowLast = lastWindow ? last : first.AddDays(ReportWindowDays - 1);
+            if (TryEntries(goal, first, windowLast, out var window))
+            {
+                entries.AddRange(window);
+            }
+
+            if (lastWindow)
+            {
+                break;
+            }
+
+            first = first.AddDays(ReportWindowDays);
+        }
+
+        return entries;
     }
 
     /// <summary>

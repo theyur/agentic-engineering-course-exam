@@ -7,11 +7,18 @@
 <body>
 <div class="ht" style="padding:16px">
 <div class="ht-grid-4">
-<div class="ht-card ht-tile"><div class="ht-tile__value">3</div><div class="ht-tile__label">Due today</div></div>
+<div class="ht-card ht-tile"><div class="ht-tile__value">3</div><div class="ht-tile__label">Due now</div></div>
 <div class="ht-card ht-tile ht-tile--pending"><div class="ht-tile__value">1</div><div class="ht-tile__label">Pending · still can record</div></div>
 <div class="ht-card ht-tile ht-tile--failed"><div class="ht-tile__value">1</div><div class="ht-tile__label">Missed this week</div></div>
 <div class="ht-card ht-tile"><div class="ht-tile__value">5</div><div class="ht-tile__label">Active goals</div></div>
 </div>
+</div>
+<!-- Slice 6 state (HP-003, HP-006): "Due now" (it counts Due commitments, days and weeks), "Pending · still can record" (ht-tile--pending), "Missed this week" (ht-tile--failed) and "Active goals". The first three are buttons with aria-pressed that filter the Today list; the pressed one has a 2px accent frame. "Active goals" is a link to /goals. Read on Wed 18 Nov 2026, 19:00. -->
+<div class="ht" style="padding:0 16px 16px" aria-label="Slice 6 state">
+<div class="ht-eyebrow" style="margin:8px 0 8px">Slice 6 state · no filter</div>
+<div class="ht-grid-4"><button type="button" class="ht-card ht-tile" aria-pressed="false"><span class="ht-tile__value">4</span><span class="ht-tile__label">Due now</span></button><button type="button" class="ht-card ht-tile ht-tile--pending" aria-pressed="false"><span class="ht-tile__value">5</span><span class="ht-tile__label">Pending · still can record</span></button><button type="button" class="ht-card ht-tile ht-tile--failed" aria-pressed="false"><span class="ht-tile__value">2</span><span class="ht-tile__label">Missed this week</span></button><a class="ht-card ht-tile" href="#"><span class="ht-tile__value">5</span><span class="ht-tile__label">Active goals</span></a></div>
+<div class="ht-eyebrow" style="margin:24px 0 8px">Slice 6 state · "Pending · still can record" pressed: the Today list shows only Pending rows</div>
+<div class="ht-grid-4"><button type="button" class="ht-card ht-tile" aria-pressed="false"><span class="ht-tile__value">4</span><span class="ht-tile__label">Due now</span></button><button type="button" class="ht-card ht-tile ht-tile--pending" aria-pressed="true"><span class="ht-tile__value">5</span><span class="ht-tile__label">Pending · still can record</span></button><button type="button" class="ht-card ht-tile ht-tile--failed" aria-pressed="false"><span class="ht-tile__value">2</span><span class="ht-tile__label">Missed this week</span></button><a class="ht-card ht-tile" href="#"><span class="ht-tile__value">5</span><span class="ht-tile__label">Active goals</span></a></div>
 </div>
 </body>
 </html>

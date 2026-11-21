@@ -60,8 +60,11 @@ public sealed class GoalsPageTests : BunitContext
         };
 
     [Fact]
-    public async Task US2_AS6_each_goal_shows_its_name_link_its_tag_and_its_meta_line_in_name_order()
+    public async Task US2_AS6_slice_6_HP_002_each_goal_shows_its_name_link_its_tag_and_its_meta_line_in_the_overviews_order()
     {
+        // Slice 6 (HP-002, FR-011): the full GoalListItem, in the overview's order. At 10:00 on Tuesday 17 November,
+        // Coffee (per day) and Reading (Mon–Fri) start today and are Due; Meditation starts on 24 November and Running's
+        // first week on 23 November, so they come after, each group by name. The slice 4 goal list keeps its name order.
         var user = SignInUser();
         var reading = _catalog.Add(HabitSamples.Reading());
         var running = _catalog.Add(HabitSamples.Catalog("Running", category: Category.Body));
@@ -80,20 +83,37 @@ public sealed class GoalsPageTests : BunitContext
         Assert.Equal("Goals", cut.Find(".ht-page-head h1").TextContent);
         Assert.Empty(cut.FindAll(".ht-tabs"));
         Assert.Single(cut.FindAll(".ht-list"));
-        var items = cut.FindAll(".ht-list > .ht-goalitem.ht-goalitem--reduced");
+        var items = cut.FindAll(".ht-list > .ht-goalitem");
+        Assert.Empty(cut.FindAll(".ht-goalitem--reduced"));
         Assert.Equal(
-            ["Coffee, at most 2 cups a day", "Meditation, 10 min, 3 days a week", "Reading, 15 min, 5 days a week", "Running, 2 times a week"],
+            ["Coffee, at most 2 cups a day", "Reading, 15 min, 5 days a week", "Meditation, 10 min, 3 days a week", "Running, 2 times a week"],
             items.Select(i => i.QuerySelector("a.ht-goalitem__name")!.TextContent));
         Assert.Equal(["Reduce", "Build", "Build", "Build"], items.Select(i => i.QuerySelector(".ht-chip")!.TextContent));
         Assert.Equal(
-            ["Every day", "Mon · Wed · Fri · starts Tue 24 Nov", "Mon–Fri · next today", "Flexible · 2 times a week · first week starts Mon 23 Nov"],
+            ["Every day", "Mon–Fri · next today", "Mon · Wed · Fri · starts Tue 24 Nov", "Flexible · 2 times a week · first week starts Mon 23 Nov"],
             items.Select(i => Text(i.QuerySelector(".ht-goalitem__meta span:not(.ht-chip)")!)));
-        Assert.Equal($"/goals/{readingId.Value}", items[2].QuerySelector("a.ht-goalitem__name")!.GetAttribute("href"));
+        Assert.Equal($"/goals/{readingId.Value}", items[1].QuerySelector("a.ht-goalitem__name")!.GetAttribute("href"));
+        Assert.Equal(
+            ["Consistency", "Current streak"],
+            items[0].QuerySelectorAll(".ht-goalitem__label").Select(l => l.TextContent));
+        Assert.Equal(4, cut.FindAll(".ht-strip.ht-strip--mini").Count);
+        Assert.Equal(
+            ["Record", "Record", null, null],
+            items.Select(i => i.QuerySelector(".ht-goalitem__actions button")?.TextContent));
+        Assert.Equal(
+            "Each goal is counted on its own. Consistency counts only finalized results; pending ones are left out.",
+            cut.Find(".ht-list + p.ht-footnote").TextContent);
         Assert.Empty(cut.FindAll(".ht-empty"));
-        foreach (var absent in new[] { "Paused", "Ended", "Consistency", "streak", "Record", "ht-strip", "Each goal is counted on its own" })
+        foreach (var absent in new[] { "Paused", "Ended", "Excuse" })
         {
             Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
         }
+
+        await using var scope = Services.CreateAsyncScope();
+        var list = await scope.ServiceProvider.GetRequiredService<GoalService>().ListAsync(user, CancellationToken.None);
+        Assert.Equal(
+            ["Coffee, at most 2 cups a day", "Meditation, 10 min, 3 days a week", "Reading, 15 min, 5 days a week", "Running, 2 times a week"],
+            list.Goals.Select(g => g.Name));
     }
 
     [Fact]
@@ -134,6 +154,7 @@ public sealed class GoalsPageTests : BunitContext
         Assert.Equal(0, _notFound);
         Assert.Equal("Goals", cut.Find(".ht-page-head h1").TextContent);
         Assert.Empty(cut.FindAll(".ht-list"));
+        Assert.Empty(cut.FindAll(".ht-footnote"));
         var empty = cut.Find(".ht-card.ht-empty");
         Assert.NotNull(empty.QuerySelector(".ht-empty__icon svg"));
         Assert.Equal("No goals yet", empty.QuerySelector("h3")!.TextContent);

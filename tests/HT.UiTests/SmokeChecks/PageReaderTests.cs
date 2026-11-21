@@ -189,6 +189,91 @@ public sealed class PageReaderTests
     }
 
     [Fact]
+    public void ReadStatLabels_returns_every_GoalStats_label_decoded_and_no_value_or_other_text()
+    {
+        // Slice 6 research R-11: the GoalStats card as GoalStats.razor renders it, a trend sub line naming "weeks", and a
+        // label with another class on the same element.
+        const string html = """
+            <section class="ht-card"><div class="ht-eyebrow">This attempt</div><h2 class="ht-card__title">Consistency and streaks</h2>
+            <div class="ht-stats">
+            <div class="ht-stat"><div class="ht-stat__value ht-stat__value--text">90% (18 of 20)</div><div class="ht-stat__label">Consistency</div></div>
+            <div class="ht-stat"><div class="ht-stat__value">6</div><div class="ht-stat__label">Streak, commitments</div></div>
+            <div class="ht-stat"><div class="ht-stat__value">11</div><div class="extra ht-stat__label">Longest, <b>commitments</b></div></div>
+            </div></section>
+            <section class="ht-card"><h2 class="ht-card__title">Times per week</h2><p class="ht-card__sub">last 12 weeks</p></section>
+            <p class="ht-stat__labels">Streak, weeks</p>
+            """;
+
+        var labels = PageReader.ReadStatLabels(html);
+
+        Assert.Equal(["Consistency", "Streak, commitments", "Longest, commitments"], labels);
+        Assert.False(PageReader.ContainsAll(labels, ["Streak, weeks"]));
+    }
+
+    [Fact]
+    public void ReadStatLabels_a_part_of_a_label_does_not_count()
+    {
+        const string html = """<div class="ht-stat__label">Streak, commitments and more</div>""";
+
+        var labels = PageReader.ReadStatLabels(html);
+
+        Assert.Equal(["Streak, commitments and more"], labels);
+        Assert.False(PageReader.ContainsAll(labels, ["Streak, commitments"]));
+        Assert.False(PageReader.ContainsAll(labels, ["Consistency"]));
+    }
+
+    [Fact]
+    public void ReadTileLabels_returns_every_StatTile_label_of_buttons_and_links_decoded()
+    {
+        // As StatTile.razor renders a filter tile (button) and the "Active goals" tile (link).
+        const string html = """
+            <div class="ht-tiles">
+            <button type="button" class="ht-tile" aria-pressed="false"><span class="ht-tile__value">3</span><span class="ht-tile__label">Due now</span></button>
+            <button type="button" class="ht-tile ht-tile--pending" aria-pressed="false"><span class="ht-tile__value">3</span><span class="ht-tile__label">Pending &#xB7; still can record</span></button>
+            <button type="button" class="ht-tile ht-tile--failed" aria-pressed="false"><span class="ht-tile__value">1</span><span class="ht-tile__label">Missed this week</span></button>
+            <a class="ht-tile" href="/goals"><span class="ht-tile__value">3</span><span class="ht-tile__label">Active goals</span></a>
+            </div>
+            <span class="ht-tile__value">Missed this week now</span>
+            """;
+
+        var labels = PageReader.ReadTileLabels(html);
+
+        Assert.Equal(["Due now", "Pending · still can record", "Missed this week", "Active goals"], labels);
+        Assert.True(PageReader.ContainsAll(labels, ["Due now", "Missed this week"]));
+        Assert.False(PageReader.ContainsAll(labels, ["Missed"]));
+    }
+
+    [Fact]
+    public void ReadStatusChips_returns_every_StatusChip_word_and_not_other_chips_or_modifiers_alone()
+    {
+        // As StatusChip.razor renders it; a plain chip and an element with only a modifier class are not status chips.
+        const string html = """
+            <div class="ht-row"><span class="ht-chip ht-status ht-status--pending">Pending</span></div>
+            <div class="ht-row"><span class="ht-chip ht-status ht-status--missed">Missed</span></div>
+            <span class="ht-chip">Missed this week</span>
+            <span class="ht-status--missed">Failed</span>
+            <span class="ht-statuses">Met</span>
+            """;
+
+        var chips = PageReader.ReadStatusChips(html);
+
+        Assert.Equal(["Pending", "Missed"], chips);
+        Assert.True(PageReader.ContainsAll(chips, ["Missed"]));
+        Assert.False(PageReader.ContainsAll(chips, ["Failed"]));
+        Assert.False(PageReader.ContainsAll(chips, ["Missed this week"]));
+    }
+
+    [Fact]
+    public void The_three_slice_6_readers_are_empty_without_their_elements()
+    {
+        const string html = "<h1>Today</h1><p>Consistency, Due now, Missed</p>";
+
+        Assert.Empty(PageReader.ReadStatLabels(html));
+        Assert.Empty(PageReader.ReadTileLabels(html));
+        Assert.Empty(PageReader.ReadStatusChips(html));
+    }
+
+    [Fact]
     public void ReadAssetUrls_returns_stylesheets_and_scripts_in_document_order_without_inline_scripts()
     {
         const string html = """

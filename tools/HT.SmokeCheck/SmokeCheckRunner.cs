@@ -3,9 +3,11 @@ using System.Globalization;
 using System.Net;
 using HT.Application.Operator;
 using HT.Application.Records;
+using HT.Application.Reports;
 using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Reports;
 
 namespace HT.SmokeCheck;
 
@@ -34,11 +36,25 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     /// <summary>The title of the goal page's History card (<c>HistoryCard.razor</c>), whose text check 6 reads.</summary>
     private const string HistoryTitle = "History";
 
+    /// <summary>The GoalStats card's consistency label (<c>GoalStats.razor</c>), which check 6 finds (slice 6 HP-008).</summary>
+    private const string ConsistencyLabel = "Consistency";
+
+    /// <summary>The Home's StatTile labels (<c>TodayPanel.razor</c>) that checks 6 and 7 find (slice 6 HP-008).</summary>
+    private const string DueNowLabel = "Due now";
+
+    private const string MissedThisWeekLabel = "Missed this week";
+
+    /// <summary>The position of "Strength training, 2 times a week" in <see cref="DemoReport.GoalNames"/>, whose page check 7 reads.</summary>
+    private const int StrengthTrainingIndex = 1;
+
+    private const string HomePath = "/";
+
     /// <summary>
     /// The goal pages of check 6 and their expected texts, all from <c>HT.Application</c> (slice 5 research R-10): the
     /// History card of "Reading" (<see cref="DemoHistory.GoalNames"/>[0], a daily commitment) holds Met, Failed, Pending,
     /// Due today, the partial amount and the note; the one of "Yoga" ([2], a per-week period) holds Failed and Missed.
-    /// On any weekday these lie in the card's first 10 rows.
+    /// On any weekday these lie in the card's first 10 rows. Slice 6 (HP-008, research R-11): "Reading"'s page also has
+    /// the stat labels "Consistency" and "Streak, commitments", matched only among its stat labels.
     /// </summary>
     private static readonly IReadOnlyList<HistoryPage> HistoryPages =
     [
@@ -50,13 +66,21 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
             RecordingText.State(EvaluationState.Due, GoalScheduleKind.CommitmentBased, null),
             RecordingText.Amount(Measurement.Duration, null, DemoHistory.PartialMinutes),
             DemoHistory.ReadingNote,
-        ]),
+        ],
+        [ConsistencyLabel, ReportText.StreakLabel(StreakUnit.Commitments)]),
         new(2,
         [
             RecordingText.State(EvaluationState.Failed, GoalScheduleKind.PeriodBased, SchedulePeriod.Week),
             RecordingText.State(EvaluationState.Missed, GoalScheduleKind.PeriodBased, SchedulePeriod.Week),
-        ]),
+        ],
+        []),
     ];
+
+    /// <summary>The stat label check 7 finds on "Strength training"'s page: "Streak, weeks" (slice 6 HP-008, research R-11).</summary>
+    private static readonly string WeeksStreakLabel = ReportText.StreakLabel(StreakUnit.Weeks);
+
+    /// <summary>The StatusChip word check 7 finds on demo5's Home: "Missed" (slice 6 HP-008).</summary>
+    private static readonly string MissedChip = ReportText.State(EvaluationState.Missed, GoalScheduleKind.PeriodBased, SchedulePeriod.Day);
 
     /// <summary>The pause between two tries of check 1, shortened to the warm-up time that is left.</summary>
     private static readonly TimeSpan RetryPause = TimeSpan.FromSeconds(5);
@@ -95,6 +119,7 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
         }
 
         await WriteCheckAsync(lines, await CheckDemoHistoryAsync().ConfigureAwait(false)).ConfigureAwait(false);
+        await WriteCheckAsync(lines, await CheckDemoReportAsync().ConfigureAwait(false)).ConfigureAwait(false);
 
         var laterMilliseconds = later?.Milliseconds;
         var laterRequests = later?.Requests ?? 0;
@@ -336,10 +361,12 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     /// Check 6 <c>demo history &lt;email&gt;</c> (slice 5 HP-008, SC-005, research R-10): <see cref="DemoHistoryService.DemoEmail"/>
     /// signs in on a new client with the demo password, <c>GET /goals</c> shows the 3 names of
     /// <see cref="DemoHistory.GoalNames"/>, and the History card of each goal page of <see cref="HistoryPages"/>, reached
-    /// through the goal's link on Goals, contains its expected texts as ordinal substrings: 11 expected texts in all.
-    /// Every page is read; a <c>FAIL</c> names the first part that misses, in that order. A goal page is named by its
-    /// position in <see cref="DemoHistory.GoalNames"/>, never by its name or its path, which holds an identifier read
-    /// from the page; no name, note or amount is printed.
+    /// through the goal's link on Goals, contains its expected texts as ordinal substrings: 11 expected texts. Slice 6
+    /// (HP-008, research R-11) adds 3: the stat labels "Consistency" and "Streak, commitments" among the stat labels of
+    /// "Reading"'s page, and "Due now" among the Home's tile labels, each matched whole: 14 in all. Every page is read; a
+    /// <c>FAIL</c> names the first part that misses, in that order. A goal page is named by its position in
+    /// <see cref="DemoHistory.GoalNames"/>, never by its name or its path, which holds an identifier read from the page;
+    /// no name, note or amount is printed.
     /// </summary>
     private async Task<string> CheckDemoHistoryAsync()
     {
@@ -361,39 +388,124 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
 
             foreach (var page in HistoryPages)
             {
-                parts.Add(await CheckHistoryPageAsync(client, links, page).ConfigureAwait(false));
+                parts.AddRange(await CheckHistoryPageAsync(client, links, page).ConfigureAwait(false));
             }
 
+            var (homeStatus, homeHtml) = await GetPageAsync(client, HomePath).ConfigureAwait(false);
+            parts.Add(LabelsPart(HomePath, homeStatus, () => PageReader.ReadTileLabels(homeHtml), [DueNowLabel], "tile labels on the Home"));
             return PartsLine(name, parts);
         }).ConfigureAwait(false);
     }
 
     /// <summary>
     /// One goal page of check 6: its link on Goals (the first goal item with the goal's name, whose <c>href</c> is a path
-    /// on this site), then its History card's text (<see cref="PageReader.ReadCardText"/>) holding each expected text.
+    /// on this site), then its History card's text (<see cref="PageReader.ReadCardText"/>) holding each expected text,
+    /// then, when the page has any, its expected stat labels (<see cref="PageReader.ReadStatLabels"/>).
     /// </summary>
-    private static async Task<NamesPart> CheckHistoryPageAsync(HttpClient client, IReadOnlyList<GoalLink> links, HistoryPage page)
+    private static async Task<IReadOnlyList<NamesPart>> CheckHistoryPageAsync(HttpClient client, IReadOnlyList<GoalLink> links, HistoryPage page)
     {
-        var goalName = DemoHistory.GoalNames[page.Index];
         var position = (page.Index + 1).ToString(CultureInfo.InvariantCulture);
-        var expected = page.Texts.Count;
-        var href = links.FirstOrDefault(link => string.Equals(link.Name, goalName, StringComparison.Ordinal))?.Href;
-        if (href is null || !IsSitePath(href))
+        var expected = page.Texts.Count + page.StatLabels.Count;
+        var (problem, html) = await GetGoalPageAsync(client, links, DemoHistory.GoalNames[page.Index], position).ConfigureAwait(false);
+        if (problem is not null)
         {
-            return new NamesPart(0, expected, $"no link for goal page {position}");
-        }
-
-        var (status, html) = await GetPageAsync(client, href).ConfigureAwait(false);
-        if (status != HttpStatusCode.OK)
-        {
-            return new NamesPart(0, expected, $"GET goal page {position} gave {StatusText(status)}");
+            return [new NamesPart(0, expected, problem)];
         }
 
         var card = PageReader.ReadCardText(html, HistoryTitle) ?? string.Empty;
         var found = page.Texts.Count(text => card.Contains(text, StringComparison.Ordinal));
-        return found == expected
-            ? new NamesPart(found, expected, null)
-            : new NamesPart(found, expected, string.Create(CultureInfo.InvariantCulture, $"{found} of {expected} texts on goal page {position} shown"));
+        List<NamesPart> parts =
+        [
+            found == page.Texts.Count
+                ? new NamesPart(found, page.Texts.Count, null)
+                : new NamesPart(found, page.Texts.Count, string.Create(CultureInfo.InvariantCulture, $"{found} of {page.Texts.Count} texts on goal page {position} shown")),
+        ];
+        if (page.StatLabels.Count > 0)
+        {
+            parts.Add(LabelsPart("goal page", HttpStatusCode.OK, () => PageReader.ReadStatLabels(html), page.StatLabels, $"stat labels on goal page {position}"));
+        }
+
+        return parts;
+    }
+
+    /// <summary>
+    /// Check 7 <c>demo report &lt;email&gt;</c> (slice 6 HP-008, research R-11): <see cref="DemoReportService.DemoEmail"/>
+    /// signs in on a new client with the demo password; <c>GET /goals</c> shows the 3 names of
+    /// <see cref="DemoReport.GoalNames"/>; the page of "Strength training, 2 times a week", reached through its link on
+    /// Goals, has the stat label "Streak, weeks"; and the Home has "Missed this week" among its tile labels and "Missed"
+    /// among its status chips: 6 expected texts, each matched whole. Every page is read; a <c>FAIL</c> names the first
+    /// part that misses, in that order. No name, note, figure or goal path is printed.
+    /// </summary>
+    private async Task<string> CheckDemoReportAsync()
+    {
+        var name = $"demo report {DemoReportService.DemoEmail}";
+        return await GuardAsync(name, async () =>
+        {
+            using var client = _createClient();
+            if (!await SignInAsync(client, DemoReportService.DemoEmail, _options.DemoPassword).ConfigureAwait(false))
+            {
+                return $"{FailPrefix}{name}: the sign-in was refused";
+            }
+
+            var (goalsStatus, goalsHtml) = await GetPageAsync(client, GoalsPath).ConfigureAwait(false);
+            IReadOnlyList<GoalLink> links = goalsStatus == HttpStatusCode.OK ? PageReader.ReadGoalLinks(goalsHtml) : [];
+            List<NamesPart> parts =
+            [
+                NamesPart.Of(GoalsPath, goalsStatus, [.. links.Select(link => link.Name)], DemoReport.GoalNames, "goal names"),
+            ];
+
+            var position = (StrengthTrainingIndex + 1).ToString(CultureInfo.InvariantCulture);
+            var (problem, strengthHtml) = await GetGoalPageAsync(client, links, DemoReport.GoalNames[StrengthTrainingIndex], position).ConfigureAwait(false);
+            parts.Add(problem is not null
+                ? new NamesPart(0, 1, problem)
+                : LabelsPart("goal page", HttpStatusCode.OK, () => PageReader.ReadStatLabels(strengthHtml), [WeeksStreakLabel], $"stat labels on goal page {position}"));
+
+            var (homeStatus, homeHtml) = await GetPageAsync(client, HomePath).ConfigureAwait(false);
+            parts.Add(LabelsPart(HomePath, homeStatus, () => PageReader.ReadTileLabels(homeHtml), [MissedThisWeekLabel], "tile labels on the Home"));
+            parts.Add(LabelsPart(HomePath, homeStatus, () => PageReader.ReadStatusChips(homeHtml), [MissedChip], "status chips on the Home"));
+            return PartsLine(name, parts);
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A goal page reached through its link on Goals: the first goal item with <paramref name="goalName"/> whose
+    /// <c>href</c> is a path on this site. Gives a reason that names the page by its <paramref name="position"/> only, or
+    /// null and the page's HTML.
+    /// </summary>
+    private static async Task<(string? Problem, string Html)> GetGoalPageAsync(
+        HttpClient client, IReadOnlyList<GoalLink> links, string goalName, string position)
+    {
+        var href = links.FirstOrDefault(link => string.Equals(link.Name, goalName, StringComparison.Ordinal))?.Href;
+        if (href is null || !IsSitePath(href))
+        {
+            return ($"no link for goal page {position}", string.Empty);
+        }
+
+        var (status, html) = await GetPageAsync(client, href).ConfigureAwait(false);
+        return status == HttpStatusCode.OK
+            ? (null, html)
+            : ($"GET goal page {position} gave {StatusText(status)}", string.Empty);
+    }
+
+    /// <summary>
+    /// The part of a check that finds whole labels or chips (<see cref="PageReader.ContainsAll"/>, ordinal): the page's
+    /// status first, then how many of <paramref name="expected"/> are among the texts read. The reason holds counts and
+    /// a path only, never a label read from the page.
+    /// </summary>
+    private static NamesPart LabelsPart(
+        string path, HttpStatusCode status, Func<IReadOnlyList<string>> read, IReadOnlyList<string> expected, string what)
+    {
+        if (status != HttpStatusCode.OK)
+        {
+            return new NamesPart(0, expected.Count, $"GET {path} gave {StatusText(status)}");
+        }
+
+        var found = read();
+        var present = found.ToHashSet(StringComparer.Ordinal);
+        var count = expected.Count(present.Contains);
+        return PageReader.ContainsAll(found, expected)
+            ? new NamesPart(count, expected.Count, null)
+            : new NamesPart(count, expected.Count, string.Create(CultureInfo.InvariantCulture, $"{count} of {expected.Count} {what} shown"));
     }
 
     /// <summary>True for a path on this site (<c>/goals/7</c>), never an absolute or protocol-relative address.</summary>
@@ -489,7 +601,7 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     /// <summary>
     /// Signs in through the sign-in page as a browser does: <c>GET /sign-in</c>, its antiforgery token and the
     /// <c>sign-in</c> form handler, then <c>POST /sign-in</c>. True when the answer is a redirect that does not go back
-    /// to <c>/sign-in</c>; the client then holds the session cookie. Used by checks 4, 5 and 6.
+    /// to <c>/sign-in</c>; the client then holds the session cookie. Used by checks 4, 5, 6 and 7.
     /// </summary>
     private static async Task<bool> SignInAsync(HttpClient client, string email, string password)
     {
@@ -540,8 +652,11 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     /// <summary>The <c>later</c> timing: its duration and how many requests it covers.</summary>
     private readonly record struct LaterTiming(long Milliseconds, int Requests);
 
-    /// <summary>A goal page of check 6: the goal's index in <see cref="DemoHistory.GoalNames"/> and its History card's expected texts.</summary>
-    private sealed record HistoryPage(int Index, IReadOnlyList<string> Texts);
+    /// <summary>
+    /// A goal page of check 6: the goal's index in <see cref="DemoHistory.GoalNames"/>, its History card's expected texts
+    /// and its expected stat labels (slice 6).
+    /// </summary>
+    private sealed record HistoryPage(int Index, IReadOnlyList<string> Texts, IReadOnlyList<string> StatLabels);
 
     /// <summary>
     /// One page of check 5: how many of its expected names it shows, how many it should, and the reason it misses, or

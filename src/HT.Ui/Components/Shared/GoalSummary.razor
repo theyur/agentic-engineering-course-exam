@@ -1,0 +1,32 @@
+@using HT.Application.Reports
+@using HT.Domain.Reports
+@* design/components/GoalSummary, slice 6 state (HP-003, constitution I): the Home's "Active goals" card. At most 5
+   goals in the order the dashboard gives them (the Goals page's order), each its name as a link to its goal page and
+   its consistency as one whole ReportText text in ht-goal__pct, then ReportText.SummaryLine ("Streak 6 commitments ·
+   longest 11"), or ReportText.NoFinalYet beside "N/A" when the goal has no finalized result; then "All goals →" to
+   /goals. Each goal is shown on its own; the card computes nothing. *@
+<section class="ht-card">
+    <h2 class="ht-card__title">Active goals</h2>
+    @foreach (var goal in Goals.Take(MaxGoals))
+    {
+        <div class="ht-goal">
+            <div class="ht-goal__top"><a class="ht-goal__name" href="@($"/goals/{goal.GoalId.Value}")">@goal.Name</a><span class="ht-goal__pct">@goal.Stats.ConsistencyText</span></div>
+            <div class="ht-goal__meta">@MetaOf(goal.Stats)</div>
+        </div>
+    }
+    <a class="ht-card__link" href="/goals">All goals →</a>
+</section>
+
+@code {
+    /// <summary>How many goals the card shows at most (HP-003).</summary>
+    private const int MaxGoals = 5;
+
+    /// <summary>Every goal of the dashboard, in its order.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<DashboardGoal> Goals { get; set; } = [];
+
+    private static string MetaOf(GoalStatsView stats) =>
+        stats.Consistency.Percentage is null
+            ? ReportText.NoFinalYet(stats.Unit)
+            : ReportText.SummaryLine(new Streaks(stats.CurrentStreak, stats.LongestStreak), stats.Unit);
+}

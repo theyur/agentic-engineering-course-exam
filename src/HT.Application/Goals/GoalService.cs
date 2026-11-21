@@ -205,7 +205,7 @@ public sealed class GoalService
         var today = ZoneOf(access.Account!).DateAt(now);
         var stored = await _goals.ListAsync(access.Owner, cancellationToken).ConfigureAwait(false);
         var items = stored
-            .Select(goal => ListItemOf(goal, now))
+            .Select(goal => GoalListItems.Of(goal, now))
             .OrderBy(item => HabitName.KeyOf(item.Name), StringComparer.Ordinal)
             .ToList();
         return GoalListResult.Found(items, today);
@@ -263,35 +263,6 @@ public sealed class GoalService
 
         return GoalCalendarResult.Found(new GoalCalendarView(calendar.Kind, calendar.Commitments, calendar.Periods));
     }
-
-    /// <summary>The list fields of FR-015 and FR-014 at <paramref name="now"/>.</summary>
-    private static GoalListItem ListItemOf(StoredGoal stored, DateTimeOffset now)
-    {
-        var goal = stored.Goal;
-        var current = GoalTimeline.CurrentDate(goal, now);
-        var target = GoalTimeline.VersionOf(goal, current ?? goal.StartDate).Settings.Target;
-        return new GoalListItem
-        {
-            Id = goal.Id,
-            Name = GoalText.Name(goal, stored.Habit.Name),
-            HabitName = stored.Habit.Name,
-            HabitKind = stored.Habit.Kind,
-            BuildOrReduce = target.BuildOrReduce,
-            Measurement = target.Measurement,
-            TargetText = GoalText.TargetText(target),
-            ScheduleText = GoalText.ScheduleText(target),
-            ScheduleKind = target.ScheduleKindOf,
-            StartDate = current is null ? goal.StartDate : null,
-            NextCommitment = GoalTimeline.NextCommitment(goal, now),
-            FirstWeekStarts = FirstWeekNotBegun(goal, now),
-        };
-    }
-
-    /// <summary>A per-week goal's first Monday while its week has not begun at <paramref name="now"/>; null otherwise.</summary>
-    private static DateOnly? FirstWeekNotBegun(Goal goal, DateTimeOffset now) =>
-        GoalTimeline.FirstWeekStart(goal) is { } monday && GoalTimeline.VersionOf(goal, monday).Settings.TimeZone.StartOfDay(monday) > now
-            ? monday
-            : null;
 
     /// <summary>The reading fields of FR-016 and FR-018 at <paramref name="now"/>.</summary>
     private static GoalDetails DetailsOf(StoredGoal stored, DateTimeOffset now)

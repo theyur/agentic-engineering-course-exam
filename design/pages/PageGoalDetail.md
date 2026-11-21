@@ -77,3 +77,23 @@ That order is the owner's decision after implementation (2026-11-20). The first 
 - Recent notes card (right column, after Settings): the title "Recent notes", then at most 5 notes, newest first, each an `ht-goal` item: the note in quotes and its StatusChip on the top line (`ht-goal__top`, `ht-spacer` before the chip), and its date under it (`ht-goal__meta`: "Thu 12 Nov", or "27 Jul – 2 Aug" for a week). The card is absent while the goal has no note.
 - A goal with no begun entry (not started yet, or a current date with no commitment or period yet, such as a per-week goal's days before its first week) shows no "Record", no History card and no Recent notes card: only slice 4's content.
 - No GoalStats, strip, trend, pauses or earlier attempts (slices 6 to 8).
+
+## Slice 6 state
+
+The last part of the preview shows the page as slice 6 builds it (HP-001, US1-AS8, US2-AS8, US4-AS8, ADR 0008). Today is Tue 17 Nov 2026; the goal "Reading, 20 min daily" started on Tue 20 Oct.
+
+- Everything of slice 5 stays as it is: the page head with "Record", the History card, the Settings card and the Recent notes card (the "Slice 5 state" above).
+- The left column gets two cards above the History card, in this order:
+  1. the GoalStats card (`components/GoalStats.md`, "Slice 6 state"): the eyebrow "This attempt", the title "Consistency and streaks" (`h2.ht-card__title`), then three stats:
+     - "Consistency" with the consistency as one whole text, "92% (24 of 26)" or "N/A", in `ht-stat__value ht-stat__value--text`;
+     - "Streak, commitments" with the current streak, "7";
+     - "Longest, commitments" with the longest streak, "9".
+
+     The labels name the goal's unit in its plural form: "commitments", "days" or "weeks". Then the ConsistencyStrip of the last 30 ended results, oldest first, with its legend: Met, Failed, Missed and Pending only (`components/ConsistencyStrip.md`, "Slice 6 state"). Its `aria-label` counts each state: "Last 28 commitments: 24 met, 1 failed, 1 missed, 2 pending".
+  2. the TrendChart card (`components/TrendChart.md`, "Slice 6 state"), a `section.ht-card` with an `h2` title: the title and sub line of the goal's kind ("Minutes per day", "Last 14 days"), the bars of FR-006, an empty bar (`ht-bar--empty`) for a commitment, day or week with no record (Sat 7 Nov and Mon 16 Nov here), the dashed target line "Target 20 min" (minutes) or "Target {n}", and the date labels. Its `aria-label` names the bars and the target: "Minutes per day, last 14 days; target 20".
+- The figures cover the whole current attempt, from its start date to today; the strip and the trend show its latest results and bars.
+- Each value renders whole, as one `ReportText` text (tasks, Conventions): "92% (24 of 26)" is not split into "92%" and a `<small>` count. The full preview above keeps its split value for later slices.
+- After a record, a change, a delete or a note is saved in a dialog, the page reads the figures again, so the cards follow the correction.
+- A goal with no begun entry (not started yet, or a per-week goal's days before its first week) keeps the slice 5 page without these two cards: no "Record", no History, no Recent notes, no GoalStats and no TrendChart (the last example of the "Slice 5 state").
+- No Excused or Paused cell, no paused bar, no Pauses card, no earlier attempts, no Edit settings, Pause or End goal (slices 7 and 8).
+- The full preview's trend title "Days done per week" (a commitment-based yes/no goal) replaces "Sessions per week", as the TrendChart's title table gives it.

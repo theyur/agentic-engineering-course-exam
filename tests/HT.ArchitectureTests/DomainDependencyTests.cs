@@ -28,8 +28,11 @@ public sealed class DomainDependencyTests
             .Check(ArchitectureModel.Architecture);
     }
 
-    /// <summary>The namespaces of slice 5's records and evaluation (research R-13).</summary>
-    internal static readonly string[] RecordsAndEvaluation = ["HT.Domain.Records", "HT.Domain.Evaluation"];
+    /// <summary>
+    /// The namespaces of slice 5's records and evaluation (research R-13), and of slice 6's reports (specs/007 research
+    /// R-14), which also get the time only as a parameter. <see cref="ClockReadTests"/> checks the same list.
+    /// </summary>
+    internal static readonly string[] RecordsAndEvaluation = ["HT.Domain.Records", "HT.Domain.Evaluation", "HT.Domain.Reports"];
 
     /// <summary>The types of one of <see cref="RecordsAndEvaluation"/>; a test fails when there are none, so moving them out fails.</summary>
     internal static List<ArchUnitNET.Domain.IType> TypesIn(string ns)
@@ -43,17 +46,17 @@ public sealed class DomainDependencyTests
 
     /// <summary>
     /// Slice 5 research R-13: <c>HT.Domain.Records</c> and <c>HT.Domain.Evaluation</c> depend only on HT.Domain and
-    /// the base class library, not even on NodaTime.
+    /// the base class library, not even on NodaTime. Slice 6 (research R-14): <c>HT.Domain.Reports</c> joins them.
     /// </summary>
     [Fact]
-    public void RecordsAndEvaluationDependOnlyOnTheDomainAndTheBcl()
+    public void RecordsEvaluationAndReportsDependOnlyOnTheDomainAndTheBcl()
     {
         foreach (var ns in RecordsAndEvaluation)
         {
             Assert.NotEmpty(TypesIn(ns));
             Types().That().ResideInNamespaceMatching($"^{Regex.Escape(ns)}$")
                 .Should().NotDependOnAny(Types(true).That().DoNotResideInNamespaceMatching(@"^(HT\.Domain|System)(\..*)?$"))
-                .Because("records and evaluation use only the domain and the base class library (research R-13)")
+                .Because("records, evaluation and reports use only the domain and the base class library (research R-13, R-14)")
                 .Check(ArchitectureModel.Architecture);
         }
     }

@@ -3,6 +3,7 @@ using HT.Application.Accounts;
 using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Application.Records;
+using HT.Application.Reports;
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
 using Xunit;
@@ -29,7 +30,7 @@ public sealed class UseCaseParameterTests
 
     public static TheoryData<Type> SignedInServices =>
         new(typeof(CatalogAdministrationService), typeof(CustomHabitService), typeof(GoalService), typeof(ProfileService),
-            typeof(RecordingService));
+            typeof(RecordingService), typeof(ReportService));
 
     [Fact]
     public void Every_method_of_the_custom_habit_port_takes_the_owner_first()

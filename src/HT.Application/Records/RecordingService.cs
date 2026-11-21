@@ -79,7 +79,7 @@ public sealed class RecordingService
             return RecordWriteResult.Refused(RecordWriteOutcome.DayNotBegun, RecordTexts.DayNotBegun);
         }
 
-        var target = TargetOf(found, entry);
+        var target = EntryViews.TargetOf(found, entry);
         if (!RecordValue.TryCreate(target.Measurement, input.Answer, input.Amount, out var value, out var problem))
         {
             return ValueRefused(problem);
@@ -103,7 +103,7 @@ public sealed class RecordingService
         switch (write.Outcome)
         {
             case RecordStoreWriteOutcome.Written:
-                var view = EntryView(found, entry, write.Entry!.Records, write.Entry.Note, now);
+                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, now);
                 return RecordWriteResult.Recorded(write.RecordId!.Value, view, view.IsCorrection);
             case RecordStoreWriteOutcome.LimitReached:
                 return RecordWriteResult.Refused(RecordWriteOutcome.RecordLimitReached, RecordTexts.RecordLimitReached);
@@ -146,7 +146,7 @@ public sealed class RecordingService
         }
 
         var entry = StoredEntryOf(found, date);
-        var target = TargetOf(found, entry);
+        var target = EntryViews.TargetOf(found, entry);
         if (!RecordValue.TryCreate(target.Measurement, input.Answer, input.Amount, out var value, out var problem))
         {
             return ValueRefused(problem);
@@ -162,7 +162,7 @@ public sealed class RecordingService
         switch (write.Outcome)
         {
             case RecordStoreWriteOutcome.Written:
-                var view = EntryView(found, entry, write.Entry!.Records, write.Entry.Note, now);
+                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, now);
                 return RecordWriteResult.Changed(write.RecordId!.Value, view, view.IsCorrection);
             case RecordStoreWriteOutcome.RecordNotFound:
                 // The record was deleted between the lookup and the write.
@@ -203,7 +203,7 @@ public sealed class RecordingService
         switch (write.Outcome)
         {
             case RecordStoreWriteOutcome.Written:
-                var view = EntryView(found, entry, write.Entry!.Records, write.Entry.Note, now);
+                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, now);
                 return RecordWriteResult.Deleted(view, view.IsCorrection);
             case RecordStoreWriteOutcome.RecordNotFound:
                 // The record was deleted between the lookup and the write.
@@ -256,7 +256,7 @@ public sealed class RecordingService
         switch (write.Outcome)
         {
             case RecordStoreWriteOutcome.Written:
-                return NoteSaveResult.Saved(EntryView(found, entry, write.Entry!.Records, write.Entry.Note, now));
+                return NoteSaveResult.Saved(EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, now));
             case RecordStoreWriteOutcome.GoalNotFound:
                 // The goal was removed between the lookup and the write.
                 return NoteSaveResult.Refused(NoteSaveOutcome.NotFound, GoalTexts.NotFound);
@@ -296,7 +296,7 @@ public sealed class RecordingService
                 continue;
             }
 
-            var view = EntryView(found, entry, RecordsIn(stored, entry), note, now);
+            var view = EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), note, now);
             notes.Add(new RecentNote { FirstDate = view.FirstDate, LastDate = view.LastDate, Note = note.Value, State = view.State });
         }
 
@@ -306,7 +306,7 @@ public sealed class RecordingService
     /// <summary>
     /// The history of one of the acting user's goals from <paramref name="first"/> to <paramref name="last"/>, both
     /// included (FR-009, FR-010, FR-014; research R-07): every commitment or period of the goal's evaluation calendar in
-    /// the range, in date order, each as <c>EntryView</c> gives it at the supplied time. The range is checked after the
+    /// the range, in date order, each as <see cref="EntryViews.Of"/> gives it at the supplied time. The range is checked after the
     /// goal (FR-018): 1 to 366 days, otherwise <see cref="HistoryOutcome.RangeOutOfBounds"/>. A per-week period that
     /// overlaps the range is given whole, with all its records, also those dated outside the range, so one store read
     /// covers the first entry's first date to the last entry's last date. A range with no entry (unscheduled days only,
@@ -333,15 +333,15 @@ public sealed class RecordingService
         var current = GoalTimeline.CurrentDate(found, now);
         if (entries.Count == 0)
         {
-            return HistoryResult.Found(HistoryOf(found, current, [], now));
+            return HistoryResult.Found(EntryViews.HistoryOf(found, current, [], now));
         }
 
         var stored = await _records.ReadAsync(access.Owner, goal, entries[0].FirstDate, entries[^1].LastDate, cancellationToken)
             .ConfigureAwait(false);
         var views = entries
-            .Select(entry => EntryView(found, entry, RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), now))
+            .Select(entry => EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), now))
             .ToList();
-        return HistoryResult.Found(HistoryOf(found, current, views, now));
+        return HistoryResult.Found(EntryViews.HistoryOf(found, current, views, now));
     }
 
     /// <summary>
@@ -364,22 +364,22 @@ public sealed class RecordingService
         var found = access.Goal!;
         if (GoalTimeline.CurrentDate(found, now) is not { } current)
         {
-            return RecordableResult.Found(HistoryOf(found, null, [], now));
+            return RecordableResult.Found(EntryViews.HistoryOf(found, null, [], now));
         }
 
         if (!GoalTimeline.TryEntries(found, current.AddDays(-RecordableWindowDays), current, out var entries) || entries.Count == 0)
         {
-            return RecordableResult.Found(HistoryOf(found, current, [], now));
+            return RecordableResult.Found(EntryViews.HistoryOf(found, current, [], now));
         }
 
         var stored = await _records.ReadAsync(access.Owner, goal, entries[0].FirstDate, entries[^1].LastDate, cancellationToken)
             .ConfigureAwait(false);
         var recordable = entries
-            .Select(entry => EntryView(found, entry, RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), now))
+            .Select(entry => EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), now))
             .Where(view => view.State is EvaluationState.Due or EvaluationState.Pending)
             .OrderByDescending(view => view.FirstDate)
             .ToList();
-        return RecordableResult.Found(HistoryOf(found, current, recordable, now));
+        return RecordableResult.Found(EntryViews.HistoryOf(found, current, recordable, now));
     }
 
     /// <summary>
@@ -407,56 +407,6 @@ public sealed class RecordingService
         return await _goals.FindAsync(owner, goal, cancellationToken).ConfigureAwait(false) is { } stored
             ? new Access(owner, stored.Goal, null, null)
             : Access.Refused(AccessRefusal.NotFound, GoalTexts.NotFound);
-    }
-
-    /// <summary>
-    /// One entry as the history gives it at <paramref name="now"/> (FR-009, FR-010, FR-014, FR-015): evaluated with the
-    /// target of the settings version in effect for its first date, its grace end only while it is Due or Pending, its
-    /// records as views, its note, and whether a change now is a correction (its grace period has ended, FR-006).
-    /// <paramref name="records"/> are the entry's records, in date order and then in the stored order.
-    /// </summary>
-    private static HistoryEntry EntryView(Goal goal, CalendarEntry entry, IReadOnlyList<GoalRecord> records, NoteText? note, DateTimeOffset now)
-    {
-        var evaluation = Evaluator.Evaluate(TargetOf(goal, entry), entry.Starts, entry.Ends, records.Select(record => record.Value).ToList(), now);
-        return new HistoryEntry
-        {
-            FirstDate = entry.FirstDate,
-            LastDate = entry.LastDate,
-            Starts = entry.Starts,
-            Ends = entry.Ends,
-            State = evaluation.State,
-            GraceEnds = evaluation.State is EvaluationState.Due or EvaluationState.Pending ? evaluation.GraceEnds : null,
-            Records = records.Select(record => new RecordView(record.Id, record.Date, record.Value.Answer, record.Value.Amount)).ToList(),
-            Progress = evaluation.Progress,
-            Note = note?.Value,
-            IsCorrection = now >= GracePeriod.EndOf(entry.Ends),
-        };
-    }
-
-    /// <summary>
-    /// The goal's settings as the pages need them to show <paramref name="entries"/> (FR-009, FR-011): those of the
-    /// version of <paramref name="currentDate"/>, or of the start date when there is none, and the instant the clock was
-    /// read. No goal or habit name.
-    /// </summary>
-    private static GoalHistory HistoryOf(Goal goal, DateOnly? currentDate, IReadOnlyList<HistoryEntry> entries, DateTimeOffset now)
-    {
-        var target = GoalTimeline.VersionOf(goal, currentDate ?? goal.StartDate).Settings.Target;
-        return new GoalHistory
-        {
-            GoalId = goal.Id,
-            GoalScheduleKind = target.ScheduleKindOf,
-            Period = target.PeriodLength,
-            BuildOrReduce = target.BuildOrReduce,
-            Measurement = target.Measurement,
-            Amount = target.Amount,
-            CountUnit = target.CountUnit,
-            DurationUnit = target.DurationUnit,
-            Times = target.ScheduleKindOf == GoalScheduleKind.PeriodBased ? target.Schedule.Times : null,
-            CurrentDate = currentDate,
-            Target = target,
-            ReadAt = now,
-            Entries = entries,
-        };
     }
 
     /// <summary>
@@ -501,13 +451,6 @@ public sealed class RecordingService
 
     /// <summary>The entry as the record store sees it: its note key and its first and last date (research R-05).</summary>
     private static EntrySpan SpanOf(CalendarEntry entry) => new(entry.Key, entry.FirstDate, entry.LastDate);
-
-    /// <summary>The target of the settings version in effect for the entry's date (FR-015).</summary>
-    private static GoalTarget TargetOf(Goal goal, CalendarEntry entry) => GoalTimeline.VersionOf(goal, entry.FirstDate).Settings.Target;
-
-    /// <summary>The records read with <paramref name="stored"/> that are dated in <paramref name="entry"/>, in their order.</summary>
-    private static List<GoalRecord> RecordsIn(StoredEntries stored, CalendarEntry entry) =>
-        stored.Records.Where(record => record.Date >= entry.FirstDate && record.Date <= entry.LastDate).ToList();
 
     private static RecordWriteResult ValueRefused(RecordProblem problem) => problem switch
     {

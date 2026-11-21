@@ -97,10 +97,12 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Equal("Yoga, 3 days a week", cut.Find(".ht-page-head h1").TextContent);
         Assert.Equal(["Body", "Build", "Commitment-based"], cut.FindAll(".ht-head-tags .ht-chip").Select(c => c.TextContent));
         Assert.Equal("Attempt 1 · started 14 Jul", cut.Find(".ht-head-tags .ht-attempt").TextContent);
-        // Slice 5 (T055): the History card in the left column, the Settings card in the right one.
-        Assert.Equal(
-            ["History", "Settings"],
-            cut.FindAll(".ht-grid-2 > .ht-stack").Select(column => column.QuerySelector(".ht-card .ht-card__title")!.TextContent));
+        // Slice 5 (T055): the History card in the left column, the Settings card in the right one; slice 6 (HP-001): the
+        // GoalStats card, then the TrendChart card, above the History card.
+        var columns = cut.FindAll(".ht-grid-2 > .ht-stack");
+        Assert.Equal(2, columns.Count);
+        Assert.Equal(["Consistency and streaks", "Days done per week", "History"], columns[0].QuerySelectorAll(".ht-card .ht-card__title").Select(Text));
+        Assert.Equal("Settings", columns[1].QuerySelector(".ht-card .ht-card__title")!.TextContent);
         Assert.Equal(
             [
                 ("Habit", "Yoga · catalog"), ("Build or reduce", "Build"), ("Measure", "Yes / no"), ("Target", "3 days a week"),
@@ -111,7 +113,7 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Empty(cut.FindAll(".ht-notice"));
         // Tuesday 17 November is not scheduled, but Monday 16 is Pending: "Record" is the page head's one action (HP-001).
         Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
-        foreach (var absent in new[] { "Edit settings", "Pause", "End goal", "Consistency", "streak", "Earlier attempts", "Excuse" })
+        foreach (var absent in new[] { "Edit settings", "Pause", "End goal", "Earlier attempts", "Excuse" })
         {
             Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
         }
@@ -184,6 +186,99 @@ public sealed class GoalDetailPageTests : BunitContext
         // T055: a current date but no begun entry, so no History card; the Settings card stands alone in ht-grid-2.
         Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
         Assert.Empty(cut.FindAll(".ht-grid-2 > .ht-stack"));
+        Assert.Empty(cut.FindAll(".ht-stats"));
+        Assert.Empty(cut.FindAll(".ht-bars"));
+    }
+
+    [Fact]
+    public void Slice_6_US1_AS8_HP_001_the_GoalStats_card_shows_the_consistency_above_the_History_card()
+    {
+        // Reading, 20 min daily, from Tuesday 10 November in UTC. At 10:00 on Tuesday 17 November the days to Saturday 14
+        // are final: 10, 11 and 13 Met (20 min), 12 Failed (10 min), 14 Missed; Sunday 15 and Monday 16 are Pending and
+        // Tuesday 17 is Due.
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 10);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        foreach (var (day, minutes) in new[] { (10, 20), (11, 20), (12, 10), (13, 20) })
+        {
+            _records.Seed(goal.Id, new DateOnly(2026, 11, day), RecordValue.FromAmount(minutes));
+        }
+
+        var cut = RenderGoal(goal.Id);
+
+        var left = cut.FindAll(".ht-grid-2 > .ht-stack")[0];
+        var card = left.Children[0];
+        Assert.Equal("This attempt", card.QuerySelector(".ht-eyebrow")!.TextContent);
+        Assert.Equal("Consistency and streaks", card.QuerySelector("h2.ht-card__title")!.TextContent);
+        Assert.Equal(
+            [("Consistency", "60% (3 of 5)"), ("Streak, commitments", "0"), ("Longest, commitments", "2")],
+            card.QuerySelectorAll(".ht-stat").Select(s => (s.QuerySelector(".ht-stat__label")!.TextContent, s.QuerySelector(".ht-stat__value")!.TextContent)));
+        Assert.Equal("Last 7 commitments: 3 met, 1 failed, 1 missed, 2 pending", card.QuerySelector(".ht-strip")!.GetAttribute("aria-label"));
+        Assert.Equal("Minutes per day", left.Children[1].QuerySelector(".ht-card__title")!.TextContent);
+        Assert.Equal("History", left.Children[2].QuerySelector(".ht-card__title")!.TextContent);
+    }
+
+    [Fact]
+    public void Slice_6_US4_HP_001_the_TrendChart_card_follows_GoalStats_with_its_bars_and_target_line()
+    {
+        // As above: 20, 20, 10 and 20 minutes on 10 to 13 November, nothing on 14 to 17. The 8 begun commitments are the
+        // bars; the largest of the values and the target is 20, so 20 minutes is 100% and 10 minutes 50%.
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 10);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        foreach (var (day, minutes) in new[] { (10, 20), (11, 20), (12, 10), (13, 20) })
+        {
+            _records.Seed(goal.Id, new DateOnly(2026, 11, day), RecordValue.FromAmount(minutes));
+        }
+
+        var cut = RenderGoal(goal.Id);
+
+        var card = cut.FindAll(".ht-grid-2 > .ht-stack")[0].Children[1];
+        Assert.Equal("section", card.LocalName);
+        Assert.Equal("Minutes per day", card.QuerySelector("h2.ht-card__title")!.TextContent);
+        Assert.Equal("Last 14 days", card.QuerySelector(".ht-card__sub")!.TextContent);
+        var chart = card.QuerySelector(".ht-bars")!;
+        Assert.Equal(("img", "Minutes per day, last 14 days; target 20"), (chart.GetAttribute("role"), chart.GetAttribute("aria-label")));
+        var bars = chart.QuerySelectorAll("i.ht-bar");
+        Assert.Equal(
+            ["height:100%", "height:100%", "height:50%", "height:100%", null, null, null, null],
+            bars.Select(b => b.GetAttribute("style")));
+        Assert.Equal(4, chart.QuerySelectorAll("i.ht-bar--empty").Length);
+        Assert.Equal(
+            ["Tue 10 Nov: 20 of 20 min", "Wed 11 Nov: 20 of 20 min", "Thu 12 Nov: 10 of 20 min", "Fri 13 Nov: 20 of 20 min",
+             "Sat 14 Nov: no record", "Sun 15 Nov: no record", "Mon 16 Nov: no record", "Tue 17 Nov: no record"],
+            bars.Select(b => b.GetAttribute("title")));
+        var line = chart.QuerySelector(".ht-bars__target")!;
+        Assert.Equal(("Target 20 min", "bottom:100%"), (line.TextContent, line.GetAttribute("style")));
+        Assert.Equal(
+            ["10 Nov", "11 Nov", "12 Nov", "13 Nov", "14 Nov", "15 Nov", "16 Nov", "17 Nov"],
+            card.QuerySelectorAll(".ht-bars__labels > span").Select(s => s.TextContent));
+    }
+
+    [Fact]
+    public async Task Slice_6_HP_001_a_goal_not_started_has_no_GoalStats_and_no_TrendChart_card()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, new DateOnly(2026, 11, 25));
+
+        var cut = RenderGoal(id);
+
+        Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Empty(cut.FindAll(".ht-stats"));
+        Assert.Empty(cut.FindAll(".ht-bars"));
+        Assert.DoesNotContain("Consistency", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Minutes per day", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -268,6 +363,51 @@ public sealed class GoalDetailPageTests : BunitContext
     }
 
     [Fact]
+    public async Task Slice_6_US3_FR_008_a_record_saved_for_a_Missed_day_shows_the_new_consistency_without_a_reload()
+    {
+        // As in Slice_6_US1_AS8: Reading, 20 min daily, from Tuesday 10 November in UTC; at 10:00 on Tuesday 17 November
+        // 10, 11 and 13 are Met, 12 Failed and Saturday 14 Missed ("60% (3 of 5)", streak 0, longest 2). Saving 20 minutes
+        // for Saturday 14 makes it Met ("80% (4 of 5)", streak 2); deleting that record makes it Missed again.
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 10);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        foreach (var (day, minutes) in new[] { (10, 20), (11, 20), (12, 10), (13, 20) })
+        {
+            _records.Seed(goal.Id, new DateOnly(2026, 11, day), RecordValue.FromAmount(minutes));
+        }
+
+        var cut = RenderGoal(goal.Id);
+        List<(string Label, string Value)> Stats() =>
+            cut.FindAll(".ht-stats .ht-stat").Select(s => (s.QuerySelector(".ht-stat__label")!.TextContent, s.QuerySelector(".ht-stat__value")!.TextContent)).ToList();
+        AngleSharp.Dom.IElement RecordControl() =>
+            cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == "Sat 14 Nov")
+                .QuerySelector("td.ht-actions > button:last-of-type")!;
+        Assert.Equal([("Consistency", "60% (3 of 5)"), ("Streak, commitments", "0"), ("Longest, commitments", "2")], Stats());
+        var buttonId = RecordControl().GetAttribute("blazor:elementReference");
+
+        await RecordControl().ClickAsync(new MouseEventArgs());
+        cut.Find(".ht-stepper input").Change("20");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal([("Consistency", "80% (4 of 5)"), ("Streak, commitments", "2"), ("Longest, commitments", "2")], Stats());
+        Assert.Equal("Last 7 commitments: 4 met, 1 failed, 2 pending", cut.Find(".ht-strip").GetAttribute("aria-label"));
+        var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
+        Assert.Equal(buttonId, focused[1]);
+
+        await RecordControl().ClickAsync(new MouseEventArgs());
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[2].ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal([("Consistency", "60% (3 of 5)"), ("Streak, commitments", "0"), ("Longest, commitments", "2")], Stats());
+    }
+
+    [Fact]
     public async Task US4_a_Missed_rows_Add_note_opens_the_NoteDialog_and_a_save_shows_the_note_in_the_row_and_in_Recent_notes()
     {
         // Reading, 20 min daily, from Tuesday 10 November in UTC; at 10:00 on Tuesday 17 November Saturday 14's grace
@@ -286,7 +426,7 @@ public sealed class GoalDetailPageTests : BunitContext
         // specs/006-note-editing HP-002: the note control is the first button of the actions column, before "Add record".
         AngleSharp.Dom.IElement NoteButton() => Row().QuerySelectorAll("td.ht-actions > button")[0];
         // No note yet: no Recent notes card, and the right column holds the Settings card alone.
-        Assert.Equal(["History", "Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Equal(["Consistency and streaks", "Minutes per day", "History", "Settings"], cut.FindAll(".ht-card__title").Select(Text));
         Assert.Equal(["Add note", "Add record"], Row().QuerySelectorAll("td.ht-actions > button").Select(Text));
         Assert.Equal(("Add note", "Add note for Sat 14 Nov"), (NoteButton().TextContent, NoteButton().GetAttribute("aria-label")));
         Assert.Equal("—", Text(Row().QuerySelectorAll("td")[3]));
@@ -323,7 +463,7 @@ public sealed class GoalDetailPageTests : BunitContext
 
         Assert.Equal(("Add note", "Add note for Sat 14 Nov"), (NoteButton().TextContent, NoteButton().GetAttribute("aria-label")));
         Assert.Equal("—", Text(Row().QuerySelectorAll("td")[3]));
-        Assert.Equal(["History", "Settings"], cut.FindAll(".ht-card__title").Select(Text));
+        Assert.Equal(["Consistency and streaks", "Minutes per day", "History", "Settings"], cut.FindAll(".ht-card__title").Select(Text));
         Assert.Empty(_records.NotesOfGoal(goal.Id));
     }
 

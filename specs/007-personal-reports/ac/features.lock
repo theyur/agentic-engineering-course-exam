@@ -1,0 +1,7 @@
+{
+  "group": "features",
+  "feature": "specs/007-personal-reports",
+  "files": {
+    "tests/HT.AcceptanceTests/Features/F007/personal-reports.feature": "74adf5c1a04a6dd7627d20680fb08fc84899e0a1df22a24a45ec3caf259b97f5"
+  }
+}

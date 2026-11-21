@@ -110,7 +110,9 @@ only you or its daily schedule do (see "The daily refresh").
 - `deploy` takes about 10 minutes, at most 15. The hosted demo is unavailable meanwhile.
 - After `deploy` and `refresh`, every registered account and every reviewer change is gone; the startup tasks
   create the administrator, the demo accounts with their custom habits and the seed catalog again, and
-  `demo4@example.com` with its results and notes relative to the start's UTC date (slice 5).
+  `demo4@example.com` with its results and notes relative to the start's UTC date (slice 5), and
+  `demo5@example.com` with 12 weeks of results and notes relative to the same date (slice 6, demo report loading,
+  ADR 0021).
 - A second run waits until the first one ends.
 - A failed run is recovered by the next run: start it again once the cause is fixed. After a failure at
   `7.1 Deploy the web app`, `Deployment__Commit` is empty and only a `deploy` run repairs it; `refresh` and
@@ -122,7 +124,8 @@ only you or its daily schedule do (see "The daily refresh").
 ### The daily refresh
 
 The workflow also runs `refresh` every day at 00:20 UTC (ADR 0018, slice 5 HP-009), so `demo4@example.com`
-shows Met, Failed, Missed, Pending and Due results relative to the current date. Its run is named
+shows Met, Failed, Missed, Pending and Due results relative to the current date, and `demo5@example.com` (slice 6
+HP-011, ADR 0021) its full trends, streaks of several weeks and a result Missed this week. Its run is named
 `Demo (refresh)` and needs nothing from you.
 
 - **After 2027-01-31** a scheduled run ends in **Gate** with the summary "Demo refresh: skipped after
@@ -175,7 +178,8 @@ PASS administrator
 PASS demo demo1@example.com (<found> of <expected>)
 PASS demo demo2@example.com (<found> of <expected>)
 PASS demo demo3@example.com (<found> of <expected>)
-PASS demo history demo4@example.com (11 of 11)
+PASS demo history demo4@example.com (14 of 14)
+PASS demo report demo5@example.com (<found> of <expected>)
 TIMING first <ms> ms, later <ms> ms (<n> requests)
 RESULT PASS
 ```
@@ -185,14 +189,25 @@ the visitor Home; `later n/a` means no demo account signed in. Exit code 1 means
 invocation. The lines never contain a password, the administrator email or a habit name.
 
 `demo history demo4@example.com` (slice 5) checks demo4's 3 goal names on Goals and 8 texts in the History cards
-of two of its goals. Its reasons name a goal page only by its number (1 "Reading", 3 "Yoga"), never by a name,
-a note, an amount or a path (`specs/003-demo-hosting/contracts/smoke-check.md`). After a late or missing daily
-refresh it is the first check to fail (see "The daily refresh").
+of two of its goals; since slice 6 also the stat labels "Consistency" and "Streak, commitments" on the page of
+"Reading" and the tile label "Due now" on the Home: 14 texts. Its reasons name a goal page only by its number
+(1 "Reading", 3 "Yoga"), never by a name, a note, an amount or a path
+(`specs/003-demo-hosting/contracts/smoke-check.md`). After a late or missing daily refresh it is the first check
+to fail (see "The daily refresh").
+
+`demo report demo5@example.com` (slice 6, check 7) checks demo5's 3 goal names on Goals, the stat label "Streak,
+weeks" on the page of "Strength training", and on the Home the tile label "Missed this week" and a "Missed" status
+chip: 6 texts. Its reasons name the goal page only by its number (2), and never print a name, a note, a figure or
+a path. It needs demo report loading's account, so it fails when that startup task failed or had no valid demo
+password (see "Read the operator log").
 
 ## Read the operator log
 
 The operator log is the web app's console output: administrator creation, demo loading, demo history loading
-(`Demo history loading: …`, `Demo account demo4@example.com: …`, `Demo goals …`, `Demo records …`) and faults. It
+(`Demo history loading: …`, `Demo account demo4@example.com: …`, `Demo goals …`, `Demo records …`), then, as the
+fourth startup task (slice 6 HP-011, ADR 0021), demo report loading (`Demo report loading: …` with no or a weak demo
+password; otherwise `Demo account demo5@example.com: …`, `Demo goals demo5@example.com: …`,
+`Demo records demo5@example.com: …`; `Demo report loading failed; the app starts without it` for a fault) and faults. It
 needs an Azure sign-in, and it contains the administrator email, so never paste it into a public place.
 
 - Live: `az webapp log tail --name <app> --resource-group <rg>`, or the portal's Log stream.
@@ -240,12 +255,12 @@ The exam submission is written outside the repository. It gives reviewers:
 | Item | Value |
 |---|---|
 | Published address | `https://<app>.azurewebsites.net`, the `DEMO_BASE_URL` variable of the environment `demo` |
-| Demo emails | `demo1@example.com`, `demo2@example.com`, `demo3@example.com` |
+| Demo emails | `demo1@example.com`, `demo2@example.com`, `demo3@example.com`; with history `demo4@example.com` (slice 5) and `demo5@example.com` (slice 6, the reports with full trends) |
 | Demo password | the value of `Operator__DemoPassword`; not written here |
 | Administrator email | the value of `Operator__AdministratorEmail`; not written here |
 | Administrator password | the value of `Operator__AdministratorPassword`; not written here |
 
-The demo password is the same for the three demo accounts. Accounts that reviewers register, and their
+The demo password is the same for every demo account. Accounts that reviewers register, and their
 changes, last until the next `deploy` or `refresh`. The administrator has no access to private data.
 
 ## Run the smoke check locally

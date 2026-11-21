@@ -15,9 +15,10 @@
 <span class="ht-chip ht-status ht-status--paused">Paused</span>
 <span class="ht-chip ht-status ht-status--due">Due today</span>
 <span class="ht-chip ht-status ht-status--due">Due this week</span>
+<span class="ht-chip ht-status ht-status--due">Upcoming</span>
 </div>
 </div>
-<!-- Slice 5 state (HP-004): the chips the goal page shows in slice 5, always with their word: Met (Build and Reduce goals alike), Failed, Missed, Pending, Due today (a commitment or a day) and Due this week (a week). No Upcoming chip ("Due Mon"), Excused or Paused (slice 7). -->
+<!-- Slice 5 state (HP-004): the chips the goal page shows in slice 5, always with their word: Met (Build and Reduce goals alike), Failed, Missed, Pending, Due today (a commitment or a day) and Due this week (a week). No Upcoming chip, Excused or Paused (slice 7). -->
 <div class="ht" style="padding:0 16px 16px" aria-label="Slice 5 state">
 <div class="ht-eyebrow" style="margin:8px 0 8px">Slice 5 state · the chips of the goal page</div>
 <div style="display:flex;flex-wrap:wrap;gap:8px">
@@ -27,6 +28,19 @@
 <span class="ht-chip ht-status ht-status--pending">Pending</span>
 <span class="ht-chip ht-status ht-status--due">Due today</span>
 <span class="ht-chip ht-status ht-status--due">Due this week</span>
+</div>
+</div>
+<!-- Slice 6 state (HP-003, constitution I): slice 5's chips plus the upcoming chip of the Home's Today rows, which reads "Upcoming" with the class ht-status--due; its date is in the row's meta line, not on the chip. Still no Excused or Paused (slice 7). -->
+<div class="ht" style="padding:0 16px 16px" aria-label="Slice 6 state">
+<div class="ht-eyebrow" style="margin:8px 0 8px">Slice 6 state · the chips of the goal page, the Goals page and the Home</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<span class="ht-chip ht-status ht-status--met">Met</span>
+<span class="ht-chip ht-status ht-status--failed">Failed</span>
+<span class="ht-chip ht-status ht-status--missed">Missed</span>
+<span class="ht-chip ht-status ht-status--pending">Pending</span>
+<span class="ht-chip ht-status ht-status--due">Due today</span>
+<span class="ht-chip ht-status ht-status--due">Due this week</span>
+<span class="ht-chip ht-status ht-status--due">Upcoming</span>
 </div>
 </div>
 </body>

@@ -3,6 +3,7 @@ using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Application.Operator;
 using HT.Application.Records;
+using HT.Application.Reports;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -23,12 +24,14 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<OperatorService>();
         services.AddScoped<DemoDataService>();
         services.AddScoped<DemoHistoryService>();
+        services.AddScoped<DemoReportService>();
         services.AddScoped<CatalogService>();
         services.AddScoped<CatalogAdministrationService>();
         services.AddScoped<CustomHabitService>();
         services.AddScoped<GoalService>();
         services.AddScoped<ProfileService>();
         services.AddScoped<RecordingService>();
+        services.AddScoped<ReportService>();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton(InstallationTimeZone.From(null));
         return services;

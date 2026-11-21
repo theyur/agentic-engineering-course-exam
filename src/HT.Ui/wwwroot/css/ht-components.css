@@ -468,3 +468,31 @@ button.ht-select-row { font:inherit; width:100%; border:0; background:transparen
 .ht-table td:not(.ht-actions) .ht-btn { white-space:normal; text-align:left; }
 /* the RecordDialog's progress bar beside its progress text */
 .ht-target > .ht-progress { flex:1; margin:0; max-width:none; }
+
+/* ---------- slice 6: personal reports ---------- */
+/* a StatTile as a button that filters the Today list, or as a link ("Active goals") */
+button.ht-tile { font:inherit; color:var(--ink); text-align:left; width:100%; cursor:pointer; }
+a.ht-tile { display:block; color:var(--ink); text-decoration:none; }
+.ht-tile > span { display:block; }
+button.ht-tile:hover, a.ht-tile:hover { border-color:var(--line-strong); }
+/* the pressed tile, whose filter is on (aria-pressed="true"): a 2px accent frame, not a fill colour alone */
+.ht-tile[aria-pressed="true"], .ht-tile[aria-pressed="true"]:hover { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent), var(--shadow-card); }
+/* a stat value given as one whole text ("90% (18 of 20)", no small part): smaller type, a wider first box, the same box height */
+.ht-stat__value--text { font-size:20px; line-height:30px; }
+.ht-stats:has(.ht-stat__value--text) { grid-template-columns:2fr 1fr 1fr; }
+/* the signed-in Home: the tiles across both columns, then the Today card | the right column. The tiles and the Today card
+   are one interactive island (ht-home__panel), whose box is left out so both still take their places in this grid. */
+.ht-home { display:grid; grid-template-columns:1.5fr 1fr; gap:var(--space-4); align-items:start; }
+.ht-home__panel { display:contents; }
+.ht-home__tiles { grid-column:1 / -1; }
+@media (max-width:860px) { .ht-home { grid-template-columns:1fr; } }
+/* the "Reduce" Tag after a CommitmentRow's name */
+.ht-row__name .ht-chip { margin-left:var(--space-1); }
+/* a GoalSummary row's name as a link to the goal page, and a card's closing link ("All goals →") */
+a.ht-goal__name { color:var(--ink); text-decoration:none; }
+a.ht-goal__name:hover { color:var(--accent); }
+.ht-card__link { display:inline-block; margin-top:var(--space-2); font-weight:700; font-size:14px; line-height:20px; text-decoration:none; }
+/* the footnote under a list (the Goals page) */
+.ht-footnote { font-size:13px; line-height:18px; color:var(--ink-muted); margin:var(--space-3) 0 0; }
+/* a trend bar with no record: an empty full-height outline, never a zero-height bar (slice 7's paused bar is dashed) */
+.ht-bar--empty { height:100%; background:transparent; border:1.5px dotted var(--line-strong); border-bottom:0; }
