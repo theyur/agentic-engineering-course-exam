@@ -26,7 +26,9 @@
            dashboard itself) and the static right column, the "Active goals" card and the "Recent notes" card (absent
            without a note), from the page's own dashboard read, so they follow a save on the next page load. An
            administrator's Home has the page head only. A session whose account is gone gets no greeting, only the slice 1
-           heading. *@
+           heading. Slice 7 (HP-005, FR-019): the "Active goals" tile counts and the card lists only the goals that are not
+           paused (Counts.Goals; the DashboardGoals with no PausedUntil); a user whose goals are all paused still has goals,
+           so the EmptyState is chosen by the dashboard's goals, not by that count. *@
         <div class="ht-container">
             @if (_heading?.Heading is { } heading)
             {
@@ -38,7 +40,7 @@
             }
             @if (_dashboard?.Dashboard is { } dashboard)
             {
-                if (dashboard.Counts.Goals == 0)
+                if (dashboard.Goals.Count == 0)
                 {
                     <NoGoalsEmptyState />
                 }
@@ -47,7 +49,7 @@
                     <div class="ht-home">
                         <TodayPanel />
                         <div class="ht-stack">
-                            <GoalSummary Goals="dashboard.Goals" />
+                            <GoalSummary Goals="ActiveGoals(dashboard)" />
                             <RecentNotesList Notes="dashboard.Notes" />
                         </div>
                     </div>
@@ -103,6 +105,10 @@
     private HomePreviewResult? _preview;
     private DashboardResult? _dashboard;
     private HomeHeadingResult? _heading;
+
+    /// <summary>The dashboard's goals that are not paused, in its order: the "Active goals" card (slice 7 HP-005, FR-019).</summary>
+    private static IReadOnlyList<DashboardGoal> ActiveGoals(Dashboard dashboard) =>
+        dashboard.Goals.Where(goal => goal.PausedUntil is null).ToList();
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationState { get; set; }

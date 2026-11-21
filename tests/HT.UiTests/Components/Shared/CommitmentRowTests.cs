@@ -78,10 +78,18 @@ public sealed class CommitmentRowTests : BunitContext
             .Add(x => x.Now, ReadAt)
             .Add(x => x.OnAction, (CommitmentRow.ActionKind kind) => onAction?.Invoke(kind)));
 
+    /// <summary>
+    /// The row's meta line, chip, and its actions' texts and accessible names, joined with " + " in their order; null
+    /// without an action. Slice 7 (T051): a Pending commitment without a record has two actions, "Record" and "Excuse".
+    /// </summary>
     private static (string Meta, string Chip, string? Action, string? Label) Parts(IRenderedComponent<CommitmentRow> cut)
     {
-        var button = cut.FindAll("button").SingleOrDefault();
-        return (cut.Find(".ht-row__meta").TextContent, cut.Find(".ht-status").TextContent, button?.TextContent, button?.GetAttribute("aria-label"));
+        var buttons = cut.FindAll("button");
+        return (
+            cut.Find(".ht-row__meta").TextContent,
+            cut.Find(".ht-status").TextContent,
+            buttons.Count == 0 ? null : string.Join(" + ", buttons.Select(b => b.TextContent)),
+            buttons.Count == 0 ? null : string.Join(" + ", buttons.Select(b => b.GetAttribute("aria-label"))));
     }
 
     [Fact]
@@ -138,7 +146,10 @@ public sealed class CommitmentRowTests : BunitContext
         // Monday 16's grace period ends on Thursday 19 at 00:00Z, 5 hours after 19:00Z on Wednesday 18; 4 h 30 min gives 5.
         var cut = RenderRow(Reading(new DateOnly(2026, 11, 16), EvaluationState.Pending, graceEnds: ReadAt.AddHours(4.5)));
 
-        Assert.Equal(("Mon 16 Nov · 5 h left to record", "Pending", "Record", "Record for Reading, 20 min, 3 days a week, Mon 16 Nov"), Parts(cut));
+        Assert.Equal(
+            ("Mon 16 Nov · 5 h left to record", "Pending", "Record + Excuse",
+                "Record for Reading, 20 min, 3 days a week, Mon 16 Nov + Excuse Reading, 20 min, 3 days a week, Mon 16 Nov"),
+            Parts(cut));
     }
 
     [Fact]
@@ -212,5 +223,59 @@ public sealed class CommitmentRowTests : BunitContext
         await cut.InvokeAsync(() => cut.Instance.FocusAsync().AsTask());
 
         Assert.Empty(JSInterop.Invocations);
+    }
+
+    // ---- slice 7: "Excuse" (HP-005, US1-AS12; design/components/CommitmentRow, slice 7 state) ----
+
+    [Fact]
+    public void Slice_7_HP_005_a_Pending_commitment_without_a_record_has_the_ghost_Excuse_after_Record()
+    {
+        var cut = RenderRow(Reading(new DateOnly(2026, 11, 16), EvaluationState.Pending, graceEnds: ReadAt.AddHours(5)));
+
+        var buttons = cut.FindAll("button");
+        Assert.Equal(["Record", "Excuse"], buttons.Select(b => b.TextContent));
+        var excuse = buttons[1];
+        Assert.Equal(["ht-btn", "ht-btn--ghost", "ht-btn--sm"], excuse.ClassList);
+        Assert.Equal(("button", "dialog"), (excuse.GetAttribute("type"), excuse.GetAttribute("aria-haspopup")));
+        Assert.Equal("Excuse Reading, 20 min, 3 days a week, Mon 16 Nov", excuse.GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void Slice_7_HP_005_no_Excuse_on_a_Due_commitment_a_period_or_a_commitment_with_a_record()
+    {
+        var due = RenderRow(Reading(Wed18, EvaluationState.Due, graceEnds: ReadAt.AddHours(53)));
+        var recorded = RenderRow(Reading(new DateOnly(2026, 11, 16), EvaluationState.Pending, minutes: 10, graceEnds: ReadAt.AddHours(5)));
+        var week = RenderRow(EntryOf("Running, 2 times a week", RunningTwiceAWeek, "Flexible · 2 times a week", new DateOnly(2026, 11, 9),
+            new DateOnly(2026, 11, 15), EvaluationState.Pending, new Progress(ProgressKind.RecordsReachingAmount, 0, 2), ReadAt.AddHours(5)));
+        var day = RenderRow(EntryOf("Coffee, at most 2 cups a day", CoffeeAtMost2Cups, "Every day", new DateOnly(2026, 11, 17), new DateOnly(2026, 11, 17),
+            EvaluationState.Pending, new Progress(ProgressKind.Total, 0, 2), ReadAt.AddHours(5)));
+
+        Assert.All(new[] { due, recorded, week, day }, cut => Assert.DoesNotContain(cut.FindAll("button"), b => b.TextContent == "Excuse"));
+    }
+
+    [Fact]
+    public void Slice_7_HP_005_Excuse_raises_OnAction_with_Excuse()
+    {
+        CommitmentRow.ActionKind? chosen = null;
+        var cut = RenderRow(Reading(new DateOnly(2026, 11, 16), EvaluationState.Pending, graceEnds: ReadAt.AddHours(5)), kind => chosen = kind);
+
+        cut.FindAll("button")[1].Click();
+
+        Assert.Equal(CommitmentRow.ActionKind.Excuse, chosen);
+    }
+
+    [Fact]
+    public async Task Slice_7_FocusExcuseAsync_focuses_Excuse_and_on_a_row_without_it_the_action()
+    {
+        var pending = RenderRow(Reading(new DateOnly(2026, 11, 16), EvaluationState.Pending, graceEnds: ReadAt.AddHours(5)));
+        var due = RenderRow(Reading(Wed18, EvaluationState.Due, graceEnds: ReadAt.AddHours(53)));
+
+        await pending.InvokeAsync(() => pending.Instance.FocusExcuseAsync().AsTask());
+        await due.InvokeAsync(() => due.Instance.FocusExcuseAsync().AsTask());
+
+        var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<ElementReference>(i.Arguments[0]).Id);
+        Assert.Equal(
+            [pending.FindAll("button")[1].GetAttribute("blazor:elementReference"), due.Find("button").GetAttribute("blazor:elementReference")],
+            focused);
     }
 }

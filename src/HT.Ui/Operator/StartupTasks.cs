@@ -50,6 +50,32 @@ internal static partial class StartupTasks
         await RunStepAsync("Demo loading", logger, () => LoadDemoDataAsync(services, logger));
         await RunStepAsync("Demo history loading", logger, () => LoadDemoHistoryAsync(services, logger));
         await RunStepAsync("Demo report loading", logger, () => LoadDemoReportAsync(services, logger));
+        await RunStepAsync("Demo pause loading", logger, () => LoadDemoPausesAsync(services, logger));
+    }
+
+    // Slice 7 HP-010: at every start, right after demo report loading (ADR 0023). The demo password, from the same key,
+    // is passed on and never logged.
+    private static async Task LoadDemoPausesAsync(IServiceProvider services, ILogger logger)
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+
+        await using var scope = services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<DemoPauseService>()
+            .LoadAsync(configuration[DemoPasswordKey], CancellationToken.None);
+
+        if (result.Outcome != DemoPauseLoadingOutcome.Loaded)
+        {
+            LogDemoPauseLoading(logger, result.Message);
+            return;
+        }
+
+        // Slice 7 contracts/host.md "Operator log": demo report loading's templates, the account line, then for a created
+        // account its goal line and its record line. The results name the demo email and a result text only, never a
+        // goal, habit, note, reason, unit or amount (FR-031, HP-009).
+        foreach (var account in result.Accounts)
+        {
+            LogHistoryAccountLines(logger, account.Email, account.Message, account.Goals, account.Records);
+        }
     }
 
     // Slice 6 HP-011: at every start, right after demo history loading (ADR 0021). The demo password, from the same key,
@@ -73,16 +99,7 @@ internal static partial class StartupTasks
         // goal, habit, note, unit or amount (FR-032, HP-007).
         foreach (var account in result.Accounts)
         {
-            LogDemoAccount(logger, account.Email, account.Message);
-            if (account.Goals is { } goals)
-            {
-                LogDemoGoals(logger, account.Email, goals.Message);
-            }
-
-            if (account.Records is { } records)
-            {
-                LogDemoRecords(logger, account.Email, records.Message);
-            }
+            LogHistoryAccountLines(logger, account.Email, account.Message, account.Goals, account.Records);
         }
     }
 
@@ -144,16 +161,24 @@ internal static partial class StartupTasks
         // a goal, habit, note, unit or amount (HP-006).
         foreach (var account in result.Accounts)
         {
-            LogDemoAccount(logger, account.Email, account.Message);
-            if (account.Goals is { } goals)
-            {
-                LogDemoGoals(logger, account.Email, goals.Message);
-            }
+            LogHistoryAccountLines(logger, account.Email, account.Message, account.Goals, account.Records);
+        }
+    }
 
-            if (account.Records is { } records)
-            {
-                LogDemoRecords(logger, account.Email, records.Message);
-            }
+    // The lines of one account of demo history, demo report or demo pause loading: the account line, then for a created
+    // account its goal line and its record line. They name the demo email and a result text only.
+    private static void LogHistoryAccountLines(
+        ILogger logger, string email, string message, DemoGoalsResult? goals, DemoRecordsResult? records)
+    {
+        LogDemoAccount(logger, email, message);
+        if (goals is not null)
+        {
+            LogDemoGoals(logger, email, goals.Message);
+        }
+
+        if (records is not null)
+        {
+            LogDemoRecords(logger, email, records.Message);
         }
     }
 
@@ -222,6 +247,9 @@ internal static partial class StartupTasks
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Demo report loading: {Result}")]
     private static partial void LogDemoReportLoading(ILogger logger, string? result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo pause loading: {Result}")]
+    private static partial void LogDemoPauseLoading(ILogger logger, string? result);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Demo records {Email}: {Result}")]
     private static partial void LogDemoRecords(ILogger logger, string email, string result);

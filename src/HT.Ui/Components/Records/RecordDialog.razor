@@ -2,6 +2,7 @@
 @using HT.Application.Accounts
 @using HT.Application.Records
 @using HT.Domain.Accounts
+@using HT.Domain.Evaluation
 @using HT.Domain.Goals
 @using HT.Domain.Records
 @using EntryProgress = HT.Domain.Evaluation.Progress
@@ -21,7 +22,9 @@
    every mode, with RecordingText.NoteHelp's help for the goal (specs/006-note-editing HP-003, ADR 0019); choosing
    another entry in "For" replaces the field's content with that entry's note, another "Date" of the same week leaves
    it; the note is saved as the field shows it, never null, so an empty field removes the note; "Save record" and
-   "Cancel", and no "Excuse instead" (slice 7). Every text comes from RecordingText and DateTexts, and the live progress
+   "Cancel", then, slice 7 (HP-003, D-2, D-3), the ghost "Excuse instead" pushed right (aria-haspopup="dialog"), only for
+   a commitment-based goal whose "For" entry is Due or Pending with no record and never in "Edit"; it raises
+   OnExcuseInstead with that entry, and the page opens the Excuse dialog in this dialog's place. Every text comes from RecordingText and DateTexts, and the live progress
    is RecordPreview's (in "Edit" with that record as the one replaced), so the dialog counts and evaluates nothing
    itself; "N h left" is formatted at the instant the use case read the clock, so it reads no clock. The result's
    message sits under the field it is about, one at a time: a value refusal under the field, "note too long" under the
@@ -99,6 +102,11 @@
             <span class="ht-spacer"></span>
             <HtButton Variant="HtButton.ButtonVariant.Ghost" @onclick="DeleteAsync" disabled="@_saving">Delete record</HtButton>
         }
+        else if (CanExcuseInstead)
+        {
+            <span class="ht-spacer"></span>
+            <HtButton Variant="HtButton.ButtonVariant.Ghost" aria-haspopup="dialog" @onclick="ExcuseInsteadAsync">Excuse instead</HtButton>
+        }
     </Footer>
 </HtDialog>
 
@@ -168,7 +176,25 @@
     [Parameter]
     public EventCallback<HistoryEntry> OnSaved { get; set; }
 
+    /// <summary>
+    /// "Excuse instead" was chosen (slice 7 HP-003): the commitment "For" names, which the page excuses in the Excuse
+    /// dialog in this dialog's place. The button is shown only when the page handles this and
+    /// <see cref="CanExcuseInstead"/> holds.
+    /// </summary>
+    [Parameter]
+    public EventCallback<HistoryEntry> OnExcuseInstead { get; set; }
+
     private string NoteId => _id + "-note";
+
+    /// <summary>
+    /// Slice 7 (HP-003, D-2, D-3; design/components/RecordDialog, slice 7 state): "Excuse instead" shows for a
+    /// commitment-based goal whose "For" entry is Due or Pending with no record, never in "Edit"; it follows the selection.
+    /// </summary>
+    private bool CanExcuseInstead =>
+        OnExcuseInstead.HasDelegate
+        && Editing is null
+        && Recordable.GoalScheduleKind == GoalScheduleKind.CommitmentBased
+        && _entry is { Records.Count: 0, State: EvaluationState.Due or EvaluationState.Pending };
 
     private string ForErrorId => _id + "-for-error";
 
@@ -318,6 +344,9 @@
         var record = editing.Id;
         await WriteAsync((service, token) => service.DeleteRecordAsync(ActingUser, GoalId, record, token));
     }
+
+    private Task ExcuseInsteadAsync() =>
+        _entry is { } entry && CanExcuseInstead ? OnExcuseInstead.InvokeAsync(entry) : Task.CompletedTask;
 
     private async Task WriteAsync(Func<RecordingService, CancellationToken, Task<RecordWriteResult>> write)
     {

@@ -23,8 +23,9 @@ public static class RecordingText
     private const string FailedWhenFinalized = " counts as Failed when it is finalized.";
 
     /// <summary>
-    /// The StatusChip's word (HP-004): "Met" (Build and Reduce alike), "Failed", "Missed", "Pending", and for Due
-    /// "Due today" for a commitment or a per-day period and "Due this week" for a per-week period.
+    /// The StatusChip's word (HP-004): "Met" (Build and Reduce alike), "Failed", "Missed", "Pending", for Due
+    /// "Due today" for a commitment or a per-day period and "Due this week" for a per-week period, and "Excused" and
+    /// "Paused" (slice 7 HP-006).
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">Upcoming, which no page of this slice shows, or an undefined state.</exception>
     public static string State(EvaluationState state, GoalScheduleKind scheduleKind, SchedulePeriod? period) => state switch
@@ -36,6 +37,8 @@ public static class RecordingText
         EvaluationState.Due => scheduleKind == GoalScheduleKind.PeriodBased && period == SchedulePeriod.Week
             ? "Due this week"
             : "Due today",
+        EvaluationState.Excused => "Excused",
+        EvaluationState.Paused => "Paused",
         _ => throw new ArgumentOutOfRangeException(nameof(state), "The state has no text in this slice."),
     };
 

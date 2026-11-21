@@ -1,0 +1,7 @@
+{
+  "group": "features",
+  "feature": "specs/008-excusals-and-pauses",
+  "files": {
+    "tests/HT.AcceptanceTests/Features/F008/excusals-and-pauses.feature": "1018aff8e11d17ae13ed4ec2d878f98ac20a718c3d76ca86f19d73be5ca8d0bc"
+  }
+}

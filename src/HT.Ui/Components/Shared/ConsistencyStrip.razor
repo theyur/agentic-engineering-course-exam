@@ -1,8 +1,9 @@
-@* design/components/ConsistencyStrip (slice-6 state, HP-001, HP-002, HP-006): one cell per ended result, oldest
-   first, each with the design's cell class, so no state is shown by colour alone (Met solid, Failed slashed, Missed
-   hatched, Pending dotted). role="img" with the counting aria-label from ReportText.StripLabel in both sizes. The
-   full strip has the legend Met, Failed, Missed, Pending; the mini strip (ht-strip--mini, the Goals page) has none.
-   No Excused or Paused cell or legend entry until slice 7, and no cell title (the History card gives each date). *@
+@* design/components/ConsistencyStrip (slice-6 and slice-7 states, HP-001, HP-002, HP-006): one cell per ended
+   result, oldest first, exempt results included (slice 7 FR-015), each with the design's cell class, so no state is
+   shown by colour alone (Met solid, Failed slashed, Missed hatched, Excused dashed, Paused light fill, Pending dotted).
+   role="img" with the counting aria-label from ReportText.StripLabel in both sizes. The full strip always has the
+   legend Met, Failed, Missed, Excused, Paused, Pending (a key, not a count); the mini strip (ht-strip--mini, the Goals
+   page) has none. No cell title (the History card gives each date). *@
 @using HT.Application.Reports
 @using HT.Domain.Evaluation
 @using HT.Domain.Reports
@@ -14,11 +15,11 @@
 </div>
 @if (!Mini)
 {
-    <div class="ht-legend"><span><i class="ht-strip__cell ht-cell--met"></i>Met</span><span><i class="ht-strip__cell ht-cell--failed"></i>Failed</span><span><i class="ht-strip__cell ht-cell--missed"></i>Missed</span><span><i class="ht-strip__cell ht-cell--pending"></i>Pending</span></div>
+    <div class="ht-legend"><span><i class="ht-strip__cell ht-cell--met"></i>Met</span><span><i class="ht-strip__cell ht-cell--failed"></i>Failed</span><span><i class="ht-strip__cell ht-cell--missed"></i>Missed</span><span><i class="ht-strip__cell ht-cell--excused"></i>Excused</span><span><i class="ht-strip__cell ht-cell--paused"></i>Paused</span><span><i class="ht-strip__cell ht-cell--pending"></i>Pending</span></div>
 }
 
 @code {
-    /// <summary>The ended results (Met, Failed, Missed or Pending), oldest first.</summary>
+    /// <summary>The ended results (Met, Failed, Missed, Excused, Paused or Pending), oldest first.</summary>
     [Parameter, EditorRequired]
     public IReadOnlyList<EvaluationState> States { get; set; } = [];
 
@@ -35,6 +36,8 @@
         EvaluationState.Met => "ht-cell--met",
         EvaluationState.Failed => "ht-cell--failed",
         EvaluationState.Missed => "ht-cell--missed",
+        EvaluationState.Excused => "ht-cell--excused",
+        EvaluationState.Paused => "ht-cell--paused",
         EvaluationState.Pending => "ht-cell--pending",
         _ => throw new InvalidOperationException("Only an ended result has a cell."),
     };

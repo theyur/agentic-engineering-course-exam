@@ -3,6 +3,7 @@ using Bunit.TestDoubles;
 using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Domain.Accounts;
+using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
@@ -111,11 +112,20 @@ public sealed class GoalDetailPageTests : BunitContext
             Rows(cut));
         Assert.Equal(Sentence, cut.Find(".ht-grid-2 > .ht-stack:last-child .ht-card .ht-card__sub").TextContent);
         Assert.Empty(cut.FindAll(".ht-notice"));
-        // Tuesday 17 November is not scheduled, but Monday 16 is Pending: "Record" is the page head's one action (HP-001).
-        Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
-        foreach (var absent in new[] { "Edit settings", "Pause", "End goal", "Earlier attempts", "Excuse" })
+        // Tuesday 17 November is not scheduled, but Monday 16 is Pending: "Record" is the page head's primary action
+        // (HP-001), after slice 7's "Pause" for a goal that is not paused (T064).
+        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        foreach (var absent in new[] { "Edit settings", "End goal", "Earlier attempts" })
         {
             Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
+        }
+
+        // Slice 7 (T042): the GoalStats legend now lists "Excused" and "Paused", so the markup contains "Excuse"; "Excuse
+        // instead" is only in the RecordDialog and "Remove excusal" only on an Excused row (T052).
+        var buttons = cut.FindAll("button").Select(b => b.TextContent.Trim()).ToList();
+        foreach (var absent in new[] { "Excuse instead", "Remove excusal" })
+        {
+            Assert.DoesNotContain(absent, buttons);
         }
     }
 
@@ -142,7 +152,8 @@ public sealed class GoalDetailPageTests : BunitContext
             Rows(cut));
         Assert.Equal(Sentence, cut.Find(".ht-card__sub").TextContent);
         Assert.Empty(cut.FindAll(".ht-notice"));
-        Assert.Empty(cut.FindAll(".ht-page-head button"));
+        // Slice 7 (T064): a goal that has not started can be paused from the account's today, so "Pause" is its one action.
+        Assert.Equal(["Pause"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         Assert.DoesNotContain(">Record<", cut.Markup, StringComparison.Ordinal);
         // Slice 5 (T055): no current date, so no History card; the Settings card stands alone in ht-grid-2.
         Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
@@ -151,7 +162,7 @@ public sealed class GoalDetailPageTests : BunitContext
     }
 
     [Fact]
-    public async Task HP_001_a_goal_with_a_Due_commitment_has_the_primary_action_Record_and_no_other_action()
+    public async Task HP_001_a_goal_with_a_Due_commitment_has_the_primary_action_Record_after_the_secondary_Pause()
     {
         var user = SignInUser();
         var reading = _catalog.Add(HabitSamples.Reading());
@@ -159,12 +170,16 @@ public sealed class GoalDetailPageTests : BunitContext
 
         var cut = RenderGoal(id);
 
+        // Slice 7 (T064): "Pause" comes before "Record", both in an ht-inline group after ht-spacer.
         var actions = cut.FindAll(".ht-page-head button");
-        var record = Assert.Single(actions);
-        Assert.Equal("Record", record.TextContent);
+        Assert.Equal(["Pause", "Record"], actions.Select(b => b.TextContent));
+        var record = actions[1];
         Assert.Equal(["ht-btn", "ht-btn--primary"], record.ClassList.ToArray());
         Assert.Equal("dialog", record.GetAttribute("aria-haspopup"));
-        Assert.Equal("ht-spacer", record.PreviousElementSibling!.ClassName);
+        Assert.Equal(["ht-btn", "ht-btn--secondary"], actions[0].ClassList.ToArray());
+        Assert.Equal("dialog", actions[0].GetAttribute("aria-haspopup"));
+        Assert.Equal("ht-inline", record.ParentElement!.ClassName);
+        Assert.Equal("ht-spacer", record.ParentElement!.PreviousElementSibling!.ClassName);
         Assert.Empty(cut.FindAll("[role=dialog]"));
     }
 
@@ -182,7 +197,8 @@ public sealed class GoalDetailPageTests : BunitContext
         var cut = RenderGoal(id);
 
         Assert.Equal("Attempt 1 · started 17 Nov", cut.Find(".ht-attempt").TextContent);
-        Assert.Empty(cut.FindAll(".ht-page-head button"));
+        // Slice 7 (T064): no "Record", but the goal can be paused.
+        Assert.Equal(["Pause"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         // T055: a current date but no begun entry, so no History card; the Settings card stands alone in ht-grid-2.
         Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
         Assert.Empty(cut.FindAll(".ht-grid-2 > .ht-stack"));
@@ -290,7 +306,7 @@ public sealed class GoalDetailPageTests : BunitContext
         var cut = RenderGoal(id);
         Assert.Equal("—", Text(cut.Find("table[aria-label=History] tbody tr").QuerySelectorAll("td")[1]));
 
-        cut.Find(".ht-page-head button").Click();
+        cut.Find(".ht-page-head .ht-btn--primary").Click();
 
         var dialog = cut.Find("[role=dialog]");
         Assert.Equal("Record · Reading, 20 min daily", dialog.QuerySelector("h2")!.TextContent);
@@ -305,7 +321,7 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Empty(cut.FindAll("[role=dialog]"));
         var record = Assert.Single(_records.RecordsOfGoal(id));
         Assert.Equal((Today, 12), (record.Date, record.Value.Amount!.Value));
-        Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         // T055: after a save the history is read again.
         var row = Assert.Single(cut.FindAll("table[aria-label=History] tbody tr"));
         Assert.Equal(["Tue 17 Nov", "12 min", "Due today"], row.QuerySelectorAll("td").Take(3).Select(Text));
@@ -585,6 +601,140 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Equal("Visiting family.", Assert.Single(_records.NotesOfGoal(goal)).Value.Value);
     }
 
+    // ---- slice 7: excusing from "Excuse instead" and "Remove excusal" (HP-001, HP-003, FR-024; T052) ----
+
+    private static readonly DateOnly Sun15 = new(2026, 11, 15);
+
+    /// <summary>
+    /// As in Slice_6_US1_AS8: Reading, 20 min daily, from Tuesday 10 November in UTC, read at 10:00 on Tuesday 17
+    /// November: 10, 11 and 13 are Met, 12 Failed, Saturday 14 Missed, Sunday 15 Pending (grace end 00:00 on Wednesday 18,
+    /// 14 h left), Monday 16 Pending and Tuesday 17 Due ("60% (3 of 5)"). <paramref name="arrange"/> may seed more.
+    /// </summary>
+    private GoalId ReadingFromTue10(Action<GoalId>? arrange = null) => OwnedReadingFromTue10(arrange).Goal;
+
+    /// <summary><see cref="ReadingFromTue10"/>, with the signed-in owner, for a test that changes the store as another session would.</summary>
+    private (GoalId Goal, AccountId Owner) OwnedReadingFromTue10(Action<GoalId>? arrange = null)
+    {
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 10);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        foreach (var (day, minutes) in new[] { (10, 20), (11, 20), (12, 10), (13, 20) })
+        {
+            _records.Seed(goal.Id, new DateOnly(2026, 11, day), RecordValue.FromAmount(minutes));
+        }
+
+        arrange?.Invoke(goal.Id);
+        return (goal.Id, owner);
+    }
+
+    private static AngleSharp.Dom.IElement HistoryRow(IRenderedComponent<GoalDetail> cut, string date) =>
+        cut.FindAll("table[aria-label=History] tbody tr").Single(r => Text(r.QuerySelector("td")!) == date);
+
+    private static List<string> HistoryActions(IRenderedComponent<GoalDetail> cut, string date) =>
+        HistoryRow(cut, date).QuerySelectorAll("td.ht-actions > button").Select(b => b.TextContent).ToList();
+
+    private static string StripLabel(IRenderedComponent<GoalDetail> cut) => cut.Find(".ht-strip").GetAttribute("aria-label")!;
+
+    private List<string> FocusedIds(int count) =>
+        JSInterop.VerifyFocusAsyncInvoke(count).Select(i => Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(i.Arguments[0]).Id).ToList();
+
+    [Fact]
+    public async Task Slice_7_HP_003_FR_024_Excuse_instead_opens_the_Excuse_dialog_and_excusing_shows_Excused_and_the_new_strip_without_a_reload()
+    {
+        var goal = ReadingFromTue10();
+        var cut = RenderGoal(goal);
+        Assert.Equal("Last 7 commitments: 3 met, 1 failed, 1 missed, 2 pending", StripLabel(cut));
+        var record = cut.Find(".ht-page-head .ht-btn--primary");
+        var recordId = record.GetAttribute("blazor:elementReference");
+
+        await record.ClickAsync(new MouseEventArgs());
+        cut.Find("[role=dialog] select").Change("2026-11-15");
+        var excuseInstead = cut.FindAll(".ht-dialog__foot .ht-btn")[^1];
+        Assert.Equal("Excuse instead", excuseInstead.TextContent);
+        await excuseInstead.ClickAsync(new MouseEventArgs());
+
+        // The Excuse dialog takes the RecordDialog's place.
+        var dialog = Assert.Single(cut.FindAll("[role=dialog]"));
+        Assert.Equal("Excuse · Reading, 20 min daily", dialog.QuerySelector("h2")!.TextContent);
+        Assert.Equal("Sun 15 Nov · Pending, 14 h left", dialog.QuerySelector(".ht-dialog__sub")!.TextContent);
+        cut.Find("[role=dialog] input.ht-input").Input("Ill");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal("Ill", _records.ExemptionsOfGoal(goal).ExcusalOf(Sun15)!.Reason!.Value);
+        Assert.Equal(["Sun 15 Nov", "—"], HistoryRow(cut, "Sun 15 Nov").QuerySelectorAll("td").Take(2).Select(Text));
+        Assert.Equal(["Excused", "Ill"], HistoryRow(cut, "Sun 15 Nov").QuerySelectorAll("td")[2].QuerySelectorAll(".ht-inline > *").Select(Text));
+        Assert.Equal(["Add note", "Remove excusal"], HistoryActions(cut, "Sun 15 Nov"));
+        // An excused Pending commitment was never counted, so the consistency stays; the strip now shows it Excused.
+        Assert.Equal("Last 7 commitments: 3 met, 1 failed, 1 missed, 1 excused, 1 pending", StripLabel(cut));
+        Assert.Equal("60% (3 of 5)", cut.Find(".ht-stats .ht-stat .ht-stat__value").TextContent);
+        // The focus goes back to the head's "Record", which opened the RecordDialog and is still there.
+        Assert.Equal(recordId, FocusedIds(4)[^1]);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_007_cancelling_the_Excuse_dialog_from_a_rows_Add_record_gives_the_focus_back_to_that_Add_record()
+    {
+        var goal = ReadingFromTue10();
+        var cut = RenderGoal(goal);
+        var addRecord = HistoryRow(cut, "Mon 16 Nov").QuerySelector("td.ht-actions > button:last-of-type")!;
+        var addRecordId = addRecord.GetAttribute("blazor:elementReference");
+
+        await addRecord.ClickAsync(new MouseEventArgs());
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[^1].ClickAsync(new MouseEventArgs());
+        Assert.Equal("Mon 16 Nov · Pending, 38 h left", cut.Find("[role=dialog] .ht-dialog__sub").TextContent);
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[1].ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Empty(_records.ExemptionsOfGoal(goal).Excusals);
+        Assert.Equal(addRecordId, FocusedIds(4)[^1]);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_001_FR_004_Remove_excusal_makes_the_row_Pending_with_Add_record_and_focuses_it()
+    {
+        var goal = ReadingFromTue10(g => _records.SeedExcusal(g, Sun15));
+        var cut = RenderGoal(goal);
+        Assert.Equal(["Sun 15 Nov", "—", "Excused"], HistoryRow(cut, "Sun 15 Nov").QuerySelectorAll("td").Take(3).Select(Text));
+        var remove = HistoryRow(cut, "Sun 15 Nov").QuerySelector("td.ht-actions > button:last-of-type")!;
+        Assert.Equal("Remove excusal of Sun 15 Nov", remove.GetAttribute("aria-label"));
+
+        await remove.ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(_records.ExemptionsOfGoal(goal).Excusals);
+        Assert.Equal(["Sun 15 Nov", "—", "Pending"], HistoryRow(cut, "Sun 15 Nov").QuerySelectorAll("td").Take(3).Select(Text));
+        Assert.Equal(["Add note", "Add record"], HistoryActions(cut, "Sun 15 Nov"));
+        Assert.Equal("Last 7 commitments: 3 met, 1 failed, 1 missed, 2 pending", StripLabel(cut));
+        Assert.Empty(cut.FindAll("[role=alert]"));
+        var addRecord = HistoryRow(cut, "Sun 15 Nov").QuerySelector("td.ht-actions > button:last-of-type")!;
+        Assert.Equal(addRecord.GetAttribute("blazor:elementReference"), FocusedIds(1)[^1]);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_001_a_Remove_excusal_too_late_shows_its_refusal_under_the_History_head_and_keeps_the_row_Excused()
+    {
+        var goal = ReadingFromTue10(g => _records.SeedExcusal(g, Sun15));
+        var cut = RenderGoal(goal);
+        var remove = HistoryRow(cut, "Sun 15 Nov").QuerySelector("td.ht-actions > button:last-of-type")!;
+        var noteId = HistoryRow(cut, "Sun 15 Nov").QuerySelector("td.ht-actions > button")!.GetAttribute("blazor:elementReference");
+
+        // Sunday 15's grace period ends at 00:00 on Wednesday 18, while the page is open.
+        ((FakeTimeProvider)Services.GetRequiredService<TimeProvider>()).SetUtcNow(new DateTimeOffset(2026, 11, 18, 0, 0, 0, TimeSpan.Zero));
+        await remove.ClickAsync(new MouseEventArgs());
+
+        var alert = cut.Find("table[aria-label=History]").Closest("section")!.QuerySelector("p.ht-field__error[role=alert]")!;
+        Assert.Equal("This excusal can no longer be removed.", alert.TextContent);
+        Assert.NotNull(_records.ExemptionsOfGoal(goal).ExcusalOf(Sun15));
+        Assert.Equal("Excused", Text(HistoryRow(cut, "Sun 15 Nov").QuerySelectorAll("td")[2]));
+        Assert.Equal(["Add note"], HistoryActions(cut, "Sun 15 Nov"));
+        Assert.Equal(noteId, FocusedIds(1)[^1]);
+    }
+
     [Fact]
     public async Task US7_AS8_a_goal_on_an_Unpublished_habit_shows_the_Notice_under_the_head()
     {
@@ -666,5 +816,287 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Equal(1, _notFound);
         Assert.Empty(cut.FindAll("h1"));
         Assert.DoesNotContain("Reading", cut.Markup, StringComparison.Ordinal);
+    }
+
+    // ---- slice 7: pauses on the goal page (T064; HP-001, HP-002, HP-007, FR-009 to FR-012, US2-AS14) ----
+    // ReadingFromTue10 at 10:00 on Tuesday 17 November: Saturday 14 is Missed, Sunday 15 and Monday 16 are Pending and
+    // Tuesday 17 is Due, so "Record" stays in the head of a paused goal; the pause date is Tuesday 17.
+
+    private static readonly DateOnly Mon16 = new(2026, 11, 16);
+    private static readonly DateOnly Sun22 = new(2026, 11, 22);
+
+    private static string NoticeOf(IRenderedComponent<GoalDetail> cut) => Text(cut.Find(".ht-notice > span"));
+
+    private static AngleSharp.Dom.IElement PausesCard(IRenderedComponent<GoalDetail> cut) =>
+        cut.FindAll("section.ht-card").Single(card => card.QuerySelector(".ht-card__title")?.TextContent == "Pauses");
+
+    private static List<string> PauseRanges(IRenderedComponent<GoalDetail> cut) =>
+        PausesCard(cut).QuerySelectorAll(".ht-goal .ht-goal__name").Select(Text).ToList();
+
+    private static ExemptionReason? Reason(string text)
+    {
+        Assert.True(ExemptionReason.TryCreate(text, out var reason, out _));
+        return reason;
+    }
+
+    [Fact]
+    public async Task Slice_7_US2_AS14_Pause_opens_the_PauseDialog_and_saving_it_shows_the_Notice_and_the_Pauses_card()
+    {
+        var goal = ReadingFromTue10();
+        var cut = RenderGoal(goal);
+        Assert.Empty(cut.FindAll(".ht-notice"));
+        Assert.DoesNotContain(cut.FindAll(".ht-card__title"), title => title.TextContent == "Pauses");
+        var pause = cut.Find(".ht-page-head .ht-btn--secondary");
+        Assert.Equal("Pause", pause.TextContent);
+
+        await pause.ClickAsync(new MouseEventArgs());
+
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Equal("Pause · Reading, 20 min daily", dialog.QuerySelector("h2")!.TextContent);
+        var from = cut.Find("[role=dialog] input[type=date]");
+        Assert.Equal("2026-11-17", from.GetAttribute("value"));
+        Assert.Equal("2026-11-17", from.GetAttribute("min"));
+        cut.FindAll("[role=dialog] input[type=date]")[1].Change("2026-11-22");
+        cut.Find("[role=dialog] input[type=text]").Input("Family visit");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        var stored = Assert.Single(_records.ExemptionsOfGoal(goal).Pauses);
+        Assert.Equal((Today, Sun22, "Family visit"), (stored.FirstDay, stored.LastDay, stored.Reason!.Value));
+        Assert.Equal("Paused until Sun 22 Nov", NoticeOf(cut));
+        var resume = cut.Find(".ht-notice button");
+        Assert.Equal("Resume now", resume.TextContent);
+        Assert.Equal(["ht-btn", "ht-btn--primary", "ht-btn--sm"], resume.ClassList.ToArray());
+        Assert.Equal("ht-page-head", cut.Find(".ht-notice").PreviousElementSibling!.ClassName?.Split(' ')[0]);
+        // "Pause" leaves the head while the pause is current; "Record" stays for the Pending days before it.
+        Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        var right = cut.FindAll(".ht-grid-2 > .ht-stack")[1];
+        Assert.Equal(["Settings", "Pauses"], right.QuerySelectorAll(".ht-card__title").Select(Text));
+        Assert.Equal(["Tue 17 Nov – Sun 22 Nov"], PauseRanges(cut));
+        Assert.Equal("Family visit", Text(PausesCard(cut).QuerySelector(".ht-goal__meta.ht-muted")!));
+        Assert.Equal("Resume now, Tue 17 Nov – Sun 22 Nov", PausesCard(cut).QuerySelector("button")!.GetAttribute("aria-label"));
+        Assert.Equal(["Tue 17 Nov", "—", "Paused"], HistoryRow(cut, "Tue 17 Nov").QuerySelectorAll("td").Take(3).Select(Text));
+        Assert.Equal(["Add note"], HistoryActions(cut, "Tue 17 Nov"));
+        // The re-read removed "Pause", the opener, so the focus goes to the Notice's "Resume now" (HP-007).
+        Assert.Equal(cut.Find(".ht-notice button").GetAttribute("blazor:elementReference"), FocusedIds(2)[^1]);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_002_a_refusal_of_the_PauseDialog_shows_under_its_field_and_keeps_the_dialog_open()
+    {
+        var goal = ReadingFromTue10(g => _records.SeedPause(g, new DateOnly(2026, 11, 20), Sun22));
+        var cut = RenderGoal(goal);
+        await cut.Find(".ht-page-head .ht-btn--secondary").ClickAsync(new MouseEventArgs());
+
+        cut.FindAll("[role=dialog] input[type=date]")[1].Change("2026-11-21");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Single(cut.FindAll("[role=dialog]"));
+        var until = cut.FindAll("[role=dialog] input[type=date]")[1];
+        Assert.Equal("This goal already has a pause on these dates.", cut.Find("#" + until.GetAttribute("aria-describedby")).TextContent);
+        Assert.Single(_records.ExemptionsOfGoal(goal).Pauses);
+    }
+
+    [Fact]
+    public async Task Slice_7_FR_010_the_Notices_Resume_now_resumes_the_goal_and_gives_the_focus_to_Pause()
+    {
+        // A pause from Tuesday 17, today, to Sunday 22: resuming on its first day removes it.
+        var goal = ReadingFromTue10(g => _records.SeedPause(g, Today, Sun22, Reason("Family visit")));
+        var cut = RenderGoal(goal);
+        Assert.Equal("Paused until Sun 22 Nov", NoticeOf(cut));
+        Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+
+        await cut.Find(".ht-notice button").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(_records.ExemptionsOfGoal(goal).Pauses);
+        Assert.Empty(cut.FindAll(".ht-notice"));
+        Assert.Empty(cut.FindAll("[role=alert]"));
+        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.DoesNotContain(cut.FindAll(".ht-card__title"), title => title.TextContent == "Pauses");
+        Assert.Equal(["Tue 17 Nov", "—", "Due today"], HistoryRow(cut, "Tue 17 Nov").QuerySelectorAll("td").Take(3).Select(Text));
+        Assert.Equal(cut.Find(".ht-page-head .ht-btn--secondary").GetAttribute("blazor:elementReference"), FocusedIds(1)[^1]);
+    }
+
+    [Fact]
+    public async Task Slice_7_FR_010_a_refusal_of_the_Notices_Resume_now_shows_in_the_Notices_place()
+    {
+        var (goal, owner) = OwnedReadingFromTue10(g => _records.SeedPause(g, Mon16, Sun22));
+        var cut = RenderGoal(goal);
+        Assert.Equal("Paused until Sun 22 Nov", NoticeOf(cut));
+
+        // Another session cancels the pause after the page was read.
+        var pause = Assert.Single(_records.ExemptionsOfGoal(goal).Pauses);
+        await _records.DeletePauseAsync(owner, goal, pause.Id, CancellationToken.None);
+        await cut.Find(".ht-notice button").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll(".ht-notice"));
+        var alert = cut.Find("p.ht-field__error[role=alert]");
+        Assert.Equal("This goal is not paused.", alert.TextContent);
+        Assert.Equal("ht-page-head", alert.PreviousElementSibling!.ClassName?.Split(' ')[0]);
+        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+    }
+
+    [Fact]
+    public async Task Slice_7_FR_011_FR_012_the_Pauses_card_lists_the_pauses_and_Cancel_pause_cancels_an_upcoming_one()
+    {
+        var goal = ReadingFromTue10(g =>
+        {
+            _records.SeedPause(g, new DateOnly(2026, 11, 10), new DateOnly(2026, 11, 11), Reason("Ill"));
+            _records.SeedPause(g, new DateOnly(2026, 11, 23), new DateOnly(2026, 11, 27));
+        });
+        var cut = RenderGoal(goal);
+        Assert.Empty(cut.FindAll(".ht-notice"));
+        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Settings", "Pauses"], cut.FindAll(".ht-grid-2 > .ht-stack")[1].QuerySelectorAll(".ht-card__title").Select(Text));
+        Assert.Equal(["Mon 23 Nov – Fri 27 Nov", "Tue 10 Nov – Wed 11 Nov"], PauseRanges(cut));
+        var cancel = Assert.Single(PausesCard(cut).QuerySelectorAll("button"));
+        Assert.Equal("Cancel pause", cancel.TextContent);
+        Assert.Equal("Cancel pause, Mon 23 Nov – Fri 27 Nov", cancel.GetAttribute("aria-label"));
+        var pauseId = cut.Find(".ht-page-head .ht-btn--secondary").GetAttribute("blazor:elementReference");
+
+        await cancel.ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(new DateOnly(2026, 11, 10), Assert.Single(_records.ExemptionsOfGoal(goal).Pauses).FirstDay);
+        Assert.Equal(["Tue 10 Nov – Wed 11 Nov"], PauseRanges(cut));
+        Assert.Empty(PausesCard(cut).QuerySelectorAll("button"));
+        Assert.Equal(pauseId, FocusedIds(1)[^1]);
+    }
+
+    [Fact]
+    public async Task Slice_7_FR_010_the_Pauses_cards_Resume_now_ends_the_current_pause_on_the_day_before()
+    {
+        var goal = ReadingFromTue10(g => _records.SeedPause(g, Mon16, Sun22));
+        var cut = RenderGoal(goal);
+        var resume = Assert.Single(PausesCard(cut).QuerySelectorAll("button"));
+        Assert.Equal("Resume now, Mon 16 Nov – Sun 22 Nov", resume.GetAttribute("aria-label"));
+
+        await resume.ClickAsync(new MouseEventArgs());
+
+        var stored = Assert.Single(_records.ExemptionsOfGoal(goal).Pauses);
+        Assert.Equal((Mon16, Mon16), (stored.FirstDay, stored.LastDay));
+        Assert.Empty(cut.FindAll(".ht-notice"));
+        Assert.Equal(["Mon 16 Nov – Mon 16 Nov"], PauseRanges(cut));
+        Assert.Empty(PausesCard(cut).QuerySelectorAll("button"));
+        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal("Paused", Text(HistoryRow(cut, "Mon 16 Nov").QuerySelectorAll("td")[2]));
+        Assert.Equal("Due today", Text(HistoryRow(cut, "Tue 17 Nov").QuerySelectorAll("td")[2]));
+    }
+
+    [Fact]
+    public async Task Slice_7_FR_011_a_refusal_of_Cancel_pause_shows_under_the_Pauses_card_title()
+    {
+        var (goal, owner) = OwnedReadingFromTue10(g =>
+        {
+            _records.SeedPause(g, new DateOnly(2026, 11, 10), new DateOnly(2026, 11, 11));
+            _records.SeedPause(g, new DateOnly(2026, 11, 23), new DateOnly(2026, 11, 27));
+        });
+        var cut = RenderGoal(goal);
+
+        // Another session cancels the upcoming pause after the page was read.
+        var upcoming = _records.ExemptionsOfGoal(goal).Pauses.Single(p => p.FirstDay == new DateOnly(2026, 11, 23));
+        await _records.DeletePauseAsync(owner, goal, upcoming.Id, CancellationToken.None);
+        await PausesCard(cut).QuerySelector("button")!.ClickAsync(new MouseEventArgs());
+
+        var alert = PausesCard(cut).QuerySelector("p.ht-field__error[role=alert]")!;
+        Assert.Equal("This pause does not exist.", alert.TextContent);
+        Assert.Equal("ht-card__title", alert.PreviousElementSibling!.ClassName);
+        Assert.Equal(["Tue 10 Nov – Wed 11 Nov"], PauseRanges(cut));
+    }
+
+    [Fact]
+    public async Task Slice_7_a_goal_that_has_not_started_can_be_paused_and_shows_its_Pauses_card_under_Settings()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, new DateOnly(2026, 11, 25));
+        var cut = RenderGoal(id);
+        Assert.Equal(["Pause"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+
+        await cut.Find(".ht-page-head button").ClickAsync(new MouseEventArgs());
+        Assert.Equal("2026-11-17", cut.Find("[role=dialog] input[type=date]").GetAttribute("min"));
+        cut.FindAll("[role=dialog] input[type=date]")[1].Change("2026-11-22");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("Paused until Sun 22 Nov", NoticeOf(cut));
+        Assert.Empty(cut.FindAll(".ht-page-head button"));
+        var column = Assert.Single(cut.FindAll(".ht-grid-2 > .ht-stack"));
+        Assert.Equal(["Settings", "Pauses"], column.QuerySelectorAll(".ht-card__title").Select(Text));
+    }
+
+    // ---- slice 7: reports leave excused and paused results out (T072; HP-001, HP-006, FR-013 to FR-016, FR-024) ----
+
+    private static AngleSharp.Dom.IElement StatsCard(IRenderedComponent<GoalDetail> cut) => cut.FindAll(".ht-grid-2 > .ht-stack")[0].Children[0];
+
+    private static AngleSharp.Dom.IElement TrendCard(IRenderedComponent<GoalDetail> cut) => cut.FindAll(".ht-grid-2 > .ht-stack")[0].Children[1];
+
+    [Fact]
+    public void Slice_7_US3_AS8_the_goal_page_shows_Excused_and_Paused_cells_and_marked_bars()
+    {
+        // Spec US3's goal on Reading: 10 minutes a day from Monday 2 November in UTC, 10 minutes on each date to 16
+        // November except 9, 11 and 13 to 15; 9 November excused and 13 to 15 November paused (seeded, as they were made
+        // while current). Read at 12:00 on Thursday 19 November: 17 ended results, 19 November Due.
+        var owner = new AccountId(_authorization.SignIn("RegisteredUser"));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var start = new DateOnly(2026, 11, 2);
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily with { Amount = 10 }, out var target, out _));
+        var goal = _goals.Add(owner,
+            new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(reading.Id, HabitKind.Catalog), start, null, new GoalAttempt(1, start),
+                [new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), start)]),
+            new GoalHabitView(reading.Id, HabitKind.Catalog, reading.Definition.Name.Value, reading.Definition.Category, true));
+        foreach (var day in new[] { 2, 3, 4, 5, 6, 7, 8, 10, 12, 16 })
+        {
+            _records.Seed(goal.Id, new DateOnly(2026, 11, day), RecordValue.FromAmount(10));
+        }
+
+        _records.SeedExcusal(goal.Id, new DateOnly(2026, 11, 9));
+        _records.SeedPause(goal.Id, new DateOnly(2026, 11, 13), Sun15);
+        ((FakeTimeProvider)Services.GetRequiredService<TimeProvider>()).SetUtcNow(new DateTimeOffset(2026, 11, 19, 12, 0, 0, TimeSpan.Zero));
+
+        var cut = RenderGoal(goal.Id);
+
+        var stats = StatsCard(cut);
+        Assert.Equal(["90% (10 of 11)", "2", "8"], stats.QuerySelectorAll(".ht-stat__value").Select(v => v.TextContent));
+        Assert.Equal("Last 17 commitments: 10 met, 1 missed, 1 excused, 3 paused, 2 pending", stats.QuerySelector(".ht-strip")!.GetAttribute("aria-label"));
+        Assert.Single(stats.QuerySelectorAll(".ht-strip > i.ht-cell--excused"));
+        Assert.Equal(3, stats.QuerySelectorAll(".ht-strip > i.ht-cell--paused").Length);
+        Assert.Equal(["Met", "Failed", "Missed", "Excused", "Paused", "Pending"], stats.QuerySelectorAll(".ht-legend > span").Select(Text));
+        var chart = TrendCard(cut).QuerySelector(".ht-bars")!;
+        Assert.Equal("Minutes per day, last 14 days; target 10; 1 excused, 3 paused", chart.GetAttribute("aria-label"));
+        Assert.Equal(["Mon 9 Nov: Excused"], chart.QuerySelectorAll("i.ht-bar--excused").Select(b => b.GetAttribute("title")));
+        Assert.Equal(
+            ["Fri 13 Nov: Paused", "Sat 14 Nov: Paused", "Sun 15 Nov: Paused"],
+            chart.QuerySelectorAll("i.ht-bar--paused").Select(b => b.GetAttribute("title")));
+        Assert.Equal(4, chart.QuerySelectorAll("i.ht-bar--empty").Length);
+    }
+
+    [Fact]
+    public async Task Slice_7_FR_024_after_pausing_in_the_PauseDialog_the_trend_and_the_GoalStats_card_are_read_again_without_a_reload()
+    {
+        // ReadingFromTue10, paused from Tuesday 17 November (today, Due) until Sunday 22. Tuesday 17 has begun, so its trend
+        // bar is marked Paused; it has not ended, so the strip and the figures stay as they were: a pause made at the
+        // pause date changes no ended result (FR-006, FR-015). The cards equal those of a fresh render, a reload.
+        var goal = ReadingFromTue10();
+        var cut = RenderGoal(goal);
+        Assert.Equal("Minutes per day, last 14 days; target 20", TrendCard(cut).QuerySelector(".ht-bars")!.GetAttribute("aria-label"));
+        Assert.Empty(TrendCard(cut).QuerySelectorAll("i.ht-bar--paused"));
+
+        await cut.Find(".ht-page-head .ht-btn--secondary").ClickAsync(new MouseEventArgs());
+        cut.FindAll("[role=dialog] input[type=date]")[1].Change("2026-11-22");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        var chart = TrendCard(cut).QuerySelector(".ht-bars")!;
+        Assert.Equal("Minutes per day, last 14 days; target 20; 1 paused", chart.GetAttribute("aria-label"));
+        var bars = chart.QuerySelectorAll("i.ht-bar");
+        Assert.Equal(8, bars.Length);
+        Assert.Equal(["ht-bar", "ht-bar--paused"], bars[^1].ClassList.ToArray());
+        Assert.Equal("Tue 17 Nov: Paused", bars[^1].GetAttribute("title"));
+        Assert.Equal(3, chart.QuerySelectorAll("i.ht-bar--empty").Length);
+        Assert.Equal("Last 7 commitments: 3 met, 1 failed, 1 missed, 2 pending", StripLabel(cut));
+        Assert.Equal("60% (3 of 5)", cut.Find(".ht-stats .ht-stat .ht-stat__value").TextContent);
+        var reloaded = RenderGoal(goal);
+        Assert.Equal(Text(StatsCard(reloaded)), Text(StatsCard(cut)));
+        Assert.Equal(StatsCard(reloaded).QuerySelector(".ht-strip")!.GetAttribute("aria-label"), StatsCard(cut).QuerySelector(".ht-strip")!.GetAttribute("aria-label"));
+        Assert.Equal(TrendCard(reloaded).InnerHtml, TrendCard(cut).InnerHtml);
     }
 }

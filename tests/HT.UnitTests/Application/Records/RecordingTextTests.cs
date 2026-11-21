@@ -65,6 +65,8 @@ public sealed class RecordingTextTests
     [InlineData(EvaluationState.Missed, "Missed")]
     [InlineData(EvaluationState.Pending, "Pending")]
     [InlineData(EvaluationState.Due, "Due today")]
+    [InlineData(EvaluationState.Excused, "Excused")]
+    [InlineData(EvaluationState.Paused, "Paused")]
     public void State_of_a_commitment(EvaluationState state, string expected) =>
         Assert.Equal(expected, RecordingText.State(state, GoalScheduleKind.CommitmentBased, null));
 

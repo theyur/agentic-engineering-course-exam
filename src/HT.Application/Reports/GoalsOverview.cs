@@ -28,6 +28,12 @@ public sealed record OverviewGoal
     /// at the same instant: its settings and its Due and Pending entries, newest first.
     /// </summary>
     public required GoalHistory Recordable { get; init; }
+
+    /// <summary>
+    /// Slice 7 (FR-018, research R-03): the last day of the goal's current pause at the pause date (the goal's current
+    /// date, or the account's today for a goal that has not started); null when the goal is not paused.
+    /// </summary>
+    public DateOnly? PausedUntil { get; init; }
 }
 
 /// <summary>Every goal of the acting user with its figures, in FR-011's order (Pending, then Due, then the others).</summary>

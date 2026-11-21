@@ -4,6 +4,7 @@ using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Domain.Accounts;
 using HT.Domain.Evaluation;
+using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
@@ -648,5 +649,186 @@ public sealed class HistoryCardTests : BunitContext
         Assert.Empty(history.Entries);
         Assert.False(HistoryCard.HasRows(history));
         Assert.Equal(string.Empty, cut.Markup.Trim());
+    }
+
+    // ---- slice 7: Excused rows (HP-001, FR-017; design/pages/PageGoalDetail, slice 7 state) ----
+
+    private static GoalTargetFields YogaOnMonWedFri => new()
+    {
+        BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.YesNo, ScheduleKind = ScheduleKind.FixedDays,
+        Days = new HashSet<DayOfWeek> { DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday },
+    };
+
+    /// <summary>
+    /// Yoga, 3 days a week (Monday, Wednesday and Friday), from Monday 2 November 2026, read at 07:00Z on Friday 13
+    /// November: Wednesday 11 is excused with the reason "Ill" and its grace period ends at 00:00Z on Saturday 14, so the
+    /// excusal can still be removed; Monday 9 is excused without a reason, with the note "Overslept.", and its grace
+    /// period ended at 00:00Z on Thursday 12; Friday 13 is Due; the rows before are Missed.
+    /// </summary>
+    private async Task<(IRenderedComponent<HistoryCard> Cut, GoalId Goal)> ExcusedRowsAsync(Action<HistoryEntry>? onRemove = null, string? refusal = null)
+    {
+        var goal = await GoalAsync(YogaOnMonWedFri, Mon2Nov);
+        Assert.True(ExemptionReason.TryCreate("Ill", out var ill, out _));
+        _records.SeedExcusal(goal, new DateOnly(2026, 11, 11), ill);
+        _records.SeedExcusal(goal, new DateOnly(2026, 11, 9));
+        Assert.True(NoteText.TryCreate("Overslept.", out var note, out _));
+        _records.SeedNote(goal, new DateOnly(2026, 11, 9), note!);
+        var history = await PageHistoryAsync(goal, Fri13Nov, new DateTimeOffset(2026, 11, 13, 7, 0, 0, TimeSpan.Zero));
+        var cut = Render<HistoryCard>(p => p
+            .Add(x => x.History, history)
+            .Add(x => x.OnRemoveExcusal, e => onRemove?.Invoke(e))
+            .Add(x => x.Refusal, refusal));
+        return (cut, goal);
+    }
+
+    private static List<string> Controls(IRenderedComponent<HistoryCard> cut, string date) =>
+        Row(cut, date).QuerySelectorAll("td.ht-actions > button").Select(Text).ToList();
+
+    [Fact]
+    public async Task HP_001_an_Excused_row_shows_its_reason_after_the_chip_and_one_without_a_reason_the_chip_alone()
+    {
+        var (cut, _) = await ExcusedRowsAsync();
+
+        var withReason = Row(cut, "Wed 11 Nov").QuerySelectorAll("td")[2];
+        // The chip and the reason are two items of one ht-inline group, which spaces them.
+        var group = withReason.QuerySelector(".ht-inline")!;
+        Assert.Equal(2, group.Children.Length);
+        Assert.Equal("Excused", Text(group.Children[0]));
+        Assert.Contains("ht-status--excused", group.Children[0].ClassList);
+        Assert.Equal("Ill", group.Children[1].TextContent);
+        Assert.Equal(["ht-muted"], group.Children[1].ClassList.ToArray());
+        var withoutReason = Row(cut, "Mon 9 Nov").QuerySelectorAll("td")[2];
+        Assert.Equal("Excused", Text(withoutReason));
+        Assert.Null(withoutReason.QuerySelector(".ht-muted"));
+        Assert.Null(withoutReason.QuerySelector(".ht-inline"));
+        Assert.Equal("Missed", Cell(cut, "Fri 6 Nov", 2));
+    }
+
+    [Fact]
+    public async Task HP_001_an_Excused_row_has_its_note_control_then_Remove_excusal_while_it_can_be_removed_and_never_Add_record()
+    {
+        var (cut, _) = await ExcusedRowsAsync();
+
+        Assert.Equal([AddNote, "Remove excusal"], Controls(cut, "Wed 11 Nov"));
+        var remove = Row(cut, "Wed 11 Nov").QuerySelectorAll("td.ht-actions > button")[1];
+        Assert.Equal("Remove excusal of Wed 11 Nov", remove.GetAttribute("aria-label"));
+        Assert.Null(remove.GetAttribute("aria-haspopup"));
+        Assert.Equal(["ht-btn", "ht-btn--ghost", "ht-btn--sm"], remove.ClassList.ToArray());
+        AssertRowControl(NoteControl(cut, "Wed 11 Nov")!, AddNote, "Add note for Wed 11 Nov");
+
+        // Monday 9's grace period has ended: its excusal is permanent, and only its note control is left.
+        Assert.Equal([EditNote], Controls(cut, "Mon 9 Nov"));
+        Assert.Equal("Overslept.", Cell(cut, "Mon 9 Nov", 3));
+
+        Assert.Equal([AddNote, "Add record"], Controls(cut, "Fri 13 Nov"));
+        Assert.DoesNotContain(Row(cut, "Wed 11 Nov").QuerySelectorAll("button"), b => Text(b) is "Add record" or "Edit");
+    }
+
+    [Fact]
+    public async Task HP_001_Remove_excusal_raises_its_row_and_the_note_control_still_raises_OnNote()
+    {
+        var removed = new List<HistoryEntry>();
+        var (cut, _) = await ExcusedRowsAsync(removed.Add);
+
+        await Row(cut, "Wed 11 Nov").QuerySelectorAll("td.ht-actions > button")[1].ClickAsync(new MouseEventArgs());
+
+        var row = Assert.Single(removed);
+        Assert.Equal((new DateOnly(2026, 11, 11), EvaluationState.Excused, "Ill"), (row.FirstDate, row.State, row.ExcusalReason));
+    }
+
+    [Fact]
+    public async Task HP_001_a_refusal_of_Remove_excusal_shows_under_the_card_head_as_an_alert()
+    {
+        var (cut, _) = await ExcusedRowsAsync(refusal: "This excusal can no longer be removed.");
+
+        var alert = cut.Find("section.ht-card > p.ht-field__error[role=alert]");
+        Assert.Equal("This excusal can no longer be removed.", alert.TextContent);
+        Assert.Equal("ht-card__head", alert.PreviousElementSibling!.ClassName);
+    }
+
+    [Fact]
+    public async Task FocusRecordOrNoteAsync_gives_the_focus_to_the_rows_Add_record_and_to_its_note_control_on_an_Excused_row()
+    {
+        var (cut, _) = await ExcusedRowsAsync();
+        var addRecord = Row(cut, "Fri 13 Nov").QuerySelectorAll("td.ht-actions > button")[1].GetAttribute("blazor:elementReference");
+        var note = NoteControl(cut, "Wed 11 Nov")!.GetAttribute("blazor:elementReference");
+
+        await cut.InvokeAsync(() => cut.Instance.FocusRecordOrNoteAsync(Fri13Nov).AsTask());
+        await cut.InvokeAsync(() => cut.Instance.FocusRecordOrNoteAsync(new DateOnly(2026, 11, 11)).AsTask());
+        await cut.InvokeAsync(() => cut.Instance.FocusAsync(new DateOnly(2026, 11, 11), null).AsTask());
+
+        var focused = JSInterop.VerifyFocusAsyncInvoke(2).Select(i => Assert.IsType<ElementReference>(i.Arguments[0]).Id);
+        Assert.Equal([addRecord, note], focused);
+    }
+
+    // ---- slice 7: Paused rows (HP-001, FR-009, US2-AS10; design/pages/PageGoalDetail, slice 7 state; T064) ----
+
+    [Fact]
+    public async Task HP_001_a_Paused_commitment_row_has_its_chip_its_note_control_or_the_Edit_of_a_kept_record_and_never_Add_record()
+    {
+        // Yoga, 3 days a week, from Monday 2 November, read at 07:00Z on Friday 13 November, with a pause from Monday 9 to
+        // Friday 13: Wednesday 11 keeps its "Yes" (recorded before the pause), Monday 9 has the note "Overslept.", Friday
+        // 13 has nothing; Friday 6 is before the pause and Missed.
+        var goal = await GoalAsync(YogaOnMonWedFri, Mon2Nov);
+        var yes = _records.Seed(goal, new DateOnly(2026, 11, 11), RecordValue.FromAnswer(YesNoAnswer.Yes));
+        Assert.True(NoteText.TryCreate("Overslept.", out var note, out _));
+        _records.SeedNote(goal, new DateOnly(2026, 11, 9), note!);
+        _records.SeedPause(goal, new DateOnly(2026, 11, 9), Fri13Nov);
+        var history = await PageHistoryAsync(goal, Fri13Nov, new DateTimeOffset(2026, 11, 13, 7, 0, 0, TimeSpan.Zero));
+        var actions = new List<HistoryCard.RowAction>();
+        var cut = RenderCard(history, actions.Add);
+
+        foreach (var date in new[] { "Fri 13 Nov", "Wed 11 Nov", "Mon 9 Nov" })
+        {
+            var chip = Row(cut, date).QuerySelectorAll("td")[2].QuerySelector(".ht-status")!;
+            Assert.Equal("Paused", Text(chip));
+            Assert.Contains("ht-status--paused", chip.ClassList);
+            Assert.DoesNotContain(Row(cut, date).QuerySelectorAll("button"), b => Text(b) == "Add record");
+        }
+
+        Assert.Equal([AddNote], Controls(cut, "Fri 13 Nov"));
+        Assert.Equal([EditNote], Controls(cut, "Mon 9 Nov"));
+        Assert.Equal("Overslept.", Cell(cut, "Mon 9 Nov", 3));
+        Assert.Equal(["Edit"], Controls(cut, "Wed 11 Nov"));
+        AssertRowControl(Row(cut, "Wed 11 Nov").QuerySelector("td.ht-actions > button")!, "Edit", "Edit record of Wed 11 Nov");
+        Assert.Equal([AddNote, "Add record"], Controls(cut, "Fri 6 Nov"));
+
+        await Row(cut, "Wed 11 Nov").QuerySelector("td.ht-actions > button")!.ClickAsync(new MouseEventArgs());
+        var action = Assert.Single(actions);
+        Assert.Equal((EvaluationState.Paused, yes), (action.Entry.State, action.Record!.Id));
+    }
+
+    [Fact]
+    public async Task HP_001_a_Paused_week_keeps_its_record_buttons_and_has_no_Add_record()
+    {
+        // Yoga, 3 times a week, from Monday 2 November, read at 07:00Z on Friday 13 November: the week of 9 November has
+        // "Yes" on Tuesday 10 and a paused Thursday 12, so the whole week is Paused (D-1); the week of 2 November is not.
+        var goal = await GoalAsync(YogaThreeTimesAWeek, Mon2Nov);
+        _records.Seed(goal, new DateOnly(2026, 11, 10), RecordValue.FromAnswer(YesNoAnswer.Yes));
+        _records.SeedPause(goal, new DateOnly(2026, 11, 12), new DateOnly(2026, 11, 12));
+        var history = await PageHistoryAsync(goal, Fri13Nov, new DateTimeOffset(2026, 11, 13, 7, 0, 0, TimeSpan.Zero));
+
+        var cut = RenderCard(history);
+
+        Assert.Equal("Paused", Cell(cut, "9 – 15 Nov", 2));
+        Assert.Single(RecordButtons(cut, "9 – 15 Nov"));
+        Assert.Empty(Controls(cut, "9 – 15 Nov"));
+        Assert.NotEqual("Paused", Cell(cut, "2 – 8 Nov", 2));
+        Assert.Equal([AddNote, "Add record"], Controls(cut, "2 – 8 Nov"));
+    }
+
+    [Fact]
+    public async Task FocusRecordOrNoteAsync_on_a_Paused_row_without_a_record_gives_the_focus_to_its_note_control()
+    {
+        var goal = await GoalAsync(YogaOnMonWedFri, Mon2Nov);
+        _records.SeedPause(goal, Fri13Nov, Fri13Nov);
+        var history = await PageHistoryAsync(goal, Fri13Nov, new DateTimeOffset(2026, 11, 13, 7, 0, 0, TimeSpan.Zero));
+        var cut = RenderCard(history);
+        var only = Assert.Single(Row(cut, "Fri 13 Nov").QuerySelectorAll("td.ht-actions > button"));
+
+        await cut.InvokeAsync(() => cut.Instance.FocusRecordOrNoteAsync(Fri13Nov).AsTask());
+
+        var focused = JSInterop.VerifyFocusAsyncInvoke().Arguments[0];
+        Assert.Equal(only.GetAttribute("blazor:elementReference"), Assert.IsType<ElementReference>(focused).Id);
     }
 }

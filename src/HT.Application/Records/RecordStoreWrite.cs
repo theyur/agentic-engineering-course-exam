@@ -9,13 +9,20 @@ public enum RecordStoreWriteOutcome
     RecordNotFound,
     LimitReached,
     Written,
+
+    /// <summary>
+    /// Slice 7 (research R-04): <see cref="IRecordStore.AddAsync"/> found, under the goal lock, an excusal on the entry's
+    /// key date or a pause on one of its dates. Last, so the values of the earlier members stay as they were.
+    /// </summary>
+    Exempt,
 }
 
 /// <summary>
 /// The outcome of a write of <see cref="IRecordStore"/> (research R-05): the store's outcome, not a use-case outcome.
 /// <see cref="GoalNotFound"/> when the goal is not one of the owner's; <see cref="RecordNotFound"/> when the goal has
-/// no such record; <see cref="LimitReached"/> when a period already has the limit's records. None of them writes
-/// anything. A <see cref="RecordStoreWriteOutcome.Written"/> carries the entry as it is after the write.
+/// no such record; <see cref="LimitReached"/> when a period already has the limit's records; <see cref="Exempt"/> when
+/// an add meets an excusal or a pause (slice 7). None of them writes anything. A
+/// <see cref="RecordStoreWriteOutcome.Written"/> carries the entry as it is after the write.
 /// </summary>
 public sealed class RecordStoreWrite
 {
@@ -34,6 +41,12 @@ public sealed class RecordStoreWrite
 
     /// <summary>The period already has the limit's records: nothing was written.</summary>
     public static RecordStoreWrite LimitReached { get; } = new(RecordStoreWriteOutcome.LimitReached, null, null);
+
+    /// <summary>
+    /// The entry has an excusal on its key date or a pause on one of its dates (slice 7, research R-04): nothing was
+    /// written, the note included.
+    /// </summary>
+    public static RecordStoreWrite Exempt { get; } = new(RecordStoreWriteOutcome.Exempt, null, null);
 
     public RecordStoreWriteOutcome Outcome { get; }
 

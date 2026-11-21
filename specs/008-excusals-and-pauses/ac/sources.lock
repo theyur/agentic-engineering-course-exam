@@ -1,0 +1,11 @@
+{
+  "group": "sources",
+  "feature": "specs/008-excusals-and-pauses",
+  "files": {
+    "specs/008-excusals-and-pauses/acceptance.md": "17b19d32706545883719e3ac0cddce107dcba0ee8c153e34886dffbb3bcf7c77"
+  },
+  "spec": {
+    "path": "specs/008-excusals-and-pauses/spec.md",
+    "sha256": "53cd904c0ecac47b37a38780eb0781c4c53f6efa6dd9c06dec4489a3be6e09f4"
+  }
+}

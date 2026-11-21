@@ -1,6 +1,7 @@
 using System.Data.Common;
 using HT.Application.Records;
 using HT.Domain.Accounts;
+using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Records;
 using Microsoft.Data.SqlClient;
@@ -16,10 +17,16 @@ namespace HT.Persistence.Records;
 /// reads the entry's records and note in the same transaction and returns them. No statement raises a database error
 /// that carries a value: the checks are conditional statements, and the values written already satisfy the Domain's
 /// ranges and lengths. Any database fault becomes an exception that names the SQL error number only, with no inner
-/// exception (HP-006).
+/// exception (HP-006). Slice 7 (research R-04): the goal's excusals and pauses are written in the same transaction and
+/// under the same lock, each write re-checking its own invariant there, and a record add is refused on an excused or
+/// paused entry, so D-3 and FR-009 hold under concurrent requests too. They are read in one owner-scoped statement.
 /// </summary>
 internal sealed class RecordStore : IRecordStore
 {
+    private const string SaveRecordFailed = "Saving a record failed";
+    private const string SaveExemptionFailed = "Saving an excusal or a pause failed";
+    private const string ReadExemptionsFailed = "Reading excusals and pauses failed";
+
     private readonly HtDbContext _db;
 
     public RecordStore(HtDbContext db) => _db = db;
@@ -40,6 +47,12 @@ internal sealed class RecordStore : IRecordStore
         ArgumentNullException.ThrowIfNull(note);
         return InGoalTransactionAsync(owner, goal, async () =>
         {
+            // Slice 7 (research R-04, D-3, FR-009): no record is added on an excused or paused entry, under the lock.
+            if (await IsExemptAsync(goal.Value, entry, cancellationToken).ConfigureAwait(false))
+            {
+                return RecordStoreWrite.Exempt;
+            }
+
             var inEntry = RecordsOf(goal.Value, entry.FirstDate, entry.LastDate);
             RecordId id;
             var existing = isCommitment
@@ -162,17 +175,178 @@ internal sealed class RecordStore : IRecordStore
     }
 
     /// <summary>
+    /// Slice 7 (research R-04): every excusal and pause of the owner's goal in one statement, the two tables joined to
+    /// <c>Goals</c> on the owner and combined with UNION ALL; an excusal's row has no pause identifier. None when the
+    /// goal is not one of the owner's.
+    /// </summary>
+    public Task<GoalExemptions> ReadExemptionsAsync(AccountId owner, GoalId goal, CancellationToken cancellationToken) =>
+        RunAsync(async () =>
+        {
+            var lines = await _db.Database.SqlQuery<ExemptionLine>(
+                    $"""
+                    SELECT CAST(NULL AS uniqueidentifier) AS [PauseId], e.[GoalId], e.[Date] AS [FirstDay], e.[Date] AS [LastDay], e.[Reason]
+                    FROM [GoalExcusals] AS e INNER JOIN [Goals] AS g ON g.[Id] = e.[GoalId]
+                    WHERE g.[Id] = {goal.Value} AND g.[OwnerId] = {owner.Value}
+                    UNION ALL
+                    SELECT p.[Id] AS [PauseId], p.[GoalId], p.[FirstDay], p.[LastDay], p.[Reason]
+                    FROM [GoalPauses] AS p INNER JOIN [Goals] AS g ON g.[Id] = p.[GoalId]
+                    WHERE g.[Id] = {goal.Value} AND g.[OwnerId] = {owner.Value}
+                    """)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (lines.Count == 0)
+            {
+                return GoalExemptions.None;
+            }
+
+            var excusals = lines
+                .Where(l => l.PauseId is null)
+                .Select(l => ExemptionMapping.ToExcusal(new GoalExcusalRow { GoalId = l.GoalId, Date = l.FirstDay, Reason = l.Reason }));
+            var pauses = lines
+                .Where(l => l.PauseId is not null)
+                .Select(l => ExemptionMapping.ToPause(new GoalPauseRow
+                {
+                    Id = l.PauseId!.Value, GoalId = l.GoalId, FirstDay = l.FirstDay, LastDay = l.LastDay, Reason = l.Reason,
+                }));
+            return new GoalExemptions(excusals.ToList(), pauses.ToList());
+        }, ReadExemptionsFailed);
+
+    /// <summary>
+    /// Excuses the commitment (FR-001), re-checking under the goal lock, in the contract's order: an excusal of the
+    /// date, a record dated on it (D-3), a pause covering it (FR-009).
+    /// </summary>
+    public Task<ExemptionStoreWrite> ExcuseAsync(
+        AccountId owner, GoalId goal, DateOnly date, ExemptionReason? reason, CancellationToken cancellationToken) =>
+        InGoalExemptionTransactionAsync(owner, goal, async () =>
+        {
+            if (await _db.GoalExcusals.AsNoTracking()
+                    .AnyAsync(e => e.GoalId == goal.Value && e.Date == date, cancellationToken).ConfigureAwait(false))
+            {
+                return ExemptionStoreWrite.AlreadyExcused;
+            }
+
+            if (await _db.GoalRecords.AsNoTracking()
+                    .AnyAsync(r => r.GoalId == goal.Value && r.Date == date, cancellationToken).ConfigureAwait(false))
+            {
+                return ExemptionStoreWrite.HasRecord;
+            }
+
+            if (await PausesOf(goal.Value, date, date).AnyAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return ExemptionStoreWrite.Paused;
+            }
+
+            _db.GoalExcusals.Add(ExemptionMapping.ToRow(goal.Value, date, reason));
+            await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return ExemptionStoreWrite.Written();
+        }, cancellationToken);
+
+    public Task<ExemptionStoreWrite> RemoveExcusalAsync(AccountId owner, GoalId goal, DateOnly date, CancellationToken cancellationToken) =>
+        InGoalExemptionTransactionAsync(owner, goal, async () =>
+        {
+            var deleted = await _db.GoalExcusals
+                .Where(e => e.GoalId == goal.Value && e.Date == date)
+                .ExecuteDeleteAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return deleted == 0 ? ExemptionStoreWrite.NotExcused : ExemptionStoreWrite.Written();
+        }, cancellationToken);
+
+    /// <summary>Adds the pause with a new identifier, re-checking under the goal lock that it shares no date with another.</summary>
+    public Task<ExemptionStoreWrite> AddPauseAsync(
+        AccountId owner, GoalId goal, DateOnly firstDay, DateOnly lastDay, ExemptionReason? reason, CancellationToken cancellationToken)
+    {
+        var row = ExemptionMapping.ToRow(goal.Value, firstDay, lastDay, reason);
+        return InGoalExemptionTransactionAsync(owner, goal, async () =>
+        {
+            if (await PausesOf(goal.Value, firstDay, lastDay).AnyAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return ExemptionStoreWrite.Overlaps;
+            }
+
+            _db.GoalPauses.Add(row);
+            await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return ExemptionStoreWrite.Written(new PauseId(row.Id));
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gives the pause, found by the goal and its identifier together, a new last day (FR-010). A last day before its
+    /// first day is a caller's fault. A later last day that would share a date with another pause gives
+    /// <see cref="ExemptionStoreWrite.Overlaps"/>, so the goal's pauses never share a date (the use case only shortens).
+    /// </summary>
+    public Task<ExemptionStoreWrite> SetPauseLastDayAsync(
+        AccountId owner, GoalId goal, PauseId pause, DateOnly lastDay, CancellationToken cancellationToken) =>
+        InGoalExemptionTransactionAsync(owner, goal, async () =>
+        {
+            var row = await _db.GoalPauses.AsNoTracking()
+                .SingleOrDefaultAsync(p => p.Id == pause.Value && p.GoalId == goal.Value, cancellationToken)
+                .ConfigureAwait(false);
+            if (row is null)
+            {
+                return ExemptionStoreWrite.PauseNotFound;
+            }
+
+            if (lastDay < row.FirstDay)
+            {
+                throw new ArgumentException("The last day cannot be before the first day.", nameof(lastDay));
+            }
+
+            if (lastDay > row.LastDay
+                && await PausesOf(goal.Value, row.LastDay.AddDays(1), lastDay).AnyAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return ExemptionStoreWrite.Overlaps;
+            }
+
+            await _db.GoalPauses
+                .Where(p => p.Id == pause.Value && p.GoalId == goal.Value)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(p => p.LastDay, lastDay), cancellationToken)
+                .ConfigureAwait(false);
+            return ExemptionStoreWrite.Written();
+        }, cancellationToken);
+
+    public Task<ExemptionStoreWrite> DeletePauseAsync(AccountId owner, GoalId goal, PauseId pause, CancellationToken cancellationToken) =>
+        InGoalExemptionTransactionAsync(owner, goal, async () =>
+        {
+            var deleted = await _db.GoalPauses
+                .Where(p => p.Id == pause.Value && p.GoalId == goal.Value)
+                .ExecuteDeleteAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return deleted == 0 ? ExemptionStoreWrite.PauseNotFound : ExemptionStoreWrite.Written();
+        }, cancellationToken);
+
+    /// <summary>
     /// Research R-05: one transaction that first locks the owner's goal row with UPDLOCK, HOLDLOCK. No row gives
     /// <see cref="RecordStoreWrite.GoalNotFound"/> and writes nothing; the transaction commits only when
     /// <paramref name="write"/> writes, and rolls back for its refusals.
     /// </summary>
-    private async Task<RecordStoreWrite> InGoalTransactionAsync(
-        AccountId owner, GoalId goal, Func<Task<RecordStoreWrite>> write, CancellationToken cancellationToken)
+    private Task<RecordStoreWrite> InGoalTransactionAsync(
+        AccountId owner, GoalId goal, Func<Task<RecordStoreWrite>> write, CancellationToken cancellationToken) =>
+        InGoalTransactionAsync(
+            owner, goal, write, RecordStoreWrite.GoalNotFound, r => r.Outcome == RecordStoreWriteOutcome.Written, SaveRecordFailed, cancellationToken);
+
+    /// <summary>
+    /// Slice 7 (research R-04): the same transaction and lock as the record writes, so the excusal, pause and record
+    /// writes on one goal are serialized. No goal row gives <see cref="ExemptionStoreWrite.GoalNotFound"/> and writes
+    /// nothing.
+    /// </summary>
+    private Task<ExemptionStoreWrite> InGoalExemptionTransactionAsync(
+        AccountId owner, GoalId goal, Func<Task<ExemptionStoreWrite>> write, CancellationToken cancellationToken) =>
+        InGoalTransactionAsync(
+            owner, goal, write, ExemptionStoreWrite.GoalNotFound, r => r.Outcome == ExemptionStoreWriteOutcome.Written, SaveExemptionFailed,
+            cancellationToken);
+
+    /// <summary>
+    /// The one goal-lock transaction of every write: it first locks the owner's goal row with UPDLOCK, HOLDLOCK. No row
+    /// gives <paramref name="goalNotFound"/> and writes nothing; the transaction commits only when the result of
+    /// <paramref name="write"/> <paramref name="commits"/>, and rolls back for its refusals.
+    /// </summary>
+    private async Task<T> InGoalTransactionAsync<T>(
+        AccountId owner, GoalId goal, Func<Task<T>> write, T goalNotFound, Func<T, bool> commits, string what, CancellationToken cancellationToken)
     {
         _db.ChangeTracker.Clear();
         try
         {
-            return await RunWriteAsync(async () =>
+            return await RunAsync(async () =>
             {
                 await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
                 var locked = await _db.Database.SqlQuery<int>(
@@ -182,11 +356,11 @@ internal sealed class RecordStore : IRecordStore
                 if (locked.Count != 1)
                 {
                     await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
-                    return RecordStoreWrite.GoalNotFound;
+                    return goalNotFound;
                 }
 
                 var result = await write().ConfigureAwait(false);
-                if (result.Outcome == RecordStoreWriteOutcome.Written)
+                if (commits(result))
                 {
                     await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
                 }
@@ -196,7 +370,7 @@ internal sealed class RecordStore : IRecordStore
                 }
 
                 return result;
-            }).ConfigureAwait(false);
+            }, what).ConfigureAwait(false);
         }
         finally
         {
@@ -292,12 +466,24 @@ internal sealed class RecordStore : IRecordStore
         where row.Id == goal.Value && row.OwnerId == owner.Value
         select note;
 
-    /// <summary>Runs a write; a database fault becomes an exception with the SQL error number only (HP-006).</summary>
-    private static Task<T> RunWriteAsync<T>(Func<Task<T>> write) => RunAsync(write, "Saving a record failed");
+    /// <summary>
+    /// Slice 7 (research R-04, D-3, FR-009): whether a locked goal's entry has an excusal on its key date or a pause on
+    /// one of its dates.
+    /// </summary>
+    private async Task<bool> IsExemptAsync(Guid goal, EntrySpan entry, CancellationToken cancellationToken) =>
+        await _db.GoalExcusals.AsNoTracking()
+            .AnyAsync(e => e.GoalId == goal && e.Date == entry.Key, cancellationToken)
+            .ConfigureAwait(false)
+        || await PausesOf(goal, entry.FirstDate, entry.LastDate).AnyAsync(cancellationToken).ConfigureAwait(false);
+
+    /// <summary>A locked goal's pauses that share a date with the range <paramref name="first"/> to <paramref name="last"/>.</summary>
+    private IQueryable<GoalPauseRow> PausesOf(Guid goal, DateOnly first, DateOnly last) =>
+        _db.GoalPauses.AsNoTracking().Where(p => p.GoalId == goal && p.FirstDay <= last && first <= p.LastDay);
 
     /// <summary>Runs a read; a database fault becomes an exception with the SQL error number only (HP-006).</summary>
     private static Task<T> RunReadAsync<T>(Func<Task<T>> read) => RunAsync(read, "Reading records failed");
 
+    /// <summary>Runs <paramref name="action"/>; a database fault becomes an exception that names <paramref name="what"/> and the SQL error number only (HP-006).</summary>
     private static async Task<T> RunAsync<T>(Func<Task<T>> action, string what)
     {
         int number;
@@ -319,5 +505,22 @@ internal sealed class RecordStore : IRecordStore
         }
 
         throw new InvalidOperationException($"{what} (SQL error {number}).");
+    }
+
+    /// <summary>
+    /// One row of <see cref="ReadExemptionsAsync"/>'s statement: an excusal (no <see cref="PauseId"/>, its date as both
+    /// days) or a pause. Mapped by column name; never tracked.
+    /// </summary>
+    private sealed class ExemptionLine
+    {
+        public Guid? PauseId { get; init; }
+
+        public Guid GoalId { get; init; }
+
+        public DateOnly FirstDay { get; init; }
+
+        public DateOnly LastDay { get; init; }
+
+        public string? Reason { get; init; }
     }
 }

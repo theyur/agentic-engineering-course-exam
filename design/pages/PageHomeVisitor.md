@@ -28,3 +28,12 @@ The last part of the preview shows the visitor Home as slice 6 builds it (HP-004
 - The figures are fixed examples that belong to no account: the card reads no stored data, so the page is the same for every visitor and shows no account's data (D-3). The texts come from the shared formatter applied to these fixed results (HP-004, HP-005), so the card follows the rules of consistency and streaks.
 - The card is part of the hero, not of the catalog preview, so it shows with or without Published habits (amended slice 2 US5-AS8).
 - No Community section (slice 9).
+
+## Slice 7 state
+
+The last part of the preview shows the visitor Home as slice 7 builds it (HP-001, HP-006, ADR 0008).
+
+- Everything of slice 6 stays, with one change in the hero's example card: the legend under its strip lists six entries, Met, Failed, Missed, Excused, Paused, Pending, in place of slice 6's four.
+- The strip of 21 fixed results (Met × 11, Missed, Met, Failed, Met × 6, Pending), the figures ("90% (18 of 20)", 6, 11) and the strip's `aria-label` ("Last 21 commitments: 18 met, 1 failed, 1 missed, 1 pending") are unchanged: the example has no Excused or Paused result.
+- Why it changes: the card is the shared `GoalStats` component (slice 6 HP-004), whose full strip always shows the six-entry legend in slice 7 (HP-001, HP-006; `components/GoalStats.md` and `components/ConsistencyStrip.md`, "Slice 7 state"). The spec's "Earlier requirements and tests this slice changes" does not list slice 6 HP-004; the change follows from HP-001 and HP-006 through the shared component.
+- Still no Community section (slice 9).

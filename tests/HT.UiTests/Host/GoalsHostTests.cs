@@ -1,8 +1,10 @@
 using System.Net;
 using HT.Application.Accounts;
+using HT.Application.Exemptions;
 using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Domain.Accounts;
+using HT.Domain.Exemptions;
 using HT.Domain.Records;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
@@ -22,6 +24,9 @@ public sealed class GoalsHostTests(HostFixture host)
 {
     private const string NewGoalAddress = "/goals/new";
     private const string GoalsAddress = "/goals";
+
+    /// <summary>The zones of the per-week pause test, in the order it tries them: UTC, then UTC+14, then UTC−11.</summary>
+    private static readonly string[] WeekGoalZones = ["UTC", "Pacific/Kiritimati", "Pacific/Pago_Pago"];
 
     private static string Email(string who) => $"ui-go-{who}-{Guid.NewGuid():N}@example.com";
 
@@ -229,6 +234,180 @@ public sealed class GoalsHostTests(HostFixture host)
     }
 
     [Fact]
+    public async Task Slice_7_HP_001_the_owners_prerendered_goal_page_has_an_Excused_History_row_with_its_reason_and_Remove_excusal()
+    {
+        // Every day from yesterday (UTC, at the host's clock); yesterday, Pending with no record, is excused with "Ill"
+        // through the host's ExcusalService, and its grace period is still open, so the excusal can be removed.
+        var name = $"Ui-Go Excused {Guid.NewGuid():N}"[..30];
+        var (browser, account) = await host.SignedInAccountAsync(Email("excused-owner"), Role.RegisteredUser);
+        using (browser)
+        {
+            DateOnly yesterday;
+            GoalId goal;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                yesterday = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow()).AddDays(-1);
+                goal = await StoreGoalAsync(services, account, name, Enum.GetValues<DayOfWeek>(), yesterday, recordFirstDay: false);
+                var excused = await services.GetRequiredService<ExcusalService>().ExcuseAsync(
+                    ActingUser.ForAccount(account, Role.RegisteredUser), goal, yesterday, "Ill", CancellationToken.None);
+                Assert.Equal(ExcuseOutcome.Excused, excused.Outcome);
+            }
+
+            var (status, html) = await browser.GetPageAsync($"{GoalsAddress}/{goal.Value}");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            var text = WebUtility.HtmlDecode(html);
+            Assert.Contains(
+                "<span class=\"ht-inline\"><span class=\"ht-chip ht-status ht-status--excused\">Excused</span><span class=\"ht-muted\">Ill</span></span>",
+                text, StringComparison.Ordinal);
+            Assert.Contains($"aria-label=\"Remove excusal of {DateTexts.ShortDate(yesterday)}\"", text, StringComparison.Ordinal);
+            Assert.Contains(">Remove excusal</button>", text, StringComparison.Ordinal);
+            Assert.DoesNotContain($"aria-label=\"Add record for {DateTexts.ShortDate(yesterday)}\"", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_001_the_owners_prerendered_page_of_a_paused_goal_has_the_Notice_the_Pauses_card_and_no_Pause()
+    {
+        // Every day from yesterday (UTC, at the host's clock), paused through the host's PauseService from today, the
+        // pause date, for 7 days: the pause is current, so the goal is paused until today + 6.
+        var name = $"Ui-Go Paused {Guid.NewGuid():N}"[..30];
+        var (browser, account) = await host.SignedInAccountAsync(Email("paused-owner"), Role.RegisteredUser);
+        using (browser)
+        {
+            DateOnly today;
+            GoalId goal;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                today = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow());
+                goal = await StoreGoalAsync(services, account, name, Enum.GetValues<DayOfWeek>(), today.AddDays(-1), recordFirstDay: false);
+                var paused = await services.GetRequiredService<PauseService>().PauseAsync(
+                    ActingUser.ForAccount(account, Role.RegisteredUser), goal, today, today.AddDays(6), "Family visit", CancellationToken.None);
+                Assert.Equal(PauseOutcome.Paused, paused.Outcome);
+            }
+
+            var (status, html) = await browser.GetPageAsync($"{GoalsAddress}/{goal.Value}");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            var text = WebUtility.HtmlDecode(html);
+            Assert.Contains("<div class=\"ht-notice\">", text, StringComparison.Ordinal);
+            Assert.Contains($"<span>Paused until {DateTexts.ShortDate(today.AddDays(6))}</span>", text, StringComparison.Ordinal);
+            Assert.Contains(">Resume now</button>", text, StringComparison.Ordinal);
+            Assert.DoesNotContain(">Pause</button>", text, StringComparison.Ordinal);
+            Assert.Contains("<h2 class=\"ht-card__title\">Pauses</h2>", text, StringComparison.Ordinal);
+            Assert.Contains(
+                $"<span class=\"ht-goal__name\">{DateTexts.ShortDate(today)} – {DateTexts.ShortDate(today.AddDays(6))}</span>", text, StringComparison.Ordinal);
+            Assert.Contains("<div class=\"ht-goal__meta ht-muted\">Family visit</div>", text, StringComparison.Ordinal);
+            Assert.Contains("<span class=\"ht-chip ht-status ht-status--paused\">Paused</span>", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Slice_7_Edge_a_per_week_goal_with_an_upcoming_pause_later_in_its_current_week_is_not_paused_but_its_week_is()
+    {
+        // A per-week goal whose current week has a date after today: its zone is the first of UTC, Kiritimati (UTC+14) and
+        // Pago Pago (UTC−11) whose date at the host's clock is not a Sunday (at most one of the three is), and it starts on
+        // that week's Monday; the account is moved to that zone first through the host's ProfileService, so the goal store
+        // writes the goal's version in it. A pause of tomorrow, set through the host's PauseService, is upcoming, so the
+        // goal is not paused (no Notice, "Pause" offered), while its current week has a paused date and is Paused as a
+        // whole (D-1).
+        var name = $"Ui-Go Week {Guid.NewGuid():N}"[..30];
+        var habit = await host.ArrangeCatalogHabitAsync(Definition(name));
+        var (browser, account) = await host.SignedInAccountAsync(Email("week-owner"), Role.RegisteredUser);
+        using (browser)
+        {
+            DateOnly monday;
+            DateOnly tomorrow;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
+                var (zoneId, zone) = WeekGoalZones
+                    .Select(id => (Id: id, Zone: NamedTimeZone.TryParse(id, out var parsed) ? parsed : throw new InvalidOperationException(id)))
+                    .First(candidate => candidate.Zone.DateAt(now).DayOfWeek != DayOfWeek.Sunday);
+                var moved = await services.GetRequiredService<ProfileService>().ChangeTimeZoneAsync(
+                    ActingUser.ForAccount(account, Role.RegisteredUser), zoneId, CancellationToken.None);
+                Assert.Contains(moved.Outcome, new[] { TimeZoneChangeOutcome.Changed, TimeZoneChangeOutcome.Unchanged });
+                var today = zone.DateAt(now);
+                monday = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+                tomorrow = today.AddDays(1);
+                Assert.True(GoalTarget.TryCreate(new GoalTargetFields
+                {
+                    BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.YesNo, ScheduleKind = ScheduleKind.Times, Times = 3,
+                    Period = SchedulePeriod.Week,
+                }, out var target, out _));
+                var created = await services.GetRequiredService<IGoalStore>().CreateAsync(
+                    account, new NewGoal(new GoalHabit(habit, HabitKind.Catalog), monday, null, target), zone, NamedTimeZone.Utc, CancellationToken.None);
+                Assert.Equal(GoalWriteOutcomeKind.Created, created.Kind);
+                var paused = await services.GetRequiredService<PauseService>().PauseAsync(
+                    ActingUser.ForAccount(account, Role.RegisteredUser), created.Id!.Value, tomorrow, tomorrow, null, CancellationToken.None);
+                Assert.Equal(PauseOutcome.Paused, paused.Outcome);
+                Assert.Equal(PauseTiming.Upcoming, paused.Pause!.Timing);
+
+                var (status, html) = await browser.GetPageAsync($"{GoalsAddress}/{created.Id.Value.Value}");
+
+                Assert.Equal(HttpStatusCode.OK, status);
+                var text = WebUtility.HtmlDecode(html);
+                Assert.DoesNotContain("<div class=\"ht-notice\">", text, StringComparison.Ordinal);
+                Assert.DoesNotContain("Paused until", text, StringComparison.Ordinal);
+                Assert.Contains("aria-haspopup=\"dialog\">Pause</button>", text, StringComparison.Ordinal);
+                Assert.Contains(
+                    $"<td><b>{DateTexts.WeekRange(monday, monday.AddDays(6))}</b></td>", text, StringComparison.Ordinal);
+                Assert.Contains("<span class=\"ht-chip ht-status ht-status--paused\">Paused</span>", text, StringComparison.Ordinal);
+                Assert.Contains(">Cancel pause</button>", text, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Slice_7_US3_the_owners_prerendered_goal_page_has_Excused_and_Paused_cells_and_marked_bars()
+    {
+        // Every day from 2 days before today (UTC, at the host's clock), 15 min recorded on its first day. Yesterday,
+        // Pending with no record, is excused through the host's ExcusalService, and the goal is paused through its
+        // PauseService from today, the pause date, until tomorrow. Then the host's clock moves forward 3 days, as other
+        // host tests move it, so every date below is taken from the clock first: the first day is Met, the excused day
+        // Excused, the two paused days Paused and ended, the next day Pending and the new today Due. The browser signs
+        // in after the move.
+        var name = $"Ui-Go Exempt {Guid.NewGuid():N}"[..30];
+        var email = Email("exempt-owner");
+        var account = (await host.CreateAccountAsync(email, "walking42")).Id;
+        GoalId goal;
+        DateOnly first;
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            var services = scope.ServiceProvider;
+            var today = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow());
+            first = today.AddDays(-2);
+            goal = await StoreGoalAsync(services, account, name, Enum.GetValues<DayOfWeek>(), first, recordFirstDay: true);
+            var user = ActingUser.ForAccount(account, Role.RegisteredUser);
+            var excused = await services.GetRequiredService<ExcusalService>().ExcuseAsync(user, goal, today.AddDays(-1), null, CancellationToken.None);
+            Assert.Equal(ExcuseOutcome.Excused, excused.Outcome);
+            var paused = await services.GetRequiredService<PauseService>().PauseAsync(user, goal, today, today.AddDays(1), null, CancellationToken.None);
+            Assert.Equal(PauseOutcome.Paused, paused.Outcome);
+        }
+
+        host.Clock.Advance(TimeSpan.FromDays(3));
+        using var browser = host.CreateBrowser();
+        await browser.SignInAsync(email, "walking42");
+
+        var (status, html) = await browser.GetPageAsync($"{GoalsAddress}/{goal.Value}");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        var text = WebUtility.HtmlDecode(html);
+        Assert.Contains("<div class=\"ht-stat__value ht-stat__value--text\">100% (1 of 1)</div>", text, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Last 5 commitments: 1 met, 1 excused, 2 paused, 1 pending\"", text, StringComparison.Ordinal);
+        Assert.Equal(1, text.Split("class=\"ht-strip__cell ht-cell--excused\"").Length - 2);
+        Assert.Equal(2, text.Split("class=\"ht-strip__cell ht-cell--paused\"").Length - 2);
+        Assert.Contains("<div class=\"ht-bars\" role=\"img\" aria-label=\"Minutes per day, last 14 days; target 15; 1 excused, 2 paused\">", text, StringComparison.Ordinal);
+        Assert.Contains($"<i class=\"ht-bar ht-bar--excused\" title=\"{DateTexts.ShortDate(first.AddDays(1))}: Excused\"></i>", text, StringComparison.Ordinal);
+        Assert.Contains($"<i class=\"ht-bar ht-bar--paused\" title=\"{DateTexts.ShortDate(first.AddDays(2))}: Paused\"></i>", text, StringComparison.Ordinal);
+        Assert.Contains($"<i class=\"ht-bar ht-bar--paused\" title=\"{DateTexts.ShortDate(first.AddDays(3))}: Paused\"></i>", text, StringComparison.Ordinal);
+        Assert.Equal(2, text.Split("class=\"ht-bar ht-bar--empty\"").Length - 1);
+    }
+
+    [Fact]
     public async Task Slice_6_the_owners_prerendered_goal_page_has_the_GoalStats_card_above_the_History_card()
     {
         // Every day from 4 days before today (UTC, at the host's clock), with 15 min on the first day: the first day is
@@ -344,11 +523,67 @@ public sealed class GoalsHostTests(HostFixture host)
             Assert.DoesNotContain(">Record</button>", notStarted, StringComparison.Ordinal);
 
             Assert.Contains(
-                "<p class=\"ht-footnote\">Each goal is counted on its own. Consistency counts only finalized results; pending ones are left out.</p>",
+                "<p class=\"ht-footnote\">Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out.</p>",
                 html, StringComparison.Ordinal);
         }
     }
 
+    [Fact]
+    public async Task Slice_7_HP_004_the_prerendered_Paused_tab_lists_the_paused_goal_with_Paused_until_and_Resume_and_Active_the_other()
+    {
+        // Two goals of 15 min every day from yesterday (UTC, at the host's clock; yesterday Pending, today Due): "… P" paused
+        // through the host's PauseService from today, the pause date, for 7 days, so it is paused until today + 6; "… A" not
+        // paused. The first HTML of /goals?tab=paused, prerendered, has the Paused tab current and only "… P", in its Paused
+        // form; that of /goals has the Active tab current and only "… A". Both have the slice-7 footnote.
+        var prefix = $"Ui-Go Tabs {Guid.NewGuid():N}"[..24];
+        var (browser, account) = await host.SignedInAccountAsync(Email("tabs"), Role.RegisteredUser);
+        using (browser)
+        {
+            DateOnly today;
+            GoalId active, paused;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                today = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow());
+                var everyDay = Enum.GetValues<DayOfWeek>();
+                active = await StoreGoalAsync(services, account, prefix + " A", everyDay, today.AddDays(-1), recordFirstDay: false);
+                paused = await StoreGoalAsync(services, account, prefix + " P", everyDay, today.AddDays(-1), recordFirstDay: false);
+                var result = await services.GetRequiredService<PauseService>().PauseAsync(
+                    ActingUser.ForAccount(account, Role.RegisteredUser), paused, today, today.AddDays(6), null, CancellationToken.None);
+                Assert.Equal(PauseOutcome.Paused, result.Outcome);
+            }
+
+            var (pausedStatus, pausedTab) = await browser.GetPageAsync(GoalsAddress + "?tab=paused");
+            var (activeStatus, activeTab) = await browser.GetPageAsync(GoalsAddress);
+
+            const string footnote =
+                "<p class=\"ht-footnote\">Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out.</p>";
+            Assert.Equal(HttpStatusCode.OK, pausedStatus);
+            Assert.Contains("<nav class=\"ht-tabs\" aria-label=\"Goal lists\">", pausedTab, StringComparison.Ordinal);
+            Assert.Contains("<a class=\"ht-tab\" href=\"/goals\">Active</a>", pausedTab, StringComparison.Ordinal);
+            Assert.Contains("<a class=\"ht-tab\" href=\"/goals?tab=paused\" aria-current=\"page\">Paused</a>", pausedTab, StringComparison.Ordinal);
+            Assert.DoesNotContain(">Ended<", pausedTab, StringComparison.Ordinal);
+            Assert.Equal(1, pausedTab.Split("<div class=\"ht-goalitem\">").Length - 1);
+            var item = ItemHtml(pausedTab, paused);
+            Assert.Contains($">{prefix} P, 15 min daily</a>", item, StringComparison.Ordinal);
+            Assert.Contains("<span class=\"ht-chip ht-status ht-status--pending\">Pending</span>", item, StringComparison.Ordinal);
+            Assert.Contains($"<span>Paused until {DateTexts.ShortDate(today.AddDays(6))}</span>", item, StringComparison.Ordinal);
+            Assert.Contains(
+                $"class=\"ht-btn ht-btn--secondary ht-btn--sm\" aria-label=\"Resume {prefix} P, 15 min daily\">Resume</button>", item, StringComparison.Ordinal);
+            Assert.DoesNotContain(">Record</button>", item, StringComparison.Ordinal);
+            Assert.DoesNotContain($"href=\"/goals/{active.Value}\"", pausedTab, StringComparison.Ordinal);
+            Assert.Contains(footnote, pausedTab, StringComparison.Ordinal);
+
+            Assert.Equal(HttpStatusCode.OK, activeStatus);
+            Assert.Contains("<a class=\"ht-tab\" href=\"/goals\" aria-current=\"page\">Active</a>", activeTab, StringComparison.Ordinal);
+            Assert.Contains("<a class=\"ht-tab\" href=\"/goals?tab=paused\">Paused</a>", activeTab, StringComparison.Ordinal);
+            Assert.Equal(1, activeTab.Split("<div class=\"ht-goalitem\">").Length - 1);
+            Assert.Contains($"aria-label=\"Record for {prefix} A, 15 min daily\">Record</button>", ItemHtml(activeTab, active), StringComparison.Ordinal);
+            Assert.DoesNotContain($"href=\"/goals/{paused.Value}\"", activeTab, StringComparison.Ordinal);
+            Assert.DoesNotContain("Paused until", activeTab, StringComparison.Ordinal);
+            Assert.Contains(footnote, activeTab, StringComparison.Ordinal);
+        }
+    }
     /// <summary>The HTML of the Goals page's item of <paramref name="goal"/>, up to the next item (or the page's end).</summary>
     private static string ItemHtml(string html, GoalId goal)
     {

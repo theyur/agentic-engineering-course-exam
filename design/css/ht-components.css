@@ -496,3 +496,9 @@ a.ht-goal__name:hover { color:var(--accent); }
 .ht-footnote { font-size:13px; line-height:18px; color:var(--ink-muted); margin:var(--space-3) 0 0; }
 /* a trend bar with no record: an empty full-height outline, never a zero-height bar (slice 7's paused bar is dashed) */
 .ht-bar--empty { height:100%; background:transparent; border:1.5px dotted var(--line-strong); border-bottom:0; }
+
+/* ---------- slice 7: excusals and pauses ---------- */
+/* an excused trend bar: a full-height dashed outline like the paused bar, in the Excused colour of its StatusChip and strip cell; its title and the chart's aria-label tell it apart */
+.ht-bar--excused { height:100%; background:transparent; border:1.5px dashed var(--excused); border-bottom:0; }
+/* the goal page's second Notice under its head (the paused Notice first, then "no longer in the public catalog") */
+.ht-detail-head + .ht-notice + .ht-notice { margin:0 0 var(--space-4); }

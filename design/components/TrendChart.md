@@ -61,3 +61,27 @@ The card's title (`ht-card__title`) and sub line (`ht-card__sub`) per goal. `Rep
 - The date labels under the bars (`ht-bars__labels`) are the day and month, "4 Nov" (for a week, its Monday).
 - The chart (`ht-bars`) has `role="img"` and the `aria-label` "{title}, {sub line, first letter lower-case}; target {n}" ("Minutes per day, last 14 days; target 20"), then, for each bar whose own target differs from the line's, "; {date}: {value} of {target}" ("Days done per week, last 12 weeks; target 3; week of 2 Nov: 2 of 2"), or "; {date}: no record of {target}" for such a bar with no record. `ReportText.TrendLabel` gives it.
 - The History card under the chart gives every exact value.
+
+## Slice 7 state
+
+The last part of the preview shows the chart as slice 7 builds it (FR-016, HP-001, HP-006, research R-07, ADR 0008). Everything of slice 6 stays: the bar kinds, titles, sub lines, heights, date labels and the empty bar. Slice 7 adds marked bars.
+
+### Marked bars
+
+| Bar | Marked when | Drawn as | `title` |
+|---|---|---|---|
+| a commitment or a day (per-day goals, commitment-based count and duration goals) | it is Paused, or (a commitment) Excused | `ht-bar ht-bar--paused` or `ht-bar ht-bar--excused` | "{date}: Paused", "{date}: Excused" ("Mon 9 Nov: Excused") |
+| a week of a per-week goal | it is Paused (any of its dates is in a pause, D-1) | `ht-bar ht-bar--paused` | "week of 21 Sep: Paused" |
+| a week of a commitment-based yes/no goal | every one of its commitments, the current week's Upcoming ones included, is Excused or Paused | `ht-bar--paused` when one of them is Paused, else `ht-bar--excused` | "week of 21 Sep: Paused", "week of 21 Sep: Excused" |
+
+- A marked bar has no value, also when a record is kept on its commitment or day (FR-009): it is drawn full height with a dashed outline and no `style` height, like the empty bar.
+- The paused bar (`ht-bar--paused`) keeps its existing dashed `line-strong` outline. The Excused bar (`ht-bar--excused`, new in `css/ht-components.css`, tokens only) is the same dashed outline in `excused`, the colour of the Excused StatusChip and strip cell. The two are told apart in their `title` and in the chart's `aria-label`, never by colour alone; the empty bar has a dotted outline and the `title` "{date}: no record".
+- A commitment-based yes/no week that is not all exempt keeps an unmarked bar: its Build target counts only its commitments that are neither Excused nor Paused (Upcoming ones of the current week included), and its value counts only the "Yes" records of those commitments. A "Yes" kept on a Paused commitment is not counted, and a week whose only records sit on Paused commitments has no value (the empty bar), not 0. A Reduce week's target stays 0. In the preview, the week of 26 Oct (one Excused commitment of three) is "2 of 2" and the week of 9 Nov (one Excused and one Paused) is "1 of 1".
+- A marked bar keeps its own target by the same rules (0 for an all-exempt yes/no week); it is not drawn.
+
+### Target line and accessible name
+
+- The dashed target line is drawn at the target of the latest bar that is not marked ("Target 1" in the third example, whose latest bar is Paused), or at 0 when every bar is marked or there is none. A goal without exemptions keeps slice 6's line.
+- The chart's `aria-label` is slice 6's, with the marked bars counted after the target: "{title}, {sub line}; target {n}; {a} excused, {b} paused", then slice 6's list of bars whose own target differs ("Days done per week, last 12 weeks; target 3; 2 paused; week of 26 Oct: 2 of 2; week of 9 Nov: 1 of 1"). A count of 0 is left out ("Minutes per day, last 14 days; target 10; 1 excused, 3 paused", "Times per day, last 14 days; target 1; 1 paused"); with no marked bar nothing is added, so slice 6's label is unchanged. Bars with no record are not counted, so they stay apart from marked bars. Marked bars are never listed among the bars whose own target differs. Settled here in slice 7 (T010): the spec and the contract ask that the label count marked bars apart from empty ones without fixing the words.
+- `ReportText` gives the bar titles and the label (HP-008); the chart computes nothing.
+- The previews: Meditation, 10 min daily (spec US3-AS4: 9 November Excused, 13 to 15 November Paused, 11 and 17 to 19 November with no record); a commitment-based yes/no goal with two all-exempt Paused weeks and two weeks with exempt commitments; and Drinking water, 8 glasses a day, paused from today with a record kept on that day (spec US2-AS10), whose line stays at the latest unmarked bar's target.

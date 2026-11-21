@@ -131,10 +131,71 @@ public sealed class TodayPanelTests : BunitContext
                 (Yoga, "Mon 23 Nov", "Upcoming"),
             ],
             Rows(cut));
+        // Slice 7 (T051, HP-005): the Pending commitments without a record (Reading 15, Yoga 16) also have "Excuse".
         Assert.Equal(
-            ["Record", "Edit", "Record", "Record", "Add note", "Edit note"],
+            ["Record", "Excuse", "Edit", "Record", "Excuse", "Record", "Add note", "Edit note"],
             cut.FindAll(".ht-row button").Select(b => b.TextContent));
         Assert.Empty(cut.FindAll("[role=dialog]"));
+    }
+
+    // ---- slice 7: "Excuse" on the Home (HP-005, US1-AS12, HP-007; T051) ----
+
+    [Fact]
+    public async Task Slice_7_US1_AS12_Excuse_opens_the_Excuse_dialog_and_excusing_removes_the_row_lowers_Pending_and_moves_the_focus()
+    {
+        await ArrangeAsync();
+        var cut = Render<TodayPanel>();
+        Assert.Equal("3", Tile(cut, "Pending · still can record").QuerySelector(".ht-tile__value")!.TextContent);
+        var nextAction = ActionOf(cut, $"Edit record of {Reading}, Mon 16 Nov").GetAttribute("blazor:elementReference");
+
+        await ActionOf(cut, $"Excuse {Reading}, Sun 15 Nov").ClickAsync(new MouseEventArgs());
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Equal($"Excuse · {Reading}", dialog.QuerySelector("h2")!.TextContent);
+        Assert.Equal("Sun 15 Nov · Pending, 14 h left", dialog.QuerySelector(".ht-dialog__sub")!.TextContent);
+        cut.Find("[role=dialog] input.ht-input").Input("Travelling");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.DoesNotContain(Rows(cut), r => r.Name == Reading && r.Meta.StartsWith("Sun 15 Nov", StringComparison.Ordinal));
+        Assert.Equal(6, Rows(cut).Count);
+        Assert.Equal("2", Tile(cut, "Pending · still can record").QuerySelector(".ht-tile__value")!.TextContent);
+        // The row is gone; the focus goes to the row now in its place, Reading's Monday 16.
+        Assert.Equal(nextAction, FocusedReferences(2)[1]);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_007_Esc_on_the_Excuse_dialog_gives_the_focus_back_to_Excuse()
+    {
+        await ArrangeAsync();
+        var cut = Render<TodayPanel>();
+        var excuse = ActionOf(cut, $"Excuse {Yoga}, Mon 16 Nov").GetAttribute("blazor:elementReference");
+
+        await ActionOf(cut, $"Excuse {Yoga}, Mon 16 Nov").ClickAsync(new MouseEventArgs());
+        cut.Find("[role=dialog]").KeyDown(new KeyboardEventArgs { Key = "Escape" });
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal(3, cut.FindAll(".ht-row .ht-status").Count(s => s.TextContent == "Pending"));
+        Assert.Equal(excuse, FocusedReferences(2)[1]);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_003_a_Due_rows_Record_offers_Excuse_instead_and_excusing_removes_the_row_and_lowers_Due_now()
+    {
+        await ArrangeAsync();
+        var cut = Render<TodayPanel>();
+        var missedNote = ActionOf(cut, $"Add note for {Reading}, Sat 14 Nov").GetAttribute("blazor:elementReference");
+        Assert.DoesNotContain(cut.FindAll(".ht-row button"), b => b.GetAttribute("aria-label") == $"Excuse {Reading}, Tue 17 Nov");
+
+        await ActionOf(cut, $"Record for {Reading}, Tue 17 Nov").ClickAsync(new MouseEventArgs());
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[^1].ClickAsync(new MouseEventArgs());
+        Assert.Equal("Today, Tue 17 Nov", cut.Find("[role=dialog] .ht-dialog__sub").TextContent);
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.DoesNotContain(Rows(cut), r => r.Chip == "Due today");
+        Assert.Equal("0", Tile(cut, "Due now").QuerySelector(".ht-tile__value")!.TextContent);
+        // The Due row was the fourth; Saturday 14's row is now in its place.
+        Assert.Equal(missedNote, FocusedReferences(4)[^1]);
     }
 
     [Fact]

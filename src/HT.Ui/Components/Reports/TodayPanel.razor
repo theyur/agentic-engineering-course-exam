@@ -5,6 +5,7 @@
 @using HT.Domain.Evaluation
 @using HT.Domain.Goals
 @using HT.Ui.Account
+@using HT.Ui.Components.Exemptions
 @using HT.Ui.Components.Records
 @using HT.Ui.Habits
 @inject UseCaseScope UseCases
@@ -19,7 +20,12 @@
    "Edit" opens the row's record, "Add note" and "Edit note" open the NoteDialog. After a save the dashboard is read
    again before the dialog closes. When either dialog closes, saved or not, the focus returns to the same row's action,
    found by its goal and first date after the re-read; when the row has left the list, or the filter hides it, it goes
-   to the "Due now" tile, which is always there (constitution IV). *@
+   to the "Due now" tile, which is always there (constitution IV).
+   Slice 7 (HP-005, HP-003, US1-AS12; contracts/host.md "Signed-in Home"): a Pending commitment row's "Excuse", and the
+   RecordDialog's "Excuse instead" in its place, open the Excuse dialog for that row's goal and date. After "excused" the
+   dashboard is read again before the dialog closes, so the row leaves the list and the "Pending · still can record"
+   tile drops by 1; the focus goes back to the opener while its row is listed, otherwise to the nearest remaining row
+   with an action, else to the "Due now" tile (HP-007). *@
 @if (_dashboard is { } dashboard)
 {
     <div class="ht-home__panel">
@@ -51,7 +57,13 @@
         {
             <RecordDialog Open="_recordOpen" OnClose="CloseRecord" FocusOnClose="FocusRowAsync"
                           GoalId="recordEntry.GoalId" GoalName="@recordEntry.GoalName" Recordable="recordEntry.Goal" Row="recordEntry.Entry"
-                          Editing="_editing" ActingUser="_actingUser" OnSaved="SavedAsync" />
+                          Editing="_editing" ActingUser="_actingUser" OnSaved="SavedAsync" OnExcuseInstead="ExcuseInstead" />
+        }
+        @if (_excuseEntry is { } excuseEntry)
+        {
+            <ExcuseDialog Open="_excuseOpen" OnClose="CloseExcuse" FocusOnClose="FocusAfterExcuseAsync" GoalId="excuseEntry.GoalId"
+                          Date="excuseEntry.Entry.FirstDate" GoalName="@excuseEntry.GoalName" SubLine="@SubLineOf(excuseEntry)"
+                          ActingUser="_actingUser" OnSaved="ExcusedAsync" />
         }
         @if (_noteEntry is { } noteEntry)
         {
@@ -85,6 +97,20 @@
     /// <summary>The goal and first date of the row whose action opened the last dialog.</summary>
     private (GoalId Goal, DateOnly First)? _opener;
 
+    private bool _excuseOpen;
+
+    /// <summary>The row the Excuse dialog was opened for; kept after it closes, so the focus can go back to it.</summary>
+    private TodayEntry? _excuseEntry;
+
+    /// <summary>Whether the Excuse dialog replaced the RecordDialog ("Excuse instead"), whose opener is the row's "Record".</summary>
+    private bool _excuseFromRecord;
+
+    /// <summary>
+    /// Where the opener row was in the Today list as shown when the Excuse dialog opened; after "excused" the row is gone,
+    /// and the focus goes to the row now at that place, else the one before it.
+    /// </summary>
+    private int _excuseIndex;
+
     /// <summary>The Today list as the filter shows it: every row, or only the rows of the pressed tile's state.</summary>
     private IReadOnlyList<TodayEntry> ShownRows =>
         _dashboard is not { } dashboard ? []
@@ -111,6 +137,12 @@
     private void Open(TodayEntry entry, CommitmentRow.ActionKind kind)
     {
         _opener = KeyOf(entry);
+        if (kind == CommitmentRow.ActionKind.Excuse)
+        {
+            OpenExcuse(entry, false);
+            return;
+        }
+
         if (kind == CommitmentRow.ActionKind.Note)
         {
             _noteEntry = entry;
@@ -133,6 +165,64 @@
         await ReadAsync();
         _recordOpen = false;
         _noteOpen = false;
+    }
+
+    /// <summary>
+    /// Slice 7 (HP-005, HP-003): the Excuse dialog for <paramref name="entry"/>, opened by the row's "Excuse" or by the
+    /// RecordDialog's "Excuse instead" in its place.
+    /// </summary>
+    private void OpenExcuse(TodayEntry entry, bool fromRecord)
+    {
+        _excuseEntry = entry;
+        _excuseFromRecord = fromRecord;
+        _excuseIndex = Math.Max(0, ShownRows.ToList().FindIndex(shown => KeyOf(shown) == KeyOf(entry)));
+        _recordOpen = false;
+        _excuseOpen = true;
+    }
+
+    /// <summary>The RecordDialog's "Excuse instead": its row is the one the RecordDialog was opened from.</summary>
+    private void ExcuseInstead(HistoryEntry entry)
+    {
+        if (_recordEntry is { } row)
+        {
+            OpenExcuse(row, true);
+        }
+    }
+
+    private void CloseExcuse() => _excuseOpen = false;
+
+    /// <summary>"excused": reads the dashboard again first, so the closing render no longer has the row and has the new counts.</summary>
+    private async Task ExcusedAsync()
+    {
+        await ReadAsync();
+        _excuseOpen = false;
+    }
+
+    /// <summary>The Excuse dialog's sub line: the commitment's "For" label at the instant the dashboard was read.</summary>
+    private static string SubLineOf(TodayEntry entry) =>
+        RecordingText.ForLabel(entry.Entry, entry.Goal.CurrentDate ?? entry.Entry.LastDate, entry.Goal.ReadAt);
+
+    /// <summary>
+    /// After the Excuse dialog closes (HP-007): the opener, the row's "Excuse" or, for "Excuse instead", its "Record",
+    /// while the row is still listed; after "excused" the row is gone, so the nearest remaining row with an action (the
+    /// one now at its place, else the one before it), else the "Due now" tile.
+    /// </summary>
+    private ValueTask FocusAfterExcuseAsync()
+    {
+        var shown = ShownRows;
+        if (_opener is { } key && shown.Any(entry => KeyOf(entry) == key) && _rows.TryGetValue(key, out var opener))
+        {
+            return _excuseFromRecord ? opener.FocusAsync() : opener.FocusExcuseAsync();
+        }
+
+        var nearest = shown.Skip(_excuseIndex).Concat(shown.Take(_excuseIndex).Reverse())
+            .FirstOrDefault(entry => entry.Entry.State != EvaluationState.Upcoming);
+        if (nearest is not null && _rows.TryGetValue(KeyOf(nearest), out var row))
+        {
+            return row.FocusAsync();
+        }
+
+        return _dueTile?.FocusAsync() ?? ValueTask.CompletedTask;
     }
 
     /// <summary>The opener row's action as the list now shows it, or the "Due now" tile when the row is gone or hidden.</summary>

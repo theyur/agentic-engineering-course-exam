@@ -1,5 +1,6 @@
 using Bunit;
 using Bunit.TestDoubles;
+using HT.Application.Exemptions;
 using HT.Application.Goals;
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
@@ -59,6 +60,26 @@ public sealed class GoalsPageTests : BunitContext
             ScheduleKind = ScheduleKind.Times, Times = times, Period = period,
         };
 
+    /// <summary>The Goals page's link Tabs as (text, href, aria-current), under nav.ht-tabs labelled "Goal lists".</summary>
+    private static (string Text, string? Href, string? Current)[] TabsOf(IRenderedComponent<Goals> cut)
+    {
+        var nav = cut.Find("nav.ht-tabs");
+        Assert.Equal("Goal lists", nav.GetAttribute("aria-label"));
+        return nav.QuerySelectorAll("a.ht-tab").Select(a => (a.TextContent, a.GetAttribute("href"), a.GetAttribute("aria-current"))).ToArray();
+    }
+
+    /// <summary>Pauses <paramref name="goal"/> through the PauseService at the clock's time, from today until Sunday 22 November.</summary>
+    private async Task PauseUntilSundayAsync(ActingUser user, GoalId goal)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var paused = await scope.ServiceProvider.GetRequiredService<PauseService>().PauseAsync(
+            user, goal, Today, new DateOnly(2026, 11, 22), null, CancellationToken.None);
+        Assert.Equal(PauseOutcome.Paused, paused.Outcome);
+    }
+
+    private const string Footnote =
+        "Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out.";
+
     [Fact]
     public async Task US2_AS6_slice_6_HP_002_each_goal_shows_its_name_link_its_tag_and_its_meta_line_in_the_overviews_order()
     {
@@ -81,7 +102,8 @@ public sealed class GoalsPageTests : BunitContext
 
         Assert.Equal(0, _notFound);
         Assert.Equal("Goals", cut.Find(".ht-page-head h1").TextContent);
-        Assert.Empty(cut.FindAll(".ht-tabs"));
+        // Slice 7 (HP-004): the link Tabs "Active" (current) and "Paused" above the list, with no counts and no "Ended".
+        Assert.Equal([("Active", "/goals", "page"), ("Paused", "/goals?tab=paused", null)], TabsOf(cut));
         Assert.Single(cut.FindAll(".ht-list"));
         var items = cut.FindAll(".ht-list > .ht-goalitem");
         Assert.Empty(cut.FindAll(".ht-goalitem--reduced"));
@@ -101,10 +123,10 @@ public sealed class GoalsPageTests : BunitContext
             ["Record", "Record", null, null],
             items.Select(i => i.QuerySelector(".ht-goalitem__actions button")?.TextContent));
         Assert.Equal(
-            "Each goal is counted on its own. Consistency counts only finalized results; pending ones are left out.",
+            "Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out.",
             cut.Find(".ht-list + p.ht-footnote").TextContent);
         Assert.Empty(cut.FindAll(".ht-empty"));
-        foreach (var absent in new[] { "Paused", "Ended", "Excuse" })
+        foreach (var absent in new[] { "Ended", "Excuse" })
         {
             Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
         }
@@ -114,6 +136,98 @@ public sealed class GoalsPageTests : BunitContext
         Assert.Equal(
             ["Coffee, at most 2 cups a day", "Meditation, 10 min, 3 days a week", "Reading, 15 min, 5 days a week", "Running, 2 times a week"],
             list.Goals.Select(g => g.Name));
+    }
+
+    /// <summary>
+    /// Slice 7: "Coffee" (per day) and "Reading" (Mon–Fri), both from today, Tuesday 17 November; "Reading" paused through
+    /// the PauseService at 10:00 today from today until Sunday 22 November. Returns Reading's identifier.
+    /// </summary>
+    private async Task<GoalId> CoffeeAndPausedReadingAsync()
+    {
+        var user = SignInUser();
+        var coffee = _catalog.Add(HabitSamples.Catalog("Coffee", category: Category.Health, intent: Intent.Reduce));
+        var reading = _catalog.Add(HabitSamples.Reading());
+        await CreateAsync(user, coffee, Times(BuildOrReduce.Reduce, Measurement.Count, 2, "cups", 1, SchedulePeriod.Day), Today);
+        var readingId = await CreateAsync(user, reading, Days(BuildOrReduce.Build, Measurement.Duration, 15, null, DurationUnit.Minutes,
+            DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday), Today);
+        await PauseUntilSundayAsync(user, readingId);
+        return readingId;
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_004_US4_AS5_the_Paused_tab_lists_the_paused_goal_with_Paused_until_and_Resume_and_the_footnote()
+    {
+        var reading = await CoffeeAndPausedReadingAsync();
+        Services.GetRequiredService<BunitNavigationManager>().NavigateTo("/goals?tab=paused");
+
+        var cut = Render<Goals>();
+
+        Assert.Equal([("Active", "/goals", null), ("Paused", "/goals?tab=paused", "page")], TabsOf(cut));
+        var item = Assert.Single(cut.FindAll(".ht-list > .ht-goalitem"));
+        var link = item.QuerySelector("a.ht-goalitem__name")!;
+        Assert.Equal(("Reading, 15 min, 5 days a week", $"/goals/{reading.Value}"), (link.TextContent, link.GetAttribute("href")));
+        Assert.Equal(["Build"], item.QuerySelectorAll(".ht-goalitem__meta .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Paused until Sun 22 Nov", Text(item.QuerySelector(".ht-goalitem__meta span:not(.ht-chip)")!));
+        Assert.Equal(["N/A", "0 commitments"], item.QuerySelectorAll(".ht-goalitem__value").Select(v => v.TextContent));
+        Assert.NotNull(item.QuerySelector(".ht-strip.ht-strip--mini"));
+        var resume = Assert.Single(item.QuerySelectorAll(".ht-goalitem__actions button"));
+        Assert.Equal(("Resume", "Resume Reading, 15 min, 5 days a week"), (resume.TextContent, resume.GetAttribute("aria-label")));
+        Assert.Equal(Footnote, cut.Find(".ht-list + p.ht-footnote").TextContent);
+        Assert.DoesNotContain("Ended", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Coffee", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/goals")]
+    [InlineData("/goals?tab=active")]
+    [InlineData("/goals?tab=Paused")]
+    [InlineData("/goals?tab=ended")]
+    [InlineData("/goals?tab=")]
+    public async Task Slice_7_HP_004_any_tab_value_but_paused_shows_the_Active_tab_without_the_paused_goal(string address)
+    {
+        await CoffeeAndPausedReadingAsync();
+        Services.GetRequiredService<BunitNavigationManager>().NavigateTo(address);
+
+        var cut = Render<Goals>();
+
+        Assert.Equal([("Active", "/goals", "page"), ("Paused", "/goals?tab=paused", null)], TabsOf(cut));
+        var item = Assert.Single(cut.FindAll(".ht-list > .ht-goalitem"));
+        Assert.Equal("Coffee, at most 2 cups a day", item.QuerySelector("a.ht-goalitem__name")!.TextContent);
+        Assert.Equal("Record", item.QuerySelector(".ht-goalitem__actions button")!.TextContent);
+        Assert.Equal(Footnote, cut.Find(".ht-list + p.ht-footnote").TextContent);
+        Assert.DoesNotContain("Paused until", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Resume", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Slice_7_US4_AS6_the_Paused_tab_with_no_paused_goal_says_No_paused_goals()
+    {
+        var user = SignInUser();
+        var coffee = _catalog.Add(HabitSamples.Catalog("Coffee", category: Category.Health, intent: Intent.Reduce));
+        await CreateAsync(user, coffee, Times(BuildOrReduce.Reduce, Measurement.Count, 2, "cups", 1, SchedulePeriod.Day), Today);
+        Services.GetRequiredService<BunitNavigationManager>().NavigateTo("/goals?tab=paused");
+
+        var cut = Render<Goals>();
+
+        Assert.Equal([("Active", "/goals", null), ("Paused", "/goals?tab=paused", "page")], TabsOf(cut));
+        Assert.Empty(cut.FindAll(".ht-list"));
+        Assert.Equal("No paused goals.", cut.Find(".ht-tabs + .ht-card > p.ht-card__sub").TextContent);
+        Assert.Equal(Footnote, cut.Find(".ht-card + p.ht-footnote").TextContent);
+        Assert.Empty(cut.FindAll(".ht-empty"));
+    }
+
+    [Fact]
+    public void Slice_7_a_user_with_no_goals_keeps_the_EmptyState_with_no_tabs_on_the_Paused_tab()
+    {
+        SignInUser();
+        Services.GetRequiredService<BunitNavigationManager>().NavigateTo("/goals?tab=paused");
+
+        var cut = Render<Goals>();
+
+        Assert.Equal("No goals yet", cut.Find(".ht-card.ht-empty h3").TextContent);
+        Assert.Empty(cut.FindAll(".ht-tabs"));
+        Assert.Empty(cut.FindAll(".ht-footnote"));
+        Assert.DoesNotContain("No paused goals.", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]

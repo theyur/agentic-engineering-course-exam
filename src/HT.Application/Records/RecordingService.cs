@@ -1,8 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
 using HT.Application.Accounts;
+using HT.Application.Exemptions;
 using HT.Application.Goals;
 using HT.Domain.Accounts;
 using HT.Domain.Evaluation;
+using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Records;
 
@@ -49,7 +51,9 @@ public sealed class RecordingService
     /// Records what happened on <paramref name="date"/> for one of the acting user's goals (FR-001 to FR-007), checking
     /// in contracts/application-api.md's order: access; the date belongs to a commitment or period of the goal
     /// (<see cref="RecordWriteOutcome.NothingScheduled"/>); its day has begun (<see cref="RecordWriteOutcome.DayNotBegun"/>);
-    /// the value for the measurement of the version in effect for the entry (FR-004, FR-015); the note (FR-007); then the
+    /// slice 7's steps 4a to 4c from the goal's excusals and pauses, read once (<see cref="RecordWriteOutcome.DatePaused"/>,
+    /// <see cref="RecordWriteOutcome.WeekPaused"/>, <see cref="RecordWriteOutcome.CommitmentExcused"/>; a store
+    /// <see cref="RecordStoreWriteOutcome.Exempt"/> reads them again and gives the matching step); the value for the measurement of the version in effect for the entry (FR-004, FR-015); the note (FR-007); then the
     /// store adds the record, or for a commitment replaces its one record in place, and refuses a period that already has
     /// <see cref="RecordLimits.MaxRecordsPerPeriod"/> records. In the record's transaction, a note with text adds or
     /// replaces the entry's note, an empty one removes it, and none leaves it unchanged (specs/006-note-editing FR-001);
@@ -80,6 +84,12 @@ public sealed class RecordingService
         }
 
         var target = EntryViews.TargetOf(found, entry);
+        var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
+        if (ExemptRefusal(exemptions, entry, target.ScheduleKindOf, date) is { } exempt)
+        {
+            return exempt;
+        }
+
         if (!RecordValue.TryCreate(target.Measurement, input.Answer, input.Amount, out var value, out var problem))
         {
             return ValueRefused(problem);
@@ -103,10 +113,14 @@ public sealed class RecordingService
         switch (write.Outcome)
         {
             case RecordStoreWriteOutcome.Written:
-                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, now);
+                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, exemptions, now);
                 return RecordWriteResult.Recorded(write.RecordId!.Value, view, view.IsCorrection);
             case RecordStoreWriteOutcome.LimitReached:
                 return RecordWriteResult.Refused(RecordWriteOutcome.RecordLimitReached, RecordTexts.RecordLimitReached);
+            case RecordStoreWriteOutcome.Exempt:
+                // An excusal or a pause was added between the checks above and the write (research R-04, R-06).
+                var again = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
+                return ExemptRefusal(again, entry, target.ScheduleKindOf, date) ?? ExemptFallback(target.ScheduleKindOf);
             case RecordStoreWriteOutcome.GoalNotFound:
                 // The goal was removed between the lookup and the write.
                 return RecordWriteResult.Refused(RecordWriteOutcome.NotFound, GoalTexts.NotFound);
@@ -162,7 +176,8 @@ public sealed class RecordingService
         switch (write.Outcome)
         {
             case RecordStoreWriteOutcome.Written:
-                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, now);
+                var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
+                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, exemptions, now);
                 return RecordWriteResult.Changed(write.RecordId!.Value, view, view.IsCorrection);
             case RecordStoreWriteOutcome.RecordNotFound:
                 // The record was deleted between the lookup and the write.
@@ -203,7 +218,8 @@ public sealed class RecordingService
         switch (write.Outcome)
         {
             case RecordStoreWriteOutcome.Written:
-                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, now);
+                var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
+                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, exemptions, now);
                 return RecordWriteResult.Deleted(view, view.IsCorrection);
             case RecordStoreWriteOutcome.RecordNotFound:
                 // The record was deleted between the lookup and the write.
@@ -256,7 +272,8 @@ public sealed class RecordingService
         switch (write.Outcome)
         {
             case RecordStoreWriteOutcome.Written:
-                return NoteSaveResult.Saved(EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, now));
+                var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
+                return NoteSaveResult.Saved(EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, exemptions, now));
             case RecordStoreWriteOutcome.GoalNotFound:
                 // The goal was removed between the lookup and the write.
                 return NoteSaveResult.Refused(NoteSaveOutcome.NotFound, GoalTexts.NotFound);
@@ -286,6 +303,9 @@ public sealed class RecordingService
         var found = access.Goal!;
         var keys = await _records.ReadRecentNoteKeysAsync(access.Owner, goal, RecentNotesCount, cancellationToken).ConfigureAwait(false);
         var notes = new List<RecentNote>(keys.Count);
+        var exemptions = keys.Count == 0
+            ? GoalExemptions.None
+            : await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
         foreach (var key in keys)
         {
             var entry = NoteEntryOf(found, key);
@@ -296,7 +316,7 @@ public sealed class RecordingService
                 continue;
             }
 
-            var view = EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), note, now);
+            var view = EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), note, exemptions, now);
             notes.Add(new RecentNote { FirstDate = view.FirstDate, LastDate = view.LastDate, Note = note.Value, State = view.State });
         }
 
@@ -336,10 +356,11 @@ public sealed class RecordingService
             return HistoryResult.Found(EntryViews.HistoryOf(found, current, [], now));
         }
 
+        var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
         var stored = await _records.ReadAsync(access.Owner, goal, entries[0].FirstDate, entries[^1].LastDate, cancellationToken)
             .ConfigureAwait(false);
         var views = entries
-            .Select(entry => EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), now))
+            .Select(entry => EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), exemptions, now))
             .ToList();
         return HistoryResult.Found(EntryViews.HistoryOf(found, current, views, now));
     }
@@ -372,10 +393,11 @@ public sealed class RecordingService
             return RecordableResult.Found(EntryViews.HistoryOf(found, current, [], now));
         }
 
+        var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
         var stored = await _records.ReadAsync(access.Owner, goal, entries[0].FirstDate, entries[^1].LastDate, cancellationToken)
             .ConfigureAwait(false);
         var recordable = entries
-            .Select(entry => EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), now))
+            .Select(entry => EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), exemptions, now))
             .Where(view => view.State is EvaluationState.Due or EvaluationState.Pending)
             .OrderByDescending(view => view.FirstDate)
             .ToList();
@@ -448,6 +470,31 @@ public sealed class RecordingService
         write = text is null ? NoteWrite.Remove : NoteWrite.Replace(text);
         return true;
     }
+
+    /// <summary>
+    /// Slice 7 FR-005 steps 4a to 4c, in that order, for recording on <paramref name="date"/> of <paramref name="entry"/>:
+    /// a date in a pause (4a), a date of a Paused week that is not itself in a pause (4b), an excused commitment (4c); null
+    /// when the entry has no exemption. A date that is both excused and paused gives 4a, as the pause wins (FR-007).
+    /// </summary>
+    private static RecordWriteResult? ExemptRefusal(GoalExemptions exemptions, CalendarEntry entry, GoalScheduleKind kind, DateOnly date) =>
+        exemptions.ExemptionOf(entry, kind) switch
+        {
+            EvaluationState.Paused when exemptions.IsPaused(date) =>
+                RecordWriteResult.Refused(RecordWriteOutcome.DatePaused, PauseTexts.DatePaused),
+            EvaluationState.Paused => RecordWriteResult.Refused(RecordWriteOutcome.WeekPaused, PauseTexts.WeekPaused),
+            EvaluationState.Excused => RecordWriteResult.Refused(RecordWriteOutcome.CommitmentExcused, ExcusalTexts.CommitmentExcused),
+            _ => null,
+        };
+
+    /// <summary>
+    /// The refusal for a store <see cref="RecordStoreWriteOutcome.Exempt"/> whose exemption is gone again at the second
+    /// read (a concurrent excusal or pause, then its removal): the excusal's step (4c) for a commitment, the pause's (4a)
+    /// otherwise, since only a commitment can be excused. Nothing was written either way.
+    /// </summary>
+    private static RecordWriteResult ExemptFallback(GoalScheduleKind kind) =>
+        kind == GoalScheduleKind.CommitmentBased
+            ? RecordWriteResult.Refused(RecordWriteOutcome.CommitmentExcused, ExcusalTexts.CommitmentExcused)
+            : RecordWriteResult.Refused(RecordWriteOutcome.DatePaused, PauseTexts.DatePaused);
 
     /// <summary>The entry as the record store sees it: its note key and its first and last date (research R-05).</summary>
     private static EntrySpan SpanOf(CalendarEntry entry) => new(entry.Key, entry.FirstDate, entry.LastDate);

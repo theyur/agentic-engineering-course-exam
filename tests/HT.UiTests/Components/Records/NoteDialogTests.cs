@@ -143,6 +143,50 @@ public sealed class NoteDialogTests : BunitContext
     }
 
     [Fact]
+    public async Task Slice_7_HP_001_opened_from_Add_note_of_an_Excused_row_the_sub_line_says_Excused_and_saving_keeps_it_Excused()
+    {
+        // Yoga, 3 days a week from Monday 16 November: Wednesday 18 is excused; at 10:00 on Thursday 19 it is Excused, not
+        // Pending (its grace period would end at 00:00 on Saturday 21).
+        var wed18 = new DateOnly(2026, 11, 18);
+        var yoga = new GoalTargetFields
+        {
+            BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.YesNo, ScheduleKind = ScheduleKind.FixedDays,
+            Days = new HashSet<DayOfWeek> { DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday },
+        };
+        var (cut, goal) = await OpenAsync(yoga, Utc(19, 10), wed18, g => _records.SeedExcusal(g, wed18), "Yoga, 3 days a week");
+
+        Assert.Equal("Add note · Yoga, 3 days a week", cut.Find(".ht-dialog__head h2").TextContent);
+        Assert.Equal("Wed 18 Nov · Excused", cut.Find(".ht-dialog__sub").TextContent);
+
+        cut.Find("textarea").Input("Ill with a cold.");
+        await SaveAsync(cut);
+
+        var saved = Assert.Single(_saved);
+        Assert.Equal((EvaluationState.Excused, "Ill with a cold."), (saved.State, saved.Note));
+        Assert.Equal("Ill with a cold.", Assert.Single(_records.NotesOfGoal(goal)).Value.Value);
+    }
+
+    [Fact]
+    public async Task Slice_7_HP_001_opened_from_Add_note_of_a_Paused_row_with_no_record_the_sub_line_ends_Paused_and_saving_keeps_it_Paused()
+    {
+        // Reading, 20 min daily from Monday 16 November, paused from Wednesday 18 to Friday 20: at 10:00 on Thursday 19,
+        // Wednesday 18 is Paused, not Pending (its grace period would end at 00:00 on Saturday 21), and has no record.
+        var wed18 = new DateOnly(2026, 11, 18);
+        var (cut, goal) = await OpenAsync(
+            Reading20MinDaily, Utc(19, 10), wed18, g => _records.SeedPause(g, wed18, new DateOnly(2026, 11, 20)));
+
+        Assert.EndsWith(" · Paused", cut.Find(".ht-dialog__sub").TextContent, StringComparison.Ordinal);
+        Assert.Equal("Wed 18 Nov · Paused", cut.Find(".ht-dialog__sub").TextContent);
+
+        cut.Find("textarea").Input("Family visit.");
+        await SaveAsync(cut);
+
+        var saved = Assert.Single(_saved);
+        Assert.Equal((EvaluationState.Paused, "Family visit."), (saved.State, saved.Note));
+        Assert.Equal("Family visit.", Assert.Single(_records.NotesOfGoal(goal)).Value.Value);
+    }
+
+    [Fact]
     public async Task Opened_from_Add_note_the_field_starts_empty()
     {
         var (cut, _) = await OpenAsync(Reading20MinDaily, Utc(20, 10), Mon16);

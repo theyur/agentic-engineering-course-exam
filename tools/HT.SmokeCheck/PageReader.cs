@@ -6,7 +6,8 @@ namespace HT.SmokeCheck;
 /// <summary>
 /// Reads what the smoke check needs from a server-rendered page (contracts/smoke-check.md): the antiforgery token
 /// and handler names of a form, the first heading, the names on habit cards and goal items, the goal items' links, the
-/// text of a card, the stat labels, tile labels and status chips (slice 6), and the linked stylesheets and scripts.
+/// text of a card, the stat labels, tile labels and status chips (slice 6), the goal items' meta texts (slice 7), and the
+/// linked stylesheets and scripts.
 /// Every value is HTML-decoded. Names and texts are compared in memory and never printed.
 /// </summary>
 public static partial class PageReader
@@ -69,6 +70,29 @@ public static partial class PageReader
     {
         ArgumentNullException.ThrowIfNull(html);
         return [.. GoalNamePattern().Matches(html).Select(m => new GoalLink(Text(m.Groups["inner"].Value), Attribute(m.Groups["attributes"].Value, "href")))];
+    }
+
+    /// <summary>
+    /// Every goal item on the Goals page with its meta text, in document order (smoke check 8, slice 7 HP-011): the name
+    /// of each <c>&lt;a class="ht-goalitem__name"&gt;</c>, as <see cref="ReadGoalNames"/> reads it, paired with the text of
+    /// the first <c>&lt;div class="ht-goalitem__meta"&gt;</c> after it and before the next goal item's name, up to that
+    /// div's <c>&lt;/div&gt;</c>, without its chips (every element whose class list holds <c>ht-chip</c>: the Build or
+    /// Reduce Tag and a StatusChip): tags removed, entities decoded and every run of white space made one space, such as
+    /// "Paused until Sun 22 Nov" or "Every day · next today". Null when the item has no meta line.
+    /// </summary>
+    public static IReadOnlyList<GoalMeta> ReadGoalMetas(string html)
+    {
+        ArgumentNullException.ThrowIfNull(html);
+        var names = GoalNamePattern().Matches(html);
+        var metas = new List<GoalMeta>(names.Count);
+        for (var i = 0; i < names.Count; i++)
+        {
+            var start = names[i].Index + names[i].Length;
+            var end = i + 1 < names.Count ? names[i + 1].Index : html.Length;
+            metas.Add(new GoalMeta(Text(names[i].Groups["inner"].Value), MetaText(html[start..end])));
+        }
+
+        return metas;
     }
 
     /// <summary>
@@ -178,6 +202,26 @@ public static partial class PageReader
 
     private static string Text(string inner) => WebUtility.HtmlDecode(InnerTagPattern().Replace(inner, string.Empty)).Trim();
 
+    /// <summary>The text of the first meta line in <paramref name="item"/> without its chips, or null when it has none.</summary>
+    private static string? MetaText(string item)
+    {
+        var meta = GoalMetaPattern().Match(item);
+        if (!meta.Success)
+        {
+            return null;
+        }
+
+        var start = meta.Index + meta.Length;
+        var end = item.IndexOf("</div", start, StringComparison.OrdinalIgnoreCase);
+        if (end < 0)
+        {
+            return null;
+        }
+
+        var inner = ChipPattern().Replace(item[start..end], " ");
+        return WhiteSpacePattern().Replace(WebUtility.HtmlDecode(InnerTagPattern().Replace(inner, " ")), " ").Trim();
+    }
+
     /// <summary>The decoded text of every leaf element the pattern matches, in document order; inner tags are removed.</summary>
     private static List<string> ReadLeafTexts(string html, Regex pattern)
     {
@@ -209,6 +253,12 @@ public static partial class PageReader
     [GeneratedRegex("""<a\b(?<attributes>[^>]*\bclass="(?:[^"]*\s)?ht-goalitem__name(?:\s[^"]*)?"[^>]*)>(?<inner>.*?)</a\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex GoalNamePattern();
 
+    [GeneratedRegex("""<div\b[^>]*\bclass="(?:[^"]*\s)?ht-goalitem__meta(?:\s[^"]*)?"[^>]*>""", RegexOptions.IgnoreCase)]
+    private static partial Regex GoalMetaPattern();
+
+    [GeneratedRegex("""<(?<tag>[a-z][a-z0-9]*)\b[^>]*\bclass="(?:[^"]*\s)?ht-chip(?:\s[^"]*)?"[^>]*>.*?</\k<tag>\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex ChipPattern();
+
     [GeneratedRegex("""<section\b[^>]*\bclass="(?:[^"]*\s)?ht-card(?:\s[^"]*)?"[^>]*>""", RegexOptions.IgnoreCase)]
     private static partial Regex CardSectionPattern();
 
@@ -232,3 +282,8 @@ public static partial class PageReader
 /// <param name="Name">The goal's visible name.</param>
 /// <param name="Href">The anchor's decoded <c>href</c> as written on the page, or null when it has none.</param>
 public sealed record GoalLink(string Name, string? Href);
+
+/// <summary>A goal item of the Goals page: its visible name and its meta text (smoke check 8, slice 7 HP-011).</summary>
+/// <param name="Name">The goal's visible name.</param>
+/// <param name="Meta">The meta line's text without its chips, such as "Paused until Sun 22 Nov", or null when the item has none.</param>
+public sealed record GoalMeta(string Name, string? Meta);

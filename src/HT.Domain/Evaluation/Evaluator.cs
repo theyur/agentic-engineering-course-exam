@@ -27,10 +27,38 @@ public static class Evaluator
     /// more than one record. The messages name no value.
     /// </exception>
     public static EntryEvaluation Evaluate(
-        GoalTarget target, DateTimeOffset starts, DateTimeOffset ends, IReadOnlyList<RecordValue> records, DateTimeOffset now)
+        GoalTarget target, DateTimeOffset starts, DateTimeOffset ends, IReadOnlyList<RecordValue> records, DateTimeOffset now) =>
+        Evaluate(target, starts, ends, records, now, null);
+
+    /// <summary>
+    /// The entry's evaluation at <paramref name="now"/> with its <paramref name="exemption"/> (slice 7 FR-003, FR-007,
+    /// FR-015, FR-017; research R-02): with <see cref="EvaluationState.Excused"/> or <see cref="EvaluationState.Paused"/>,
+    /// the state is the exemption at every instant, the progress comes from the records as without it, the grace end is
+    /// computed as without it and the entry is never final; with null, exactly the result of the overload without an
+    /// exemption.
+    /// </summary>
+    /// <exception cref="ArgumentException">As the overload without an exemption.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="exemption"/> is a state other than Excused, Paused or null.</exception>
+    public static EntryEvaluation Evaluate(
+        GoalTarget target,
+        DateTimeOffset starts,
+        DateTimeOffset ends,
+        IReadOnlyList<RecordValue> records,
+        DateTimeOffset now,
+        EvaluationState? exemption)
     {
+        if (exemption is not (null or EvaluationState.Excused or EvaluationState.Paused))
+        {
+            throw new ArgumentOutOfRangeException(nameof(exemption), "Only Excused or Paused can take an entry's state.");
+        }
+
         var progress = ProgressOf(target, records);
         var graceEnds = GracePeriod.EndOf(ends);
+        if (exemption is { } exempt)
+        {
+            return new EntryEvaluation(exempt, progress, graceEnds, false);
+        }
+
         var state = now < starts ? EvaluationState.Upcoming
             : now < ends ? EvaluationState.Due
             : now < graceEnds ? EvaluationState.Pending

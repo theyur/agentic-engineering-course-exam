@@ -6,8 +6,11 @@
 @using HT.Application.Reports
 @using HT.Domain.Accounts
 @using HT.Domain.Evaluation
+@using HT.Domain.Exemptions
 @using HT.Domain.Goals
+@using HT.Application.Exemptions
 @using HT.Ui.Account
+@using HT.Ui.Components.Exemptions
 @using HT.Ui.Components.Goals
 @using HT.Ui.Habits
 @inject UseCaseScope UseCases
@@ -30,6 +33,19 @@
    report, and only for a goal with a current date. After a save or a delete, what can be recorded, the history, the
    report and the recent notes are read again before the dialog closes, so the closing render already has the new rows,
    figures and notes, and the focus goes back to the head's "Record" or to the row's control as the card now shows it.
+   Slice 7 (HP-001, HP-003, FR-024; contracts/host.md "Goal page"): the RecordDialog's "Excuse instead" opens the Excuse
+   dialog for that commitment in its place, with the RecordDialog's opener as its own; a History row's "Remove excusal"
+   calls RemoveExcusalAsync and shows a refusal under the History card head. After "excused" and after a removal (or its
+   refusal) everything is read again, so the History, GoalStats and trend agree without a reload; the focus goes back
+   to the opener, or to the row's "Add record" or note control.
+   Slice 7 pauses (HP-001, HP-002, FR-009 to FR-012, US2-AS14): the goal's pauses are read first, with the pause date
+   (research R-03), for every goal. The head has the secondary "Pause" (aria-haspopup="dialog") before "Record", both in an
+   ht-inline group, while no pause is current; it opens the PauseDialog, whose "From" starts on the pause date. While a
+   pause is current, the Notice "Paused until {last day} · Resume now" sits under the head, before slice 4's catalog
+   Notice; its "Resume now" resumes the goal, and a refusal shows in its place. The Pauses card follows Settings in the
+   right column (in the Settings column of a goal with no begun entry), with "Resume now" and "Cancel pause"; their
+   refusals show under its title. After any of these the page reads everything again, and the focus goes to "Pause", or,
+   when a current pause removed it, to the Notice's "Resume now".
    Every use case runs in its own scope. *@
 @if (_goal is { } goal)
 {
@@ -44,12 +60,35 @@
                 <span class="ht-attempt">@AttemptLine(goal)</span>
             </div>
         </div>
-        @if (CanRecord)
+        @if (CanPause)
+        {
+            <span class="ht-spacer"></span>
+            <div class="ht-inline">
+                <button type="button" class="ht-btn ht-btn--secondary" aria-haspopup="dialog" @ref="_pauseButton" @onclick="OpenPause">Pause</button>
+                @if (CanRecord)
+                {
+                    <button type="button" class="ht-btn ht-btn--primary" aria-haspopup="dialog" @ref="_recordButton" @onclick="OpenRecord">Record</button>
+                }
+            </div>
+        }
+        else if (CanRecord)
         {
             <span class="ht-spacer"></span>
             <button type="button" class="ht-btn ht-btn--primary" aria-haspopup="dialog" @ref="_recordButton" @onclick="OpenRecord">Record</button>
         }
     </div>
+    @if (_resumeRefusal is { } resumeRefusal)
+    {
+        <p class="ht-field__error" role="alert">@resumeRefusal</p>
+    }
+    else if (CurrentPause is { } current)
+    {
+        <div class="ht-notice">
+            <span>@ReportText.PausedUntil(current.LastDay)</span>
+            <span aria-hidden="true">·</span>
+            <button type="button" class="ht-btn ht-btn--primary ht-btn--sm" @ref="_noticeResumeButton" @onclick="ResumeFromNoticeAsync">Resume now</button>
+        </div>
+    }
     @if (goal.Habit.IsInCatalog == false)
     {
         <Notice Neutral="true">This habit is no longer in the public catalog. Your goal keeps working.</Notice>
@@ -63,11 +102,24 @@
                     <GoalStats View="report.Stats" Strip="StripOf(report)" Unit="report.Stats.Unit" Eyebrow="This attempt" Title="Consistency and streaks" />
                     <TrendChart Trend="report.Trend" />
                 }
-                <HistoryCard @ref="_historyCard" History="_history!" OnAction="OpenRow" OnNote="OpenNote" />
+                <HistoryCard @ref="_historyCard" History="_history!" OnAction="OpenRow" OnNote="OpenNote"
+                             OnRemoveExcusal="RemoveExcusalAsync" Refusal="@_removeRefusal" />
             </div>
             <div class="ht-stack">
                 <GoalSettingsCard Details="goal" />
+                <PausesCard Pauses="_pauses" OnResume="ResumeFromCardAsync" OnCancel="CancelPauseAsync" Refusal="@_pausesRefusal" />
                 <RecentNotesCard Notes="_recentNotes" ScheduleKind="_history!.GoalScheduleKind" Period="_history.Period" />
+            </div>
+        </div>
+    }
+    else if (_pauses.Count > 0)
+    {
+        @* A goal with no begun entry keeps the Settings card in ht-grid-2; with a pause, the Pauses card follows it in the
+           same column (design/pages/PageGoalDetail, slice 7 state, settled in T003). *@
+        <div class="ht-grid-2">
+            <div class="ht-stack">
+                <GoalSettingsCard Details="goal" />
+                <PausesCard Pauses="_pauses" OnResume="ResumeFromCardAsync" OnCancel="CancelPauseAsync" Refusal="@_pausesRefusal" />
             </div>
         </div>
     }
@@ -81,12 +133,22 @@
     {
         <RecordDialog Open="_recordOpen" OnClose="CloseRecord" ReturnFocus="_recordButton" FocusOnClose="@(_row is null ? null : FocusRowAsync)"
                       GoalId="goal.Id" GoalName="@goal.Name" Recordable="dialogHistory" Row="_row" Editing="_editing"
-                      ActingUser="_actingUser" OnSaved="SavedAsync" />
+                      ActingUser="_actingUser" OnSaved="SavedAsync" OnExcuseInstead="OpenExcuse" />
+    }
+    @if (_excuseEntry is { } excuseEntry)
+    {
+        <ExcuseDialog Open="_excuseOpen" OnClose="CloseExcuse" FocusOnClose="FocusAfterExcuseAsync" GoalId="goal.Id" Date="excuseEntry.FirstDate"
+                      GoalName="@goal.Name" SubLine="@_excuseSubLine" ActingUser="_actingUser" OnSaved="ExcusedAsync" />
     }
     @if (_noteRow is { } noteRow && _history is { } history)
     {
         <NoteDialog Open="_noteOpen" OnClose="CloseNote" FocusOnClose="FocusNoteRowAsync" GoalId="goal.Id" GoalName="@goal.Name"
                     History="history" Row="noteRow" ActingUser="_actingUser" OnSaved="NoteSavedAsync" />
+    }
+    @if (_pauseDate is { } pauseDate)
+    {
+        <PauseDialog Open="_pauseOpen" OnClose="ClosePause" FocusOnClose="FocusPauseOrResumeAsync" GoalId="goal.Id" GoalName="@goal.Name"
+                     Today="pauseDate" ActingUser="_actingUser" OnSaved="PausedAsync" />
     }
 }
 
@@ -114,12 +176,52 @@
     /// <summary>The record of <see cref="_row"/> that "Edit" opened; null for "Add record" and for "Record".</summary>
     private RecordView? _editing;
 
+    /// <summary>The commitment "Excuse instead" opened the Excuse dialog for; kept after it closes, so the focus can go back.</summary>
+    private HistoryEntry? _excuseEntry;
+
+    /// <summary>The History row whose RecordDialog "Excuse instead" replaced; null when the head's "Record" opened it.</summary>
+    private HistoryEntry? _excuseRow;
+
+    private bool _excuseOpen;
+    private string _excuseSubLine = string.Empty;
+
+    /// <summary>A refusal of a History row's "Remove excusal", shown under the History card head; null for none.</summary>
+    private string? _removeRefusal;
+
+    /// <summary>The History row whose control gets the focus after the next render ("Remove excusal" and its re-read).</summary>
+    private DateOnly? _focusRowAfterRender;
+
+    /// <summary>The goal's pauses, the latest first day first (slice 7 FR-012); empty until read.</summary>
+    private IReadOnlyList<PauseView> _pauses = [];
+
+    /// <summary>The pause date of the last pauses read (research R-03): the PauseDialog's "From" default and min.</summary>
+    private DateOnly? _pauseDate;
+
+    private bool _pauseOpen;
+    private ElementReference _pauseButton;
+    private ElementReference _noticeResumeButton;
+
+    /// <summary>A refusal of the Notice's "Resume now", shown in the Notice's place; null for none.</summary>
+    private string? _resumeRefusal;
+
+    /// <summary>A refusal of the Pauses card's "Resume now" or "Cancel pause", shown under its title; null for none.</summary>
+    private string? _pausesRefusal;
+
+    /// <summary>Whether the head's "Pause", or else the Notice's "Resume now", gets the focus after the next render.</summary>
+    private bool _focusPauseAfterRender;
+
     /// <summary>The goal's identifier; the page shell has already found it among the acting user's goals.</summary>
     [Parameter]
     public Guid Id { get; set; }
 
     /// <summary>"Record" is offered only when something can be recorded now (FR-011, HP-002).</summary>
     private bool CanRecord => _recordable is { Entries.Count: > 0 };
+
+    /// <summary>The pause that is current at the pause date, which makes the goal paused (FR-018); null for none.</summary>
+    private PauseView? CurrentPause => _pauses.FirstOrDefault(pause => pause.Timing == PauseTiming.Current);
+
+    /// <summary>"Pause" is offered once the pauses are read, while no pause is current (HP-001).</summary>
+    private bool CanPause => _pauseDate is not null && CurrentPause is null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -143,6 +245,12 @@
     /// </summary>
     private async Task ReadRecordsAsync()
     {
+        var pauses = await UseCases.RunAsync<PauseService, PausesResult>(
+            (service, token) => service.GetPausesAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        _pauses = pauses.Pauses;
+        _pauseDate = pauses.PauseDate;
+        _resumeRefusal = null;
+        _pausesRefusal = null;
         var recordable = await UseCases.RunAsync<RecordingService, RecordableResult>(
             (service, token) => service.GetRecordableAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
         _recordable = recordable.History;
@@ -192,7 +300,155 @@
     private async Task SavedAsync(HistoryEntry entry)
     {
         await ReadRecordsAsync();
+        _removeRefusal = null;
         _recordOpen = false;
+    }
+
+    /// <summary>
+    /// The RecordDialog's "Excuse instead" (slice 7 HP-003): the Excuse dialog opens for the commitment "For" names, in
+    /// the RecordDialog's place, and its opener is the control that opened the RecordDialog. The sub line is that
+    /// commitment's "For" label, at the instant the dialog's entries were read.
+    /// </summary>
+    private void OpenExcuse(HistoryEntry entry)
+    {
+        var read = DialogHistory ?? _recordable!;
+        _excuseEntry = entry;
+        _excuseRow = _row;
+        _excuseSubLine = RecordingText.ForLabel(entry, read.CurrentDate ?? entry.LastDate, read.ReadAt);
+        _recordOpen = false;
+        _excuseOpen = true;
+    }
+
+    private void CloseExcuse() => _excuseOpen = false;
+
+    /// <summary>"excused": reads everything again first, so the closing render has the Excused row and the new figures (FR-024).</summary>
+    private async Task ExcusedAsync()
+    {
+        await ReadRecordsAsync();
+        _removeRefusal = null;
+        _excuseOpen = false;
+    }
+
+    /// <summary>
+    /// Gives the focus back after the Excuse dialog closes (HP-007): to the opener, the head's "Record" or the row's
+    /// "Add record", while the page still shows it; otherwise to the nearest remaining control, the row's note control
+    /// (an excused row has no "Add record").
+    /// </summary>
+    private ValueTask FocusAfterExcuseAsync()
+    {
+        if (_excuseRow is null && CanRecord)
+        {
+            return _recordButton.FocusAsync();
+        }
+
+        return (_excuseRow ?? _excuseEntry) is { } row && _historyCard is { } card
+            ? card.FocusRecordOrNoteAsync(row.FirstDate)
+            : ValueTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// A History row's "Remove excusal" (slice 7 FR-004, HP-001): removes the excusal, then reads everything again, also
+    /// after a refusal, which shows under the History card head; the focus then goes to the row's "Add record", or to its
+    /// note control when it has none.
+    /// </summary>
+    private async Task RemoveExcusalAsync(HistoryEntry row)
+    {
+        var date = row.FirstDate;
+        var result = await UseCases.RunAsync<ExcusalService, RemoveExcusalResult>(
+            (service, token) => service.RemoveExcusalAsync(_actingUser, new GoalId(Id), date, token), CancellationToken.None);
+        await ReadRecordsAsync();
+        _removeRefusal = result.Outcome == RemoveExcusalOutcome.Removed ? null : result.Message;
+        _focusRowAfterRender = date;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusRowAfterRender is { } row)
+        {
+            _focusRowAfterRender = null;
+            if (_historyCard is { } card)
+            {
+                await card.FocusRecordOrNoteAsync(row);
+            }
+        }
+
+        if (_focusPauseAfterRender)
+        {
+            _focusPauseAfterRender = false;
+            await FocusPauseOrResumeAsync();
+        }
+    }
+
+    private void OpenPause() => _pauseOpen = true;
+
+    private void ClosePause() => _pauseOpen = false;
+
+    /// <summary>
+    /// "paused" (slice 7 FR-006, US2-AS14): reads everything again first, so the closing render has the Notice, the Pauses
+    /// card and the new figures; the dialog then gives the focus back through <see cref="FocusPauseOrResumeAsync"/>.
+    /// </summary>
+    private async Task PausedAsync()
+    {
+        await ReadRecordsAsync();
+        _removeRefusal = null;
+        _pauseOpen = false;
+    }
+
+    /// <summary>
+    /// Gives the focus to the head's "Pause" while the page shows it; otherwise, as a re-read removed it (a pause is
+    /// current), to the nearest remaining control, the Notice's "Resume now" (HP-007).
+    /// </summary>
+    private ValueTask FocusPauseOrResumeAsync()
+    {
+        if (CanPause)
+        {
+            return _pauseButton.FocusAsync();
+        }
+
+        return CurrentPause is not null && _resumeRefusal is null ? _noticeResumeButton.FocusAsync() : ValueTask.CompletedTask;
+    }
+
+    /// <summary>The Notice's "Resume now" (FR-010): a refusal shows in the Notice's place.</summary>
+    private async Task ResumeFromNoticeAsync()
+    {
+        var refusal = await ResumeAsync();
+        _resumeRefusal = refusal;
+    }
+
+    /// <summary>The Pauses card's "Resume now" on the current pause (FR-010): a refusal shows under the card title.</summary>
+    private async Task ResumeFromCardAsync(PauseView pause)
+    {
+        var refusal = await ResumeAsync();
+        _pausesRefusal = refusal;
+    }
+
+    /// <summary>
+    /// Resumes the goal, then reads everything again, also after a refusal, so the Notice, "Pause", the cards and the
+    /// figures agree; the focus then goes to "Pause". Returns the refusal's text, or null.
+    /// </summary>
+    private async Task<string?> ResumeAsync()
+    {
+        var result = await UseCases.RunAsync<PauseService, ResumeResult>(
+            (service, token) => service.ResumeAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        await ReadRecordsAsync();
+        _removeRefusal = null;
+        _focusPauseAfterRender = true;
+        return result.Outcome == ResumeOutcome.Resumed ? null : result.Message;
+    }
+
+    /// <summary>
+    /// The Pauses card's "Cancel pause" on an upcoming pause (FR-011): cancels it, then reads everything again, also after
+    /// a refusal, which shows under the card title; the focus then goes to "Pause", or to the Notice's "Resume now".
+    /// </summary>
+    private async Task CancelPauseAsync(PauseView pause)
+    {
+        var id = pause.Id;
+        var result = await UseCases.RunAsync<PauseService, CancelPauseResult>(
+            (service, token) => service.CancelPauseAsync(_actingUser, new GoalId(Id), id, token), CancellationToken.None);
+        await ReadRecordsAsync();
+        _removeRefusal = null;
+        _pausesRefusal = result.Outcome == CancelPauseOutcome.Cancelled ? null : result.Message;
+        _focusPauseAfterRender = true;
     }
 
     private void OpenNote(HistoryEntry row)
@@ -207,6 +463,7 @@
     private async Task NoteSavedAsync(HistoryEntry entry)
     {
         await ReadRecordsAsync();
+        _removeRefusal = null;
         _noteOpen = false;
     }
 

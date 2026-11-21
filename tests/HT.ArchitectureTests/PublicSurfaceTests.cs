@@ -30,7 +30,9 @@ public sealed class PublicSurfaceTests
     /// <c>HT.Application.Records</c> are in the surface checked above and have no NodaTime type in a signature. The
     /// namespaces must be exported and hold the named types, so moving them cannot make the rule pass on nothing.
     /// <c>NoteWrite</c> and <c>NoteWriteKind</c> join them with specs/006-note-editing (research R-11), and the report
-    /// types of <c>HT.Domain.Reports</c> with specs/007-personal-reports (research R-14).
+    /// types of <c>HT.Domain.Reports</c> with specs/007-personal-reports (research R-14), and the exemption types of
+    /// <c>HT.Domain.Exemptions</c> and <c>TrendMark</c> with specs/008-excusals-and-pauses (research R-11), with the
+    /// store write of <c>HT.Application.Records</c> and the texts of <c>HT.Application.Exemptions</c>.
     /// </summary>
     [Theory]
     [InlineData("HT.Domain.Records", "RecordValue")]
@@ -49,6 +51,30 @@ public sealed class PublicSurfaceTests
     [InlineData("HT.Domain.Reports", "TrendBar")]
     [InlineData("HT.Domain.Reports", "Trend")]
     [InlineData("HT.Domain.Reports", "TrendBuilder")]
+    [InlineData("HT.Domain.Reports", "TrendMark")]
+    [InlineData("HT.Domain.Exemptions", "ExemptionLimits")]
+    [InlineData("HT.Domain.Exemptions", "ExemptionReason")]
+    [InlineData("HT.Domain.Exemptions", "Excusal")]
+    [InlineData("HT.Domain.Exemptions", "PauseId")]
+    [InlineData("HT.Domain.Exemptions", "Pause")]
+    [InlineData("HT.Domain.Exemptions", "PauseTiming")]
+    [InlineData("HT.Domain.Exemptions", "GoalExemptions")]
+    [InlineData("HT.Domain.Exemptions", "PauseProblem")]
+    [InlineData("HT.Domain.Exemptions", "PauseResumption")]
+    [InlineData("HT.Domain.Exemptions", "PauseRules")]
+    [InlineData("HT.Application.Records", "ExemptionStoreWrite")]
+    [InlineData("HT.Application.Records", "ExemptionStoreWriteOutcome")]
+    [InlineData("HT.Application.Exemptions", "ExcusalTexts")]
+    [InlineData("HT.Application.Exemptions", "PauseTexts")]
+    [InlineData("HT.Application.Exemptions", "ExcusalService")]
+    [InlineData("HT.Application.Exemptions", "ExcuseResult")]
+    [InlineData("HT.Application.Exemptions", "RemoveExcusalResult")]
+    [InlineData("HT.Application.Exemptions", "PauseService")]
+    [InlineData("HT.Application.Exemptions", "PauseResult")]
+    [InlineData("HT.Application.Exemptions", "ResumeResult")]
+    [InlineData("HT.Application.Exemptions", "CancelPauseResult")]
+    [InlineData("HT.Application.Exemptions", "PausesResult")]
+    [InlineData("HT.Application.Exemptions", "PauseView")]
     public void TheNewRecordingTypesHaveNoNodaTimeTypeInTheirSignatures(string ns, string typeName)
     {
         var types = new[] { ArchitectureModel.Domain, ArchitectureModel.Application }

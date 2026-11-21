@@ -1,5 +1,6 @@
 using HT.Application.Records;
 using HT.Domain.Accounts;
+using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Records;
 
@@ -13,6 +14,13 @@ namespace HT.UnitTests.Fakes;
 /// a record's write applies its <see cref="NoteWrite"/> only after its own checks pass, so a refusal leaves the note.
 /// <see cref="Calls"/> names every member called, so a test can prove that a refusal made no store call. Shared with
 /// HT.UiTests by a link. Safe to call from parallel tasks; the goal store's lock is never held while this one is.
+/// <para>
+/// Slice 7 (research R-04; contracts/application-api.md, "Re-checked under the lock"): excusals and pauses are kept per
+/// goal with the real store's re-checks and outcomes, a record add is refused with <see cref="RecordStoreWrite.Exempt"/>
+/// on an excused or paused entry, and <see cref="ReadExemptionsAsync"/> gives <see cref="GoalExemptions.None"/> for
+/// another owner's goal. <see cref="SeedExcusal"/> and <see cref="SeedPause"/> arrange any dates, past ones included,
+/// and <see cref="BeforeNextWrite"/> simulates a concurrent write between a use case's checks and its store write.
+/// </para>
 /// </summary>
 public sealed class FakeRecordStore : IRecordStore
 {
@@ -20,8 +28,12 @@ public sealed class FakeRecordStore : IRecordStore
     private readonly FakeGoalStore _goals;
     private readonly Dictionary<GoalId, List<StoredRecord>> _records = [];
     private readonly Dictionary<GoalId, SortedDictionary<DateOnly, NoteText>> _notes = [];
+    private readonly Dictionary<GoalId, SortedDictionary<DateOnly, ExemptionReason?>> _excusals = [];
+    private readonly Dictionary<GoalId, List<Pause>> _pauses = [];
     private readonly List<string> _calls = [];
     private long _sequence;
+    private Action? _beforeNextWrite;
+    private Action? _afterNextAdd;
 
     /// <summary>Takes the goal store whose goals decide who owns what.</summary>
     public FakeRecordStore(FakeGoalStore goals)
@@ -67,6 +79,70 @@ public sealed class FakeRecordStore : IRecordStore
         }
     }
 
+    /// <summary>
+    /// An action run once, at the start of the next write that the exemptions re-check (<see cref="AddAsync"/>,
+    /// <see cref="ExcuseAsync"/>, <see cref="RemoveExcusalAsync"/>, <see cref="AddPauseAsync"/>,
+    /// <see cref="SetPauseLastDayAsync"/> or <see cref="DeletePauseAsync"/>), before that write's ownership check and
+    /// re-checks, and then cleared. A unit test sets it to simulate a concurrent excusal, pause or
+    /// record between a use case's checks and its write, for example with <see cref="SeedExcusal"/>,
+    /// <see cref="SeedPause"/> or <see cref="Seed"/>. It runs outside this store's lock; members it calls on this store
+    /// are recorded in <see cref="Calls"/> before the write's own name.
+    /// </summary>
+    public Action? BeforeNextWrite
+    {
+        get => Volatile.Read(ref _beforeNextWrite);
+        set => Volatile.Write(ref _beforeNextWrite, value);
+    }
+
+    /// <summary>
+    /// An action run once, at the end of the next <see cref="AddAsync"/>, after its result is decided and outside this
+    /// store's lock, and then cleared. With <see cref="BeforeNextWrite"/>, a unit test simulates an excusal or pause that
+    /// is added before the write and removed again before the use case reads the exemptions a second time.
+    /// </summary>
+    public Action? AfterNextAdd
+    {
+        get => Volatile.Read(ref _afterNextAdd);
+        set => Volatile.Write(ref _afterNextAdd, value);
+    }
+
+    /// <summary>
+    /// Stores an excusal of <paramref name="date"/> directly, for arranging a test (any date, past ones included), with no
+    /// ownership check, no re-check and no <see cref="Calls"/> entry. An existing excusal of the date is replaced.
+    /// </summary>
+    public void SeedExcusal(GoalId goal, DateOnly date, ExemptionReason? reason = null)
+    {
+        lock (_gate)
+        {
+            ExcusalsOf(goal)[date] = reason;
+        }
+    }
+
+    /// <summary>
+    /// Stores a pause directly, for arranging a test (any dates, past ones included, which the use case would refuse),
+    /// with no ownership check, no overlap check and no <see cref="Calls"/> entry; its new identifier. Pauses of one goal
+    /// must not share a date, or <see cref="ReadExemptionsAsync"/> throws, as <see cref="GoalExemptions"/> does.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="lastDay"/> is before <paramref name="firstDay"/>.</exception>
+    public PauseId SeedPause(GoalId goal, DateOnly firstDay, DateOnly lastDay, ExemptionReason? reason = null)
+    {
+        var pause = new Pause(new PauseId(Guid.NewGuid()), firstDay, lastDay, reason);
+        lock (_gate)
+        {
+            PausesOf(goal).Add(pause);
+        }
+
+        return pause.Id;
+    }
+
+    /// <summary>Every excusal and pause of the goal, with no ownership check and no <see cref="Calls"/> entry; for assertions only.</summary>
+    public GoalExemptions ExemptionsOfGoal(GoalId goal)
+    {
+        lock (_gate)
+        {
+            return ExemptionsOf(goal);
+        }
+    }
+
     /// <summary>Every record of the goal, in date order and then in the stored order; for assertions only.</summary>
     public IReadOnlyList<GoalRecord> RecordsOfGoal(GoalId goal)
     {
@@ -96,9 +172,25 @@ public sealed class FakeRecordStore : IRecordStore
         int limit,
         CancellationToken cancellationToken)
     {
+        var result = Add(owner, goal, entry, isCommitment, date, value, note, limit);
+        Interlocked.Exchange(ref _afterNextAdd, null)?.Invoke();
+        return result;
+    }
+
+    private Task<RecordStoreWrite> Add(
+        AccountId owner,
+        GoalId goal,
+        EntrySpan entry,
+        bool isCommitment,
+        DateOnly date,
+        RecordValue value,
+        NoteWrite note,
+        int limit)
+    {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(note);
+        RunBeforeNextWrite();
         var owned = Owns(owner, goal);
         lock (_gate)
         {
@@ -106,6 +198,13 @@ public sealed class FakeRecordStore : IRecordStore
             if (!owned)
             {
                 return Task.FromResult(RecordStoreWrite.GoalNotFound);
+            }
+
+            // Slice 7 (research R-04): no record is added on an excused or paused entry; nothing is written.
+            var exemptions = ExemptionsOf(goal);
+            if (exemptions.IsExcused(entry.Key) || exemptions.Overlaps(entry.FirstDate, entry.LastDate))
+            {
+                return Task.FromResult(RecordStoreWrite.Exempt);
             }
 
             var records = RecordsOf(goal);
@@ -258,7 +357,155 @@ public sealed class FakeRecordStore : IRecordStore
         }
     }
 
+    public Task<GoalExemptions> ReadExemptionsAsync(AccountId owner, GoalId goal, CancellationToken cancellationToken)
+    {
+        var owned = Owns(owner, goal);
+        lock (_gate)
+        {
+            _calls.Add(nameof(ReadExemptionsAsync));
+            return Task.FromResult(owned ? ExemptionsOf(goal) : GoalExemptions.None);
+        }
+    }
+
+    public Task<ExemptionStoreWrite> ExcuseAsync(
+        AccountId owner, GoalId goal, DateOnly date, ExemptionReason? reason, CancellationToken cancellationToken)
+    {
+        RunBeforeNextWrite();
+        var owned = Owns(owner, goal);
+        lock (_gate)
+        {
+            _calls.Add(nameof(ExcuseAsync));
+            if (!owned)
+            {
+                return Task.FromResult(ExemptionStoreWrite.GoalNotFound);
+            }
+
+            var excusals = ExcusalsOf(goal);
+            if (excusals.ContainsKey(date))
+            {
+                return Task.FromResult(ExemptionStoreWrite.AlreadyExcused);
+            }
+
+            if (RecordsOf(goal).Any(r => r.Record.Date == date))
+            {
+                return Task.FromResult(ExemptionStoreWrite.HasRecord);
+            }
+
+            if (PausesOf(goal).Any(p => p.Covers(date)))
+            {
+                return Task.FromResult(ExemptionStoreWrite.Paused);
+            }
+
+            excusals[date] = reason;
+            return Task.FromResult(ExemptionStoreWrite.Written());
+        }
+    }
+
+    public Task<ExemptionStoreWrite> RemoveExcusalAsync(AccountId owner, GoalId goal, DateOnly date, CancellationToken cancellationToken)
+    {
+        RunBeforeNextWrite();
+        var owned = Owns(owner, goal);
+        lock (_gate)
+        {
+            _calls.Add(nameof(RemoveExcusalAsync));
+            if (!owned)
+            {
+                return Task.FromResult(ExemptionStoreWrite.GoalNotFound);
+            }
+
+            return Task.FromResult(ExcusalsOf(goal).Remove(date) ? ExemptionStoreWrite.Written() : ExemptionStoreWrite.NotExcused);
+        }
+    }
+
+    public Task<ExemptionStoreWrite> AddPauseAsync(
+        AccountId owner, GoalId goal, DateOnly firstDay, DateOnly lastDay, ExemptionReason? reason, CancellationToken cancellationToken)
+    {
+        // The real store throws for a reversed range before it opens its transaction; so does the fake.
+        var pause = new Pause(new PauseId(Guid.NewGuid()), firstDay, lastDay, reason);
+        RunBeforeNextWrite();
+        var owned = Owns(owner, goal);
+        lock (_gate)
+        {
+            _calls.Add(nameof(AddPauseAsync));
+            if (!owned)
+            {
+                return Task.FromResult(ExemptionStoreWrite.GoalNotFound);
+            }
+
+            var pauses = PausesOf(goal);
+            if (pauses.Any(p => p.Overlaps(firstDay, lastDay)))
+            {
+                return Task.FromResult(ExemptionStoreWrite.Overlaps);
+            }
+
+            pauses.Add(pause);
+            return Task.FromResult(ExemptionStoreWrite.Written(pause.Id));
+        }
+    }
+
+    public Task<ExemptionStoreWrite> SetPauseLastDayAsync(
+        AccountId owner, GoalId goal, PauseId pause, DateOnly lastDay, CancellationToken cancellationToken)
+    {
+        RunBeforeNextWrite();
+        var owned = Owns(owner, goal);
+        lock (_gate)
+        {
+            _calls.Add(nameof(SetPauseLastDayAsync));
+            if (!owned)
+            {
+                return Task.FromResult(ExemptionStoreWrite.GoalNotFound);
+            }
+
+            var pauses = PausesOf(goal);
+            var position = pauses.FindIndex(p => p.Id == pause);
+            if (position < 0)
+            {
+                return Task.FromResult(ExemptionStoreWrite.PauseNotFound);
+            }
+
+            var current = pauses[position];
+            if (lastDay < current.FirstDay)
+            {
+                throw new ArgumentException("The last day cannot be before the first day.", nameof(lastDay));
+            }
+
+            // As the real store: a later last day that would share a date with another pause is refused.
+            if (lastDay > current.LastDay && pauses.Any(p => p.Id != pause && p.Overlaps(current.LastDay.AddDays(1), lastDay)))
+            {
+                return Task.FromResult(ExemptionStoreWrite.Overlaps);
+            }
+
+            pauses[position] = new Pause(current.Id, current.FirstDay, lastDay, current.Reason);
+            return Task.FromResult(ExemptionStoreWrite.Written());
+        }
+    }
+
+    public Task<ExemptionStoreWrite> DeletePauseAsync(AccountId owner, GoalId goal, PauseId pause, CancellationToken cancellationToken)
+    {
+        RunBeforeNextWrite();
+        var owned = Owns(owner, goal);
+        lock (_gate)
+        {
+            _calls.Add(nameof(DeletePauseAsync));
+            if (!owned)
+            {
+                return Task.FromResult(ExemptionStoreWrite.GoalNotFound);
+            }
+
+            return Task.FromResult(PausesOf(goal).RemoveAll(p => p.Id == pause) == 0
+                ? ExemptionStoreWrite.PauseNotFound
+                : ExemptionStoreWrite.Written());
+        }
+    }
+
     private static bool In(DateOnly date, EntrySpan entry) => date >= entry.FirstDate && date <= entry.LastDate;
+
+    /// <summary>Takes and clears <see cref="BeforeNextWrite"/>, then runs it, outside this store's lock.</summary>
+    private void RunBeforeNextWrite() => Interlocked.Exchange(ref _beforeNextWrite, null)?.Invoke();
+
+    /// <summary>The goal's excusals and pauses as the real store reads them; called under this store's lock.</summary>
+    private GoalExemptions ExemptionsOf(GoalId goal) =>
+        new(ExcusalsOf(goal).Select(e => new Excusal(e.Key, e.Value)).ToList(), PausesOf(goal).ToList());
 
     private static List<GoalRecord> Ordered(IEnumerable<StoredRecord> records, DateOnly from, DateOnly to) =>
         records
@@ -312,6 +559,28 @@ public sealed class FakeRecordStore : IRecordStore
         }
 
         return notes;
+    }
+
+    private SortedDictionary<DateOnly, ExemptionReason?> ExcusalsOf(GoalId goal)
+    {
+        if (!_excusals.TryGetValue(goal, out var excusals))
+        {
+            excusals = [];
+            _excusals[goal] = excusals;
+        }
+
+        return excusals;
+    }
+
+    private List<Pause> PausesOf(GoalId goal)
+    {
+        if (!_pauses.TryGetValue(goal, out var pauses))
+        {
+            pauses = [];
+            _pauses[goal] = pauses;
+        }
+
+        return pauses;
     }
 
     /// <summary>A record and its place in the stored order, which a change keeps (FR-003).</summary>

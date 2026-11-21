@@ -14,8 +14,9 @@ namespace HT.Persistence.Habits;
 
 /// <summary>
 /// The writer of a demo account with history, shared by <see cref="DemoHistoryStore"/> (slice 5 FR-030, research R-08)
-/// and <see cref="DemoReportStore"/> (slice 6 FR-032, research R-09), so both ports write in exactly the same way
-/// (ADR 0013, ADR 0021). Its one member is one transaction on the scoped context,
+/// and <see cref="DemoReportStore"/> (slice 6 FR-032, research R-09), and by <see cref="DemoPauseStore"/> (slice 7
+/// FR-031, research R-08), which also writes each goal's excusals and pauses after its records and notes, so the ports
+/// write in exactly the same way (ADR 0013, ADR 0021, ADR 0023). Each of its members is one transaction on the scoped context,
 /// which Identity's user manager uses too: the demo account is inserted with its profile, then each goal whose catalog
 /// habit, looked up by name key under the key-range locks of goal creation, is in one of the goal's accepted states,
 /// with settings version 1 in the profile's zone and attempt 1 from its start date, its records in list order (one
@@ -43,12 +44,42 @@ internal sealed class DemoAccountWriter
         _failure = failure;
     }
 
-    public async Task<CreateDemoAccountOutcome> CreateAsync(
+    /// <summary>The demo account with these goals, their records and their notes (demo history and demo report loading).</summary>
+    public Task<CreateDemoAccountOutcome> CreateAsync(
         Email email,
         string password,
         DemoAccountProfile profile,
         IReadOnlyList<DemoHistoryGoal> goals,
+        CancellationToken cancellationToken) =>
+        CreateAsync(email, password, profile, goals, static goal => goal, static (_, _, _) => Task.CompletedTask, cancellationToken);
+
+    /// <summary>
+    /// The demo account with these goals, their records and their notes, then each written goal's excusals and pauses
+    /// (slice 7 FR-031, research R-08), in the same transaction: a goal left out is left out with its excusals and
+    /// pauses, and an excusal or pause that cannot be written is a fault that rolls everything back.
+    /// </summary>
+    public Task<CreateDemoAccountOutcome> CreateWithExemptionsAsync(
+        Email email,
+        string password,
+        DemoAccountProfile profile,
+        IReadOnlyList<DemoPauseGoal> goals,
+        CancellationToken cancellationToken) =>
+        CreateAsync(email, password, profile, goals, static goal => goal.History, WriteExemptionsAsync, cancellationToken);
+
+    /// <summary>
+    /// The one transaction: the account, then each goal of <paramref name="goals"/> whose habit qualifies, as
+    /// <paramref name="historyOf"/> gives it with its records and notes, then what <paramref name="writeAfter"/> writes
+    /// for it under the new goal's identifier.
+    /// </summary>
+    private async Task<CreateDemoAccountOutcome> CreateAsync<TGoal>(
+        Email email,
+        string password,
+        DemoAccountProfile profile,
+        IReadOnlyList<TGoal> goals,
+        Func<TGoal, DemoHistoryGoal> historyOf,
+        Func<Guid, TGoal, CancellationToken, Task> writeAfter,
         CancellationToken cancellationToken)
+        where TGoal : class
     {
         ArgumentNullException.ThrowIfNull(password);
         ArgumentNullException.ThrowIfNull(profile);
@@ -69,9 +100,11 @@ internal sealed class DemoAccountWriter
             foreach (var goal in goals)
             {
                 ArgumentNullException.ThrowIfNull(goal);
-                if (await PublishedHabitOfAsync(goal.Goal, cancellationToken).ConfigureAwait(false) is { } habit)
+                var history = historyOf(goal);
+                if (await PublishedHabitOfAsync(history.Goal, cancellationToken).ConfigureAwait(false) is { } habit)
                 {
-                    await WriteGoalAsync(owner, habit, goal, profile, cancellationToken).ConfigureAwait(false);
+                    var goalId = await WriteGoalAsync(owner, habit, history, profile, cancellationToken).ConfigureAwait(false);
+                    await writeAfter(goalId, goal, cancellationToken).ConfigureAwait(false);
                 }
             }
 
@@ -142,9 +175,9 @@ internal sealed class DemoAccountWriter
     /// <summary>
     /// The goal row with settings version 1 in the profile's zone and attempt 1, both from the start date; then its
     /// records, one save each in list order, so the identity column keeps that order; then its notes, one save each,
-    /// so a second note under the same entry key is a primary-key fault of the database.
+    /// so a second note under the same entry key is a primary-key fault of the database. Gives the new goal's identifier.
     /// </summary>
-    private async Task WriteGoalAsync(
+    private async Task<Guid> WriteGoalAsync(
         AccountId owner, Guid habitId, DemoHistoryGoal goal, DemoAccountProfile profile, CancellationToken cancellationToken)
     {
         var id = Guid.NewGuid();
@@ -169,6 +202,26 @@ internal sealed class DemoAccountWriter
         foreach (var note in goal.Notes)
         {
             await SaveAsync(RecordMapping.ToRow(id, note.EntryDate, note.Text), cancellationToken).ConfigureAwait(false);
+        }
+
+        return id;
+    }
+
+    /// <summary>
+    /// The goal's excusals, one save each, so a second excusal on the same date is a primary-key fault of the database;
+    /// then its pauses, one save each, mapped by <see cref="ExemptionMapping"/> and stored directly as facts (FR-025).
+    /// </summary>
+    private async Task WriteExemptionsAsync(Guid goalId, DemoPauseGoal goal, CancellationToken cancellationToken)
+    {
+        foreach (var excusal in goal.Excusals)
+        {
+            await SaveAsync(ExemptionMapping.ToRow(goalId, excusal.Date, excusal.Reason), cancellationToken).ConfigureAwait(false);
+        }
+
+        foreach (var pause in goal.Pauses)
+        {
+            await SaveAsync(ExemptionMapping.ToRow(goalId, pause.FirstDay, pause.LastDay, pause.Reason), cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 

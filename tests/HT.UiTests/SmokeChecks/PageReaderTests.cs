@@ -137,6 +137,53 @@ public sealed class PageReaderTests
     }
 
     [Fact]
+    public void ReadGoalMetas_pairs_a_Paused_item_and_an_Active_item_with_their_meta_texts_without_the_chips()
+    {
+        // As GoalItem renders them (slice 7 HP-004): the Tag and the Pending StatusChip come before the meta text, with
+        // Blazor's comment markers; the figures after the meta line are not part of it.
+        const string html = """
+            <div class="ht-goalitem"><div>
+              <a class="ht-goalitem__name" href="/goals/1">Drinking water, 8 glasses a day</a>
+              <div class="ht-goalitem__meta"><!--!--><span class="ht-chip">Build</span>
+                <span class="ht-chip ht-status ht-status--pending">Pending</span><!--!-->
+                <span>Paused until Sun 22 Nov</span></div></div>
+              <div><div class="ht-goalitem__value">94% (18 of 19)</div><div class="ht-goalitem__label">Consistency</div></div>
+            </div>
+            <div class="ht-goalitem"><div>
+              <a class="ht-goalitem__name" href="/goals/2">Read &amp; reflect, 15 min, 5 days a week</a>
+              <div class="ht-goalitem__meta"><span class="ht-chip">Build</span><span>Mon&#x2013;Fri &#xB7; next today</span></div></div>
+              <div><div class="ht-goalitem__value">N/A</div></div>
+            </div>
+            """;
+
+        Assert.Equal(
+            [
+                new GoalMeta("Drinking water, 8 glasses a day", "Paused until Sun 22 Nov"),
+                new GoalMeta("Read & reflect, 15 min, 5 days a week", "Mon–Fri · next today"),
+            ],
+            PageReader.ReadGoalMetas(html));
+    }
+
+    [Fact]
+    public void ReadGoalMetas_gives_null_for_an_item_without_a_meta_line_and_never_reads_the_next_items_meta()
+    {
+        const string html = """
+            <div class="ht-goalitem"><div><a class="ht-goalitem__name" href="/goals/1">Morning yoga</a></div></div>
+            <div class="ht-goalitem"><div><a class="ht-goalitem__name" href="/goals/2">Coffee</a>
+              <div class="ht-goalitem__meta-extra"><span>Not a meta line</span></div>
+              <div class="ht-goalitem__meta is-muted"><span>Every day</span></div></div></div>
+            """;
+
+        Assert.Equal([new GoalMeta("Morning yoga", null), new GoalMeta("Coffee", "Every day")], PageReader.ReadGoalMetas(html));
+    }
+
+    [Fact]
+    public void ReadGoalMetas_is_empty_without_a_goal_item()
+    {
+        Assert.Empty(PageReader.ReadGoalMetas("<h1>Goals</h1><p>No paused goals.</p>"));
+    }
+
+    [Fact]
     public void ReadCardText_reads_only_the_card_with_that_title_and_not_the_settings_card()
     {
         const string html = """

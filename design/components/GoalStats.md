@@ -29,3 +29,13 @@ The last part of the preview shows the card as slice 6 builds it (HP-001, HP-004
 - With no finalized result: "N/A", and both streaks "0".
 - No Excused or Paused cell or legend entry (slice 7). The strip's `aria-label` counts each state shown ("Last 28 commitments: 24 met, 1 failed, 1 missed, 2 pending").
 - All texts come from `ReportText` (HP-005); the card computes nothing.
+
+## Slice 7 state
+
+The last part of the preview shows the card as slice 7 builds it (HP-001, HP-004, HP-006, US3-AS8, ADR 0008). The one `GoalStats` component still renders every variant.
+
+- Everything of slice 6 stays: the eyebrow, the title, the three stats and their texts, and the strip of the last 30 ended results.
+- The strip (`components/ConsistencyStrip.md`, "Slice 7 state") shows Excused (`ht-cell--excused`) and Paused (`ht-cell--paused`) cells with their shapes, and its legend always lists all six entries, Met, Failed, Missed, Excused, Paused, Pending, in that order (a key, not a count). Its `aria-label` counts Excused and Paused too: "Last 17 commitments: 10 met, 1 missed, 1 excused, 3 paused, 2 pending".
+- The figures leave Excused and Paused results out (FR-013, FR-014): spec US3's goal reads "90% (10 of 11)", streak 2 and longest 8 commitments; a goal whose ended results are all exempt reads "N/A", 0 and 0, with a strip of only Excused and Paused cells ("Last 7 commitments: 1 excused, 6 paused").
+- Visitor Home variant: the same component, so its legend lists the same six entries; its 21 fixed results, figures and `aria-label` are slice 6's, unchanged (`pages/PageHomeVisitor.md`, "Slice 7 state").
+- All texts still come from `ReportText` (HP-008); the card computes nothing.

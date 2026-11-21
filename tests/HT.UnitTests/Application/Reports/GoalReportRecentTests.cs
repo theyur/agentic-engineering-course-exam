@@ -1,8 +1,10 @@
+using HT.Application.Exemptions;
 using HT.Application.Reports;
 using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
+using HT.UnitTests.Application.Exemptions;
 using static HT.UnitTests.Domain.Goals.GoalSamples;
 using static HT.UnitTests.Domain.Time.Instants;
 
@@ -138,5 +140,87 @@ public sealed class GoalReportRecentTests
         Assert.Equal(
             new[] { EvaluationState.Met, EvaluationState.Failed, EvaluationState.Missed, EvaluationState.Pending }.Order(),
             recent.Counts.Keys.Order());
+    }
+
+    // Slice 7 (T067; FR-015, FR-023): exempt results among the recent results, over the fakes of ExemptionWorld.
+    // Excusals and pauses are made through ExcusalService and PauseService while they are current.
+
+    private static GoalTargetFields Meditation10MinDaily => DurationDays(10, DurationUnit.Minutes, BuildOrReduce.Build, AllDays);
+
+    /// <summary>
+    /// "Meditation, 10 min daily" from Monday 2 November with 10 minutes on 2, 3, 5 and 6 November and no record on
+    /// Wednesday 4; created on Monday 2 at 08:00Z.
+    /// </summary>
+    private static async Task<GoalId> MeditationAsync(ExemptionWorld world)
+    {
+        var goal = await world.CreateGoalAsync(Meditation10MinDaily, Mon2, Mon2Morning);
+        foreach (var day in new[] { 2, 3, 5, 6 })
+        {
+            world.SeedAmount(goal, Date(2026, 11, day), 10);
+        }
+
+        return goal;
+    }
+
+    [Fact]
+    public async Task FR_015_exempt_results_are_listed_as_Excused_or_Paused_with_their_progress_and_counted_by_state()
+    {
+        // Wednesday 4 November (no record) excused on Thursday 5 at 08:00Z; the goal paused on Friday 6 at 08:00Z from
+        // that day until Saturday 7, so Friday 6 keeps its record. Read on Tuesday 10 November at 10:00Z: 2 to 7 November
+        // are final, 8 and 9 November Pending and 10 November Due.
+        var world = new ExemptionWorld();
+        var goal = await MeditationAsync(world);
+        world.At(Utc("2026-11-05T08:00:00Z"));
+        Assert.Equal(ExcuseOutcome.Excused, (await world.ExcuseAsync(goal, Date(2026, 11, 4))).Outcome);
+        world.At(Utc("2026-11-06T08:00:00Z"));
+        Assert.Equal(PauseOutcome.Paused, (await world.PauseAsync(goal, Date(2026, 11, 6), Date(2026, 11, 7))).Outcome);
+        world.At(Utc("2026-11-10T10:00:00Z"));
+
+        var recent = (await world.ReportAsync(goal)).Recent;
+
+        Assert.Equal(
+            [
+                (Mon2, EvaluationState.Met, new Progress(ProgressKind.RecordedValue, 10, 10)),
+                (Date(2026, 11, 3), EvaluationState.Met, new Progress(ProgressKind.RecordedValue, 10, 10)),
+                (Date(2026, 11, 4), EvaluationState.Excused, new Progress(ProgressKind.RecordedValue, null, 10)),
+                (Date(2026, 11, 5), EvaluationState.Met, new Progress(ProgressKind.RecordedValue, 10, 10)),
+                (Date(2026, 11, 6), EvaluationState.Paused, new Progress(ProgressKind.RecordedValue, 10, 10)),
+                (Date(2026, 11, 7), EvaluationState.Paused, new Progress(ProgressKind.RecordedValue, null, 10)),
+                (Date(2026, 11, 8), EvaluationState.Pending, new Progress(ProgressKind.RecordedValue, null, 10)),
+                (Date(2026, 11, 9), EvaluationState.Pending, new Progress(ProgressKind.RecordedValue, null, 10)),
+            ],
+            recent.Results.Select(result => (result.FirstDate, result.State, result.Progress)));
+        Assert.Equal(
+            new Dictionary<EvaluationState, int>
+            {
+                [EvaluationState.Met] = 3, [EvaluationState.Failed] = 0, [EvaluationState.Missed] = 0,
+                [EvaluationState.Excused] = 1, [EvaluationState.Paused] = 2, [EvaluationState.Pending] = 2,
+            },
+            recent.Counts);
+    }
+
+    [Fact]
+    public async Task FR_015_the_counts_have_the_key_Excused_or_Paused_only_when_its_number_is_above_0()
+    {
+        // Three goals as above, read on Tuesday 10 November at 10:00Z: one with Wednesday 4 excused on Thursday 5 at
+        // 08:00Z, one paused on Wednesday 4 at 08:00Z for that day only, one with neither (4 and 7 Missed).
+        var world = new ExemptionWorld();
+        var excused = await MeditationAsync(world);
+        var paused = await MeditationAsync(world);
+        var plain = await MeditationAsync(world);
+        world.At(Utc("2026-11-04T08:00:00Z"));
+        Assert.Equal(PauseOutcome.Paused, (await world.PauseAsync(paused, Date(2026, 11, 4), Date(2026, 11, 4))).Outcome);
+        world.At(Utc("2026-11-05T08:00:00Z"));
+        Assert.Equal(ExcuseOutcome.Excused, (await world.ExcuseAsync(excused, Date(2026, 11, 4))).Outcome);
+        world.At(Utc("2026-11-10T10:00:00Z"));
+
+        var sliceSix = new[] { EvaluationState.Met, EvaluationState.Failed, EvaluationState.Missed, EvaluationState.Pending };
+        Assert.Equal(
+            sliceSix.Append(EvaluationState.Excused).Order(), (await world.ReportAsync(excused)).Recent.Counts.Keys.Order());
+        Assert.Equal(
+            sliceSix.Append(EvaluationState.Paused).Order(), (await world.ReportAsync(paused)).Recent.Counts.Keys.Order());
+        var plainCounts = (await world.ReportAsync(plain)).Recent.Counts;
+        Assert.Equal(sliceSix.Order(), plainCounts.Keys.Order());
+        Assert.Equal(2, plainCounts[EvaluationState.Missed]);
     }
 }

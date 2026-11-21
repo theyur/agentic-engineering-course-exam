@@ -1,3 +1,4 @@
+using HT.Application.Exemptions;
 using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Application.Reports;
@@ -5,6 +6,7 @@ using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Reports;
+using HT.UnitTests.Application.Exemptions;
 using HT.UnitTests.Application.Records;
 using static HT.UnitTests.Domain.Goals.GoalSamples;
 using static HT.UnitTests.Domain.Time.Instants;
@@ -282,5 +284,126 @@ public sealed class GoalsOverviewTests
         var overview = await _world.OverviewAsync(user);
 
         Assert.Equal(Wed18, overview.Today);
+    }
+
+    // ---- slice 7: paused goals (FR-018, US4-AS1, Edge Cases; T073), over the fakes of ExemptionWorld ----
+
+    /// <summary>"Drinking water, 8 glasses a day": Build, count at least 8 "glasses", once per day (period-based).</summary>
+    private static GoalTargetFields DrinkingWater => CountTimes(8, "glasses", 1, SchedulePeriod.Day);
+
+    /// <summary>"Meditation, 10 min daily": Build, duration 10 minutes, all seven days (commitment-based).</summary>
+    private static GoalTargetFields Meditation => DurationDays(10, DurationUnit.Minutes, BuildOrReduce.Build, AllDays);
+
+    /// <summary>"Yoga, 3 times a week": a yes/no Build goal of three times a week (period-based, per week).</summary>
+    private static GoalTargetFields YogaThreeTimesAWeek => YesNoTimes(3, SchedulePeriod.Week);
+
+    /// <summary>09:00Z on Monday 16 November, when US4's pause is set.</summary>
+    private static readonly DateTimeOffset Mon16NineOClock = Utc("2026-11-16T09:00:00Z");
+
+    /// <summary>10:00Z on Monday 16 November, when US4-AS1 reads the overview: today is Monday 16.</summary>
+    private static readonly DateTimeOffset Mon16TenOClock = Utc("2026-11-16T10:00:00Z");
+
+    /// <summary>
+    /// US4's account: "Drinking water, 8 glasses a day" and "Meditation, 10 min daily", both created on Monday 2 November
+    /// at 08:00Z with that start date ("Meditation" first, so the creation order is not the goal order), both on target
+    /// on each date from 2 to 13 November and not recorded from 14 November on; "Drinking water" paused at 09:00Z on
+    /// Monday 16 from Monday 16 until Sunday 22 November. The clock is left at 09:00Z on Monday 16.
+    /// </summary>
+    private static async Task<(GoalId Water, GoalId Meditation)> UserStoryFourAsync(ExemptionWorld world)
+    {
+        var meditation = await world.CreateNamedGoalAsync("Meditation, 10 min daily", Meditation, Mon2, Mon2Morning);
+        var water = await world.CreateNamedGoalAsync("Drinking water, 8 glasses a day", DrinkingWater, Mon2, Mon2Morning);
+        for (var date = Mon2; date <= Date(2026, 11, 13); date = date.AddDays(1))
+        {
+            world.SeedAmount(water, date, 8);
+            world.SeedAmount(meditation, date, 10);
+        }
+
+        world.At(Mon16NineOClock);
+        Assert.Equal(PauseOutcome.Paused, (await world.PauseAsync(water, Mon16, Date(2026, 11, 22))).Outcome);
+        return (water, meditation);
+    }
+
+    [Fact]
+    public async Task US4_AS1_a_paused_goal_gives_the_last_day_of_its_pause_and_the_goal_order_is_unchanged()
+    {
+        var world = new ExemptionWorld();
+        var (water, meditation) = await UserStoryFourAsync(world);
+        world.At(Mon16TenOClock);
+
+        var overview = await world.OverviewAsync();
+
+        // Both have Pending results (14 and 15 November), so they come by name.
+        Assert.Equal([water, meditation], overview.Goals.Select(g => g.Item.Id));
+        Assert.Equal(["Drinking water, 8 glasses a day", "Meditation, 10 min daily"], overview.Goals.Select(g => g.Item.Name));
+        Assert.Equal([Date(2026, 11, 22), null], overview.Goals.Select(g => g.PausedUntil));
+        Assert.All(overview.Goals, g => Assert.True(g.HasPending));
+    }
+
+    [Fact]
+    public async Task Edge_a_goal_whose_current_week_is_Paused_only_by_an_upcoming_pause_is_not_paused()
+    {
+        var world = new ExemptionWorld();
+        var goal = await world.CreateGoalAsync(YogaThreeTimesAWeek, Mon2, Mon2Morning);
+        world.At(Mon16NineOClock);
+        Assert.Equal(PauseOutcome.Paused, (await world.PauseAsync(goal, Wed18, Wed18)).Outcome);
+        world.At(Mon16TenOClock);
+
+        var item = Assert.Single((await world.OverviewAsync()).Goals);
+
+        // The week of 16 November has a paused date, so it is Paused as a whole (D-1); the goal itself is not paused.
+        Assert.Equal(EvaluationState.Paused, (await world.EntryAsync(goal, Mon16)).State);
+        Assert.Null(item.PausedUntil);
+    }
+
+    [Fact]
+    public async Task Edge_a_goal_resumed_in_the_middle_of_a_week_is_not_paused()
+    {
+        var world = new ExemptionWorld();
+        var goal = await world.CreateGoalAsync(YogaThreeTimesAWeek, Mon2, Mon2Morning);
+        world.At(Mon16NineOClock);
+        Assert.Equal(PauseOutcome.Paused, (await world.PauseAsync(goal, Mon16, Date(2026, 11, 22))).Outcome);
+        Assert.Equal(Date(2026, 11, 22), Assert.Single((await world.OverviewAsync()).Goals).PausedUntil);
+
+        // 08:00Z on Wednesday 18 November: the pause now ends on Tuesday 17, and the week stays Paused.
+        world.At(Utc("2026-11-18T08:00:00Z"));
+        Assert.Equal(ResumeOutcome.Resumed, (await world.ResumeAsync(goal)).Outcome);
+
+        var item = Assert.Single((await world.OverviewAsync()).Goals);
+
+        Assert.Equal(EvaluationState.Paused, (await world.EntryAsync(goal, Wed18)).State);
+        Assert.Null(item.PausedUntil);
+    }
+
+    [Fact]
+    public async Task Research_R03_a_goal_that_has_not_started_is_paused_by_a_pause_over_the_accounts_today()
+    {
+        // Created at 08:00Z on Monday 16 with the start date Wednesday 25: it has no current date, so the pause date is
+        // the account's today in UTC, Monday 16.
+        var world = new ExemptionWorld();
+        var goal = await world.CreateGoalAsync(DrinkingWater, Wed25, Mon16Morning);
+        world.At(Mon16NineOClock);
+        Assert.Equal(PauseOutcome.Paused, (await world.PauseAsync(goal, Mon16, Date(2026, 11, 27))).Outcome);
+        world.At(Mon16TenOClock);
+
+        var item = Assert.Single((await world.OverviewAsync()).Goals);
+
+        Assert.Equal(Date(2026, 11, 27), item.PausedUntil);
+    }
+
+    [Fact]
+    public async Task FR_018_a_past_pause_does_not_make_the_goal_paused()
+    {
+        var world = new ExemptionWorld();
+        var goal = await world.CreateGoalAsync(DrinkingWater, Mon2, Mon2Morning);
+        world.At(Mon16NineOClock);
+        Assert.Equal(PauseOutcome.Paused, (await world.PauseAsync(goal, Mon16, Tue17)).Outcome);
+
+        // 10:00Z on Wednesday 18 November: the pause ended on Tuesday 17.
+        world.At(Utc("2026-11-18T10:00:00Z"));
+        var item = Assert.Single((await world.OverviewAsync()).Goals);
+
+        Assert.Null(item.PausedUntil);
+        Assert.Equal(EvaluationState.Paused, (await world.EntryAsync(goal, Tue17)).State);
     }
 }

@@ -413,4 +413,161 @@ public sealed class ReportTextTests
             Assert.Equal(expected, Texts());
         }
     }
+
+    // ---- Slice 7: excusals and pauses (HP-004, HP-006, HP-008; T040) ----
+
+    [Theory]
+    [InlineData(EvaluationState.Excused, GoalScheduleKind.CommitmentBased, null, "Excused")]
+    [InlineData(EvaluationState.Paused, GoalScheduleKind.CommitmentBased, null, "Paused")]
+    [InlineData(EvaluationState.Paused, GoalScheduleKind.PeriodBased, SchedulePeriod.Day, "Paused")]
+    [InlineData(EvaluationState.Paused, GoalScheduleKind.PeriodBased, SchedulePeriod.Week, "Paused")]
+    public void Slice_7_State_gives_Excused_and_Paused(EvaluationState state, GoalScheduleKind kind, SchedulePeriod? period, string expected) =>
+        Assert.Equal(expected, ReportText.State(state, kind, period));
+
+    [Fact]
+    public void Slice_7_PausedUntil_names_the_pauses_last_day_by_its_short_date()
+    {
+        Assert.Equal("Paused until Sun 22 Nov", ReportText.PausedUntil(WeekSunday));
+        Assert.Equal("Paused until Fri 1 Jan", ReportText.PausedUntil(new DateOnly(2027, 1, 1)));
+    }
+
+    [Fact]
+    public void Slice_7_StripLabel_counts_excused_and_paused_after_missed_and_before_pending()
+    {
+        // Spec US3: Met × 7, Excused, Met, Missed, Met, Paused × 3, Met, Pending × 2.
+        var strip = States(
+            (EvaluationState.Met, 7),
+            (EvaluationState.Excused, 1),
+            (EvaluationState.Met, 1),
+            (EvaluationState.Missed, 1),
+            (EvaluationState.Met, 1),
+            (EvaluationState.Paused, 3),
+            (EvaluationState.Met, 1),
+            (EvaluationState.Pending, 2));
+
+        Assert.Equal("Last 17 commitments: 10 met, 1 missed, 1 excused, 3 paused, 2 pending", ReportText.StripLabel(strip, StreakUnit.Commitments));
+    }
+
+    [Fact]
+    public void Slice_7_StripLabel_of_only_exempt_cells_and_without_any_keeps_its_words()
+    {
+        var exemptOnly = States((EvaluationState.Excused, 1), (EvaluationState.Paused, 6));
+        var withoutExemptions = States((EvaluationState.Met, 24), (EvaluationState.Failed, 1), (EvaluationState.Missed, 1), (EvaluationState.Pending, 2));
+
+        Assert.Equal("Last 7 commitments: 1 excused, 6 paused", ReportText.StripLabel(exemptOnly, StreakUnit.Commitments));
+        Assert.Equal("Last 1 week: 1 paused", ReportText.StripLabel([EvaluationState.Paused], StreakUnit.Weeks));
+        Assert.Equal("Last 28 commitments: 24 met, 1 failed, 1 missed, 2 pending", ReportText.StripLabel(withoutExemptions, StreakUnit.Commitments));
+    }
+
+    [Fact]
+    public void Slice_7_TrendLabel_counts_the_marked_bars_after_the_target_apart_from_bars_with_no_record()
+    {
+        // Spec US3-AS4: 9 November Excused, 13 to 15 November Paused, 11 November with no record.
+        var view = View(
+            "Minutes per day",
+            "Last 14 days",
+            TrendSpan.Day,
+            10,
+            new TrendBar(new DateOnly(2026, 11, 9), new DateOnly(2026, 11, 9), null, 10) { Mark = TrendMark.Excused },
+            new TrendBar(new DateOnly(2026, 11, 10), new DateOnly(2026, 11, 10), 10, 10),
+            new TrendBar(new DateOnly(2026, 11, 11), new DateOnly(2026, 11, 11), null, 10),
+            new TrendBar(new DateOnly(2026, 11, 13), new DateOnly(2026, 11, 13), null, 10) { Mark = TrendMark.Paused },
+            new TrendBar(new DateOnly(2026, 11, 14), new DateOnly(2026, 11, 14), null, 10) { Mark = TrendMark.Paused },
+            new TrendBar(new DateOnly(2026, 11, 15), new DateOnly(2026, 11, 15), null, 10) { Mark = TrendMark.Paused });
+
+        Assert.Equal("Minutes per day, last 14 days; target 10; 1 excused, 3 paused", ReportText.TrendLabel(view));
+    }
+
+    [Fact]
+    public void Slice_7_TrendLabel_leaves_out_a_count_of_0_and_never_lists_a_marked_bar_among_differing_targets()
+    {
+        // The design's commitment-based yes/no example: two all-exempt Paused weeks (target 0) and two weeks with
+        // exempt commitments, whose reduced targets differ from the line's.
+        var weeks = View(
+            "Days done per week",
+            "Last 12 weeks",
+            TrendSpan.Week,
+            3,
+            new TrendBar(new DateOnly(2026, 10, 19), new DateOnly(2026, 10, 25), null, 0) { Mark = TrendMark.Paused },
+            new TrendBar(new DateOnly(2026, 10, 26), new DateOnly(2026, 11, 1), 2, 2),
+            new TrendBar(new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 8), null, 0) { Mark = TrendMark.Paused },
+            new TrendBar(new DateOnly(2026, 11, 9), new DateOnly(2026, 11, 15), 1, 1),
+            new TrendBar(new DateOnly(2026, 11, 16), new DateOnly(2026, 11, 22), 3, 3));
+        var oneExcused = View(
+            "Times per day",
+            "Last 14 days",
+            TrendSpan.Day,
+            1,
+            new TrendBar(new DateOnly(2026, 11, 9), new DateOnly(2026, 11, 9), null, 1) { Mark = TrendMark.Excused },
+            new TrendBar(new DateOnly(2026, 11, 10), new DateOnly(2026, 11, 10), 1, 1));
+
+        Assert.Equal(
+            "Days done per week, last 12 weeks; target 3; 2 paused; week of 26 Oct: 2 of 2; week of 9 Nov: 1 of 1",
+            ReportText.TrendLabel(weeks));
+        Assert.Equal("Times per day, last 14 days; target 1; 1 excused", ReportText.TrendLabel(oneExcused));
+    }
+
+    [Fact]
+    public void Slice_7_BarTitle_of_a_marked_bar_says_Excused_or_Paused_in_place_of_a_value()
+    {
+        var minutes = View("Minutes per day", "Last 14 days", TrendSpan.Day, 10) with { Kind = TrendKind.Minutes, Measurement = Measurement.Duration };
+        var weeks = View("Days done per week", "Last 12 weeks", TrendSpan.Week, 3);
+
+        Assert.Equal("Mon 9 Nov: Excused", ReportText.BarTitle(minutes, new TrendBar(new DateOnly(2026, 11, 9), new DateOnly(2026, 11, 9), null, 10) { Mark = TrendMark.Excused }));
+        Assert.Equal("Fri 13 Nov: Paused", ReportText.BarTitle(minutes, new TrendBar(new DateOnly(2026, 11, 13), new DateOnly(2026, 11, 13), null, 10) { Mark = TrendMark.Paused }));
+        Assert.Equal("week of 21 Sep: Paused", ReportText.BarTitle(weeks, new TrendBar(new DateOnly(2026, 9, 21), new DateOnly(2026, 9, 27), null, 0) { Mark = TrendMark.Paused }));
+        Assert.Equal("week of 21 Sep: Excused", ReportText.BarTitle(weeks, new TrendBar(new DateOnly(2026, 9, 21), new DateOnly(2026, 9, 27), null, 0) { Mark = TrendMark.Excused }));
+    }
+
+    [Fact]
+    public void Slice_7_the_Goals_footnote_and_the_empty_Paused_tab_are_worded_as_the_spec_gives_them()
+    {
+        Assert.Equal(
+            "Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out.",
+            ReportText.GoalsFootnote);
+        Assert.Equal("No paused goals.", ReportText.NoPausedGoals);
+    }
+
+    [Fact]
+    public void Slice_7_every_text_is_the_same_under_cultures_with_another_decimal_and_list_separator()
+    {
+        var strip = States((EvaluationState.Met, 1200), (EvaluationState.Excused, 1001), (EvaluationState.Paused, 3));
+        var view = View(
+            "Days done per week",
+            "Last 12 weeks",
+            TrendSpan.Week,
+            3,
+            new TrendBar(new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 8), null, 0) { Mark = TrendMark.Paused },
+            new TrendBar(new DateOnly(2026, 11, 9), new DateOnly(2026, 11, 15), null, 0) { Mark = TrendMark.Excused },
+            new TrendBar(new DateOnly(2026, 11, 16), new DateOnly(2026, 11, 22), 1234, 2));
+
+        string[] Texts() =>
+        [
+            ReportText.State(EvaluationState.Excused, GoalScheduleKind.CommitmentBased, null),
+            ReportText.State(EvaluationState.Paused, GoalScheduleKind.PeriodBased, SchedulePeriod.Week),
+            ReportText.PausedUntil(WeekSunday),
+            ReportText.StripLabel(strip, StreakUnit.Commitments),
+            ReportText.TrendLabel(view),
+            ReportText.BarTitle(view, view.Bars[0]),
+        ];
+
+        string[] expected =
+        [
+            "Excused",
+            "Paused",
+            "Paused until Sun 22 Nov",
+            "Last 2204 commitments: 1200 met, 1001 excused, 3 paused",
+            "Days done per week, last 12 weeks; target 3; 1 excused, 1 paused; week of 16 Nov: 1234 of 2",
+            "week of 2 Nov: Paused",
+        ];
+
+        Assert.Equal(expected, Texts());
+        foreach (var culture in new[] { "ar-SA", "de-DE", "uk-UA" })
+        {
+            using (new CultureScope(culture))
+            {
+                Assert.Equal(expected, Texts());
+            }
+        }
+    }
 }

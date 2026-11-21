@@ -1,9 +1,11 @@
+using HT.Application.Exemptions;
 using HT.Application.Records;
 using HT.Application.Reports;
 using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
+using HT.UnitTests.Application.Exemptions;
 using HT.UnitTests.Application.Records;
 using static HT.UnitTests.Domain.Goals.GoalSamples;
 using static HT.UnitTests.Domain.Time.Instants;
@@ -367,5 +369,141 @@ public sealed class DashboardTests
         Assert.True(row.HasRecord);
         Assert.True(row.HasNote);
         Assert.Equal("Short one", Assert.Single(dashboard.Notes).Note);
+    }
+
+    // ---- slice 7: excused and paused entries, paused goals (FR-019, FR-020, US4-AS2 to AS4; T074), over ExemptionWorld ----
+
+    private static readonly DateOnly Mon2 = Date(2026, 11, 2);
+    private static readonly DateOnly Fri20 = Date(2026, 11, 20);
+    private static readonly DateOnly Sun22 = Date(2026, 11, 22);
+    private static readonly DateTimeOffset Mon2Morning = Utc("2026-11-02T08:00:00Z");
+
+    /// <summary>10:00Z on Monday 16 November: today is Monday 16; Saturday 14 is Pending until Tuesday 17 at 00:00Z, Sunday 15 until Wednesday 18 at 00:00Z.</summary>
+    private static readonly DateTimeOffset Mon16TenOClock = Utc("2026-11-16T10:00:00Z");
+
+    /// <summary>"Drinking water, 8 glasses a day": Build, count at least 8 "glasses", once per day (period-based).</summary>
+    private static GoalTargetFields DrinkingWater => CountTimes(8, "glasses", 1, SchedulePeriod.Day);
+
+    /// <summary>"Meditation, 10 min daily": Build, duration 10 minutes, all seven days (commitment-based).</summary>
+    private static GoalTargetFields Meditation => DurationDays(10, DurationUnit.Minutes, BuildOrReduce.Build, AllDays);
+
+    /// <summary>
+    /// US4's account: "Drinking water, 8 glasses a day" and "Meditation, 10 min daily", both created on Monday 2 November
+    /// at 08:00Z with that start date, both on target on each date from 2 to 13 November and not recorded from 14
+    /// November on; "Drinking water" paused at 09:00Z on Monday 16 from Monday 16 until Sunday 22 November. The clock is
+    /// left at 10:00Z on Monday 16.
+    /// </summary>
+    private static async Task<(GoalId Water, GoalId Meditation)> UserStoryFourAsync(ExemptionWorld world)
+    {
+        var water = await world.CreateNamedGoalAsync("Drinking water, 8 glasses a day", DrinkingWater, Mon2, Mon2Morning);
+        var meditation = await world.CreateNamedGoalAsync("Meditation, 10 min daily", Meditation, Mon2, Mon2Morning);
+        for (var date = Mon2; date <= Fri13; date = date.AddDays(1))
+        {
+            world.SeedAmount(water, date, 8);
+            world.SeedAmount(meditation, date, 10);
+        }
+
+        world.At(Utc("2026-11-16T09:00:00Z"));
+        Assert.Equal(PauseOutcome.Paused, (await world.PauseAsync(water, Mon16, Sun22)).Outcome);
+        world.At(Mon16TenOClock);
+        return (water, meditation);
+    }
+
+    [Fact]
+    public async Task US4_AS2_a_paused_goal_has_no_Due_or_Upcoming_entry_keeps_its_Pending_ones_and_is_not_counted()
+    {
+        var world = new ExemptionWorld();
+        var (water, meditation) = await UserStoryFourAsync(world);
+
+        var dashboard = await world.DashboardAsync();
+
+        Assert.Equal(
+            [
+                // Pending by grace end: Saturday 14 (Tuesday 17 00:00Z), then Sunday 15 (Wednesday 18 00:00Z), each in goal
+                // order (both goals have Pending results, so by name: Drinking water, then Meditation).
+                (water, Sat14, Sat14, EvaluationState.Pending), (meditation, Sat14, Sat14, EvaluationState.Pending),
+                (water, Sun15, Sun15, EvaluationState.Pending), (meditation, Sun15, Sun15, EvaluationState.Pending),
+                // Due: only Meditation's Monday 16; Drinking water's Monday 16 is Paused, and 17 to 22 November too, so it
+                // has no Upcoming entry.
+                (meditation, Mon16, Mon16, EvaluationState.Due),
+            ],
+            dashboard.Today.Select(Row));
+        Assert.Equal(new DashboardCounts { Due = 1, Pending = 4, MissedThisWeek = 0, Goals = 1 }, dashboard.Counts);
+        Assert.Equal([water, meditation], dashboard.Goals.Select(g => g.GoalId));
+        Assert.Equal([Sun22, null], dashboard.Goals.Select(g => g.PausedUntil));
+    }
+
+    [Fact]
+    public async Task US4_AS3_an_excused_commitment_is_neither_counted_nor_listed_as_Pending()
+    {
+        var world = new ExemptionWorld();
+        var (water, meditation) = await UserStoryFourAsync(world);
+        Assert.Equal(ExcuseOutcome.Excused, (await world.ExcuseAsync(meditation, Sun15)).Outcome);
+        world.At(Utc("2026-11-16T10:01:00Z"));
+
+        var dashboard = await world.DashboardAsync();
+
+        Assert.Equal(3, dashboard.Counts.Pending);
+        Assert.DoesNotContain(dashboard.Today, e => e.GoalId == meditation && e.Entry.FirstDate == Sun15);
+        Assert.Contains(dashboard.Today, e => e.GoalId == meditation && e.Entry.FirstDate == Sat14 && e.Entry.State == EvaluationState.Pending);
+        Assert.Contains(dashboard.Today, e => e.GoalId == water && e.Entry.FirstDate == Sun15 && e.Entry.State == EvaluationState.Pending);
+    }
+
+    [Fact]
+    public async Task US4_AS4_the_Upcoming_entry_is_the_earliest_Upcoming_commitment_that_is_not_Paused()
+    {
+        // Another account's "Yoga, 3 days a week" (Monday, Wednesday and Friday) from Monday 2 November, with no records,
+        // paused at 08:00Z on Monday 16 from Wednesday 18 until Wednesday 18; read on Tuesday 17 at 10:00Z (no commitment
+        // that day, so no Due entry).
+        var world = new ExemptionWorld();
+        var yoga = await world.CreateNamedGoalAsync(
+            "Yoga, 3 days a week", YesNoDays(BuildOrReduce.Build, MonWedFri), Mon2, Mon2Morning, world.OtherUser);
+        world.At(Utc("2026-11-16T08:00:00Z"));
+        Assert.Equal(PauseOutcome.Paused, (await world.PauseAsync(yoga, Wed18, Wed18, user: world.OtherUser)).Outcome);
+        world.At(Tue17TenOClock);
+
+        var dashboard = await world.DashboardAsync(world.OtherUser);
+
+        Assert.DoesNotContain(dashboard.Today, e => e.Entry.State == EvaluationState.Due);
+        var upcoming = Assert.Single(dashboard.Today, e => e.Entry.State == EvaluationState.Upcoming);
+        Assert.Equal((yoga, Fri20, Fri20, EvaluationState.Upcoming), Row(upcoming));
+        Assert.Null(Assert.Single(dashboard.Goals).PausedUntil);
+        Assert.Equal(1, dashboard.Counts.Goals);
+    }
+
+    [Fact]
+    public async Task FR_019_Missed_this_week_leaves_out_excused_and_paused_entries()
+    {
+        // "Meditation" from Monday 9 November with no records; Friday 13 excused and Saturday 14 paused, stored directly.
+        // Read on Tuesday 17 at 10:00Z, Friday 13 (grace end Monday 16 00:00Z) and Saturday 14 (Tuesday 17 00:00Z) would be
+        // Missed this week; Thursday 12's grace period ended on Sunday 15, last week.
+        var world = new ExemptionWorld();
+        var goal = await world.CreateGoalAsync(Meditation, Mon9, Mon9Morning);
+        world.SeedExcusal(goal, Fri13);
+        world.SeedPause(goal, Sat14, Sat14);
+        world.At(Tue17TenOClock);
+
+        var dashboard = await world.DashboardAsync();
+
+        Assert.Equal(new DashboardCounts { Due = 1, Pending = 2, MissedThisWeek = 0, Goals = 1 }, dashboard.Counts);
+        Assert.Equal(
+            [(goal, Sun15, Sun15, EvaluationState.Pending), (goal, Mon16, Mon16, EvaluationState.Pending), (goal, Tue17, Tue17, EvaluationState.Due)],
+            dashboard.Today.Select(Row));
+    }
+
+    [Fact]
+    public async Task FR_020_a_note_on_a_Paused_or_Excused_entry_comes_with_that_state()
+    {
+        var world = new ExemptionWorld();
+        var (water, meditation) = await UserStoryFourAsync(world);
+        Assert.Equal(ExcuseOutcome.Excused, (await world.ExcuseAsync(meditation, Sun15)).Outcome);
+        world.SeedNote(water, Mon16, "Visiting family");
+        world.SeedNote(meditation, Sun15, "Too tired");
+
+        var notes = (await world.DashboardAsync()).Notes;
+
+        Assert.Equal(
+            [(water, Mon16, "Visiting family", EvaluationState.Paused), (meditation, Sun15, "Too tired", EvaluationState.Excused)],
+            notes.Select(n => (n.GoalId, n.FirstDate, n.Note, n.State)));
     }
 }

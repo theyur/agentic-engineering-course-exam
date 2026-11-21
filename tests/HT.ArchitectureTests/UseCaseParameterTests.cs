@@ -1,5 +1,6 @@
 using System.Reflection;
 using HT.Application.Accounts;
+using HT.Application.Exemptions;
 using HT.Application.Goals;
 using HT.Application.Habits;
 using HT.Application.Records;
@@ -30,7 +31,7 @@ public sealed class UseCaseParameterTests
 
     public static TheoryData<Type> SignedInServices =>
         new(typeof(CatalogAdministrationService), typeof(CustomHabitService), typeof(GoalService), typeof(ProfileService),
-            typeof(RecordingService), typeof(ReportService));
+            typeof(RecordingService), typeof(ReportService), typeof(ExcusalService), typeof(PauseService));
 
     [Fact]
     public void Every_method_of_the_custom_habit_port_takes_the_owner_first()

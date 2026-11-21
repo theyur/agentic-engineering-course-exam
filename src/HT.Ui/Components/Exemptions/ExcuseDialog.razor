@@ -1,0 +1,149 @@
+@using HT.Application.Exemptions
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@* design/components/ExcuseDialog, slice 7 state (HP-003, HP-007, D-2, D-3; contracts/host.md "Excuse dialog"): excuses
+   one Due or Pending commitment with no record. The title "Excuse · {goal name}"; the sub line the opener gives, the
+   commitment's date and state as RecordingText writes the RecordDialog's "For" entry ("Wed 11 Nov · Pending, 22 h left",
+   "Today, Fri 13 Nov"); the effect; "Reason (optional)", empty on open; the primary "Excuse commitment" and "Cancel".
+   The dialog reads no clock and decides nothing: "Excuse commitment" calls ExcuseAsync for the commitment's date in a
+   scope of its own and raises OnSaved on "excused"; a refusal shows in the dialog with the result's message as it is,
+   one at a time: the reason's under the field (aria-invalid and aria-describedby), any other as an alert between the
+   effect and the field. The field keeps what was entered. Focus moves to the field on open; Esc, × and Cancel close
+   the dialog, and focus returns to the opener (FocusOnClose, or ReturnFocus). *@
+<HtDialog Open="Open" OnClose="OnClose" ReturnFocus="ReturnFocus" FocusOnOpen="FocusReasonAsync" FocusOnClose="FocusOnClose">
+    <Title>@TitlePrefix@GoalName</Title>
+    <Subtitle>@SubLine</Subtitle>
+    <ChildContent>
+        <p>An excused commitment is not counted. Your streak stays as it is.</p>
+        @if (_error is { } alert && !_reasonError)
+        {
+            <p class="ht-field__error" role="alert">@alert</p>
+        }
+        <label class="ht-field">
+            <span class="ht-field__label">Reason <span class="ht-muted">(optional)</span></span>
+            <input class="ht-input" type="text" id="@ReasonId" @ref="_reasonInput" value="@_reason"
+                   @oninput="e => _reason = e.Value?.ToString()"
+                   aria-invalid="@(_reasonError ? "true" : null)" aria-describedby="@(_reasonError ? ReasonErrorId : null)" />
+            @if (_error is { } reasonError && _reasonError)
+            {
+                <span class="ht-field__error" id="@ReasonErrorId">@reasonError</span>
+            }
+        </label>
+    </ChildContent>
+    <Footer>
+        <HtButton @onclick="ExcuseAsync" disabled="@_saving">Excuse commitment</HtButton>
+        <HtButton Variant="HtButton.ButtonVariant.Secondary" @onclick="() => OnClose.InvokeAsync()">Cancel</HtButton>
+    </Footer>
+</HtDialog>
+
+@code {
+    /// <summary>The title: "Excuse · " and the goal's name (HP-003).</summary>
+    private const string TitlePrefix = "Excuse · ";
+
+    private readonly string _id = $"excuse-dialog-{Guid.NewGuid():N}";
+    private ElementReference _reasonInput;
+    private string? _reason;
+    private string? _error;
+    private bool _reasonError;
+    private bool _saving;
+    private bool _wasOpen;
+
+    /// <summary>Whether the dialog is shown; the page owns this value.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Esc, × or Cancel: the page should close the dialog.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>The control that opened the dialog; it gets the focus back when the dialog closes.</summary>
+    [Parameter]
+    public ElementReference? ReturnFocus { get; set; }
+
+    /// <summary>
+    /// Gives the focus back when the dialog closes, in place of <see cref="ReturnFocus"/>: for an opener that the
+    /// closing render or the re-read after "excused" may have replaced or removed.
+    /// </summary>
+    [Parameter]
+    public Func<ValueTask>? FocusOnClose { get; set; }
+
+    /// <summary>The goal of the commitment.</summary>
+    [Parameter, EditorRequired]
+    public GoalId GoalId { get; set; }
+
+    /// <summary>The commitment's date.</summary>
+    [Parameter, EditorRequired]
+    public DateOnly Date { get; set; }
+
+    /// <summary>The goal's name, for the title.</summary>
+    [Parameter, EditorRequired]
+    public string GoalName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The sub line: the commitment's date and state as <c>RecordingText.ForLabel</c> writes them ("Wed 11 Nov · Pending,
+    /// 22 h left", "Today, Fri 13 Nov"); the opener formats it from the view it read.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public string SubLine { get; set; } = string.Empty;
+
+    /// <summary>The acting user the page read.</summary>
+    [Parameter, EditorRequired]
+    public ActingUser ActingUser { get; set; } = ActingUser.Anonymous;
+
+    /// <summary>The commitment was excused: the opener reads its data again and closes the dialog.</summary>
+    [Parameter]
+    public EventCallback OnSaved { get; set; }
+
+    private string ReasonId => _id + "-reason";
+
+    private string ReasonErrorId => _id + "-reason-error";
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !_wasOpen)
+        {
+            _reason = null;
+            _error = null;
+            _reasonError = false;
+            _saving = false;
+        }
+
+        _wasOpen = Open;
+    }
+
+    private ValueTask FocusReasonAsync() => _reasonInput.FocusAsync();
+
+    private async Task ExcuseAsync()
+    {
+        if (_saving)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var goal = GoalId;
+            var date = Date;
+            var reason = _reason;
+            var result = await UseCases.RunAsync<ExcusalService, ExcuseResult>(
+                (service, token) => service.ExcuseAsync(ActingUser, goal, date, reason, token), CancellationToken.None);
+            if (result.Outcome == ExcuseOutcome.Excused)
+            {
+                _error = null;
+                _reasonError = false;
+                await OnSaved.InvokeAsync();
+                return;
+            }
+
+            _error = result.Message;
+            _reasonError = result.Outcome == ExcuseOutcome.ReasonTooLong;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

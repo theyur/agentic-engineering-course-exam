@@ -40,3 +40,17 @@ The last part of the preview shows the page as slice 6 builds it (HP-002, ADR 00
 - Under the list, the footnote (`ht-footnote`): "Each goal is counted on its own. Consistency counts only finalized results; pending ones are left out." Slice 7 adds "excused and paused".
 - After a record is saved in the RecordDialog, the list is read again, and the focus returns to that item's "Record" (or its name link when "Record" is gone).
 - No goals: slice 4's EmptyState "No goals yet", unchanged, with no footnote.
+
+## Slice 7 state
+
+The last part of the preview shows the page as slice 7 builds it (HP-004, US4-AS5, US4-AS6, ADR 0008). Today is Mon 16 Nov 2026, 10:00 in the preview (spec US4): "Meditation, 10 min daily" is active, and "Drinking water, 8 glasses a day" is paused from Mon 16 until Sun 22 Nov.
+
+- `/goals` for registered users; an administrator gets the Not found page, as in slices 4 and 6.
+- Page head: `heading-1` "Goals" only.
+- Under it, the link Tabs (`components/Tabs.md`, link variant): `nav.ht-tabs` with `aria-label="Goal lists"`, then "Active" (`/goals`) and "Paused" (`/goals?tab=paused`); the current one has `aria-current="page"`. No "Ended" (slice 8). No counts (settled here, T007: HP-004 names none, and the page shell reads no data). `?tab=paused` shows Paused; any other value, or none, shows Active.
+- Active: one `ht-list` of the goals that are not paused, as slice 6 lists them (the same items, the same order). When every goal is paused, the Active tab has no list, only the Tabs and the footnote (settled here, T077).
+- Paused: one `ht-list` of the paused goals (`PausedUntil`), in the overview's order (slice 6's), each in the Paused form of the GoalListItem (`components/GoalListItem.md`, "Slice 7 state"): the name link, the Build or Reduce Tag, the Pending StatusChip when it has a Pending result, the meta "Paused until Sun 22 Nov", its figures and mini strip, and the secondary "Resume".
+- An empty Paused tab: a Card with the sentence "No paused goals." (`ht-card__sub`, as the Home's "Nothing to record right now."; settled here, T007).
+- Under the list, on either tab, the footnote (`ht-footnote`): "Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out." It replaces slice 6's footnote.
+- After "Resume", the list is read again and the goal moves to the Active tab; after a record is saved on the Active tab, slice 6's behaviour.
+- No goals: slice 4's EmptyState "No goals yet", unchanged, in place of the tabs, with no footnote.

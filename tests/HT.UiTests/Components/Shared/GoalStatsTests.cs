@@ -69,7 +69,9 @@ public sealed class GoalStatsTests : BunitContext
             ["ht-cell--met", "ht-cell--failed", "ht-cell--met", "ht-cell--missed", "ht-cell--pending"],
             cells.Select(c => c.ClassList.Single(name => name.StartsWith("ht-cell--", StringComparison.Ordinal))));
         Assert.Equal("Last 5 weeks: 2 met, 1 failed, 1 missed, 1 pending", cut.Find("div.ht-strip").GetAttribute("aria-label"));
-        Assert.Equal(["Met", "Failed", "Missed", "Pending"], cut.FindAll("section.ht-card > .ht-legend > span").Select(s => s.TextContent));
+        Assert.Equal(
+            ["Met", "Failed", "Missed", "Excused", "Paused", "Pending"],
+            cut.FindAll("section.ht-card > .ht-legend > span").Select(s => s.TextContent));
         Assert.Empty(cut.FindAll(".ht-strip--mini"));
     }
 
@@ -94,6 +96,46 @@ public sealed class GoalStatsTests : BunitContext
         Assert.Equal(
             [current.ToString(CultureInfo.InvariantCulture), longest.ToString(CultureInfo.InvariantCulture)],
             stats.Skip(1).Select(s => s.QuerySelector(".ht-stat__value")!.TextContent));
+    }
+
+    /// <summary>
+    /// Slice 7 US3-AS8 (HP-001, HP-006; T069): spec US3's goal, "Meditation, 10 min daily", read on Thursday 19 November
+    /// 2026: its 17 ended results from 2 to 18 November with Monday 9 Excused and 13 to 15 November Paused. The legend's
+    /// six entries are asserted above (T042).
+    /// </summary>
+    [Fact]
+    public void US3_AS8_the_strip_shows_Excused_and_Paused_cells_and_its_label_counts_each_state()
+    {
+        var met = EvaluationState.Met;
+        EvaluationState[] strip =
+        [
+            met, met, met, met, met, met, met, EvaluationState.Excused, met, EvaluationState.Missed, met,
+            EvaluationState.Paused, EvaluationState.Paused, EvaluationState.Paused, met, EvaluationState.Pending, EvaluationState.Pending,
+        ];
+
+        var cut = RenderStats(Stats(new Consistency(10, 11), 2, 8, StreakUnit.Commitments), strip);
+
+        Assert.Equal(["90% (10 of 11)", "2", "8"], cut.FindAll(".ht-stat__value").Select(v => v.TextContent));
+        var cells = cut.FindAll("section.ht-card > div.ht-strip > i").Select(c => c.ClassList.Single(name => name.StartsWith("ht-cell--", StringComparison.Ordinal))).ToList();
+        Assert.Equal(17, cells.Count);
+        Assert.Equal("ht-cell--excused", cells[7]);
+        Assert.Equal(["ht-cell--paused", "ht-cell--paused", "ht-cell--paused"], cells.Skip(11).Take(3));
+        Assert.Equal(
+            "Last 17 commitments: 10 met, 1 missed, 1 excused, 3 paused, 2 pending",
+            cut.Find("section.ht-card > div.ht-strip").GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void FR_013_a_goal_whose_ended_results_are_all_exempt_reads_N_A_with_a_strip_of_Excused_and_Paused_cells()
+    {
+        EvaluationState[] strip = [EvaluationState.Excused, .. Enumerable.Repeat(EvaluationState.Paused, 6)];
+
+        var cut = RenderStats(Stats(new Consistency(0, 0), 0, 0, StreakUnit.Commitments), strip);
+
+        Assert.Equal(["N/A", "0", "0"], cut.FindAll(".ht-stat__value").Select(v => v.TextContent));
+        Assert.Equal("Last 7 commitments: 1 excused, 6 paused", cut.Find("div.ht-strip").GetAttribute("aria-label"));
+        Assert.Single(cut.FindAll("div.ht-strip > i.ht-cell--excused"));
+        Assert.Equal(6, cut.FindAll("div.ht-strip > i.ht-cell--paused").Count);
     }
 
     [Fact]

@@ -8,11 +8,11 @@ The form to record what happened for one commitment or period; the field depends
 - **Duration**: Stepper in minutes, with a progress bar and "12 of 20 min".
 
 ## Rules
-- "For" select: every Due and every Pending commitment or period (FR-011); none on an unscheduled day. Finalized dates are corrected from the goal page History table.
+- "For" select: every Due and every Pending commitment or period (FR-011) that is not Excused or Paused (slice 7 FR-005, FR-009); none on an unscheduled day. Finalized dates are corrected from the goal page History table.
 - Show the target in the sub line ("Build · at least 20 min · every day") and progress under the field.
 - Say what partial progress means: it is kept, and below target the result is Failed when finalized.
 - Reduce goals: ask for an explicit number, 0 included, or an explicit "No" for yes/no: "At most 2. Enter 0 if you had none: an empty day cannot prove you stayed under the limit.". An empty day is never treated as success: it is Missed (FR-013).
-- "Excuse instead" (ghost, right) only for commitment-based goals and only while the commitment is upcoming or Pending. *(Provisional — depends on SPEC §11 Q3; confirm when the recording feature is planned.)*
+- "Excuse instead" (ghost, right) only for commitment-based goals and only while the commitment that "For" names is Due or Pending with no record (slice 7 D-2, D-3). It opens the Excuse dialog (`ExcuseDialog.md`). Confirmed in slice 7 (specs/008-excusals-and-pauses, HP-003); it was marked provisional, for upcoming or Pending commitments, until SPEC §11 Q3 was decided.
 - Note is optional and private.
 
 ## Slice 5 state
@@ -107,3 +107,22 @@ Durations are always in minutes; a goal in hours compares with the amount × 60 
 - Footer: primary "Save record" and secondary "Cancel". "Edit" adds the ghost "Delete record", pushed right (`ht-spacer`). No "Excuse instead" (slice 7).
 - Refusals sit under the field they are about (`ht-field__error`), one at a time, with the result's message as it is.
 - Focus moves to the first field on open; Esc and × close the dialog, and focus returns to the button that opened it.
+
+## Slice 7 state
+
+The last part of the preview shows the dialog as slice 7 builds it (HP-003, D-2, D-3, FR-005, FR-009, ADR 0008). Everything of slice 5 stays, with two changes.
+
+### "For" without exempt entries
+
+- Opened from the page head's "Record" (goal page) or the Goals page's "Record", "For" lists every Due and every Pending commitment or period that is neither Excused nor Paused (FR-005, FR-009), newest first, with slice 5's labels. A paused goal's Paused today is not listed, so the list can start with a Pending entry and have no "Today, " entry; a goal with nothing left to record offers no "Record", as in slice 5.
+- Opened from a History row's "Add record": an Excused or Paused row has no "Add record" (`pages/PageGoalDetail.md`, "Slice 7 state"), so "For" is never fixed to one.
+- For a week, the "Date" select lists the week's dates as in slice 5; a Paused week is not listed at all.
+
+### "Excuse instead"
+
+- The ghost button "Excuse instead" (`ht-btn--ghost`, `aria-haspopup="dialog"`), the last button of the footer, pushed right with `ht-spacer`, after "Save record" and "Cancel".
+- Shown only when the goal is commitment-based and the commitment the dialog is for (the selected "For" entry, or the fixed one from a History row's "Add record") is Due or Pending and has no record (D-2, D-3). It follows the selection: choosing another "For" entry shows or hides it.
+- Never in "Edit" of one record (that commitment has a record, D-3), never for a period (per day or per week; FR-002 step 4), never for an Upcoming or a final commitment.
+- It opens the Excuse dialog (`components/ExcuseDialog.md`) for that commitment in the RecordDialog's place: the RecordDialog closes without saving, and the Excuse dialog's opener is the control that opened the RecordDialog. What was typed in the RecordDialog is not kept (settled here, T006).
+- No other change: the title, sub line, field, progress line, help, note and refusals are slice 5's.
+- The previews: "Yoga, 3 days a week" (spec US1) on Fri 13 Nov 2026, 07:00, with the Due "Today, Fri 13 Nov" chosen and "Excuse instead" shown; "Drinking water, 8 glasses a day" (spec US2) on Mon 16 Nov, 10:00, paused from that day, whose "For" lists only the Pending Sun 15 and Sat 14 Nov, with no "Excuse instead".

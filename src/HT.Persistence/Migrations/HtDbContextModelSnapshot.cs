@@ -342,6 +342,23 @@ namespace HT.Persistence.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("HT.Persistence.Records.GoalExcusalRow", b =>
+                {
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("GoalId", "Date");
+
+                    b.ToTable("GoalExcusals", (string)null);
+                });
+
             modelBuilder.Entity("HT.Persistence.Records.GoalNoteRow", b =>
                 {
                     b.Property<Guid>("GoalId")
@@ -358,6 +375,32 @@ namespace HT.Persistence.Migrations
                     b.HasKey("GoalId", "EntryDate");
 
                     b.ToTable("GoalNotes", (string)null);
+                });
+
+            modelBuilder.Entity("HT.Persistence.Records.GoalPauseRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("FirstDay")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("LastDay")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GoalId", "FirstDay")
+                        .HasDatabaseName("IX_GoalPauses_GoalId_FirstDay");
+
+                    b.ToTable("GoalPauses", (string)null);
                 });
 
             modelBuilder.Entity("HT.Persistence.Records.GoalRecordRow", b =>
@@ -574,7 +617,25 @@ namespace HT.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("HT.Persistence.Records.GoalExcusalRow", b =>
+                {
+                    b.HasOne("HT.Persistence.Goals.GoalRow", null)
+                        .WithMany()
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HT.Persistence.Records.GoalNoteRow", b =>
+                {
+                    b.HasOne("HT.Persistence.Goals.GoalRow", null)
+                        .WithMany()
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HT.Persistence.Records.GoalPauseRow", b =>
                 {
                     b.HasOne("HT.Persistence.Goals.GoalRow", null)
                         .WithMany()

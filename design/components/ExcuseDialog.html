@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/ht-components.css"><title>ExcuseDialog — preview</title></head>
+<body>
+<div class="ht" style="padding:16px">
+<div class="ht-dialog" style="margin:0 auto" role="dialog" aria-modal="true" aria-labelledby="dlg-t">
+  <div class="ht-dialog__head"><div><h2 id="dlg-t">Excuse · Yoga, 3 days a week</h2><div class="ht-dialog__sub">Wed 11 Nov · Pending, 22 h left</div></div><button type="button" class="ht-dialog__close" aria-label="Close">×</button></div>
+  <div class="ht-dialog__body"><p>An excused commitment is not counted. Your streak stays as it is.</p><label class="ht-field"><span class="ht-field__label">Reason <span class="ht-muted">(optional)</span></span><input class="ht-input" type="text"></label></div>
+  <div class="ht-dialog__foot"><button type="button" class="ht-btn ht-btn--primary">Excuse commitment</button><button type="button" class="ht-btn ht-btn--secondary">Cancel</button></div>
+</div>
+</div>
+<!-- Slice 7 state (HP-003, HP-007, D-2): new in slice 7; the full preview above is the same dialog, opened from the Home's "Excuse" on the Pending row of Wed 11 Nov (read on Fri 13 Nov 2026, 02:00). The title "Excuse · {goal name}"; the sub line, the commitment's date and state as RecordingText writes the RecordDialog's "For" entry ("Wed 11 Nov · Pending, 22 h left", "Today, Fri 13 Nov" for a Due one); the effect; "Reason (optional)"; the primary "Excuse commitment" and the secondary "Cancel". It opens from the Home's "Excuse" (a Pending commitment with no record) and from the RecordDialog's "Excuse instead" (a Due or Pending commitment with no record). A refusal of the reason shows under the field; any other refusal shows above the field with role="alert". -->
+<div class="ht" style="padding:16px" aria-label="Slice 7 state">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;align-items:start">
+<div><div class="ht-eyebrow" style="margin:24px 0 8px">Slice 7 state · opened from "Excuse instead" for a Due commitment (Fri 13 Nov 2026, 07:00)</div>
+<div class="ht-dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-s7-due-t">
+  <div class="ht-dialog__head"><div><h2 id="dlg-s7-due-t">Excuse · Yoga, 3 days a week</h2><div class="ht-dialog__sub">Today, Fri 13 Nov</div></div><button type="button" class="ht-dialog__close" aria-label="Close">×</button></div>
+  <div class="ht-dialog__body"><p>An excused commitment is not counted. Your streak stays as it is.</p><label class="ht-field"><span class="ht-field__label">Reason <span class="ht-muted">(optional)</span></span><input class="ht-input" type="text"></label></div>
+  <div class="ht-dialog__foot"><button type="button" class="ht-btn ht-btn--primary">Excuse commitment</button><button type="button" class="ht-btn ht-btn--secondary">Cancel</button></div>
+</div></div>
+<div><div class="ht-eyebrow" style="margin:24px 0 8px">Slice 7 state · a reason of more than 200 characters</div>
+<div class="ht-dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-s7-long-t">
+  <div class="ht-dialog__head"><div><h2 id="dlg-s7-long-t">Excuse · Reading, 20 min daily</h2><div class="ht-dialog__sub">Mon 16 Nov · Pending, 5 h left</div></div><button type="button" class="ht-dialog__close" aria-label="Close">×</button></div>
+  <div class="ht-dialog__body"><p>An excused commitment is not counted. Your streak stays as it is.</p><label class="ht-field"><span class="ht-field__label">Reason <span class="ht-muted">(optional)</span></span><input class="ht-input" type="text" value="Away at my sister's wedding for the whole weekend, with the rehearsal dinner on Friday, the ceremony on Saturday and the long drive home on Sunday, so there was no quiet time left for reading at all this time" aria-invalid="true" aria-describedby="s7-long-error"><span class="ht-field__error" id="s7-long-error">Keep the reason to 200 characters or fewer.</span></label></div>
+  <div class="ht-dialog__foot"><button type="button" class="ht-btn ht-btn--primary">Excuse commitment</button><button type="button" class="ht-btn ht-btn--secondary">Cancel</button></div>
+</div></div>
+<div><div class="ht-eyebrow" style="margin:24px 0 8px">Slice 7 state · a refusal about the commitment (its grace period ended while the dialog was open)</div>
+<div class="ht-dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-s7-final-t">
+  <div class="ht-dialog__head"><div><h2 id="dlg-s7-final-t">Excuse · Reading, 20 min daily</h2><div class="ht-dialog__sub">Mon 16 Nov · Pending, 1 h left</div></div><button type="button" class="ht-dialog__close" aria-label="Close">×</button></div>
+  <div class="ht-dialog__body"><p>An excused commitment is not counted. Your streak stays as it is.</p><p class="ht-field__error" role="alert">This commitment is final and can no longer be excused.</p><label class="ht-field"><span class="ht-field__label">Reason <span class="ht-muted">(optional)</span></span><input class="ht-input" type="text" value="Ill"></label></div>
+  <div class="ht-dialog__foot"><button type="button" class="ht-btn ht-btn--primary">Excuse commitment</button><button type="button" class="ht-btn ht-btn--secondary">Cancel</button></div>
+</div></div>
+</div>
+</div>
+</body>
+</html>

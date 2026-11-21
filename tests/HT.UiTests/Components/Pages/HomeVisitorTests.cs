@@ -113,7 +113,9 @@ public sealed class HomeVisitorTests : BunitContext
         Assert.Equal(
             [.. Enumerable.Repeat("ht-cell--met", 11), "ht-cell--missed", "ht-cell--met", "ht-cell--failed", .. Enumerable.Repeat("ht-cell--met", 6), "ht-cell--pending"],
             cells.Select(c => c.ClassList.Single(name => name.StartsWith("ht-cell--", StringComparison.Ordinal))));
-        Assert.Equal(["Met", "Failed", "Missed", "Pending"], card.QuerySelectorAll(".ht-legend span").Select(s => s.TextContent));
+        Assert.Equal(
+            ["Met", "Failed", "Missed", "Excused", "Paused", "Pending"],
+            card.QuerySelectorAll(".ht-legend span").Select(s => s.TextContent));
     }
 
     [Fact]

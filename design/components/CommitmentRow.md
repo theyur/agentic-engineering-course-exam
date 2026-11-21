@@ -45,3 +45,26 @@ The last part of the preview shows the rows as slice 6 builds them in the Home's
 - Order in the Today card: every Pending row, the one whose grace period ends soonest first; then every Due row, in the goal order of the Goals page; then every row Missed this week, the latest grace end first; rows whose grace periods end at the same instant in goal order; then the Upcoming rows, the earliest start first. An Upcoming row is shown for each goal with no Due row whose next commitment or period starts within 6 days.
 - A Today card with no row says "Nothing to record right now." (`ht-card__sub`). A tile's filter that leaves no row says the same.
 - Partial progress is shown, never hidden: "15 of 20 min today" stays on the row while the day runs.
+
+## Slice 7 state
+
+The last part of the preview shows the rows as slice 7 builds them in the Home's Today card (HP-005, HP-003, D-2, D-3, US1-AS12, ADR 0008). Everything of slice 6 stays: the parts, the meta lines, the progress bar, the chips, the order and "Nothing to record right now.".
+
+- A Pending row of a commitment-based goal whose commitment has no record gets a second action after "Record": the ghost "Excuse" (`ht-btn--ghost ht-btn--sm`, `aria-haspopup="dialog"`). It opens the Excuse dialog for that row's goal and date (`components/ExcuseDialog.md`).
+- The actions, slice 6's table with the new row:
+
+  | Row | Actions | Opens |
+  |---|---|---|
+  | a Pending commitment without a record | "Record" (secondary), then "Excuse" (ghost) | the RecordDialog fixed to that commitment; the Excuse dialog |
+  | a Due commitment without a record | "Record" (secondary) | the RecordDialog fixed to that commitment |
+  | a Due or Pending period (per day or per week) | "Record" (secondary) | the RecordDialog fixed to that period |
+  | a Due or Pending commitment with a record | "Edit" (secondary) | that record in the RecordDialog |
+  | a Missed commitment or period without a note | "Add note" (ghost) | the NoteDialog |
+  | a Missed commitment or period with a note | "Edit note" (ghost) | the NoteDialog |
+  | Upcoming | none | — |
+
+  A Due commitment is excused from the RecordDialog's "Excuse instead", not from its row (HP-003, HP-005). "Excuse" comes after "Record", as in the full preview, so "Record" stays where it is on every row (settled here, T008).
+- The accessible name of "Excuse" starts with its visible text and names the row: "Excuse {goal name}, {date}" ("Excuse Reading, 20 min daily, Mon 16 Nov"; settled here, T008, after slice 6's "Record for {goal name}, {date}").
+- After "excused" the island reads the list again: the row leaves the Today list, and the "Pending · still can record" tile drops by 1. Focus goes to the nearest remaining control, as the row and its buttons are gone (HP-007).
+- Excused and Paused entries are never rows: they are not Due, Pending or Missed (FR-019). A goal's Upcoming row is its earliest Upcoming commitment or period that is not Paused, within slice 6's 6 days, so a goal paused for the whole window has none.
+- Still no "Add time" or "+1".

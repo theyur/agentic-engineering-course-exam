@@ -30,9 +30,11 @@ public sealed class DomainDependencyTests
 
     /// <summary>
     /// The namespaces of slice 5's records and evaluation (research R-13), and of slice 6's reports (specs/007 research
-    /// R-14), which also get the time only as a parameter. <see cref="ClockReadTests"/> checks the same list.
+    /// R-14), and of slice 7's exemptions (specs/008 research R-11), which also get the time only as a parameter.
+    /// <see cref="ClockReadTests"/> checks the same list.
     /// </summary>
-    internal static readonly string[] RecordsAndEvaluation = ["HT.Domain.Records", "HT.Domain.Evaluation", "HT.Domain.Reports"];
+    internal static readonly string[] RecordsAndEvaluation =
+        ["HT.Domain.Records", "HT.Domain.Evaluation", "HT.Domain.Reports", "HT.Domain.Exemptions"];
 
     /// <summary>The types of one of <see cref="RecordsAndEvaluation"/>; a test fails when there are none, so moving them out fails.</summary>
     internal static List<ArchUnitNET.Domain.IType> TypesIn(string ns)
@@ -46,7 +48,8 @@ public sealed class DomainDependencyTests
 
     /// <summary>
     /// Slice 5 research R-13: <c>HT.Domain.Records</c> and <c>HT.Domain.Evaluation</c> depend only on HT.Domain and
-    /// the base class library, not even on NodaTime. Slice 6 (research R-14): <c>HT.Domain.Reports</c> joins them.
+    /// the base class library, not even on NodaTime. Slice 6 (research R-14): <c>HT.Domain.Reports</c> joins them;
+    /// slice 7 (research R-11): <c>HT.Domain.Exemptions</c>.
     /// </summary>
     [Fact]
     public void RecordsEvaluationAndReportsDependOnlyOnTheDomainAndTheBcl()
@@ -56,7 +59,7 @@ public sealed class DomainDependencyTests
             Assert.NotEmpty(TypesIn(ns));
             Types().That().ResideInNamespaceMatching($"^{Regex.Escape(ns)}$")
                 .Should().NotDependOnAny(Types(true).That().DoNotResideInNamespaceMatching(@"^(HT\.Domain|System)(\..*)?$"))
-                .Because("records, evaluation and reports use only the domain and the base class library (research R-13, R-14)")
+                .Because("records, evaluation, reports and exemptions use only the domain and the base class library (research R-13, R-14; specs/008 R-11)")
                 .Check(ArchitectureModel.Architecture);
         }
     }

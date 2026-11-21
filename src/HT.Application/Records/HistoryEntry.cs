@@ -31,6 +31,21 @@ public sealed record HistoryEntry
     /// <summary>Its note, private to the goal's owner (FR-007); null when it has none.</summary>
     public string? Note { get; init; }
 
-    /// <summary>True when it is final at the supplied time, so a change now would be a correction (FR-006).</summary>
+    /// <summary>
+    /// True when it is final at the supplied time, so a change now would be a correction (FR-006). False for an Excused
+    /// or Paused entry, which is never final (slice 7 FR-017).
+    /// </summary>
     public required bool IsCorrection { get; init; }
+
+    /// <summary>
+    /// Slice 7 (FR-017): the reason of an Excused commitment's excusal; null when it has none, and for any other state.
+    /// Private to the goal's owner, like the note.
+    /// </summary>
+    public string? ExcusalReason { get; init; }
+
+    /// <summary>
+    /// Slice 7 (FR-004, FR-017): true for an Excused commitment whose grace period has not ended at the supplied time,
+    /// so its excusal can still be removed; false for any other state.
+    /// </summary>
+    public bool CanRemoveExcusal { get; init; }
 }

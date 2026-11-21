@@ -251,7 +251,7 @@ public sealed class HistoryTests
         Assert.Equal(Utc("2026-11-25T00:00:00Z"), first.GraceEnds);
         Assert.Equal("Knee was sore.", first.Note);
         Assert.Equal(EvaluationState.Due, history.Entries[1].State);
-        Assert.Equal([nameof(IRecordStore.ReadAsync)], _world.Records.Calls);
+        Assert.Equal([nameof(IRecordStore.ReadExemptionsAsync), nameof(IRecordStore.ReadAsync)], _world.Records.Calls);
     }
 
     [Fact]
@@ -320,7 +320,7 @@ public sealed class HistoryTests
 
         await FoundAsync(goal, Mon2, Sun15);
 
-        Assert.Equal([nameof(IRecordStore.ReadAsync)], _world.Records.Calls);
+        Assert.Equal([nameof(IRecordStore.ReadExemptionsAsync), nameof(IRecordStore.ReadAsync)], _world.Records.Calls);
     }
 
     [Fact]
