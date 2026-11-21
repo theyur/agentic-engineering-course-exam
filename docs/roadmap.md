@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-11-20"
+updated_at: "2026-11-21"
 ---
 
 # Roadmap — Habit Tracker
@@ -33,7 +33,7 @@ in its idea brief, which assumed the catalog also carried the account foundation
 | 4 | `goals` | A user turns a catalog or custom habit into a measurable Build or Reduce goal and sees it in the goal list and detail. | §5.1 | 2 | — | — | shipped | [004](../specs/004-goals/spec.md) |
 | 5 | `recording-and-evaluation` | A user records what actually happened, including partial amounts and notes. Unrecorded results are Pending, become Missed after the 48-hour grace period, and corrections are evaluated with the original rules. | §5.2 | 4 | — | — | shipped | [005](../specs/005-recording-and-evaluation/spec.md) |
 | 5a | `note-editing` | Every dialog that saves a note shows the note it would change. A row with a record changes its note only together with a record, in the record dialog; a row without one has a single "Add note" or "Edit note" control ([issue #37](https://github.com/theyur/agentic-engineering-course-exam/issues/37), slice note 5). | §5.2 | 5 | — | — | shipped | [006](../specs/006-note-editing/spec.md) |
-| 6 | `personal-reports` | A user sees how consistent they are: a dashboard of upcoming, due and overdue commitments and Missed results, consistency with its count, strict streaks with their unit, trends. | §6 | 5 | — | Now | implementing | [007](../specs/007-personal-reports/spec.md) |
+| 6 | `personal-reports` | A user sees how consistent they are: a dashboard of upcoming, due and overdue commitments and Missed results, consistency with its count, strict streaks with their unit, trends. | §6 | 5 | — | Now | AC tests green | [007](../specs/007-personal-reports/spec.md) |
 | 7 | `excusals-and-pauses` | Excused commitments and paused expectations are left out of consistency and neither extend nor break the streak. | §5.3 | 5, 6 | — | Next | not started | — |
 | 8 | `goal-changes` | A user changes a goal from the next evaluation boundary, ends it with an outcome, and restarts it as a new attempt, with earlier attempts kept in history. | §5.4 | 5, 6 | 7 | Next | not started | — |
 | 9 | `community` | People who opt in appear in Consistency Bands under a public display name, and catalog habits show aggregate performance. Anyone, including anonymous visitors, sees these views; no private data is exposed. | §7 | 2, 6 | 7 | Later | not started | — |
