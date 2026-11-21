@@ -4,8 +4,9 @@
 
 .DESCRIPTION
     Prints the project's mutation score and every mutant the tests did not detect (Survived or NoCoverage),
-    with its file, line, mutator and source line. Mutants Stryker did not test (Ignored, CompileError) are only
-    counted. The mutation workflow appends the output to the job summary; locally it reads like a to-do list.
+    with its file, line, mutator and source line. Mutants Stryker did not test or could not judge (Ignored,
+    CompileError, RuntimeError) are only counted; like Stryker, the score leaves them out. Runtime errors mean the
+    test host crashed, so the summary warns about them: the score then rests on fewer mutants than it seems. The mutation workflow appends the output to the job summary; locally it reads like a to-do list.
 
     Score as Stryker computes it: detected (Killed + Timeout) / (detected + undetected (Survived + NoCoverage)).
 
@@ -94,8 +95,14 @@ $score = if ($detected + $missed -gt 0) {
 "### $Project — mutation score $score"
 ''
 "Killed $($counts['Killed'] ?? 0) · Timeout $($counts['Timeout'] ?? 0) · Survived $($counts['Survived'] ?? 0) · " +
-"No coverage $($counts['NoCoverage'] ?? 0) · Ignored $($counts['Ignored'] ?? 0) · Compile errors $($counts['CompileError'] ?? 0)"
+"No coverage $($counts['NoCoverage'] ?? 0) · Ignored $($counts['Ignored'] ?? 0) · Compile errors $($counts['CompileError'] ?? 0) · " +
+"Runtime errors $($counts['RuntimeError'] ?? 0)"
 ''
+if (($counts['RuntimeError'] ?? 0) -gt 0) {
+    "**Warning:** $($counts['RuntimeError']) mutants crashed the test host (runtime errors). They are not in the " +
+    'score, so it rests on fewer mutants than were created; see the job log.'
+    ''
+}
 if ($configureAwait -gt 0) {
     "Not listed: $configureAwait undetected ``ConfigureAwait(false)`` → ``true`` mutants, which no test can detect. " +
     'They are in the score.'

@@ -92,8 +92,9 @@ Findings:
 
 ## Consequences
 
-- PRs that change Domain or Application get a mutation report in about 2–5 minutes of runner time per project
-  (estimated from the spike; GitHub's runners are slower than the developer machine). Other PRs don't start the
+- GitHub's runner is about 4× slower than the developer machine. Whole-project runs on PR #41 took 7.5–8.5
+  minutes for Domain and 8.5–10 minutes for Application, the two in parallel. A diff run is estimated at about
+  4–6 minutes per project (the spike's diff runs took about 75 seconds locally). Other PRs don't start the
   workflow. A PR that changes `HT.UnitTests.csproj` or `stryker-config.json` gets a whole-project run.
 - The ignored and left-out mutants make the score higher than an unfiltered one: the spike's whole-project
   Application score rose from 74.84% to 88.03% with this configuration. A score is only comparable with one from
