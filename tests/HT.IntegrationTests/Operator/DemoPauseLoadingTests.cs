@@ -269,14 +269,15 @@ public sealed class DemoPauseLoadingTests(SeedDatabaseFixture database)
         Assert.True(NoteText.TryCreate("It Dp Zqnote", out var note, out _));
         Assert.True(ExemptionReason.TryCreate("It Dp Zqreason", out var reason, out _));
 
-        // Two excusals on the same date break the GoalExcusals primary key, after the account, the goal, its record, its
-        // note and the first excusal are written, and before the pause.
+        // Two notes under the same entry key break the GoalNotes primary key, after the account, the goal, its record and
+        // its first note are written, and before the excusal and the pause. (Two excusals on the same date, or two pauses
+        // that share a date, are refused by DemoPauseGoal before anything is written.)
         var goal = new DemoPauseGoal(
             new DemoHistoryGoal(
                 DemoGoal.OnCatalogHabit("It Dp Zqhabit", [CatalogHabitState.Published], target, goalName, start),
                 [new DemoRecord(day, value)],
-                [new DemoNote(day, note!)]),
-            [new DemoExcusal(day.AddDays(1), reason), new DemoExcusal(day.AddDays(1), null)],
+                [new DemoNote(day, note!), new DemoNote(day, note!)]),
+            [new DemoExcusal(day.AddDays(1), reason)],
             [new DemoGoalPause(day.AddDays(3), day.AddDays(4), reason)]);
 
         InvalidOperationException exception;

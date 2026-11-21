@@ -237,6 +237,45 @@ public sealed class DemoPausesTests
         Assert.Throws<ArgumentNullException>(() => new DemoPauseGoal(null!, [], []));
     }
 
+    [Fact]
+    public void A_demo_pause_goal_refuses_two_excusals_of_the_same_date()
+    {
+        var history = DemoPauses.For(new DateOnly(2026, 11, 16))[0].History;
+        var day = new DateOnly(2026, 11, 9);
+
+        var error = Assert.Throws<ArgumentException>(
+            () => new DemoPauseGoal(history, [new DemoExcusal(day, null), new DemoExcusal(day, null)], []));
+        Assert.Equal("excusals", error.ParamName);
+        Assert.Equal(2, new DemoPauseGoal(history, [new DemoExcusal(day, null), new DemoExcusal(day.AddDays(1), null)], []).Excusals.Count);
+    }
+
+    [Theory]
+    [InlineData(10, 12, 12, 14)]
+    [InlineData(12, 14, 10, 12)]
+    [InlineData(10, 14, 11, 12)]
+    [InlineData(10, 10, 10, 10)]
+    public void A_demo_pause_goal_refuses_two_pauses_that_share_a_date(int firstA, int lastA, int firstB, int lastB)
+    {
+        var history = DemoPauses.For(new DateOnly(2026, 11, 16))[0].History;
+        DemoGoalPause[] pauses = [Pause(firstA, lastA), Pause(firstB, lastB)];
+
+        var error = Assert.Throws<ArgumentException>(() => new DemoPauseGoal(history, [], pauses));
+        Assert.Equal("pauses", error.ParamName);
+    }
+
+    [Fact]
+    public void A_demo_pause_goal_accepts_pauses_that_only_touch()
+    {
+        var history = DemoPauses.For(new DateOnly(2026, 11, 16))[0].History;
+
+        var goal = new DemoPauseGoal(history, [], [Pause(13, 14), Pause(10, 12)]);
+
+        Assert.Equal(2, goal.Pauses.Count);
+    }
+
+    private static DemoGoalPause Pause(int firstDay, int lastDay) =>
+        new(new DateOnly(2026, 11, firstDay), new DateOnly(2026, 11, lastDay), null);
+
     private static void AssertGoal(DemoHistoryGoal goal, string habitName, DateOnly start, GoalTargetFields fields)
     {
         Assert.True(GoalTarget.TryCreate(fields, out var target, out _));

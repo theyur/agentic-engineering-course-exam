@@ -8,7 +8,11 @@ namespace HT.Application.Operator;
 /// </summary>
 public sealed class DemoPauseGoal
 {
-    /// <exception cref="ArgumentException">An excusal or a pause is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// An excusal or a pause is null, two excusals have the same date, or two pauses share a date. The goal's reads
+    /// refuse the last two (<see cref="HT.Domain.Exemptions.GoalExemptions"/>), so they are refused before anything is
+    /// written.
+    /// </exception>
     public DemoPauseGoal(DemoHistoryGoal history, IEnumerable<DemoExcusal> excusals, IEnumerable<DemoGoalPause> pauses)
     {
         ArgumentNullException.ThrowIfNull(history);
@@ -25,6 +29,20 @@ public sealed class DemoPauseGoal
         if (pauseList.Any(p => p is null))
         {
             throw new ArgumentException("A demo pause goal has no null pause.", nameof(pauses));
+        }
+
+        if (excusalList.DistinctBy(e => e.Date).Count() != excusalList.Length)
+        {
+            throw new ArgumentException("A demo pause goal has at most one excusal per date.", nameof(excusals));
+        }
+
+        DemoGoalPause[] byFirstDay = [.. pauseList.OrderBy(p => p.FirstDay)];
+        for (var i = 1; i < byFirstDay.Length; i++)
+        {
+            if (byFirstDay[i].FirstDay <= byFirstDay[i - 1].LastDay)
+            {
+                throw new ArgumentException("The pauses of a demo pause goal never share a date.", nameof(pauses));
+            }
         }
 
         History = history;
