@@ -493,8 +493,8 @@ manual quickstart.
   - Fix the real findings only. The documented false positives stay.
   - Then update the "Baseline" paragraph of `CLAUDE.md` with the date, the three new counts and "after slice 6", so the next slice compares against them.
 - [X] T086 [P] Sweep the goal page, the Goals page, the signed-in Home and the visitor Home for constitution IV and HP-006 (SC-008): tokens and `ht-` classes only, with no literal colours; visible focus on tiles, links and buttons; states never by colour alone; the strip's and the trend's `role="img"` and labels; the tiles' `aria-pressed`; every dialog opened from the goal page, the Goals page and the Home focusing its first field on open, closing on Esc and ×, and giving the focus back to its opener, or to the fallback T051 and T059 name, after a save; sentence case per `design/brand-book.md`. Then rerun `DesignSyncTests`
-- [ ] T087 Run quickstart §3 in the running app after dropping the local database that `HT.Ui`'s connection string names. Report each step's result. The hosted smoke check and the daily refresh (quickstart §4) stay labelled unverified until they run after the merge
-- [ ] T088 Run the full build and `dotnet test HabitTracker.slnx`, and report `PASS` with the counts. Leave slice 6's roadmap Status at `implementing`: `AC tests green` comes after the owner's `/speckit-ac-tests-analyze`. Commit
+- [X] T087 Run quickstart §3 in the running app after dropping the local database that `HT.Ui`'s connection string names. Report each step's result. The hosted smoke check and the daily refresh (quickstart §4) stay labelled unverified until they run after the merge
+- [X] T088 Run the full build and `dotnet test HabitTracker.slnx`, and report `PASS` with the counts. Leave slice 6's roadmap Status at `implementing`: `AC tests green` comes after the owner's `/speckit-ac-tests-analyze`. Commit
 
 ---
 
