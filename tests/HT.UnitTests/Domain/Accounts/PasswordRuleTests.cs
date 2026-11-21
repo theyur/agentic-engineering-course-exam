@@ -10,6 +10,8 @@ public class PasswordRuleTests
     [InlineData("walkingfar", false)]
     [InlineData("walk4", false)]
     [InlineData("12345678", true)]
+    [InlineData("walking0", true)]
+    [InlineData("walking9", true)]
     [InlineData("", false)]
     public void Needs_8_characters_and_a_digit(string password, bool expected)
     {

@@ -270,6 +270,16 @@ public class GoalTimelineCalendarTests
     }
 
     [Fact]
+    public void A_goal_started_weeks_ago_still_has_a_next_commitment()
+    {
+        // Started on Monday 19 October, four weeks earlier: the scan starts two days before the current date, so
+        // the 15-day look-ahead is not spent on days that ended long ago.
+        var goal = Goal(OnDays(MonWedFri), Date(2026, 10, 19), Kyiv);
+
+        Assert.Equal(Wednesday, GoalTimeline.NextCommitment(goal, Utc("2026-11-18T10:00:00Z")));
+    }
+
+    [Fact]
     public void VersionOf_gives_the_version_in_effect_for_a_date()
     {
         var goal = GoalVersionChange.Add(Date(2026, 11, 19), NewYork).ApplyTo(Goal(PerDay(), MondayBefore, Kyiv));
