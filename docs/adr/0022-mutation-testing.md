@@ -62,6 +62,8 @@ Findings:
 ## Decision
 
 - **Tool.** Stryker.NET (`dotnet-stryker`), pinned in the repository's tool manifest `dotnet-tools.json`.
+  CI installs only that tool, at the pinned version, instead of `dotnet tool restore`, which fails on the
+  .NET 10 SDK's runner for a manifest with several tools (as in `deploy-demo.yml`).
 - **Scope.** `HT.Domain` and `HT.Application`, tested by `tests/HT.UnitTests` only. Not `HT.Persistence`
   (mappings and migrations give mostly equivalent mutants), not `HT.Ui` (Stryker cannot mutate `.razor`), not
   `tools/HT.SmokeCheck`.
