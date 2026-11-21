@@ -80,9 +80,19 @@ function Get-SonarGateState {
     if ($job.conclusion -eq 'skipped') { return New-GateResult 'SKIPPED' 'SonarQube Cloud job was skipped.' $checks }
 
     if (-not $gate) {
-        if (Test-WithinGrace $job $Now) { return New-GateResult 'PENDING' 'Workflow finished; waiting for the SonarQube Cloud app to post its gate check.' $checks }
+        if (Test-WithinGrace $job $Now) {
+            if ($job.conclusion -eq 'success') { return New-GateResult 'PENDING' 'Workflow finished; waiting for the SonarQube Cloud app to post its gate check.' $checks }
+            $until = ([datetime]$job.completed_at).AddSeconds($script:Config.GateCheckGraceSeconds).ToUniversalTime().ToString('HH:mm:ss')
+            # sonar.qualitygate.wait fails the job on a red gate too, so a gate check may still come. Without
+            # one by the end of the grace window, the build or the tests failed.
+            if ($job.conclusion -eq 'failure') {
+                return New-GateResult 'PENDING' "Workflow ended 'failure'; a red quality gate also fails it, so waiting until $until UTC for the gate check. Without one it is BUILD_FAILED: the failed job's log has the cause." $checks
+            }
+            return New-GateResult 'PENDING' "Workflow ended '$($job.conclusion)'; waiting until $until UTC for the gate check." $checks
+        }
         if ($job.conclusion -eq 'success') { return New-GateResult 'SKIPPED' 'Workflow succeeded but no quality gate was reported - analysis was skipped (SONAR_TOKEN missing?).' $checks }
-        return New-GateResult 'BUILD_FAILED' "Workflow ended '$($job.conclusion)' before SonarQube reported (build or test failure)." $checks
+        if ($job.conclusion -eq 'failure') { return New-GateResult 'BUILD_FAILED' "Workflow ended 'failure' before SonarQube reported (build or test failure)." $checks }
+        return New-GateResult 'INFRA_FAILED' "Workflow ended '$($job.conclusion)' without a quality gate check." $checks
     }
     if ($gate.status -ne 'completed') { return New-GateResult 'PENDING' 'Sonar quality gate check is still running.' $checks }
     switch ($gate.conclusion) {
