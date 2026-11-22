@@ -235,13 +235,21 @@ internal sealed class RecordStore : IRecordStore
         }, ReadExemptionsFailed);
 
     /// <summary>
-    /// Excuses the commitment (FR-001), re-checking under the goal lock, in the contract's order: an excusal of the
+    /// Excuses the commitment (FR-001), re-checking under the goal lock, in the contract's order: an ending of the
+    /// latest attempt on or before the date (slice 8 FR-009, as <see cref="AddPauseAsync"/> does), an excusal of the
     /// date, a record dated on it (D-3), a pause covering it (FR-009).
     /// </summary>
     public Task<ExemptionStoreWrite> ExcuseAsync(
         AccountId owner, GoalId goal, DateOnly date, ExemptionReason? reason, CancellationToken cancellationToken) =>
         InGoalExemptionTransactionAsync(owner, goal, async () =>
         {
+            // An ending removes the excusals of its date and later (slice 8 FR-009); one made between the use case's
+            // check and this write must not add one back.
+            if (await LatestEndingAsync(goal, cancellationToken).ConfigureAwait(false) is { } ending && date >= ending)
+            {
+                return ExemptionStoreWrite.GoalEnded;
+            }
+
             if (await _db.GoalExcusals.AsNoTracking()
                     .AnyAsync(e => e.GoalId == goal.Value && e.Date == date, cancellationToken).ConfigureAwait(false))
             {
@@ -284,13 +292,7 @@ internal sealed class RecordStore : IRecordStore
         var row = ExemptionMapping.ToRow(goal.Value, firstDay, lastDay, reason);
         return InGoalExemptionTransactionAsync(owner, goal, async () =>
         {
-            var latestEnding = await _db.GoalAttempts.AsNoTracking()
-                .Where(a => a.GoalId == goal.Value)
-                .OrderByDescending(a => a.Number)
-                .Select(a => a.EndingDate)
-                .FirstOrDefaultAsync(cancellationToken)
-                .ConfigureAwait(false);
-            if (latestEnding is not null)
+            if (await LatestEndingAsync(goal, cancellationToken).ConfigureAwait(false) is not null)
             {
                 return ExemptionStoreWrite.GoalEnded;
             }
@@ -512,6 +514,14 @@ internal sealed class RecordStore : IRecordStore
             .AnyAsync(e => e.GoalId == goal && e.Date == entry.Key, cancellationToken)
             .ConfigureAwait(false)
         || await PausesOf(goal, entry.FirstDate, entry.LastDate).AnyAsync(cancellationToken).ConfigureAwait(false);
+
+    /// <summary>A locked goal's latest attempt's ending date, or null while that attempt is not ended (slice 8, research R-05).</summary>
+    private Task<DateOnly?> LatestEndingAsync(GoalId goal, CancellationToken cancellationToken) =>
+        _db.GoalAttempts.AsNoTracking()
+            .Where(a => a.GoalId == goal.Value)
+            .OrderByDescending(a => a.Number)
+            .Select(a => a.EndingDate)
+            .FirstOrDefaultAsync(cancellationToken);
 
     /// <summary>A locked goal's pauses that share a date with the range <paramref name="first"/> to <paramref name="last"/>.</summary>
     private IQueryable<GoalPauseRow> PausesOf(Guid goal, DateOnly first, DateOnly last) =>

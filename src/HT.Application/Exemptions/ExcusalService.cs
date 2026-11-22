@@ -40,7 +40,9 @@ public sealed class ExcusalService
     /// in FR-002's order after access: (4) a period-based goal; (5) a date that is not a commitment; (6) a date in a
     /// pause; (7) an excusal of the date; (8) the commitment's state without exemption, which must be Due or Pending
     /// (D-2); (9) a record of the commitment (D-3); (10) a reason over 200 characters after trimming. The store
-    /// re-checks steps 6, 7 and 9 under the goal-row lock, and a concurrent write there gives that step's refusal.
+    /// re-checks steps 6, 7 and 9 under the goal-row lock, and a concurrent write there gives that step's refusal. Slice
+    /// 8: it also re-checks an ending, and an ending on or before the date between the checks and the write gives step
+    /// 5's "Nothing is scheduled on this date.", as the same call made after the ending does.
     /// <para>
     /// Slice 8 (plan "Spec discrepancies" 2, FR-010): step 4 judges "period-based" by the schedule kind of the attempt
     /// that contains the date (every version of one attempt has its schedule kind). A date between two attempts, or after
@@ -116,6 +118,10 @@ public sealed class ExcusalService
             ExemptionStoreWriteOutcome.AlreadyExcused => ExcuseResult.Refused(ExcuseOutcome.AlreadyExcused, ExcusalTexts.AlreadyExcused),
             ExemptionStoreWriteOutcome.HasRecord => ExcuseResult.Refused(ExcuseOutcome.HasRecord, ExcusalTexts.HasRecord),
             ExemptionStoreWriteOutcome.Paused => ExcuseResult.Refused(ExcuseOutcome.DatePaused, PauseTexts.DatePaused),
+
+            // The goal was ended on or before the date between the checks above and the write (slice 8 FR-009): the date
+            // is now after the ended attempt, which step 5 refuses.
+            ExemptionStoreWriteOutcome.GoalEnded => ExcuseResult.Refused(ExcuseOutcome.NothingScheduled, RecordTexts.NothingScheduled),
 
             // The goal was removed between the lookup and the write.
             ExemptionStoreWriteOutcome.GoalNotFound => ExcuseResult.Refused(ExcuseOutcome.NotFound, GoalTexts.NotFound),

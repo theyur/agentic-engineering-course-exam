@@ -324,6 +324,26 @@ public sealed class GoalChangeStoreTests(DatabaseFixture database)
     }
 
     [Fact]
+    public async Task ExcuseAsync_on_or_after_the_ending_date_gives_GoalEnded_and_writes_nothing_and_the_last_date_still_works()
+    {
+        // From 16 November, ended on 20 November (last date 19): an excusal of the 20th or later would be one that the
+        // ending removes (FR-009), so the store refuses it under the lock; the ended attempt's 19th can still be excused.
+        await using var services = BuildServices();
+        var suffix = Suffix();
+        var owner = await OwnerAsync($"excuse-{suffix}");
+        var goal = await GoalAsync(services, owner, $"Excuse {suffix}", YesNoDaily());
+        await EndAsync(services, owner, goal, D(20));
+
+        await WithRecordsAsync(services, async records =>
+        {
+            Assert.Equal(ExemptionStoreWriteOutcome.GoalEnded, (await records.ExcuseAsync(owner, goal, D(20), null, None)).Outcome);
+            Assert.Equal(ExemptionStoreWriteOutcome.GoalEnded, (await records.ExcuseAsync(owner, goal, D(21), null, None)).Outcome);
+            Assert.Equal(ExemptionStoreWriteOutcome.Written, (await records.ExcuseAsync(owner, goal, D(19), null, None)).Outcome);
+            Assert.Equal([D(19)], (await records.ReadExemptionsAsync(owner, goal, None)).Excusals.Select(e => e.Date));
+        });
+    }
+
+    [Fact]
     public async Task The_catalog_counts_and_goal_list_leave_out_an_ended_goal_and_the_used_by_goals_counts_keep_it()
     {
         await using var services = BuildServices();

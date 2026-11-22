@@ -29,7 +29,10 @@ public enum ExemptionStoreWriteOutcome
     /// <summary>The write was made.</summary>
     Written,
 
-    /// <summary>Slice 8 (research R-05): the goal's latest attempt is ended, so no pause is added.</summary>
+    /// <summary>
+    /// Slice 8 (research R-05, FR-009): the goal's latest attempt is ended, so no pause is added and no date on or after
+    /// its ending date is excused.
+    /// </summary>
     GoalEnded,
 }
 

@@ -140,6 +140,7 @@ public sealed class AttemptService
 |---|---|
 | `ReadRecentNoteKeysAsync(owner, goal, from, through, count, ct)` (new overload) | The newest `count` note keys from `from` through `through` (no upper bound when `through` is null), under the owner scope. Empty for a `count` of 0 or less, as the old overload. |
 | `AddPauseAsync` | Also re-checks under the goal lock that the goal's latest attempt has no ending; otherwise it returns `GoalEnded` with nothing written. This re-check comes before the overlap check (T039). |
+| `ExcuseAsync` | Also re-checks first under the goal lock that the goal's latest attempt did not end on or before the date; otherwise it returns `GoalEnded` with nothing written, so an ending between the use case's checks and the write cannot leave an excusal that the ending removes (FR-009; found in the review of PR 45). |
 
 ## Changed reads (FR-013, FR-016 to FR-021)
 
@@ -160,7 +161,7 @@ public sealed class AttemptService
 | `RecordPreview.Progress`, every `RecordingText` member that takes a `GoalHistory` (`Recorded`, `TargetLine`, `Progress`, `FieldLabel`, `PartialNote`, `ReduceHelp`, `NoteHelp`), `ReportText.ProgressText` | Overloads on `EntrySettings` (research R-07). The pages call only those, with `GoalHistory.SettingsOf(entry)`. `RecordPreview.Progress(GoalHistory, HistoryEntry, …)` reads `history.SettingsOf(entry)`. |
 | `ProfileService.ChangeTimeZoneAsync` | Adds no version to an ended goal, and updates the first version of a waiting attempt (FR-021). |
 | `PauseService.PauseAsync` | Step after (3): an ended goal gives `GoalEnded`, "This goal has ended.". |
-| `ExcusalService.ExcuseAsync` | Step 4 uses the schedule kind of the date's attempt. A date between attempts, or after an ended latest attempt, skips it and gets step 5's "Nothing is scheduled on this date." (data-model.md, T050). |
+| `ExcusalService.ExcuseAsync` | Step 4 uses the schedule kind of the date's attempt. A date between attempts, or after an ended latest attempt, skips it and gets step 5's "Nothing is scheduled on this date." (data-model.md, T050). A store `GoalEnded` (an ending made between the checks and the write) gives the same refusal. |
 
 ## `DemoGoalChangeService` (`HT.Application.Operator`, FR-031)
 

@@ -109,7 +109,9 @@ public interface IRecordStore
 
     /// <summary>
     /// Excuses the goal's commitment of <paramref name="date"/> with an optional reason (FR-001). Re-checked under the
-    /// goal lock, in this order: an excusal of the date gives <see cref="ExemptionStoreWrite.AlreadyExcused"/>, a record
+    /// goal lock, in this order: the goal's latest attempt ended on or before the date gives
+    /// <see cref="ExemptionStoreWrite.GoalEnded"/> (slice 8 FR-009: an ending removes those excusals, so a concurrent
+    /// one must not add one back), an excusal of the date <see cref="ExemptionStoreWrite.AlreadyExcused"/>, a record
     /// dated on it <see cref="ExemptionStoreWrite.HasRecord"/> (D-3), a pause covering it
     /// <see cref="ExemptionStoreWrite.Paused"/>. Every refusal, <see cref="ExemptionStoreWrite.GoalNotFound"/> included,
     /// writes nothing.

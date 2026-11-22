@@ -418,12 +418,19 @@ public sealed class FakeRecordStore : IRecordStore
     {
         RunBeforeNextWrite();
         var owned = Owns(owner, goal);
+        var ending = owned ? _goals.Goals.FirstOrDefault(g => g.Id == goal)?.Attempt.Ending?.Date : null;
         lock (_gate)
         {
             _calls.Add(nameof(ExcuseAsync));
             if (!owned)
             {
                 return Task.FromResult(ExemptionStoreWrite.GoalNotFound);
+            }
+
+            // Slice 8 (FR-009): no excusal on or after the latest attempt's ending date; nothing is written.
+            if (ending is { } endingDate && date >= endingDate)
+            {
+                return Task.FromResult(ExemptionStoreWrite.GoalEnded);
             }
 
             var excusals = ExcusalsOf(goal);
