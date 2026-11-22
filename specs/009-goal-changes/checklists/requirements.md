@@ -46,6 +46,12 @@
   alternatives, and D-1 binds slice 9). `CONTEXT.md` gained Ended goal, Outcome and Settings change, and Attempt,
   Goal settings version, Streak, Report range and Dashboard were sharpened; the demo entries wait for D-3. The
   roadmap's SPEC §11.7 row is decided. All items pass. D-3 is left for `/speckit-clarify`.
+- Iteration 3 (2026-11-22, `/speckit-clarify`): the owner answered D-3 (A: a sixth startup task, demo goal-change
+  loading, creating `demo7@example.com`; ADR 0026), the earlier attempt's History (B: an attempt view with figures,
+  strip and correctable History; FR-014, HP-014), an ended goal's Pending results on Home (B: kept, marked "Ended",
+  until their grace period ends; FR-019, HP-007) and the name of an earlier attempt (A: named by its own last
+  settings; FR-004, FR-015). `CONTEXT.md` gained the demo entries, and Attempt, Dashboard and Ended goal were
+  sharpened. No markers remain; all items pass.
 - As in earlier slices, page and file names in HP requirements (`design/...`, routes, `tools/HT.SmokeCheck`) sit
   outside the AC surface and name the repo's design sources. They are not implementation choices.
 - Demo figures of FR-031 and the scenario figures were recomputed by hand (counts, rounding down, streak runs,
