@@ -113,7 +113,9 @@ only you or its daily schedule do (see "The daily refresh").
   `demo4@example.com` with its results and notes relative to the start's UTC date (slice 5), and
   `demo5@example.com` with 12 weeks of results and notes relative to the same date (slice 6, demo report loading,
   ADR 0021), and `demo6@example.com` with 4 weeks of results, Excused commitments, a past pause and a current
-  pause relative to the same date (slice 7, demo pause loading, ADR 0023).
+  pause relative to the same date (slice 7, demo pause loading, ADR 0023), and `demo7@example.com` with a changed
+  target, an ended goal, a goal on its second attempt and a goal history relative to the same date (slice 8, demo
+  goal-change loading, ADR 0026).
 - A second run waits until the first one ends.
 - A failed run is recovered by the next run: start it again once the cause is fixed. After a failure at
   `7.1 Deploy the web app`, `Deployment__Commit` is empty and only a `deploy` run repairs it; `refresh` and
@@ -128,7 +130,8 @@ The workflow also runs `refresh` every day at 00:20 UTC (ADR 0018, slice 5 HP-00
 shows Met, Failed, Missed, Pending and Due results relative to the current date, and `demo5@example.com` (slice 6
 HP-011, ADR 0021) its full trends, streaks of several weeks and a result Missed this week, and
 `demo6@example.com` (slice 7 HP-010, ADR 0023) Excused results and a goal paused from the day before the refresh
-to 5 days after it. Its run is named `Demo (refresh)` and needs nothing from you.
+to 5 days after it, and `demo7@example.com` (slice 8 HP-011, ADR 0026) a target change still waiting for its
+boundary, an ended goal, a goal on attempt 2 and a filled goal history. Its run is named `Demo (refresh)` and needs nothing from you.
 
 - **After 2027-01-31** a scheduled run ends in **Gate** with the summary "Demo refresh: skipped after
   2027-01-31" and succeeds with `Demo (refresh)` skipped: it never enters the environment `demo` and changes
@@ -138,7 +141,9 @@ to 5 days after it. Its run is named `Demo (refresh)` and needs nothing from you
   History, Pending first and then Missed. demo4's Failed row of "Reading" leaves the first 10 History rows
   after about 4 days, and the smoke check of a `check` run then fails `demo history demo4@example.com`. demo6's
   current pause ends 5 days after the refresh; from the 6th day "Drinking water" leaves the Paused tab, and
-  `demo pause demo6@example.com` fails as well.
+  `demo pause demo6@example.com` fails as well. demo7's waiting target change takes effect the day after the
+  refresh; from then "Reading" has no "From …" row in its Settings card, and `demo goal changes demo7@example.com`
+  fails.
 - **A failed run** leaves the hosted demo as the step it failed at says ("Read the result"); a failure before
   `5.2 Delete the database` leaves the previous day's data. The next day's run, or a run by hand, recovers it.
 - **A refresh by hand.** Run the workflow with `mode` `refresh` (see the table above). Do this after a failed
@@ -185,6 +190,7 @@ PASS demo demo3@example.com (<found> of <expected>)
 PASS demo history demo4@example.com (14 of 14)
 PASS demo report demo5@example.com (<found> of <expected>)
 PASS demo pause demo6@example.com (3 of 3)
+PASS demo goal changes demo7@example.com (4 of 4)
 TIMING first <ms> ms, later <ms> ms (<n> requests)
 RESULT PASS
 ```
@@ -213,6 +219,14 @@ in the same goal item: 3 texts. Its reasons name the goal page only by its numbe
 reason, a note, a figure, a date or a path. It needs demo pause loading's account, so it fails when that startup
 task failed or had no valid demo password.
 
+`demo goal changes demo7@example.com` (slice 8, check 9) checks "Sugar, at most 1 sweet a day" on the Goals page's
+Ended tab (`/goals?tab=ended`); an attempt line that starts "Attempt 2 · started" on the page of "Meditation, 5 min
+daily"; in the Settings card of "Reading, 20 min daily" the row "From …" with "25 min daily"; and "Abandoned" in the
+table "Goal history" on the Profile's Goal history tab (`/profile?tab=history`): 4 texts. The goal pages are reached
+through their links on Goals. Its reasons name the goal pages only by their numbers (1 and 2), and never print a name,
+an ending note, a note, a figure, a date or a path. It needs demo goal-change loading's account, so it fails when that
+startup task failed or had no valid demo password.
+
 ## Read the operator log
 
 The operator log is the web app's console output: administrator creation, demo loading, demo history loading
@@ -222,7 +236,10 @@ password; otherwise `Demo account demo5@example.com: …`, `Demo goals demo5@exa
 `Demo records demo5@example.com: …`; `Demo report loading failed; the app starts without it` for a fault), then, as
 the fifth startup task (slice 7 HP-010, ADR 0023), demo pause loading (`Demo pause loading: …` with no or a weak
 demo password; otherwise `Demo account demo6@example.com: …`, `Demo goals demo6@example.com: …`,
-`Demo records demo6@example.com: …`; `Demo pause loading failed; the app starts without it` for a fault) and faults. It
+`Demo records demo6@example.com: …`; `Demo pause loading failed; the app starts without it` for a fault), then, as
+the sixth startup task (slice 8 HP-011, ADR 0026), demo goal-change loading (`Demo goal-change loading: …` with no or
+a weak demo password; otherwise `Demo account demo7@example.com: …`, `Demo goals demo7@example.com: …`,
+`Demo records demo7@example.com: …`; `Demo goal-change loading failed; the app starts without it` for a fault) and faults. It
 needs an Azure sign-in, and it contains the administrator email, so never paste it into a public place.
 
 - Live: `az webapp log tail --name <app> --resource-group <rg>`, or the portal's Log stream.
@@ -270,7 +287,7 @@ The exam submission is written outside the repository. It gives reviewers:
 | Item | Value |
 |---|---|
 | Published address | `https://<app>.azurewebsites.net`, the `DEMO_BASE_URL` variable of the environment `demo` |
-| Demo emails | `demo1@example.com`, `demo2@example.com`, `demo3@example.com`; with history `demo4@example.com` (slice 5) and `demo5@example.com` (slice 6, the reports with full trends); with excusals and pauses `demo6@example.com` (slice 7) |
+| Demo emails | `demo1@example.com`, `demo2@example.com`, `demo3@example.com`; with history `demo4@example.com` (slice 5) and `demo5@example.com` (slice 6, the reports with full trends); with excusals and pauses `demo6@example.com` (slice 7); with goal changes `demo7@example.com` (slice 8) |
 | Demo password | the value of `Operator__DemoPassword`; not written here |
 | Administrator email | the value of `Operator__AdministratorEmail`; not written here |
 | Administrator password | the value of `Operator__AdministratorPassword`; not written here |

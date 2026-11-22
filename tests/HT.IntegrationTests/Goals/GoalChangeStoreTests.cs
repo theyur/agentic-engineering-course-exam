@@ -109,7 +109,6 @@ public sealed class GoalChangeStoreTests(DatabaseFixture database)
             await AddRecordAsync(records, owner, goal, D(18));
             await AddRecordAsync(records, owner, goal, D(22));
             await SaveNoteAsync(records, owner, goal, D(22), "Kept after the last date.");
-            return 0;
         });
 
         var read = (await WithGoalsAsync(services, s => s.ReadOwnerGoalAsync(owner, goal, None)))!;
@@ -135,7 +134,6 @@ public sealed class GoalChangeStoreTests(DatabaseFixture database)
             var stored = await records.ReadAsync(owner, goal, D(16), D(30), None);
             Assert.Equal([D(18), D(22)], stored.Records.Select(r => r.Date));
             Assert.Equal([D(22)], stored.Notes.Keys);
-            return 0;
         });
     }
 
@@ -281,12 +279,11 @@ public sealed class GoalChangeStoreTests(DatabaseFixture database)
         var goal = await TwoAttemptGoalAsync(services, owner, $"Notes {suffix}");
         await WithRecordsAsync(services, async records =>
         {
-            foreach (var day in new[] { 17, 18, 20, 21, 24 })
+            int[] noteDays = [17, 18, 20, 21, 24];
+            foreach (var day in noteDays)
             {
                 await SaveNoteAsync(records, owner, goal, D(day), $"Note {day}.");
             }
-
-            return 0;
         });
 
         await WithRecordsAsync(services, async records =>
@@ -300,7 +297,6 @@ public sealed class GoalChangeStoreTests(DatabaseFixture database)
 
             // The old overload is unchanged.
             Assert.Equal([D(24), D(21), D(20)], await records.ReadRecentNoteKeysAsync(owner, goal, 3, None));
-            return 0;
         });
     }
 
@@ -317,7 +313,6 @@ public sealed class GoalChangeStoreTests(DatabaseFixture database)
         {
             Assert.Equal(ExemptionStoreWriteOutcome.GoalEnded, (await records.AddPauseAsync(owner, goal, D(23), D(25), null, None)).Outcome);
             Assert.Empty((await records.ReadExemptionsAsync(owner, goal, None)).Pauses);
-            return 0;
         });
 
         // A new attempt can be paused again.
@@ -325,7 +320,6 @@ public sealed class GoalChangeStoreTests(DatabaseFixture database)
         await WithRecordsAsync(services, async records =>
         {
             Assert.Equal(ExemptionStoreWriteOutcome.Written, (await records.AddPauseAsync(owner, goal, D(23), D(25), null, None)).Outcome);
-            return 0;
         });
     }
 
@@ -400,10 +394,10 @@ public sealed class GoalChangeStoreTests(DatabaseFixture database)
         return await call(scope.ServiceProvider.GetRequiredService<IGoalStore>());
     }
 
-    private static async Task<T> WithRecordsAsync<T>(ServiceProvider services, Func<IRecordStore, Task<T>> call)
+    private static async Task WithRecordsAsync(ServiceProvider services, Func<IRecordStore, Task> call)
     {
         await using var scope = services.CreateAsyncScope();
-        return await call(scope.ServiceProvider.GetRequiredService<IRecordStore>());
+        await call(scope.ServiceProvider.GetRequiredService<IRecordStore>());
     }
 
     /// <summary>A registered user <c>it-gc-{name}@example.com</c> whose stored zone is UTC.</summary>

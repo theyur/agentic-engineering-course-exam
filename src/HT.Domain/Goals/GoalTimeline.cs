@@ -208,6 +208,7 @@ public static class GoalTimeline
         }
 
         // Overlaps after a move east can make yesterday's end later than today's start, so the scan starts two days back.
+        // Stryker disable once Equality : when current − 2 equals the timing date both branches give the same date, so >= gives the same
         var scanStart = line.OwnCurrentDate(instant) is { } current && current.AddDays(-CandidateSpread) > line.TimingDate
             ? current.AddDays(-CandidateSpread)
             : line.TimingDate;
@@ -273,6 +274,7 @@ public static class GoalTimeline
                 : GoalVersionChange.ReplaceFirst(zone);
         }
 
+        // Stryker disable once Linq,Equality : All ignores the order, and a version from D itself is VersionOf(D), already in the list, so Append and >= give the same
         var fromCurrent = line.Versions.Where(version => version.AppliesFrom > current).Prepend(line.VersionOf(current));
         if (fromCurrent.All(version => version.Settings.TimeZone == zone))
         {
@@ -420,6 +422,7 @@ public static class GoalTimeline
         ArgumentNullException.ThrowIfNull(goal);
         var ending = goal.Attempt.Ending ?? throw new InvalidOperationException("The goal is not ended.");
         var after = ending.Date.AddDays(1);
+        // Stryker disable once Equality : when both dates are equal either branch gives that date, so >= gives the same
         return accountToday > after ? accountToday : after;
     }
 
@@ -463,15 +466,18 @@ public static class GoalTimeline
 
     private static List<CalendarEntry> EntriesThrough(AttemptLine line, DateOnly last)
     {
+        // Stryker disable once Equality : when both dates are equal either branch gives that date, so <= gives the same (> is killed by GoalTimelineEdgeTests)
         var end = line.Last is { } lastDate && lastDate < last ? lastDate : last;
         var entries = new List<CalendarEntry>();
         var first = MondayOnOrBefore(line.TimingDate);
         while (first <= end)
         {
+            // Stryker disable once Equality : at exactly 364 days the two reads split at a Monday and list the same entries as one read, so <= gives the same
             var lastWindow = end.DayNumber - first.DayNumber < ReportWindowDays;
             var windowLast = lastWindow ? end : first.AddDays(ReportWindowDays - 1);
             entries.AddRange(line.Entries(first, windowLast));
             if (lastWindow)
+            // Stryker disable once Block,Statement : the next window would start after the end, so the loop stops without the break as well
             {
                 break;
             }
@@ -484,6 +490,7 @@ public static class GoalTimeline
 
     private static DateOnly Later(DateOnly a, DateOnly b) => a > b ? a : b;
 
+    // Stryker disable once Equality : when both dates are equal either branch gives that date, so <= gives the same
     private static DateOnly Earlier(DateOnly a, DateOnly? b) => b is { } other && other < a ? other : a;
 
     /// <summary>Days since Monday: 0 for Monday, 6 for Sunday.</summary>
@@ -539,6 +546,7 @@ public static class GoalTimeline
         public bool Spans(DateOnly date) => date >= TimingDate && (Last is not { } last || date <= last);
 
         /// <summary>Whether one of the attempt's entries contains <paramref name="date"/>.</summary>
+        // Stryker disable once Logical : every entry of the one-day range contains that day, so || gives the same
         public bool Contains(DateOnly date) => Entries(date, date).Any(entry => entry.FirstDate <= date && date <= entry.LastDate);
 
         /// <summary>A not-ended attempt has begun when it has a current date of its own; an ended one when it has a date.</summary>
@@ -546,7 +554,10 @@ public static class GoalTimeline
 
         public GoalSettingsVersion VersionOf(DateOnly date)
         {
-            for (var i = Versions.Count - 1; i > 0; i--)
+            for (var i = Versions.Count - 1;
+                 // Stryker disable once Equality : at i = 0 the loop returns Versions[0], which the method returns after the loop anyway, so >= gives the same
+                 i > 0;
+                 i--)
             {
                 if (Versions[i].AppliesFrom <= date)
                 {
@@ -580,10 +591,17 @@ public static class GoalTimeline
             foreach (var zone in Versions.Select(version => version.Settings.TimeZone).Distinct())
             {
                 var local = zone.DateAt(instant);
-                for (var offset = -CandidateSpread; offset <= CandidateSpread; offset++)
+                for (var offset = -CandidateSpread;
+                     // Stryker disable once Equality : a date after a zone's local date has begun only in a zone whose local date is that late, which offers it at an offset of 0 or less, so < gives the same
+                     offset <= CandidateSpread;
+                     offset++)
                 {
                     var candidate = local.AddDays(offset);
-                    if (candidate >= TimingDate && (current is null || candidate > current) && DayStart(candidate) <= instant)
+                    if (candidate >= TimingDate
+                        && (current is null ||
+                            // Stryker disable once Equality : a candidate equal to the current date sets it to the same date, so >= gives the same
+                            candidate > current)
+                        && DayStart(candidate) <= instant)
                     {
                         current = candidate;
                     }

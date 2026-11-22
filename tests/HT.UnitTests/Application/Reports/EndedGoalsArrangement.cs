@@ -46,17 +46,14 @@ internal sealed class EndedGoalsArrangement
 
     private static readonly CancellationToken None = CancellationToken.None;
 
-    private EndedGoalsArrangement(AttemptWorld world, CatalogHabit meditationHabit, CatalogHabit sugarHabit, GoalId reading, GoalId meditation, GoalId sugar)
+    private EndedGoalsArrangement(CatalogHabit meditationHabit, CatalogHabit sugarHabit, GoalId reading, GoalId meditation, GoalId sugar)
     {
-        World = world;
         MeditationHabit = meditationHabit;
         SugarHabit = sugarHabit;
         Reading = reading;
         Meditation = meditation;
         Sugar = sugar;
     }
-
-    public AttemptWorld World { get; }
 
     public CatalogHabit MeditationHabit { get; }
 
@@ -103,7 +100,7 @@ internal sealed class EndedGoalsArrangement
         Assert.Equal((GoalEndOutcome.Ended, (DateOnly?)Mon16, (DateOnly?)Sun15), (meditationEnded.Outcome, meditationEnded.EndingDate, meditationEnded.LastDate));
 
         world.At(Mon16At12);
-        return new EndedGoalsArrangement(world, meditationHabit, sugarHabit, reading, meditation, sugar);
+        return new EndedGoalsArrangement(meditationHabit, sugarHabit, reading, meditation, sugar);
     }
 
     private static async Task<GoalId> CreateAsync(AttemptWorld world, CatalogHabit habit, GoalTargetFields target)

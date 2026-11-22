@@ -21,6 +21,7 @@ internal static class AttemptEntries
     /// The number of the attempt whose entries contain <paramref name="entry"/>: the latest attempt for a goal with one
     /// attempt, without a timeline call, so slice 7's reads cost what they did.
     /// </summary>
+    // Stryker disable once Conditional : with one attempt AttemptOf gives 1 or null, and null falls back to the latest attempt's number, 1, so the timeline call gives the same
     internal static int NumberOf(Goal goal, CalendarEntry entry) =>
         goal.Attempts.Count == 1 ? goal.Attempt.Number : GoalTimeline.AttemptOf(goal, entry.FirstDate) ?? goal.Attempt.Number;
 
@@ -57,11 +58,15 @@ internal static class AttemptEntries
         {
             var number = attempt.Attempt.Number;
             var entries = BoundsOf(goal, number);
-            if (entries.Count == 0 || GracePeriod.EndOf(entries[^1].Ends) <= now)
+            if (entries.Count == 0 ||
+                // Stryker disable once Equality : the filter below keeps no entry whose grace period ends at or before now, so < gives the same
+                GracePeriod.EndOf(entries[^1].Ends) <= now)
+            // Stryker disable once Block,Statement : the filter below keeps no entry of an attempt whose last grace period has ended, so going on gives the same
             {
                 continue;
             }
 
+            // Stryker disable once Equality : an entry whose grace period ends exactly now is Missed, Met or Failed, never the Pending that callers keep, so >= gives the same
             open.AddRange(entries.Where(entry => GracePeriod.EndOf(entry.Ends) > now).Select(entry => (number, entry)));
         }
 

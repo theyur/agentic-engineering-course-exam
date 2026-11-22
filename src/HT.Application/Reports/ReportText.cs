@@ -140,7 +140,7 @@ public static class ReportText
     /// <summary>
     /// The progress of a Due entry with a record in a meta line (HP-002, HP-003), followed by " today" for a commitment
     /// or a day and " this week" for a week: "12 of 20 min today", "2 of at most 3 cups today" (amounts, as
-    /// <see cref="RecordingText.Progress"/> gives them); "1 of 3 this week", "1 of at most 2 today" (numbers of records);
+    /// <see cref="RecordingText.Progress(EntrySettings, Progress)"/> gives them); "1 of 3 this week", "1 of at most 2 today" (numbers of records);
     /// "Yes today" or "No today" for a yes/no commitment, whose value is its answer.
     /// </summary>
     /// <exception cref="ArgumentException">A commitment with no recorded value; the message names no value.</exception>

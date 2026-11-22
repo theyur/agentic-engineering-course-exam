@@ -154,6 +154,7 @@ public sealed class AttemptService
         var goal = stored.Goal;
         var ending = attempt.Ending!;
         var isLatest = attempt.Number == goal.Attempt.Number;
+        // Stryker disable once Conditional : only ended attempts are listed, and for an ended latest attempt Name and AttemptName both name its last version, so AttemptName gives the same
         return new EndedAttemptView
         {
             GoalId = goal.Id,

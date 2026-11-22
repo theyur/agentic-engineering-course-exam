@@ -21,7 +21,7 @@ namespace HT.UnitTests.Application.Goals;
 /// pattern: the slice-4 fakes, a <see cref="FakeRecordStore"/> sharing the goal store's goals, a fake clock and the UTC
 /// installation default, with a registered user in UTC, another registered user and an administrator. Goals are either
 /// seeded through the attempts constructor of <see cref="Goal"/> with any attempts, versions and endings
-/// (<see cref="Seed"/>), or created at an earlier supplied time through <see cref="GoalService"/> and then changed,
+/// (<see cref="Seed(ActingUser, GoalName?, GoalAttemptVersions[])"/>), or created at an earlier supplied time through <see cref="GoalService"/> and then changed,
 /// ended and restarted at later times through the store's conditional writes, as the goal-change use cases will make
 /// them (<see cref="ChangeSettingsAsync"/>, <see cref="EndAsync"/>, <see cref="StartAttemptAsync"/>): each reads
 /// <see cref="IGoalStore.ReadOwnerGoalAsync"/>, decides in the Domain at the clock's time and writes. Records go through

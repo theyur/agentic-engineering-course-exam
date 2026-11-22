@@ -75,7 +75,7 @@ public sealed class ChangeSettingsEffectTests
     {
         var (goal, _) = await ReadingAsync();
         _world.At(Utc("2026-11-11T10:00:00Z"));
-        Assert.Equal((DateOnly?)Thu12, (await ChangeAsync(goal, MinutesDaily(20))).AppliesFrom);
+        Assert.Equal(Thu12, (await ChangeAsync(goal, MinutesDaily(20))).AppliesFrom);
 
         _world.At(Utc("2026-11-16T12:00:00Z"));
         var history = await _world.HistoryAsync(goal, Mon2, Sun15);
@@ -133,7 +133,7 @@ public sealed class ChangeSettingsEffectTests
         }
 
         _world.At(Utc("2026-11-18T10:00:00Z"));
-        Assert.Equal((DateOnly?)Mon23, (await ChangeAsync(goal, YesNoTimes(4, SchedulePeriod.Week))).AppliesFrom);
+        Assert.Equal(Mon23, (await ChangeAsync(goal, YesNoTimes(4, SchedulePeriod.Week))).AppliesFrom);
 
         _world.At(Utc("2026-11-25T12:00:00Z"));
         var history = await _world.HistoryAsync(goal, Mon16, Mon30);
@@ -170,7 +170,7 @@ public sealed class ChangeSettingsEffectTests
         var result = await ChangeAsync(goal, DurationDays(30, DurationUnit.Minutes, BuildOrReduce.Reduce, AllDays));
 
         var appliesFrom = Date(2026, 11, appliesFromDay);
-        Assert.Equal((DateOnly?)appliesFrom, result.AppliesFrom);
+        Assert.Equal(appliesFrom, result.AppliesFrom);
         var after = await _world.HistoryAsync(goal, Mon2, Sun15);
         Assert.Equal(Begun(before, appliesFrom), Begun(after, appliesFrom));
         Assert.Contains(after.Entries, e => e.FirstDate == appliesFrom.AddDays(-1));
@@ -194,7 +194,7 @@ public sealed class ChangeSettingsEffectTests
         var result = await ChangeAsync(goal, YesNoTimes(2, SchedulePeriod.Week));
 
         var appliesFrom = Date(2026, 11, appliesFromDay);
-        Assert.Equal((DateOnly?)appliesFrom, result.AppliesFrom);
+        Assert.Equal(appliesFrom, result.AppliesFrom);
         Assert.Equal(DayOfWeek.Monday, appliesFrom.DayOfWeek);
         var after = await _world.HistoryAsync(goal, Mon2, Date(2026, 12, 6));
         Assert.Equal(Begun(before, appliesFrom), Begun(after, appliesFrom));
@@ -212,7 +212,7 @@ public sealed class ChangeSettingsEffectTests
         var before = await _world.HistoryAsync(goal, Mon2, Sun15);
         var result = await ChangeAsync(goal, MinutesDaily(10));
 
-        Assert.Equal((DateOnly?)Thu12, result.AppliesFrom);
+        Assert.Equal(Thu12, result.AppliesFrom);
         var after = await _world.HistoryAsync(goal, Mon2, Sun15);
         Assert.Equal(Begun(before, Thu12), Begun(after, Thu12));
         Assert.All(after.Entries.Where(e => e.FirstDate >= Thu12), e => Assert.Equal(10, after.SettingsOf(e).Amount));

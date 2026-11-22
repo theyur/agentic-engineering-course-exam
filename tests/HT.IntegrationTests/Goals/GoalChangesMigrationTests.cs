@@ -78,7 +78,8 @@ public sealed class GoalChangesMigrationTests(MigrationDatabaseFixture database)
         Assert.Contains("AttemptNumber int NOT NULL", await ColumnsAsync("GoalSettingsVersions"));
         var numbers = await Sql.QueryAsync(database.ConnectionString,
             "SELECT [AttemptNumber] FROM [GoalSettingsVersions] WHERE [GoalId] = @goal ORDER BY [AppliesFrom]", ("@goal", goal));
-        Assert.Equal(new[] { 1, 1 }, numbers.Select(row => (int)row["AttemptNumber"]!));
+        int[] firstAttemptOnly = [1, 1];
+        Assert.Equal(firstAttemptOnly, numbers.Select(row => (int)row["AttemptNumber"]!));
 
         // (2) The key (goal, attempt number, applies-from), which also serves both foreign keys; the cascade from Goals
         // stays and the foreign key to the attempt takes no action on delete.

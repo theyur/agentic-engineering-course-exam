@@ -221,7 +221,12 @@ public sealed class DemoGoalChangesTests
         Assert.Throws<ArgumentException>(() => new DemoGoalChangeGoal(" ", states, [Open(1, 3)], [], []));
         Assert.Throws<ArgumentException>(() => new DemoGoalChangeGoal("Reading", [], [Open(1, 3)], [], []));
         Assert.Throws<ArgumentException>(() => new DemoGoalChangeGoal("Reading", [(CatalogHabitState)99], [Open(1, 3)], [], []));
+        Assert.Throws<ArgumentException>(() => new DemoGoalChangeGoal("Reading", [CatalogHabitState.Published, (CatalogHabitState)99], [Open(1, 3)], [], []));
         Assert.Throws<ArgumentException>(() => new DemoGoalChangeGoal("Reading", states, [null!], [], []));
+        Assert.Contains(
+            "no null attempt",
+            Assert.Throws<ArgumentException>(() => new DemoGoalChangeGoal("Reading", states, [Open(1, 3), null!], [], [])).Message,
+            StringComparison.Ordinal);
         Assert.Throws<ArgumentException>(() => new DemoGoalChangeGoal("Reading", states, [Open(1, 3)], [null!], []));
         Assert.Throws<ArgumentException>(() => new DemoGoalChangeGoal("Reading", states, [Open(1, 3)], [], [null!]));
 
@@ -251,6 +256,7 @@ public sealed class DemoGoalChangesTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new DemoAttempt(0, [version], null));
         Assert.Throws<ArgumentException>(() => new DemoAttempt(1, [], null));
         Assert.Throws<ArgumentException>(() => new DemoAttempt(1, [null!], null));
+        Assert.Throws<ArgumentException>(() => new DemoAttempt(1, [version, null!], null));
         Assert.Throws<ArgumentNullException>(() => new DemoVersion(version.AppliesFrom, null!));
     }
 

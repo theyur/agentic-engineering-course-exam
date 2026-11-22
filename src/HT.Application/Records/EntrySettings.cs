@@ -42,6 +42,7 @@ public sealed record EntrySettings
     internal static EntrySettings Of(GoalTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);
+        // Stryker disable once Conditional : a fixed-days schedule has no Times (null), so taking Schedule.Times for every target gives the same
         return new EntrySettings
         {
             GoalScheduleKind = target.ScheduleKindOf,

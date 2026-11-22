@@ -19,7 +19,7 @@ namespace HT.Application.Reports;
 /// <para>
 /// Slice 8 (research R-07): one evaluation covers one attempt. The figures, results, trend and notes are that
 /// attempt's, and the target it is built with is that attempt's settings in effect
-/// (<see cref="GoalTimeline.VersionInEffect(Goal, int, DateTimeOffset)"/>). The evaluation of the latest attempt (the
+/// (<see cref="GoalTimeline.VersionInEffect(HT.Domain.Goals.Goal, int, DateTimeOffset)"/>). The evaluation of the latest attempt (the
 /// report range, FR-013) also gives <see cref="EarlierPending"/>, so what can be recorded now covers the open grace
 /// periods of earlier attempts.
 /// </para>
@@ -81,7 +81,7 @@ internal sealed class GoalEvaluation
 
     /// <summary>
     /// The goal's own or derived name (slice 4 FR-010): for the latest attempt the name at <see cref="Now"/>
-    /// (<see cref="GoalText.Name(Goal, string, DateTimeOffset)"/>), for an earlier one <see cref="GoalText.AttemptName"/>
+    /// (<see cref="GoalText.Name(HT.Domain.Goals.Goal, string, DateTimeOffset)"/>), for an earlier one <see cref="GoalText.AttemptName"/>
     /// (slice 8 FR-004, research R-08).
     /// </summary>
     public string Name { get; }
@@ -163,7 +163,7 @@ internal sealed class GoalEvaluation
     /// <summary>
     /// Evaluates the latest attempt of <paramref name="stored"/> at <paramref name="now"/> (the report range, slice 8
     /// FR-013): its entries through its current date from
-    /// <see cref="GoalTimeline.EntriesThrough(Goal, int, DateOnly)"/>, their records and notes from one
+    /// <see cref="GoalTimeline.EntriesThrough(HT.Domain.Goals.Goal, int, DateOnly)"/>, their records and notes from one
     /// <see cref="IRecordStore.ReadAsync"/> for <paramref name="owner"/> over the first entry's first date to the last
     /// entry's last date, and, for a commitment-based yes/no goal, the Upcoming commitments of the current week for its
     /// trend's target. A goal with no current date, or no entry through it, reads no record.
@@ -212,6 +212,7 @@ internal sealed class GoalEvaluation
     /// </summary>
     public HistoryEntry? NextUpcoming(DateOnly windowStart)
     {
+        // Stryker disable once Logical : only the dashboard calls this, for latest attempts, and an ended goal has no entry from its current date or today on, so && gives the same
         if (!IsLatestAttempt || Goal.IsEnded
             || !GoalTimeline.TryEntries(Goal, windowStart, windowStart.AddDays(UpcomingWindowDays), out var window))
         {
@@ -284,6 +285,7 @@ internal sealed class GoalEvaluation
         }
 
         // Only the latest attempt, while it runs, has commitments after the current date in the current week.
+        // Stryker disable once Conditional,Logical : only the latest attempt's trend is read (ReportService.TrendOf), an ended goal has no entry after its current date, and an attempt that has not begun has no begun week to add to, so computing them always gives the same
         var upcoming = isLatest && !goal.IsEnded && GoalTimeline.LatestAttemptHasBegun(goal, now) ? CurrentWeekUpcoming(goal, latest, current) : [];
         var trend = TrendBuilder.Of(latest, begun, upcoming, exemptions);
         var name = isLatest ? GoalText.Name(goal, stored.Habit.Name, now) : GoalText.AttemptName(goal, number, stored.Habit.Name);

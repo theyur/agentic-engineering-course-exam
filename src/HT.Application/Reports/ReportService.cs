@@ -241,6 +241,7 @@ public sealed class ReportService
         return new TodayEntry
         {
             GoalId = evaluation.Goal.Id,
+            // Stryker disable once Conditional : an entry of the latest attempt has no AttemptName, so the fallback gives evaluation.Name as well
             GoalName = entry.IsLatestAttempt ? evaluation.Name : entry.AttemptName ?? evaluation.Name,
             BuildOrReduce = entry.IsLatestAttempt ? evaluation.BuildOrReduce : settings.BuildOrReduce,
             ScheduleText = GoalText.ScheduleText(entry.IsLatestAttempt ? evaluation.LatestTarget : settings.Target),

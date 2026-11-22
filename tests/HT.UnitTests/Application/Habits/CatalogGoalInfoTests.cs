@@ -5,6 +5,8 @@ using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.UnitTests.Application.Goals;
 using HT.UnitTests.Fakes;
+using static HT.UnitTests.Domain.Goals.GoalSamples;
+using static HT.UnitTests.Domain.Time.Instants;
 
 namespace HT.UnitTests.Application.Habits;
 
@@ -20,7 +22,7 @@ public sealed class CatalogGoalInfoTests
     private CatalogService Service => new(_world.CatalogHabits, _world.Goals);
 
     private static readonly GoalTargetFields ThreeTimesAWeek =
-        HT.UnitTests.Domain.Goals.GoalSamples.YesNoTimes(3, SchedulePeriod.Week);
+        YesNoTimes(3, SchedulePeriod.Week);
 
     private async Task<GoalId> CreateAsync(ActingUser user, CatalogHabit habit, string? name = null, GoalTargetFields? target = null)
     {
@@ -115,8 +117,8 @@ public sealed class CatalogGoalInfoTests
         var stretching = _world.CatalogHabits.Add(HabitSamples.Catalog("Stretching", CatalogHabitState.Unpublished));
         var user = GoalInputs.RegisteredUser(_world.Accounts);
         await CreateAsync(user, reading);
-        _world.AddGoal(user.AccountId!.Value, stretching, HT.UnitTests.Domain.Goals.GoalSamples.PerWeek(),
-            (GoalWorld.Today, HT.UnitTests.Domain.Goals.GoalSamples.Kyiv));
+        _world.AddGoal(user.AccountId!.Value, stretching, PerWeek(),
+            (GoalWorld.Today, Kyiv));
 
         var result = await BrowseAsync(user, onlyTracked: true);
 
@@ -177,8 +179,8 @@ public sealed class CatalogGoalInfoTests
     {
         var stretching = _world.CatalogHabits.Add(HabitSamples.Catalog("Stretching", CatalogHabitState.Unpublished));
         var user = GoalInputs.RegisteredUser(_world.Accounts);
-        _world.AddGoal(user.AccountId!.Value, stretching, HT.UnitTests.Domain.Goals.GoalSamples.PerWeek(),
-            (GoalWorld.Today, HT.UnitTests.Domain.Goals.GoalSamples.Kyiv));
+        _world.AddGoal(user.AccountId!.Value, stretching, PerWeek(),
+            (GoalWorld.Today, Kyiv));
 
         var result = await DetailsAsync(user, stretching);
 
@@ -292,9 +294,9 @@ public sealed class CatalogGoalInfoTests
     // ---- Slice 8: ended goals and names at one time read (FR-004, FR-020, research R-08; T056) ----
 
     private static GoalTargetFields MinutesDaily(int minutes) =>
-        HT.UnitTests.Domain.Goals.GoalSamples.DurationDays(minutes, DurationUnit.Minutes, BuildOrReduce.Build, HT.UnitTests.Domain.Goals.GoalSamples.AllDays);
+        DurationDays(minutes, DurationUnit.Minutes, BuildOrReduce.Build, AllDays);
 
-    private static DateTimeOffset At(string literal) => HT.UnitTests.Domain.Time.Instants.Utc(literal);
+    private static DateTimeOffset At(string literal) => Utc(literal);
 
     [Fact]
     public async Task Slice_8_the_counts_only_habits_I_track_and_the_goal_list_leave_out_an_ended_goal_which_stays_used_by_goals()
