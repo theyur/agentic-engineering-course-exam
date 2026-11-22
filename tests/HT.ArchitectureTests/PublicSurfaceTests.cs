@@ -85,6 +85,10 @@ public sealed class PublicSurfaceTests
     [InlineData("HT.Application.Goals", "GoalChangeTexts")]
     [InlineData("HT.Application.Records", "EntrySettings")]
     [InlineData("HT.Application.Goals", "GoalSettingsView")]
+    [InlineData("HT.Application.Goals", "GoalChangeService")]
+    [InlineData("HT.Application.Goals", "GoalSettingsInput")]
+    [InlineData("HT.Application.Goals", "SettingsChangeResult")]
+    [InlineData("HT.Application.Goals", "SettingsChangeOutcome")]
     public void TheNewRecordingTypesHaveNoNodaTimeTypeInTheirSignatures(string ns, string typeName)
     {
         var types = new[] { ArchitectureModel.Domain, ArchitectureModel.Application }

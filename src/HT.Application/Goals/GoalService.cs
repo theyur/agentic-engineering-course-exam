@@ -451,8 +451,11 @@ public sealed class GoalService
     private static GoalCreateResult Refused(GoalProblem problem) =>
         GoalCreateResult.Refused(Enum.Parse<GoalCreateOutcome>(problem.ToString()), TextOf(problem), GoalDraft.FieldOf(problem));
 
-    /// <summary>The text of a goal problem (FR-006): slice 2's target texts, with the goal's own yes/no text.</summary>
-    private static string TextOf(GoalProblem problem) => problem switch
+    /// <summary>
+    /// The text of a goal problem (FR-006): slice 2's target texts, with the goal's own yes/no text. Slice 8: also the
+    /// target texts of a settings change and a new attempt (<see cref="GoalChangeService"/>), so each exists once.
+    /// </summary>
+    internal static string TextOf(GoalProblem problem) => problem switch
     {
         GoalProblem.HabitMissing => GoalTexts.HabitMissing,
         GoalProblem.BuildOrReduceMissing => HabitTexts.IntentMissing,

@@ -224,6 +224,14 @@ view.
 | `NewAttemptValuesResult` | `Found`, `NotSignedIn`, `NotForAdministrators`, `NotFound`, `NotEnded` | `Values` (`NewAttemptValues`) |
 | `AttemptStartResult` | `Started`, `NotSignedIn`, `NotForAdministrators`, `NotFound`, `NotEnded`, the target problems, `StartDateMissing`, `StartDateInPast`, `StartDateNotAfterEnding`, `StartDateTooFar` | `AttemptNumber`, `StartDate`, `Field` on a refusal |
 
+Settled in T060: `SettingsChangeResult`'s outcome enum is `SettingsChangeOutcome` (in `GoalChangeResults.cs`), with
+the members in FR-003's check order and the successes last, as `GoalCreateOutcome` has them: `NotSignedIn`,
+`NotForAdministrators`, `NotFound`, `GoalEnded`, the target problems from `BuildOrReduceMissing` to `PeriodMissing`,
+`ReduceAmountNeedsOneTime`, `ScheduleKindChanged`, `NameTooLong`, `Unchanged`, `Changed`. `Message` is never null: the
+refusal's text, or "settings changed" / "settings unchanged". `Field` is set only for the target refusals
+(`GoalDraft.FieldOf`), `ScheduleKindChanged` (`Schedule`) and `NameTooLong` (`Name`). `GoalSettingsInput` is a sealed
+record with init-only `Target` (default empty) and `Name`, as `GoalInput`.
+
 `NewAttemptValues` has:
 
 - the target fields of the ended attempt's last version, as `GoalStartingValues` gives them: `BuildOrReduce`,

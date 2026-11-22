@@ -1,0 +1,105 @@
+@page "/goals/{Id:guid}/edit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using HT.Application.Goals
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Ui.Account
+@using HT.Ui.Components.Goals
+@using HT.Ui.Goals
+@using HT.Ui.Habits
+@using Microsoft.AspNetCore.Authorization
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageEditGoalSettings, slice 8 state (HP-002, contracts/host.md "Edit settings page"): reads the goal
+   with GoalService.GetAsync. An administrator, an unknown goal and another account's goal get the Not found page; an
+   ended goal returns to its goal page. Otherwise: BackLink "← {goal name}" to the goal page, the heading "Edit
+   settings", and NewGoalForm in its edit mode, filled with the latest settings and the own name, with the Notice
+   "Changes apply from {ChangesApplyFrom}. Past results keep their rules." above "Save changes" and Cancel (back to
+   the goal page), beside the summary card. "settings changed" and "settings unchanged" both return to the goal page;
+   a refusal about a field shows under it, one about no field above the form's first section (the goal ended
+   elsewhere while the page was open), and an access refusal gives the Not found page. Every use case runs in its own
+   scope. *@
+<PageTitle>Edit settings · Habit Tracker</PageTitle>
+
+@if (_model is { } model && _goal is { } goal)
+{
+    <div class="ht-container">
+        <BackLink Href="@GoalAddress" Text="@goal.Name" />
+        <div class="ht-page-head ht-detail-head">
+            <div>
+                <h1>Edit settings</h1>
+            </div>
+        </div>
+        <NewGoalForm Model="model" Error="_error" ActingUser="_actingUser" CancelHref="@GoalAddress" EditMode="true"
+                     ChangesApplyFrom="goal.ChangesApplyFrom" Refusal="@_refusal" OnSubmit="SaveAsync" />
+    </div>
+}
+
+@code {
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private GoalDetails? _goal;
+    private GoalFormModel? _model;
+    private GoalFormError? _error;
+    private string? _refusal;
+
+    /// <summary>The goal's identifier from the address.</summary>
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private string GoalAddress => $"/goals/{Id}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _actingUser = await ActingUsers.GetAsync();
+        var read = await UseCases.RunAsync<GoalService, GoalReadResult>(
+            (service, token) => service.GetAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        if (read.Goal is not { } goal)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        if (goal.IsEnded)
+        {
+            Navigation.NavigateTo(GoalAddress);
+            return;
+        }
+
+        _goal = goal;
+        _model = GoalFormModel.From(goal);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_model is not { } model)
+        {
+            return;
+        }
+
+        var input = model.ToSettingsInput();
+        var result = await UseCases.RunAsync<GoalChangeService, SettingsChangeResult>(
+            (service, token) => service.ChangeSettingsAsync(_actingUser, new GoalId(Id), input, token), CancellationToken.None);
+        switch (result.Outcome)
+        {
+            case SettingsChangeOutcome.Changed or SettingsChangeOutcome.Unchanged:
+                Navigation.NavigateTo(GoalAddress);
+                return;
+            case SettingsChangeOutcome.NotSignedIn or SettingsChangeOutcome.NotForAdministrators or SettingsChangeOutcome.NotFound:
+                Navigation.NotFound();
+                return;
+        }
+
+        if (result.Field is { } field)
+        {
+            _error = new GoalFormError(field, result.Message);
+            _refusal = null;
+            return;
+        }
+
+        // "This goal has ended.": ended elsewhere while the page was open.
+        _error = null;
+        _refusal = result.Message;
+    }
+}

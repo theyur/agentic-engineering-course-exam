@@ -1,10 +1,15 @@
 @using HT.Application.Accounts
 @using HT.Application.Goals
+@using HT.Application.Reports
 @using HT.Domain.Goals
 @using HT.Domain.Habits
 @* design/pages/PageGoalDetail, slice 4 state (HP-004): the Settings card, KeyValue rows in the design's order, then
    the sentence that changes apply from the next commitment. "First week" is there for a per-week goal only, and the
-   start date's row is "Starts" while the goal has not started. Every value comes from the use case's GoalDetails. *@
+   start date's row is "Starts" while the goal has not started. Every value comes from the use case's GoalDetails.
+   Slice 8 state (HP-001, contracts/host.md "Settings card"): the rows show the settings in effect; when a later
+   version exists (GoalDetails.Later), the row "From Thu 12 Nov" (ReportText.From) with its target text follows the
+   Target row. The start row shows the latest attempt's date: "Started" or "Starts" from AttemptHasBegun with
+   AttemptStartDate; an ended goal whose latest attempt never began has no start row. *@
 <HtCard Title="Settings">
     <KeyValue Rows="Rows" />
     <p class="ht-card__sub">Changes apply from the next commitment. Past results keep their rules.</p>
@@ -25,15 +30,24 @@
                 new("Build or reduce", Details.BuildOrReduce.ToString()),
                 new("Measure", MeasureText(Details.Measurement)),
                 new("Target", Details.TargetText),
-                new("Schedule", Details.ScheduleText),
-                new("Evaluated", GoalSummaryText.EvaluatedOf(Details.GoalScheduleKind, Details.Period)),
             };
+            if (Details.Later is { } later)
+            {
+                rows.Add(new(ReportText.From(later.AppliesFrom), later.TargetText));
+            }
+
+            rows.Add(new("Schedule", Details.ScheduleText));
+            rows.Add(new("Evaluated", GoalSummaryText.EvaluatedOf(Details.GoalScheduleKind, Details.Period)));
             if (Details.FirstWeekStarts is { } monday)
             {
                 rows.Add(new("First week", DateTexts.DayMonthYear(monday)));
             }
 
-            rows.Add(new(Details.HasStarted ? "Started" : "Starts", DateTexts.DayMonthYear(Details.StartDate)));
+            if (Details.AttemptHasBegun || !Details.IsEnded)
+            {
+                rows.Add(new(Details.AttemptHasBegun ? "Started" : "Starts", DateTexts.DayMonthYear(Details.AttemptStartDate)));
+            }
+
             return rows;
         }
     }

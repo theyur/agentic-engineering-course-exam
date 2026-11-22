@@ -34,6 +34,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<CatalogAdministrationService>();
         services.AddScoped<CustomHabitService>();
         services.AddScoped<GoalService>();
+        services.AddScoped<GoalChangeService>();
         services.AddScoped<ProfileService>();
         services.AddScoped<RecordingService>();
         services.AddScoped<ReportService>();

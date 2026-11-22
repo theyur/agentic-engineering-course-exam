@@ -113,9 +113,11 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Equal(Sentence, cut.Find(".ht-grid-2 > .ht-stack:last-child .ht-card .ht-card__sub").TextContent);
         Assert.Empty(cut.FindAll(".ht-notice"));
         // Tuesday 17 November is not scheduled, but Monday 16 is Pending: "Record" is the page head's primary action
-        // (HP-001), after slice 7's "Pause" for a goal that is not paused (T064).
+        // (HP-001), after slice 7's "Pause" for a goal that is not paused (T064). Slice 8 (T069, on purpose): the ghost
+        // link "Edit settings" comes first in the head, so it leaves the absent list.
         Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
-        foreach (var absent in new[] { "Edit settings", "End goal", "Earlier attempts" })
+        Assert.Equal(["Edit settings", "Pause", "Record"], cut.FindAll(".ht-page-head .ht-btn").Select(b => b.TextContent));
+        foreach (var absent in new[] { "End goal", "Earlier attempts" })
         {
             Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
         }
@@ -1098,5 +1100,78 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Equal(Text(StatsCard(reloaded)), Text(StatsCard(cut)));
         Assert.Equal(StatsCard(reloaded).QuerySelector(".ht-strip")!.GetAttribute("aria-label"), StatsCard(cut).QuerySelector(".ht-strip")!.GetAttribute("aria-label"));
         Assert.Equal(TrendCard(reloaded).InnerHtml, TrendCard(cut).InnerHtml);
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_001_Edit_settings_is_the_first_head_action_a_ghost_link_to_the_edit_page()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, Today);
+
+        var cut = RenderGoal(id);
+
+        var group = cut.Find(".ht-page-head > .ht-inline");
+        Assert.Equal("ht-spacer", group.PreviousElementSibling!.ClassName);
+        var edit = group.FirstElementChild!;
+        Assert.Equal(("A", "Edit settings", $"/goals/{id.Value}/edit"), (edit.TagName, edit.TextContent, edit.GetAttribute("href")));
+        Assert.Equal(["ht-btn", "ht-btn--ghost"], edit.ClassList.ToArray());
+        Assert.Equal(["Edit settings", "Pause", "Record"], group.QuerySelectorAll(".ht-btn").Select(b => b.TextContent));
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_001_a_goal_that_has_not_started_also_has_Edit_settings_and_its_Settings_card_says_Starts()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, new DateOnly(2026, 11, 25));
+
+        var cut = RenderGoal(id);
+
+        Assert.Equal(["Edit settings", "Pause"], cut.FindAll(".ht-page-head .ht-btn").Select(b => b.TextContent));
+        Assert.Equal(("Starts", "25 Nov 2026"), Rows(cut)[^1]);
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_001_the_Settings_card_shows_the_later_settings_as_From_after_the_Target_row()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, Today);
+        await using (var scope = Services.CreateAsyncScope())
+        {
+            var changed = await scope.ServiceProvider.GetRequiredService<GoalChangeService>().ChangeSettingsAsync(
+                user, id, new GoalSettingsInput { Target = Reading20MinDaily with { Amount = 30 } }, CancellationToken.None);
+            Assert.Equal((SettingsChangeOutcome.Changed, (DateOnly?)Today.AddDays(1)), (changed.Outcome, changed.AppliesFrom));
+        }
+
+        var cut = RenderGoal(id);
+
+        Assert.Equal(
+            [
+                ("Habit", "Reading · catalog"), ("Build or reduce", "Build"), ("Measure", "Duration"), ("Target", "20 min daily"),
+                ("From Wed 18 Nov", "30 min daily"), ("Schedule", "Every day"), ("Evaluated", "Each scheduled day"), ("Started", "17 Nov 2026"),
+            ],
+            Rows(cut));
+        Assert.Equal("Reading, 20 min daily", cut.Find(".ht-page-head h1").TextContent);
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_001_an_ended_goal_whose_attempt_never_began_has_no_start_row_and_no_Edit_settings()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, new DateOnly(2026, 11, 25));
+        var owner = user.AccountId!.Value;
+        var read = (await _goals.ReadOwnerGoalAsync(owner, id, CancellationToken.None))!;
+        var stored = read.Goal!.Goal;
+        var effect = GoalTimeline.EndingOf(stored, Today);
+        Assert.Equal(GoalChangeWriteOutcome.Written, await _goals.TryEndAsync(owner, read.StoredTimeZone, read.GoalsRevision,
+            new GoalEndingWrite(id, 1, new GoalEnding(Today, Outcome.Abandoned, null), effect.LastDate, effect.KeptVersions), CancellationToken.None));
+
+        var cut = RenderGoal(id);
+
+        Assert.DoesNotContain(Rows(cut), row => row.Label is "Started" or "Starts");
+        Assert.DoesNotContain("Edit settings", cut.Markup, StringComparison.Ordinal);
     }
 }

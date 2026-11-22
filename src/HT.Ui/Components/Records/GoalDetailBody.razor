@@ -46,6 +46,9 @@
    right column (in the Settings column of a goal with no begun entry), with "Resume now" and "Cancel pause"; their
    refusals show under its title. After any of these the page reads everything again, and the focus goes to "Pause", or,
    when a current pause removed it, to the Notice's "Resume now".
+   Slice 8 (HP-001, design/pages/PageGoalDetail "Slice 8 state"): the head of a goal that is not ended always has its
+   actions in one ht-inline group after ht-spacer, the ghost link "Edit settings" (to /goals/{id}/edit) first, then
+   "Pause" and "Record" as above, whatever the goal's state (paused or not started included).
    Every use case runs in its own scope. *@
 @if (_goal is { } goal)
 {
@@ -60,7 +63,22 @@
                 <span class="ht-attempt">@AttemptLine(goal)</span>
             </div>
         </div>
-        @if (CanPause)
+        @if (!goal.IsEnded)
+        {
+            <span class="ht-spacer"></span>
+            <div class="ht-inline">
+                <a class="ht-btn ht-btn--ghost" href="@($"/goals/{Id}/edit")">Edit settings</a>
+                @if (CanPause)
+                {
+                    <button type="button" class="ht-btn ht-btn--secondary" aria-haspopup="dialog" @ref="_pauseButton" @onclick="OpenPause">Pause</button>
+                }
+                @if (CanRecord)
+                {
+                    <button type="button" class="ht-btn ht-btn--primary" aria-haspopup="dialog" @ref="_recordButton" @onclick="OpenRecord">Record</button>
+                }
+            </div>
+        }
+        else if (CanPause)
         {
             <span class="ht-spacer"></span>
             <div class="ht-inline">

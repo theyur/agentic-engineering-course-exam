@@ -88,6 +88,9 @@ public sealed class AttemptWorld
 
     public ExcusalService Excusals => new(Records, Goals, Accounts, Clock);
 
+    /// <summary>Slice 8 (T061): the goal-change use cases over the same fakes and clock.</summary>
+    public GoalChangeService Changes => new(Goals, Accounts, Clock, DefaultZone);
+
     /// <summary>A registered user stored with <paramref name="timeZone"/>.</summary>
     public ActingUser UserIn(string timeZone) => _reports.UserIn(timeZone);
 

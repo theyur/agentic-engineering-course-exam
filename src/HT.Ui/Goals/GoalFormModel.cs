@@ -64,6 +64,54 @@ public sealed class GoalFormModel
         Name = Name,
     };
 
+    /// <summary>The Edit settings page's change (slice 8 HP-002): the target fields of the shown controls and the name.</summary>
+    public GoalSettingsInput ToSettingsInput() => new()
+    {
+        Target = ToTargetFields(),
+        Name = Name,
+    };
+
+    /// <summary>
+    /// The Edit settings form of a goal (slice 8 HP-002, contracts/host.md "Edit settings page"): its latest settings
+    /// (<see cref="GoalDetails.Later"/> when there is one, else the settings in effect) and its own name. The habit is
+    /// kept for the summary card's sentence, and the start date is the date a change made now applies from
+    /// (<see cref="GoalDetails.ChangesApplyFrom"/>), which the summary card's sentence ends with; neither is sent.
+    /// </summary>
+    public static GoalFormModel From(GoalDetails details)
+    {
+        ArgumentNullException.ThrowIfNull(details);
+        var model = new GoalFormModel
+        {
+            Habit = details.Habit,
+            StartDate = details.ChangesApplyFrom,
+            Name = details.HasOwnName ? details.Name : null,
+        };
+        if (details.Later is { } later)
+        {
+            model.BuildOrReduce = later.BuildOrReduce;
+            model.Measurement = later.Measurement;
+            model.Amount = later.Amount;
+            model.CountUnit = later.CountUnit;
+            model.DurationUnit = later.DurationUnit;
+            model.ScheduleKind = later.ScheduleKind;
+            model.Days = later.Days.ToHashSet();
+            model.Times = later.Times;
+            model.Period = later.Period;
+            return model;
+        }
+
+        model.BuildOrReduce = details.BuildOrReduce;
+        model.Measurement = details.Measurement;
+        model.Amount = details.Amount;
+        model.CountUnit = details.CountUnit;
+        model.DurationUnit = details.DurationUnit;
+        model.ScheduleKind = details.ScheduleKind;
+        model.Days = details.Days.ToHashSet();
+        model.Times = details.Times;
+        model.Period = details.Period;
+        return model;
+    }
+
     /// <summary>The form as <c>StartNewGoalAsync</c> starts it (FR-007).</summary>
     public static GoalFormModel From(GoalStartingValues values)
     {

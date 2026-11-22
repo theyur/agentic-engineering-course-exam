@@ -31,7 +31,25 @@ public sealed class UseCaseParameterTests
 
     public static TheoryData<Type> SignedInServices =>
         new(typeof(CatalogAdministrationService), typeof(CustomHabitService), typeof(GoalService), typeof(ProfileService),
-            typeof(RecordingService), typeof(ReportService), typeof(ExcusalService), typeof(PauseService));
+            typeof(RecordingService), typeof(ReportService), typeof(ExcusalService), typeof(PauseService), typeof(GoalChangeService));
+
+    [Fact]
+    public void Every_public_method_of_GoalChangeService_takes_the_acting_user_first_and_the_cancellation_token_last()
+    {
+        // Slice 8 (T061, contracts/application-api.md "GoalChangeService"): every use case is async, the acting user
+        // first and the token last.
+        var methods = PublicMethods(typeof(GoalChangeService)).ToList();
+        Assert.NotEmpty(methods);
+
+        var offenders = methods
+            .Where(m => m.GetParameters() is not [{ } first, .., { } last]
+                || first.ParameterType != typeof(ActingUser)
+                || last.ParameterType != typeof(CancellationToken)
+                || !typeof(Task).IsAssignableFrom(m.ReturnType))
+            .Select(m => m.Name)
+            .ToList();
+        Assert.Empty(offenders);
+    }
 
     [Fact]
     public void Every_method_of_the_custom_habit_port_takes_the_owner_first()
