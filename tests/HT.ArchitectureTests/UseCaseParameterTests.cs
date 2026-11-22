@@ -85,9 +85,10 @@ public sealed class UseCaseParameterTests
     [Theory]
     [InlineData(nameof(AttemptService.GetAttemptsAsync))]
     [InlineData(nameof(AttemptService.GetAttemptAsync))]
+    [InlineData(nameof(AttemptService.GetGoalHistoryAsync))]
     public void AttemptService_has_the_use_case(string name)
     {
-        // Slice 8 (T083): each use case of contracts/application-api.md "AttemptService" built so far is a public method,
+        // Slice 8 (T083, T093): each use case of contracts/application-api.md "AttemptService" is a public method,
         // so the rule above covers it.
         Assert.Single(PublicMethods(typeof(AttemptService)), m => m.Name == name);
     }

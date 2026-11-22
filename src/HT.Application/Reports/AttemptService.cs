@@ -3,6 +3,7 @@ using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
+using HT.Domain.Habits;
 
 namespace HT.Application.Reports;
 
@@ -109,6 +110,60 @@ public sealed class AttemptService
             Recent = ReportService.RecentOf(evaluation, ReportService.GoalReportRecentCount),
             History = HistoryOf(evaluation),
         });
+    }
+
+    /// <summary>
+    /// The goal history at the supplied time (FR-015): every ended attempt of the acting user's goals, from one read of
+    /// the owner's goals, each with its goal, name (FR-004: the goal's name at the supplied time for its latest attempt,
+    /// otherwise the attempt's name at its last date), number, ending date, outcome, note and whether it is the goal's
+    /// latest attempt. The latest ending date comes first, then the name (<see cref="HabitName.KeyOf"/> compared
+    /// ordinally), then the attempt number. It reads no record. An account that is no longer stored gives "You are not
+    /// signed in.".
+    /// </summary>
+    public async Task<GoalHistoryListResult> GetGoalHistoryAsync(ActingUser actingUser, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await AccessAsync(actingUser, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return GoalHistoryListResult.Refused(
+                refusal == AccessRefusal.NotSignedIn ? GoalHistoryListOutcome.NotSignedIn : GoalHistoryListOutcome.NotForAdministrators,
+                access.Message!);
+        }
+
+        if (await _goals.ReadOwnerGoalsAsync(access.Owner, cancellationToken).ConfigureAwait(false) is not { } owned)
+        {
+            return GoalHistoryListResult.Refused(GoalHistoryListOutcome.NotSignedIn, AccountTexts.NotSignedIn);
+        }
+
+        var now = _clock.GetUtcNow();
+        var entries = owned.Goals
+            .SelectMany(stored => stored.Goal.Attempts
+                .Where(attempt => attempt.Attempt.Ending is not null)
+                .Select(attempt => EndedViewOf(stored, attempt.Attempt, now)))
+            .OrderByDescending(entry => entry.EndingDate)
+            .ThenBy(entry => HabitName.KeyOf(entry.Name), StringComparer.Ordinal)
+            .ThenBy(entry => entry.AttemptNumber)
+            .ToList();
+        return GoalHistoryListResult.Found(entries);
+    }
+
+    /// <summary>One ended attempt of the goal history (FR-015), named as FR-004 gives it.</summary>
+    private static EndedAttemptView EndedViewOf(StoredGoal stored, GoalAttempt attempt, DateTimeOffset now)
+    {
+        var goal = stored.Goal;
+        var ending = attempt.Ending!;
+        var isLatest = attempt.Number == goal.Attempt.Number;
+        return new EndedAttemptView
+        {
+            GoalId = goal.Id,
+            Name = isLatest ? GoalText.Name(goal, stored.Habit.Name, now) : GoalText.AttemptName(goal, attempt.Number, stored.Habit.Name),
+            AttemptNumber = attempt.Number,
+            EndingDate = ending.Date,
+            Outcome = ending.Outcome,
+            EndingNote = ending.Note?.Value,
+            IsLatestAttempt = isLatest,
+        };
     }
 
     /// <summary>One attempt with its figures, from its evaluation (FR-014).</summary>

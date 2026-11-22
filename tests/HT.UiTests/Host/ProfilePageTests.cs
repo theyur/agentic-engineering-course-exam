@@ -1,8 +1,11 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using HT.Application.Accounts;
+using HT.Application.Goals;
 using HT.Domain.Accounts;
+using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Time;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using static HT.UnitTests.Fakes.HabitSamples;
@@ -48,7 +51,9 @@ public sealed partial class ProfilePageTests(HostFixture host)
             "<h1>ana.profile@example.com</h1><span class=\"ht-muted\">member since November 2026</span>", html, StringComparison.Ordinal);
         AssertEmailRow(html, "ana.profile@example.com");
         Assert.Contains("Change password", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Goal history", html, StringComparison.Ordinal);
+        // Slice 8 (HP-006, T099): the Account tab now has the tab "Goal history", but not its table.
+        Assert.Contains("<a class=\"ht-tab\" href=\"/profile?tab=history\">Goal history</a>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-label=\"Goal history\"", html, StringComparison.Ordinal);
     }
 
     // ---- The name (HP-017, US11) -----------------------------------------------------------------------------------
@@ -247,6 +252,7 @@ public sealed partial class ProfilePageTests(HostFixture host)
         Assert.Equal(HttpStatusCode.OK, status);
         Assert.Contains("<nav class=\"ht-tabs\" aria-label=\"Profile sections\">"
             + "<a class=\"ht-tab\" href=\"/profile\" aria-current=\"page\">Account</a>"
+            + "<a class=\"ht-tab\" href=\"/profile?tab=history\">Goal history</a>"
             + "<a class=\"ht-tab\" href=\"/profile?tab=custom-habits\">Custom habits</a></nav>", html, StringComparison.Ordinal);
         AssertEmailRow(html, "tabs.profile@example.com");
         Assert.Contains("Change password", html, StringComparison.Ordinal);
@@ -299,6 +305,7 @@ public sealed partial class ProfilePageTests(HostFixture host)
     [Theory]
     [InlineData("/profile")]
     [InlineData("/profile?tab=custom-habits")]
+    [InlineData("/profile?tab=history")]
     public async Task HP_008_an_administrators_Profile_stays_Account_only_without_Tabs(string path)
     {
         var email = $"admin.profile.{Guid.NewGuid():N}@example.com";
@@ -314,6 +321,97 @@ public sealed partial class ProfilePageTests(HostFixture host)
         Assert.Contains("Change password", html, StringComparison.Ordinal);
         Assert.DoesNotContain("ht-tabs", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Custom habits", html, StringComparison.Ordinal);
+        // Slice 8 (HP-006, FR-023): no Goal history, also for ?tab=history.
+        Assert.DoesNotContain("Goal history", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("No ended goals yet.", html, StringComparison.Ordinal);
+    }
+
+    // ---- slice 8: the Goal history tab (HP-006, US4-AS7, T099) ----
+
+    [Fact]
+    public async Task Slice_8_HP_006_the_Goal_history_tab_lists_the_ended_attempts_with_their_links_outcomes_and_notes()
+    {
+        // Two goals of 15 min daily from today (UTC, at the host's clock), on new Published habits "Ui-Pr … A" and
+        // "Ui-Pr … B", both ended today through the host's GoalChangeService; B with a note, then restarted from tomorrow,
+        // so its attempt 1 is no longer the latest and links to the attempt view. Same ending date: by name, A then B.
+        var prefix = $"Ui-Pr Hist {Guid.NewGuid():N}"[..24];
+        var (browser, account) = await host.SignedInAccountAsync($"ui-pr-history-{Guid.NewGuid():N}@example.com", Role.RegisteredUser);
+        using (browser)
+        {
+            var user = ActingUser.ForAccount(account, Role.RegisteredUser);
+            GoalId a, b;
+            DateOnly today;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                today = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow());
+                a = await CreateDailyGoalAsync(services, user, prefix + " A", today);
+                b = await CreateDailyGoalAsync(services, user, prefix + " B", today);
+                var changes = services.GetRequiredService<GoalChangeService>();
+                Assert.Equal(GoalEndOutcome.Ended,
+                    (await changes.EndAsync(user, a, Outcome.Abandoned, null, CancellationToken.None)).Outcome);
+                Assert.Equal(GoalEndOutcome.Ended,
+                    (await changes.EndAsync(user, b, Outcome.Achieved, "Ui-Pr done for now.", CancellationToken.None)).Outcome);
+                var started = await changes.StartAttemptAsync(
+                    user, b, new NewAttemptInput { Target = MinutesDaily, StartDate = today.AddDays(1) }, CancellationToken.None);
+                Assert.Equal(AttemptStartOutcome.Started, started.Outcome);
+            }
+
+            var (status, html) = await browser.GetPageAsync("/profile?tab=history");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            var text = WebUtility.HtmlDecode(html);
+            Assert.Contains("<nav class=\"ht-tabs\" aria-label=\"Profile sections\">"
+                + "<a class=\"ht-tab\" href=\"/profile\">Account</a>"
+                + "<a class=\"ht-tab\" href=\"/profile?tab=history\" aria-current=\"page\">Goal history</a>"
+                + "<a class=\"ht-tab\" href=\"/profile?tab=custom-habits\">Custom habits</a></nav>", text, StringComparison.Ordinal);
+            Assert.Contains("<table class=\"ht-table\" aria-label=\"Goal history\">", text, StringComparison.Ordinal);
+            Assert.Contains(
+                "<th scope=\"col\">Goal</th><th scope=\"col\">Attempt</th><th scope=\"col\">Ended</th><th scope=\"col\">Outcome</th><th scope=\"col\">Note</th>",
+                text, StringComparison.Ordinal);
+            var date = DateTexts.ShortDate(today);
+            var rowA = $"<tr><td><b><a href=\"/goals/{a.Value}\">{prefix} A, 15 min daily</a></b></td><td>1</td><td>{date}</td>"
+                + "<td><span class=\"ht-chip\">Abandoned</span></td><td class=\"ht-muted\">—</td></tr>";
+            var rowB = $"<tr><td><b><a href=\"/goals/{b.Value}/attempts/1\">{prefix} B, 15 min daily</a></b></td><td>1</td><td>{date}</td>"
+                + "<td><span class=\"ht-chip\">Achieved</span></td><td class=\"ht-muted\">Ui-Pr done for now.</td></tr>";
+            // The row's markup without the whitespace the component writes between its cells.
+            var flat = BetweenTagsPattern().Replace(text, "><");
+            var first = flat.IndexOf(rowA, StringComparison.Ordinal);
+            Assert.True(first >= 0, "Row A is in the table.");
+            Assert.True(flat.IndexOf(rowB, StringComparison.Ordinal) > first, "Row B comes after row A.");
+            Assert.DoesNotContain("Change password", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("Community", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_006_with_no_ended_attempt_the_Goal_history_tab_says_No_ended_goals_yet()
+    {
+        using var browser = await host.SignedInBrowserAsync($"ui-pr-history-empty-{Guid.NewGuid():N}@example.com", Role.RegisteredUser);
+
+        var (status, html) = await browser.GetPageAsync("/profile?tab=history");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("<div class=\"ht-card\"><p class=\"ht-card__sub\">No ended goals yet.</p></div>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<table", html, StringComparison.Ordinal);
+    }
+
+    private static GoalTargetFields MinutesDaily => new()
+    {
+        BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 15, DurationUnit = DurationUnit.Minutes,
+        ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+    };
+
+    /// <summary>A goal of 15 min daily from <paramref name="start"/>, on a new Published catalog habit named <paramref name="habitName"/>.</summary>
+    private async Task<GoalId> CreateDailyGoalAsync(IServiceProvider services, ActingUser user, string habitName, DateOnly start)
+    {
+        var habit = await host.ArrangeCatalogHabitAsync(Definition(habitName));
+        var created = await services.GetRequiredService<GoalService>().CreateAsync(user, new GoalInput
+        {
+            Habit = new GoalHabit(habit, HabitKind.Catalog), Target = MinutesDaily, StartDate = start,
+        }, CancellationToken.None);
+        Assert.Equal(GoalCreateOutcome.Created, created.Outcome);
+        return created.GoalId!.Value;
     }
 
     [Theory]
@@ -508,6 +606,9 @@ public sealed partial class ProfilePageTests(HostFixture host)
 
     [GeneratedRegex("""<div class="ht-page-head ht-profile-head">.*?<h1>(?<heading>[^<]*)</h1><span class="ht-muted">(?<line>[^<]*)</span>""", RegexOptions.Singleline)]
     private static partial Regex HeaderPattern();
+
+    [GeneratedRegex(""">\s+<""")]
+    private static partial Regex BetweenTagsPattern();
 
     [GeneratedRegex("""id="account-menu-button"[^>]*>(?<letter>[^<]*)</button>""")]
     private static partial Regex NavLetterPattern();

@@ -14,10 +14,24 @@
    without a record gets the ghost "Excuse" after "Record" ("Excuse {goal name}, {date}"). Each action's accessible
    name starts with its text and names the row. The row raises OnAction; the island opens the dialog. Every text and value comes from ReportText, RecordingText and the entry; the
    row computes no figure. Slice 8 (research R-07): the state words, the bar test, the commitment rules and the progress
-   text read the row's own settings (Entry.Goal.SettingsOf(Entry)), never the goal-level ones (AC-080). *@
+   text read the row's own settings (Entry.Goal.SettingsOf(Entry)), never the goal-level ones (AC-080). Slice 8 (HP-007;
+   design/components/CommitmentRow, slice 8 state): one Tag directly after the name, before the "Reduce" Tag:
+   ReportText.Attempt(n) for a row whose attempt is not the goal's latest, otherwise ReportText.EndedTag for a row of an
+   ended goal (TodayEntry.GoalEnded); none for any other row. *@
 <div class="ht-row">
     <div class="ht-row__main">
-        @if (Entry.BuildOrReduce == BuildOrReduce.Reduce)
+        @if (AttemptTag is { } attemptTag)
+        {
+            @if (Entry.BuildOrReduce == BuildOrReduce.Reduce)
+            {
+                <div class="ht-row__name">@Entry.GoalName <Tag Text="@attemptTag" /> <Tag Text="Reduce" /></div>
+            }
+            else
+            {
+                <div class="ht-row__name">@Entry.GoalName <Tag Text="@attemptTag" /></div>
+            }
+        }
+        else if (Entry.BuildOrReduce == BuildOrReduce.Reduce)
         {
             <div class="ht-row__name">@Entry.GoalName <Tag Text="Reduce" /></div>
         }
@@ -87,6 +101,15 @@
     private bool CanExcuse => State == EvaluationState.Pending && IsCommitment && !Entry.HasRecord;
 
     private EvaluationState State => Entry.Entry.State;
+
+    /// <summary>
+    /// Slice 8 (HP-007): the Tag after the name: "Attempt n" for a row of an attempt that is not the goal's latest,
+    /// otherwise "Ended" for a row of an ended goal; null for any other row.
+    /// </summary>
+    private string? AttemptTag =>
+        !Entry.Entry.IsLatestAttempt ? ReportText.Attempt(Entry.Entry.AttemptNumber)
+        : Entry.GoalEnded ? ReportText.EndedTag
+        : null;
 
     private Progress Progress => Entry.Entry.Progress;
 

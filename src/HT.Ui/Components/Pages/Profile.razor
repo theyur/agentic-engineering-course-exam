@@ -1,7 +1,9 @@
 @page "/profile"
 @attribute [Authorize]
+@using System.Globalization
 @using HT.Application.Accounts
 @using HT.Application.Habits
+@using HT.Application.Reports
 @using HT.Domain.Accounts
 @using HT.Ui.Account
 @using HT.Ui.Components.Account
@@ -9,6 +11,7 @@
 @inject ActingUserAccessor ActingUsers
 @inject ProfileService Profiles
 @inject CustomHabitService CustomHabits
+@inject AttemptService Attempts
 @inject AccountSession AccountSession
 @inject NavigationManager Navigation
 @* design/pages/PageProfile. Slice 2 state for registered users (HP-008, US4-AS14): the header, then the link
@@ -18,7 +21,14 @@
    request never gets here: the endpoint's [Authorize] sends it to Sign in (HP-008). After a change the session
    that made it is re-issued with the new security stamp (HP-007). Slice 4 (HP-015): the Account card has the
    "Time zone" form before "Change password", for every account. HP-017: the header shows the name as its h1 when the
-   account has one, then the email and "member since …" when known; the Account card starts with the "Name" form. *@
+   account has one, then the email and "member since …" when known; the Account card starts with the "Name" form.
+   Slice 8 (HP-006; design/pages/PageProfile, slice 8 state): registered users get the tab "Goal history" after
+   "Account" (?tab=history), no Community tab. It reads the goal history (AttemptService.GetGoalHistoryAsync) only when
+   that tab is shown, and lists it in the use case's order in a DataTable with the columns Goal (the attempt's name in
+   bold, a link to /goals/{id}/attempts/{n}, or to /goals/{id} for the goal's latest attempt), Attempt, Ended
+   (DateTexts.ShortDate), Outcome (ReportText.OutcomeText as a Tag) and Note (td.ht-muted: the ending note, or "—"); with
+   no ended attempt, a Card with ReportText.NoEndedGoalsYet in place of the table. An administrator's Profile keeps its
+   Account content without Tabs and ignores the tab (FR-023). *@
 <PageTitle>Profile · Habit Tracker</PageTitle>
 
 @if (_profile is { } profile)
@@ -67,6 +77,28 @@
                 </section>
             }
         }
+        else if (_goalHistory is { } history)
+        {
+            @if (history.Count == 0)
+            {
+                <div class="ht-card"><p class="ht-card__sub">@ReportText.NoEndedGoalsYet</p></div>
+            }
+            else
+            {
+                <DataTable Columns="HistoryColumns" Label="Goal history">
+                    @foreach (var entry in history)
+                    {
+                        <tr>
+                            <td><b><a href="@AttemptAddress(entry)">@entry.Name</a></b></td>
+                            <td>@entry.AttemptNumber.ToString(CultureInfo.InvariantCulture)</td>
+                            <td>@DateTexts.ShortDate(entry.EndingDate)</td>
+                            <td><Tag Text="@ReportText.OutcomeText(entry.Outcome)" /></td>
+                            <td class="ht-muted">@(entry.EndingNote ?? NoNote)</td>
+                        </tr>
+                    }
+                </DataTable>
+            }
+        }
         else
         {
             <div class="ht-grid-2">
@@ -87,19 +119,36 @@
 @code {
     private const string CustomHabitsTab = "custom-habits";
 
+    /// <summary>Slice 8 (HP-006): the Goal history tab's value in the address.</summary>
+    private const string HistoryTab = "history";
+
+    /// <summary>The Note cell of an ended attempt without an ending note (design/pages/PageProfile, slice 8 state).</summary>
+    private const string NoNote = "—";
+
+    private static readonly IReadOnlyList<string> HistoryColumns = ["Goal", "Attempt", "Ended", "Outcome", "Note"];
+
     private ActingUser _actingUser = ActingUser.Anonymous;
     private ProfileView? _profile;
     private IReadOnlyList<CustomHabitView>? _customHabits;
 
-    /// <summary>"custom-habits" opens the Custom habits tab; anything else is Account.</summary>
+    /// <summary>
+    /// Slice 8 (HP-006): the goal history, read only for a registered user on the Goal history tab; null otherwise, so
+    /// an administrator's <c>?tab=history</c> shows the Account content.
+    /// </summary>
+    private IReadOnlyList<EndedAttemptView>? _goalHistory;
+
+    /// <summary>"custom-habits" opens the Custom habits tab, "history" the Goal history tab; anything else is Account.</summary>
     [SupplyParameterFromQuery(Name = "tab")]
     public string? Tab { get; set; }
 
     private bool ShowsCustomHabits => string.Equals(Tab, CustomHabitsTab, StringComparison.Ordinal);
 
+    private bool ShowsHistory => string.Equals(Tab, HistoryTab, StringComparison.Ordinal);
+
     private IReadOnlyList<Tabs.TabItem> TabItems =>
     [
-        new("Account", "/profile", null, !ShowsCustomHabits),
+        new("Account", "/profile", null, !ShowsCustomHabits && !ShowsHistory),
+        new("Goal history", "/profile?tab=" + HistoryTab, null, ShowsHistory),
         new("Custom habits", "/profile?tab=" + CustomHabitsTab, null, ShowsCustomHabits),
     ];
 
@@ -116,7 +165,20 @@
         _profile = result.Profile;
         var custom = await CustomHabits.ListAsync(_actingUser, CancellationToken.None);
         _customHabits = custom.Outcome == CustomHabitListOutcome.Found ? custom.Habits : null;
+        if (_customHabits is not null && ShowsHistory)
+        {
+            var history = await Attempts.GetGoalHistoryAsync(_actingUser, CancellationToken.None);
+            _goalHistory = history.Outcome == GoalHistoryListOutcome.Found ? history.Entries : null;
+        }
     }
+
+    /// <summary>
+    /// The Goal column's link (HP-006): the goal page for the goal's latest attempt, otherwise the attempt view.
+    /// </summary>
+    private static string AttemptAddress(EndedAttemptView entry) =>
+        entry.IsLatestAttempt
+            ? $"/goals/{entry.GoalId.Value}"
+            : $"/goals/{entry.GoalId.Value}/attempts/{entry.AttemptNumber.ToString(CultureInfo.InvariantCulture)}";
 
     // The muted line of the header (design/pages/PageProfile, slice 4): with a name, the email and "member since" when
     // known; without one, "member since" or, for an account created before slice 4, "Profile" as in slice 1.

@@ -341,6 +341,38 @@ public sealed class GoalChangeHostTests(HostFixture host)
     }
 
     [Fact]
+    public async Task SC_001_HP_005_a_new_attempt_in_two_actions_from_the_Ended_tab_moves_the_goal_back_to_Active()
+    {
+        // Slice 8 US4 (T099): the same two actions starting from the Goals page's Ended tab.
+        var (browser, user, goal, habit, today) = await OwnerWithGoalAsync("us4-start");
+        using (browser)
+        {
+            await EndAsync(user, goal);
+
+            // 1. "Start new attempt" of the goal's item on the Ended tab.
+            var (endedStatus, endedTab) = await browser.GetPageAsync("/goals?tab=ended");
+            Assert.Equal(HttpStatusCode.OK, endedStatus);
+            Assert.Contains(
+                $"<a class=\"ht-btn ht-btn--secondary ht-btn--sm\" href=\"{NewAttemptAddress(goal)}\" aria-label=\"Start new attempt for {habit}, 15 min daily\">Start new attempt</a>",
+                WebUtility.HtmlDecode(endedTab), StringComparison.Ordinal);
+
+            // 2. "Start attempt" on the Start new attempt page, with its starting values (sent as the interactive save does).
+            var (startStatus, start) = await browser.GetPageAsync(NewAttemptAddress(goal));
+            Assert.Equal(HttpStatusCode.OK, startStatus);
+            Assert.Contains(">Start attempt</button>", start, StringComparison.Ordinal);
+            Assert.Equal(today.AddDays(1), await StartWithStartingValuesAsync(user, goal));
+
+            // The goal has left the Ended tab and is on the Active tab again.
+            var (_, endedAfter) = await browser.GetPageAsync("/goals?tab=ended");
+            var (_, activeAfter) = await browser.GetPageAsync("/goals");
+            Assert.DoesNotContain($"href=\"/goals/{goal.Value}\"", endedAfter, StringComparison.Ordinal);
+            Assert.Contains("<p class=\"ht-card__sub\">No ended goals.</p>", endedAfter, StringComparison.Ordinal);
+            Assert.Contains($"href=\"/goals/{goal.Value}\"", activeAfter, StringComparison.Ordinal);
+            Assert.DoesNotContain("Start new attempt", activeAfter, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public async Task HP_014_the_attempt_view_of_attempt_1_is_prerendered_with_its_head_and_figures_and_no_goal_actions()
     {
         var (browser, user, goal, habit, _) = await OwnerWithGoalAsync("us3-view");

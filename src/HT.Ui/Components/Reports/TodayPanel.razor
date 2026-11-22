@@ -25,7 +25,12 @@
    RecordDialog's "Excuse instead" in its place, open the Excuse dialog for that row's goal and date. After "excused" the
    dashboard is read again before the dialog closes, so the row leaves the list and the "Pending · still can record"
    tile drops by 1; the focus goes back to the opener while its row is listed, otherwise to the nearest remaining row
-   with an action, else to the "Due now" tile (HP-007). *@
+   with an action, else to the "Due now" tile (HP-007).
+   Slice 8 (HP-007, FR-019; design/pages/PageHomeSignedIn, slice 8 state): the dashboard keeps the Pending entries of
+   ended attempts in its Today list and its Pending count, and leaves ended goals out of the other counts, the Active
+   goals card and the recent notes; the panel shows its data as it is, with no filtering of its own, and each such row's
+   CommitmentRow carries its Tag ("Attempt n" or "Ended"). Rows are still found by goal and first date: the attempts of
+   one goal never share a date. *@
 @if (_dashboard is { } dashboard)
 {
     <div class="ht-home__panel">

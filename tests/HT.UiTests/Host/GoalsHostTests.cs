@@ -562,7 +562,8 @@ public sealed class GoalsHostTests(HostFixture host)
             Assert.Contains("<nav class=\"ht-tabs\" aria-label=\"Goal lists\">", pausedTab, StringComparison.Ordinal);
             Assert.Contains("<a class=\"ht-tab\" href=\"/goals\">Active</a>", pausedTab, StringComparison.Ordinal);
             Assert.Contains("<a class=\"ht-tab\" href=\"/goals?tab=paused\" aria-current=\"page\">Paused</a>", pausedTab, StringComparison.Ordinal);
-            Assert.DoesNotContain(">Ended<", pausedTab, StringComparison.Ordinal);
+            // Slice 8 (HP-005, T099): the third tab "Ended" is now there (slice 7 asserted it absent).
+            Assert.Contains("<a class=\"ht-tab\" href=\"/goals?tab=ended\">Ended</a>", pausedTab, StringComparison.Ordinal);
             Assert.Equal(1, pausedTab.Split("<div class=\"ht-goalitem\">").Length - 1);
             var item = ItemHtml(pausedTab, paused);
             Assert.Contains($">{prefix} P, 15 min daily</a>", item, StringComparison.Ordinal);
@@ -584,6 +585,62 @@ public sealed class GoalsHostTests(HostFixture host)
             Assert.Contains(footnote, activeTab, StringComparison.Ordinal);
         }
     }
+
+    [Fact]
+    public async Task Slice_8_HP_005_the_prerendered_Ended_tab_lists_the_ended_goal_in_its_Ended_form_and_Active_the_other()
+    {
+        // Two goals of 15 min every day from yesterday (UTC, at the host's clock; yesterday Pending, today Due): "… E" ended
+        // through the host's GoalChangeService today with "Abandoned" (ending date today, last date yesterday, still
+        // Pending); "… A" not ended. The first HTML of /goals?tab=ended, prerendered, has the Ended tab current and only
+        // "… E", in its Ended form; that of /goals has only "… A".
+        var prefix = $"Ui-Go Ended {Guid.NewGuid():N}"[..25];
+        var (browser, account) = await host.SignedInAccountAsync(Email("ended"), Role.RegisteredUser);
+        using (browser)
+        {
+            DateOnly today;
+            GoalId active, ended;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                today = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow());
+                var everyDay = Enum.GetValues<DayOfWeek>();
+                active = await StoreGoalAsync(services, account, prefix + " A", everyDay, today.AddDays(-1), recordFirstDay: false);
+                ended = await StoreGoalAsync(services, account, prefix + " E", everyDay, today.AddDays(-1), recordFirstDay: false);
+                var result = await services.GetRequiredService<GoalChangeService>().EndAsync(
+                    ActingUser.ForAccount(account, Role.RegisteredUser), ended, Outcome.Abandoned, null, CancellationToken.None);
+                Assert.Equal((GoalEndOutcome.Ended, (DateOnly?)today), (result.Outcome, result.EndingDate));
+            }
+
+            var (endedStatus, endedTab) = await browser.GetPageAsync(GoalsAddress + "?tab=ended");
+            var (activeStatus, activeTab) = await browser.GetPageAsync(GoalsAddress);
+
+            Assert.Equal(HttpStatusCode.OK, endedStatus);
+            Assert.Contains("<a class=\"ht-tab\" href=\"/goals\">Active</a>", endedTab, StringComparison.Ordinal);
+            Assert.Contains("<a class=\"ht-tab\" href=\"/goals?tab=paused\">Paused</a>", endedTab, StringComparison.Ordinal);
+            Assert.Contains("<a class=\"ht-tab\" href=\"/goals?tab=ended\" aria-current=\"page\">Ended</a>", endedTab, StringComparison.Ordinal);
+            Assert.Equal(1, endedTab.Split("<div class=\"ht-goalitem\">").Length - 1);
+            var item = ItemHtml(endedTab, ended);
+            Assert.Contains($">{prefix} E, 15 min daily</a>", item, StringComparison.Ordinal);
+            Assert.Contains("<span class=\"ht-chip\">Abandoned</span>", item, StringComparison.Ordinal);
+            Assert.Contains("<span class=\"ht-chip ht-status ht-status--pending\">Pending</span>", item, StringComparison.Ordinal);
+            Assert.Contains($"<span>Ended {DateTexts.ShortDate(today)}</span>", item, StringComparison.Ordinal);
+            Assert.Contains(
+                $"<a class=\"ht-btn ht-btn--secondary ht-btn--sm\" href=\"/goals/{ended.Value}/new-attempt\" aria-label=\"Start new attempt for {prefix} E, 15 min daily\">Start new attempt</a>",
+                item, StringComparison.Ordinal);
+            Assert.DoesNotContain(">Record</button>", item, StringComparison.Ordinal);
+            Assert.DoesNotContain($"href=\"/goals/{active.Value}\"", endedTab, StringComparison.Ordinal);
+            Assert.Contains(
+                "<p class=\"ht-footnote\">Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out.</p>",
+                endedTab, StringComparison.Ordinal);
+
+            Assert.Equal(HttpStatusCode.OK, activeStatus);
+            Assert.Equal(1, activeTab.Split("<div class=\"ht-goalitem\">").Length - 1);
+            Assert.Contains($"aria-label=\"Record for {prefix} A, 15 min daily\">Record</button>", ItemHtml(activeTab, active), StringComparison.Ordinal);
+            Assert.DoesNotContain($"href=\"/goals/{ended.Value}\"", activeTab, StringComparison.Ordinal);
+            Assert.DoesNotContain("Start new attempt", activeTab, StringComparison.Ordinal);
+        }
+    }
+
     /// <summary>The HTML of the Goals page's item of <paramref name="goal"/>, up to the next item (or the page's end).</summary>
     private static string ItemHtml(string html, GoalId goal)
     {

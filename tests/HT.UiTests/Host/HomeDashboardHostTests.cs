@@ -136,6 +136,66 @@ public sealed class HomeDashboardHostTests(HostFixture host)
             Assert.DoesNotContain($"{prefix} P", text, StringComparison.Ordinal);
         }
     }
+
+    [Fact]
+    public async Task Slice_8_HP_007_the_prerendered_Home_keeps_the_Pending_rows_of_ended_attempts_with_their_Tags()
+    {
+        // Three goals of 15 min every day from yesterday (UTC, at the host's clock; yesterday Pending, today Due): "… E" ended
+        // today through the host's GoalChangeService (last date yesterday, still Pending: "Ended"); "… R" ended today and
+        // restarted from tomorrow (its attempt 1's yesterday: "Attempt 1", its attempt 2's tomorrow Upcoming without a Tag);
+        // "… A" not ended. "Pending · still can record"
+        // counts the three yesterdays, "Due now" A's today, and "Active goals" A and R; the card lists only those two.
+        var prefix = $"Ui-Hd Ended {Guid.NewGuid():N}"[..25];
+        var (browser, account) = await host.SignedInAccountAsync(Email("ended"), Role.RegisteredUser);
+        using (browser)
+        {
+            GoalId active, ended, restarted;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var services = scope.ServiceProvider;
+                var user = ActingUser.ForAccount(account, Role.RegisteredUser);
+                var today = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow());
+                active = await StoreGoalAsync(services, account, prefix + " A", today.AddDays(-1), recordFirstDay: false);
+                ended = await StoreGoalAsync(services, account, prefix + " E", today.AddDays(-1), recordFirstDay: false);
+                restarted = await StoreGoalAsync(services, account, prefix + " R", today.AddDays(-1), recordFirstDay: false);
+                var changes = services.GetRequiredService<GoalChangeService>();
+                Assert.Equal(GoalEndOutcome.Ended, (await changes.EndAsync(user, ended, Outcome.Abandoned, null, CancellationToken.None)).Outcome);
+                Assert.Equal(GoalEndOutcome.Ended, (await changes.EndAsync(user, restarted, Outcome.Abandoned, null, CancellationToken.None)).Outcome);
+                var started = await changes.StartAttemptAsync(user, restarted, new NewAttemptInput
+                {
+                    Target = new GoalTargetFields
+                    {
+                        BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 15, DurationUnit = DurationUnit.Minutes,
+                        ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+                    },
+                    StartDate = today.AddDays(1),
+                }, CancellationToken.None);
+                Assert.Equal(AttemptStartOutcome.Started, started.Outcome);
+            }
+
+            var (status, html) = await browser.GetPageAsync("/");
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            var text = WebUtility.HtmlDecode(html);
+            foreach (var (value, label) in new[] { ("1", "Due now"), ("3", "Pending · still can record"), ("0", "Missed this week"), ("2", "Active goals") })
+            {
+                Assert.Contains($"<span class=\"ht-tile__value\">{value}</span><span class=\"ht-tile__label\">{label}</span>", text, StringComparison.Ordinal);
+            }
+
+            // The three Pending yesterdays, A's Due today, and R's attempt 2 Upcoming tomorrow (a row of the latest attempt,
+            // with no Tag).
+            Assert.Equal(5, Count(text, "<div class=\"ht-row\">"));
+            Assert.Equal(1, Count(text, $"<div class=\"ht-row__name\">{prefix} R, 15 min daily</div>"));
+            Assert.Contains($"<div class=\"ht-row__name\">{prefix} E, 15 min daily <span class=\"ht-chip\">Ended</span></div>", text, StringComparison.Ordinal);
+            Assert.Contains($"<div class=\"ht-row__name\">{prefix} R, 15 min daily <span class=\"ht-chip\">Attempt 1</span></div>", text, StringComparison.Ordinal);
+            Assert.Equal(2, Count(text, $"<div class=\"ht-row__name\">{prefix} A, 15 min daily</div>"));
+            Assert.Equal(2, Count(text, "<a class=\"ht-goal__name\""));
+            Assert.Contains($"<a class=\"ht-goal__name\" href=\"/goals/{active.Value}\">", text, StringComparison.Ordinal);
+            Assert.Contains($"<a class=\"ht-goal__name\" href=\"/goals/{restarted.Value}\">", text, StringComparison.Ordinal);
+            Assert.DoesNotContain($"<a class=\"ht-goal__name\" href=\"/goals/{ended.Value}\">", text, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public async Task A_user_with_no_goals_gets_the_EmptyState_and_no_tile()
     {

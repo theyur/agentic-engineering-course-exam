@@ -71,3 +71,38 @@ public sealed class AttemptReadResult
 
     internal static AttemptReadResult Found(AttemptDetails details) => new(AttemptReadOutcome.Found, null, details);
 }
+
+/// <summary>The outcomes of reading the goal history, in FR-023's check order (contracts/application-api.md "AttemptService").</summary>
+public enum GoalHistoryListOutcome
+{
+    NotSignedIn,
+    NotForAdministrators,
+    Found,
+}
+
+/// <summary>
+/// Every ended attempt of the acting user's goals (slice 8 FR-015), the latest ending date first, then by name and attempt
+/// number, or the refusal. Not a goal's History (slice 5 FR-009).
+/// </summary>
+public sealed class GoalHistoryListResult
+{
+    private GoalHistoryListResult(GoalHistoryListOutcome outcome, string? message, IReadOnlyList<EndedAttemptView> entries)
+    {
+        Outcome = outcome;
+        Message = message;
+        Entries = entries;
+    }
+
+    public GoalHistoryListOutcome Outcome { get; }
+
+    /// <summary>The refusal's text; null for <see cref="GoalHistoryListOutcome.Found"/>.</summary>
+    public string? Message { get; }
+
+    /// <summary>Every ended attempt in FR-015's order; empty for a refusal.</summary>
+    public IReadOnlyList<EndedAttemptView> Entries { get; }
+
+    internal static GoalHistoryListResult Refused(GoalHistoryListOutcome outcome, string message) => new(outcome, message, []);
+
+    internal static GoalHistoryListResult Found(IReadOnlyList<EndedAttemptView> entries) =>
+        new(GoalHistoryListOutcome.Found, null, entries);
+}

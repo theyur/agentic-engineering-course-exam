@@ -390,6 +390,15 @@ the end date − 365 to the end date, the end date being the last date, or the c
 5's 366-day range keeps the weeks that overlap it. A number that is not one of the goal's attempts (0 and negative
 numbers included) gives `AttemptNotFound`. `GetGoalHistoryAsync` and `EndedAttemptView` come with US4.
 
+Settled in T093: the goal history's outcome enum is `GoalHistoryListOutcome` (`NotSignedIn`, `NotForAdministrators`,
+`Found`), in `src/HT.Application/Reports/AttemptResults.cs` next to `GoalHistoryListResult`, in the check order with the
+success last. `Message` is null for `Found`, and `Entries` is empty for a refusal. An account that is no longer stored,
+also when `ReadOwnerGoalsAsync` gives null after the account check, gives `NotSignedIn`, "You are not signed in.".
+`EndedAttemptView` is a sealed record with init-only properties, `required` except `EndingNote` (the trimmed text,
+`string?`); `Outcome` is `Outcome` (never null: only ended attempts are listed). The name of the goal's latest attempt is
+`GoalText.Name(goal, habitName, now)`, of an earlier one `GoalText.AttemptName`. Entries with the same ending date, name
+and number (two goals) keep the store's goal order. No record is read.
+
 ### Internal: `GoalEvaluation` (changed)
 
 - `OfAsync(records, owner, stored, now, ct)` evaluates the latest attempt (the report range, FR-013).

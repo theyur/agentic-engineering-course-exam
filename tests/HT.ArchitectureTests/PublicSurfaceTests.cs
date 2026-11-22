@@ -104,6 +104,9 @@ public sealed class PublicSurfaceTests
     [InlineData("HT.Application.Reports", "AttemptListOutcome")]
     [InlineData("HT.Application.Reports", "AttemptReadResult")]
     [InlineData("HT.Application.Reports", "AttemptReadOutcome")]
+    [InlineData("HT.Application.Reports", "EndedAttemptView")]
+    [InlineData("HT.Application.Reports", "GoalHistoryListResult")]
+    [InlineData("HT.Application.Reports", "GoalHistoryListOutcome")]
     public void TheNewRecordingTypesHaveNoNodaTimeTypeInTheirSignatures(string ns, string typeName)
     {
         var types = new[] { ArchitectureModel.Domain, ArchitectureModel.Application }

@@ -320,7 +320,73 @@ public sealed class CommitmentRowTests : BunitContext
                 "Record for Reading, 20 min, 3 days a week, Mon 16 Nov + Excuse Reading, 20 min, 3 days a week, Mon 16 Nov"),
             Parts(cut));
         Assert.Equal(("Mon 16 Nov · 5 h left to record", "Pending", "Edit", "Edit record of Reading, 20 min, 3 days a week, Mon 16 Nov"), Parts(recorded));
+        // Slice 8 (T099, HP-007): the row of an attempt that is not the latest now carries its "Attempt 1" Tag.
+        Assert.Equal(["Attempt 1"], cut.FindAll(".ht-row__name .ht-chip").Select(c => c.TextContent));
+    }
+
+    // ---- slice 8: the Tag after the name (HP-007, design/components/CommitmentRow "Slice 8 state"; T099) ----
+
+    [Fact]
+    public void HP_007_a_Pending_row_of_an_ended_goal_has_the_Ended_Tag_after_the_name()
+    {
+        var row = Reading(new DateOnly(2026, 11, 16), EvaluationState.Pending, graceEnds: ReadAt.AddHours(5)) with { GoalEnded = true };
+
+        var cut = RenderRow(row);
+
+        Assert.Equal(["Ended"], cut.FindAll(".ht-row__name .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Reading, 20 min, 3 days a week Ended", cut.Find(".ht-row__name").TextContent);
+        Assert.Equal(
+            ("Mon 16 Nov · 5 h left to record", "Pending", "Record + Excuse",
+                "Record for Reading, 20 min, 3 days a week, Mon 16 Nov + Excuse Reading, 20 min, 3 days a week, Mon 16 Nov"),
+            Parts(cut));
+    }
+
+    [Fact]
+    public void HP_007_a_Reduce_row_of_an_ended_goal_has_the_Ended_Tag_before_the_Reduce_Tag()
+    {
+        var row = EntryOf("Coffee, at most 2 cups a day", CoffeeAtMost2Cups, "Every day", new DateOnly(2026, 11, 16), new DateOnly(2026, 11, 16),
+            EvaluationState.Pending, new Progress(ProgressKind.Total, null, 2), ReadAt.AddHours(5)) with { GoalEnded = true };
+
+        var cut = RenderRow(row);
+
+        Assert.Equal(["Ended", "Reduce"], cut.FindAll(".ht-row__name .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Coffee, at most 2 cups a day Ended Reduce", cut.Find(".ht-row__name").TextContent);
+    }
+
+    [Fact]
+    public void HP_007_a_row_of_an_earlier_attempt_has_Attempt_n_and_not_Ended_even_when_the_goal_is_ended()
+    {
+        var row = EarlierReading(Reading20MinOnMonWedFri, new DateOnly(2026, 11, 16), EvaluationState.Pending, null, ReadAt.AddHours(5));
+        var second = row with { Entry = row.Entry with { AttemptNumber = 2 }, GoalEnded = true };
+
+        var cut = RenderRow(second);
+
+        Assert.Equal(["Attempt 2"], cut.FindAll(".ht-row__name .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Reading, 20 min, 3 days a week Attempt 2", cut.Find(".ht-row__name").TextContent);
+    }
+
+    [Fact]
+    public void HP_007_a_Reduce_row_of_an_earlier_attempt_has_Attempt_n_before_the_Reduce_Tag()
+    {
+        var row = EntryOf("Coffee, at most 2 cups a day", CoffeeAtMost2Cups, "Every day", new DateOnly(2026, 11, 16), new DateOnly(2026, 11, 16),
+            EvaluationState.Pending, new Progress(ProgressKind.Total, null, 2), ReadAt.AddHours(5));
+        var earlier = row with { Entry = row.Entry with { AttemptNumber = 1, IsLatestAttempt = false } };
+
+        var cut = RenderRow(earlier);
+
+        Assert.Equal(["Attempt 1", "Reduce"], cut.FindAll(".ht-row__name .ht-chip").Select(c => c.TextContent));
+    }
+
+    [Fact]
+    public void HP_007_a_row_of_the_latest_attempt_of_a_goal_that_is_not_ended_has_no_Tag()
+    {
+        var row = Reading(Wed18, EvaluationState.Due, graceEnds: ReadAt.AddHours(53));
+        var restarted = row with { Entry = row.Entry with { AttemptNumber = 2, IsLatestAttempt = true } };
+
+        var cut = RenderRow(restarted);
+
         Assert.Empty(cut.FindAll(".ht-row__name .ht-chip"));
+        Assert.Equal("Reading, 20 min, 3 days a week", cut.Find(".ht-row__name").TextContent);
     }
 
     [Fact]
