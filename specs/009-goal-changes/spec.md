@@ -44,7 +44,7 @@ alternatives, and D-1 also binds the community slice, so both are recorded in
 - Q: After a goal starts a new attempt, how can the user see the History of an earlier attempt and correct its
   records? → A: Each entry of the Earlier attempts card links to a view of that attempt, with its figures, strip
   and History card and the same record and note actions as the goal page, but no Pause, End goal or Edit
-  settings (FR-014, FR-016, HP-001, HP-014, US3-AS11, US3-AS13).
+  settings (FR-014, FR-016, HP-001, HP-014, US3-AS11, US3-AS15).
 - Q: When a goal is ended, should the signed-in Home keep showing its still-open Pending results until their grace
   period is over? → A: Yes, partly: its Pending entries stay in the Today list and the Pending count until their
   grace period ends, each marked as belonging to an ended goal. Its Missed entries, goal summary, recent notes and
@@ -54,6 +54,19 @@ alternatives, and D-1 also binds the community slice, so both are recorded in
   the habit's current name and the target text of that attempt's last settings version ("Meditation, 10 min
   daily"); the latest attempt keeps the goal's current name (FR-004, FR-014, FR-015, FR-031, HP-001, HP-006,
   HP-014, US3-AS4).
+
+### Session 2026-11-22 (spec review)
+
+Confirmed by the owner after `/speckit-ac-critic spec` (three passes). Both are consequences of D-2 and are
+recorded in [ADR 0025](../../docs/adr/0025-goal-change-rules.md):
+
+- Q: Can a new attempt start on the day the goal was ended? → A: No. A new attempt starts the day after the
+  ending date at the earliest ("A new attempt starts after the day the goal ended."), so that no date belongs to
+  two attempts when the account's today and the goal's timeline differ, and no record kept under the ended
+  attempt's measurement falls into a new attempt (FR-011, FR-012, US3-AS1, US3-AS6, US3-AS13).
+- Q: Does ending keep an attempt's settings when the attempt ends before it begins? → A: Yes. Ending removes the
+  settings versions after the last date but always keeps the attempt's first version, so the ended goal keeps
+  its name, settings and starting values (FR-009, US2-AS12).
 
 ## Decisions this slice cites
 
@@ -219,8 +232,9 @@ date from 2 to 15 November):
     (a later version from Thursday 12 November, slice 4 FR-026), **When** the user changes the amount to 20
     minutes at 10:00 that day, **Then** the goal has one later version, from Thursday 12 November, with "Europe/Kyiv"
     and 20 minutes.
-14. **Given** the goal paused from Wednesday 11 until Friday 13 November, **When** the user changes its amount on
-    Wednesday 11 November, **Then** the change is accepted as in scenario 1. A pause does not block a change.
+14. **Given** the goal with records only from 2 to 10 November, paused on Wednesday 11 November at 09:00 from
+    Wednesday 11 until Friday 13 November, **When** the user changes its amount to 20 minutes at 10:00 that day,
+    **Then** the change is accepted as in scenario 1. A pause does not block a change.
 15. *(page)* **Given** the goal page, **When** the user chooses "Edit settings", **Then** the Edit settings page
     opens with the latest settings filled in and the line "Changes apply from Thu 12 Nov. Past results keep their
     rules."; saving returns to the goal page, whose Settings card shows the later settings with their date.
@@ -274,9 +288,12 @@ the note "Too busy this month."):
     on Wednesday 18 November with the outcome "No longer relevant", **Then** the attempt's last date is Sunday 15
     November. The week 16–22 November is not part of the attempt, is not counted and is not Failed. Its two
     records are kept [D-2].
-12. **Given** a goal created on Monday 16 November with the start date Monday 23 November, **When** the user ends
-    it on Tuesday 17 November with the outcome "No longer relevant", **Then** the result is "goal ended". Its
-    attempt has no commitment and its consistency is "N/A".
+12. **Given** a goal with the background's settings created on Monday 16 November with the start date Monday 23
+    November, **When** the user ends it on Tuesday 17 November with the outcome "No longer relevant", **Then** the
+    result is "goal ended", with the ending date Tuesday 17 November (the account's today, as the goal has not
+    started) and the last date Monday 16 November. Its attempt has no commitment and its consistency is "N/A". Its
+    first version stays: the goal is still named "Meditation, 10 min daily", and the starting values of a new
+    attempt are Build, duration 10 minutes, all seven days.
 13. *(page)* **Given** the goal page, **When** the user chooses "End goal", picks "Abandoned", writes a note and
     confirms "End goal", **Then** the goal page shows the Notice "Ended Mon 16 Nov · Abandoned" with "Start new
     attempt", and has no "Record", "Edit settings", "Pause" or "End goal".
@@ -300,11 +317,12 @@ unchanged.
 
 1. **Given** the ended goal, **When** the user asks for the starting values of a new attempt on Wednesday 18
    November, **Then** they get the settings of the ended attempt's last version (Build, duration 10 minutes, all
-   seven days) and the start date Wednesday 18 November.
+   seven days) and the start date Wednesday 18 November. Asked on Monday 16 November at 11:00, the day of the
+   ending, the start date is Tuesday 17 November, the day after the ending date.
 2. **Given** the ended goal, **When** the user starts a new attempt with those values unchanged on Wednesday 18
    November at 08:00, **Then** the result is "attempt started", with attempt number 2 and start date Wednesday 18
-   November. The goal is no longer ended, its attempt line is "Attempt 2 · started 18 Nov", its consistency is
-   "N/A" and its current streak is "0 commitments".
+   November. The goal is no longer ended. Reading it gives its latest attempt as number 2, started 18 November,
+   its consistency "N/A" and its current streak "0 commitments".
 3. **Given** attempt 2 of scenario 2 with 10 minutes recorded on 18, 19 and 20 November, **When** the report is read
    on Monday 23 November at 12:00, **Then** the consistency is "100% (3 of 3)" and the current and longest streak
    are "3 commitments". Attempt 1's Missed 14 and 15 November are not counted.
@@ -312,14 +330,19 @@ unchanged.
    minutes, all seven days) and the start date Monday 23 November, **Then** attempt 2 starts on Monday 23
    November with those settings. The goal is no longer ended, its name is "Meditation, 5 min daily" at once (FR-004:
    an attempt that has not begun is named by its first version), and its next commitment is Monday 23 November.
-   Reading its attempts gives attempt 1 named "Meditation, 10 min daily", by its own last settings.
+   Reading its attempts gives attempt 1 named "Meditation, 10 min daily", by its own last settings. The goal has
+   started (attempt 1 began), so its current date on Thursday 19 November is 19 November, and recording 10 minutes
+   for 15 November (attempt 1) then is accepted and makes attempt 1's consistency "92% (13 of 14)".
 5. **Given** the ended goal, **When** the user starts a new attempt on Wednesday 18 November with the schedule 3
    times per week, **Then** it is accepted. A new attempt can change the schedule kind, and its streak unit is
    "weeks" [D-1].
-6. **Given** the ended goal, **When** the user tries to start a new attempt with the start date Tuesday 17
-   November (in the past), or Saturday 20 November 2027 (more than 365 days ahead), **Then** the result is "The
+6. **Given** the ended goal, **When** the user tries on Wednesday 18 November at 08:00 to start a new attempt with
+   the start date Tuesday 17 November (in the past), or Saturday 20 November 2027 (more than 365 days ahead),
+   **Then** the result is "The
    start date cannot be in the past." or "Choose a start date within a year from today.", and nothing changes.
-   Each target refusal of "Earlier behaviour these tests use" is given as for a change (one scenario per message).
+   On Monday 16 November at 11:00, the start date Monday 16 November (the ending date) gives "A new attempt starts
+   after the day the goal ended.". Each target refusal of "Earlier behaviour these tests use" is given as for a
+   change (one scenario per message).
 7. **Given** a goal that is not ended, **When** the user tries to start a new attempt, or to read the starting
    values of one, **Then** the result is "Only an ended goal can start a new attempt.".
 8. **Given** attempt 2 started on Monday 23 November as in scenario 4, **When** the user tries on Tuesday 24
@@ -335,11 +358,25 @@ unchanged.
     gives 2 to 15 November, newest first, with 2 to 13 November Met and 14 and 15 November Missed, and nothing from
     16 November on. Its recent results are those 14 results, oldest first. **When** the user reads attempt 3,
     **Then** the result is "This attempt does not exist.".
-12. *(page)* **Given** an ended goal on the Goals page's Ended tab or on its goal page, **When** the user chooses
+12. **Given** the ended goal restarted on Tuesday 17 November at 09:00 with unchanged settings from that date,
+    **When** what can be recorded now and the dashboard are read at 10:00 that day, **Then** both give attempt 1's
+    Pending 15 November, marked as of attempt 1, which is not the goal's latest attempt, and attempt 2's Due 17 November. Attempt 1's
+    Missed 14 November is neither listed nor counted. **When** the user records 10 minutes for 15 November at
+    10:05, **Then** it is accepted and counts in attempt 1's figures only.
+13. **Given** a goal with the background's settings, not ended, created on Monday 2 November with that start date
+    while the account's time zone was "Europe/Kyiv" (UTC+2), and on Monday 16 November at 23:30 UTC (Tuesday 17
+    November 01:30 in Kyiv) the account's time zone changed to "UTC", **When** the user ends the goal at 23:40 UTC
+    with the outcome "Abandoned", **Then** the ending date
+    is Tuesday 17 November, the goal's current date in Kyiv, and the last date Monday 16 November; the waiting time
+    zone version is removed. **When** the user then reads the starting values, **Then** the start date is
+    Wednesday 18 November, the day after the ending date, while the account's today is Monday 16 November.
+    **When** the user tries to start a new attempt with the start date Tuesday 17 November, **Then** the result
+    is "A new attempt starts after the day the goal ended." and nothing changes.
+14. *(page)* **Given** an ended goal on the Goals page's Ended tab or on its goal page, **When** the user chooses
     "Start new attempt", **Then** the Start new attempt page opens with the earlier settings filled in and the
-    start date today. Its line reads "Attempt 2 starts with its own history and a streak from zero.".
+    start date of FR-011, the later of the account's today and the day after the ending date. Its line reads "Attempt 2 starts with its own history and a streak from zero.".
     Confirming "Start attempt" opens the goal page.
-13. *(page)* **Given** the goal page of the restarted goal, **When** the user chooses "Attempt 1" in the Earlier
+15. *(page)* **Given** the goal page of the restarted goal, **When** the user chooses "Attempt 1" in the Earlier
     attempts card, **Then** the attempt view opens with "Attempt 1 · 2 Nov – 15 Nov", the outcome Tag, its figures,
     strip and History card. "Add record" on 14 November opens the RecordDialog for that date, and the view has no
     "Pause", "End goal" or "Edit settings".
@@ -377,12 +414,12 @@ Monday 16 November at 09:00 with unchanged settings from that date):
 3. **Given** the three goals, **When** the goal history is read on Monday 16 November at 12:00, **Then** it gives
    "Meditation, 10 min daily", attempt 1, ended Monday 16 November, "Abandoned", no note; then "Sugar, at most 1
    sweet a day", attempt 1, ended Saturday 14 November, "Achieved", "Three weeks without extra sweets.". The
-   latest ending comes first.
+   latest ending comes first. Meditation's attempt 1 is its goal's latest attempt; Sugar's is not.
 4. **Given** the three goals, **When** "Sugar" is read, **Then** its attempt is number 2, started Monday 16
    November. Its report counts only attempt 2: the consistency is "N/A".
 5. **Given** the three goals, **When** the catalog is browsed with "Only habits I track", **Then** "Reading" and
-   "Sugar" are included and "Meditation" is not, and the goal count of "Meditation" is 0. An ended goal is not
-   tracked.
+   "Sugar" are included and "Meditation" is not, the goal count of "Meditation" is 0, and its details list none of
+   the user's goals. An ended goal is not tracked.
 6. *(page)* **Given** the Goals page, **Then** it shows the Tabs "Active", "Paused" and "Ended". The Ended tab lists
    "Meditation, 10 min daily" with the outcome Tag "Abandoned", the meta "Ended Mon 16 Nov", its figures and
    strip, and the action "Start new attempt". An empty Ended tab says "No ended goals.".
@@ -469,8 +506,20 @@ reports.
 - **Pending results at the ending**: they belong to the ended attempt, can still be recorded or excused during
   their grace period, and become final as usual [D-2]. The dashboard keeps listing them, marked as belonging to an
   ended goal, until their grace period ends; once they are final it no longer shows them (FR-019).
-- **Ending and restarting on the same day**: allowed. The new attempt may start on the ending date, which is no
-  longer part of the ended attempt [D-2]. Records kept on that date then belong to the new attempt.
+- **Ending and restarting on the same day**: the restart is allowed, but the new attempt starts the day after the
+  ending date at the earliest ("A new attempt starts after the day the goal ended.", FR-012). Records kept on the
+  ending date, or on the other dates of a per-week goal's week in progress, were entered under the ended attempt's
+  measurement. They stay outside every attempt, so a new attempt with another measurement never reads a count as
+  minutes [D-2].
+- **The account's today and the ending date differ**: the ending date is on the goal's timeline, and the account's
+  time zone can be a day behind it (a time zone change on its way, or one made after the ending, FR-021). The
+  start date of a new attempt is checked against both, so no date belongs to two attempts (FR-011, FR-012,
+  US3-AS13).
+- **Earlier attempt's Pending results after a restart**: they stay in what can be recorded now and on the
+  dashboard, marked with their attempt, until their grace period ends; its Missed results are not listed there
+  (FR-016, FR-019, US3-AS12).
+- **A habit unpublished before a restart**: a new attempt is part of the existing goal, so it can start on an
+  Unpublished catalog habit, as existing goals keep working (slice 4 FR-034; FR-012).
 - **Restarting a per-week goal**: the new attempt's first week is the first Monday-to-Sunday week that starts on or
   after its start date (slice 4 FR-013).
 - **Several attempts**: any number. Each has its own number, figures and streak, and its own settings versions.
@@ -479,6 +528,12 @@ reports.
   attempt uses the account's time zone at the time it starts.
 - **Ending a goal with a later version waiting**: the later version is removed, as its first date is after the
   attempt's last date.
+- **Ending on the day a change took effect**: a version that took effect on the ending date (or, for a per-week
+  goal, on the Monday of the week in progress) judged no date of the ended attempt, so ending removes it too
+  (FR-009), unless it is the attempt's first version. The ended goal's name, its Settings card and the starting
+  values of a new attempt then come from the attempt's last version, the version of its last date. This is
+  accepted: the removed settings never applied to a result, and the user can enter them again when starting the
+  new attempt. An attempt ended on or before its start date keeps its first version (US2-AS12).
 - **A habit unpublished, or a custom habit used only by ended goals**: still "used by goals" (slice 4 FR-033,
   FR-035). Ended goals keep their habit.
 - **Undoing an ending**: not possible. The user starts a new attempt.
@@ -496,6 +551,21 @@ reports.
 - *Last date* of an ended attempt: the last date that belongs to it [D-2]. It is derived from the ending date as
   FR-008 gives it.
 - *Latest attempt*: the current attempt, or for an ended goal its last ended attempt.
+- *Goal's start date*: the start date of its attempt 1, set at creation and never changed (FR-001). Each attempt
+  also has its own start date, and reading a goal gives both (FR-017).
+- *A goal that has not started* (slice 4 FR-012, slice 6 FR-012, slice 7 FR-006) keeps its meaning: none of its
+  attempts has begun, so it has no current date, and those slices use the account's today for it. A goal whose
+  latest attempt has not begun but an earlier attempt has begun has started.
+- *Current date* (slice 4 FR-012, extended): while the goal's latest attempt has begun and is not ended, as slice
+  4 gives it. Otherwise, once any attempt has begun (an ended goal, or a goal whose new attempt has not begun),
+  it is the date of the supplied time in the time zone of the last version of the latest attempt that has
+  begun. So the dates of an earlier attempt can still be recorded (slice 5 FR-002: their day has begun), also
+  while a new attempt waits to begin. A date of an attempt that has not begun has not begun either, whatever the
+  current date: slice 5 FR-002 refuses it with "You cannot record a day that has not begun." until its day begins
+  in that attempt's own time zone (which can be later when the new attempt's time zone is west of the earlier
+  one's). No commitment or period lies on a current date outside an attempt (FR-010, FR-016).
+- *Last version* of an attempt: the latest of its settings versions that ending keeps (FR-009), so the version of
+  its last date, or its first version when it has no date.
 - *Next boundary* at the goal's current date D: D + 1 day for a commitment-based or per-day goal, and the Monday
   after D's week for a per-week goal (as in slice 4 FR-026).
 
@@ -539,7 +609,11 @@ reports.
   (clarify)).
 - **FR-005**: Reading a goal (slice 4 FR-016) MUST return the settings version in effect on its current date,
   with the date from which it applies, and the version that takes effect after its current date, if any, with all
-  its settings and its date. These are no longer only the time zone. Completed and begun commitments and periods
+  its settings and its date. These are no longer only the time zone. For an ended goal, the settings in effect are
+  its latest attempt's last version, with no later version. For a goal whose latest attempt has not begun, they are
+  that attempt's first version, with its start date, and there is no later version, as for a goal that has not
+  started (slice 4 FR-016), also when the goal has a current date from an earlier attempt. A change or a time zone
+  change before such an attempt begins replaces that first version (FR-002, FR-021). Completed and begun commitments and periods
   MUST keep being judged by the version of their date (slice 5 FR-010), corrections included.
 - **FR-006**: Streaks across settings versions: the current and longest streak of an attempt MUST run over its
   counted results in date order across all its settings versions, each result judged by the version of its date,
@@ -567,7 +641,10 @@ reports.
   stops future commitments without creating a failure).
 - **FR-009**: Ending MUST also cut every pause of the goal to the attempt's last date. A pause that begins after
   it is removed, and a pause that covers it ends on it. It also removes every excusal of a date after it, and
-  every settings version that takes effect after it. Records and notes of dates after the last date are kept
+  every settings version that takes effect after it except the attempt's first version. The first version stays,
+  also when the attempt ends on or before its start date and so has no date, because it is the only record of
+  what the attempt measured: the ended goal's name (FR-004), the settings returned by reading it (FR-005) and the
+  starting values of a new attempt (FR-011) come from it then. Records and notes of dates after the last date are kept
   as stored facts: they are not shown or counted while no attempt contains their date (FR-016).
 - **FR-010**: An ended goal MUST have no commitment or period after its latest attempt's last date. Adding a record
   for such a date gives "Nothing is scheduled on this date." (slice 5 FR-005, step (4)). Changing settings and
@@ -578,20 +655,27 @@ reports.
 **Starting a new attempt**
 
 - **FR-011**: Reading the starting values of a new attempt MUST return the settings of the ended attempt's last
-  version and the start date today, the account's today (SPEC §5.4: optionally copying prior settings). Checks:
+  version (SPEC §5.4: optionally copying prior settings) and, as the start date, the later of the account's today
+  and the day after the ending date. Checks:
   1. to 3. as FR-003;
   4. a goal that is not ended "Only an ended goal can start a new attempt.".
 - **FR-012**: A registered user MUST be able to start a new attempt of one of their own ended goals, with settings
   of any schedule kind (the fields and checks of goal creation) and a start date. Checks:
   1. to 4. as FR-011;
   5. the target fields as FR-003 step 5;
-  6. the start date checks of slice 4 FR-006 ("Choose a start date.", "The start date cannot be in the past.",
-     "Choose a start date within a year from today.").
+  6. the start date, in this order: "Choose a start date."; a date before the account's today "The start date
+     cannot be in the past."; a date on or before the ending date "A new attempt starts after the day the goal
+     ended."; a date more than 365 days after the account's today "Choose a start date within a year from today."
+     (slice 4 FR-006 with one step added).
 
   Otherwise the result is "attempt started", with the attempt's number (the previous number + 1) and its start
   date. The new attempt starts on its start date with its first settings version from that date, in the
   account's current time zone. It is not ended, and the goal is no longer ended. The goal keeps its identifier,
-  habit and name.
+  habit and name. A goal whose catalog habit is Unpublished can start a new attempt: the attempt is part of an
+  existing goal, which keeps working (slice 4 FR-034). Because the start date is after the ending date, no date
+  belongs to two attempts (FR-013). No record kept under the ended attempt's measurement falls into the new
+  attempt either: when the goal was ended, no day after the ending date had begun, so no such date had a record,
+  and none can be added while it belongs to no attempt (FR-010).
 - **FR-013**: Each attempt MUST have its own commitments or periods, from its start date (for a per-week schedule,
   the first week that starts on or after it) to its last date, or with no end while it is not ended. No date
   belongs to two attempts, and dates between attempts belong to none. The report range (slice 6) is the latest
@@ -605,35 +689,45 @@ reports.
 
   A correction of a date of an earlier attempt changes that attempt's figures only.
 
-  Reading one attempt of a goal by its number MUST return the same fields, its recent results (slice 6 FR-005,
-  with slice 7 FR-015) and its history (slice 5 FR-009, with slice 7 FR-017) over its own dates, both computed at
-  the supplied time. The history range is limited to the attempt's dates and to slice 5's 1 to 366 days. A number
+  Reading one attempt of a goal takes the acting user, the goal, the attempt's number and the supplied time, and no
+  range. It MUST return the same fields, the attempt's recent results (slice 6 FR-005, with slice 7 FR-015) and its
+  History (slice 5 FR-009, with slice 7 FR-017), both computed at the supplied time. The History covers the
+  attempt's dates from its start date to its last date, or to the current date while it is not ended, newest
+  first. When those are more than 366 dates, it gives the newest 366 of them (slice 5's longest range). A number
   that is not one of the goal's attempts gives "This attempt does not exist.". Adding, changing and deleting records
   and notes for a date of an earlier attempt MUST work as for any date of a goal (slice 5 FR-005 to FR-007; SPEC
-  §5.2), so the history of an earlier attempt can be corrected.
+  §5.2), so the History of an earlier attempt can be corrected.
 
 **Lists and earlier reads**
 
 - **FR-015**: Reading the goal history MUST return every ended attempt of the acting user's goals, each with the
-  goal's identifier, the attempt's name (FR-004), number, ending date, outcome and note, the latest ending date
-  first, then by the attempt's name (slice 2 FR-004 comparison) and attempt number.
-- **FR-016**: Reading a goal's history, recent results, trend, recent notes and what can be recorded now (slices 5
-  to 7) MUST cover only dates of its latest attempt. An earlier attempt's history and recent results are read
-  through FR-014. The history range of slice 5 FR-009 is limited to them. The
-  goal's current date (slice 4 FR-012) and the evaluation calendar (slice 4 FR-013) MUST give no commitment or
-  period outside an attempt.
+  goal's identifier, the attempt's name (FR-004), number, ending date, outcome and note, and whether it is the
+  goal's latest attempt, the latest ending date first, then by the attempt's name (slice 2 FR-004 comparison) and
+  attempt number. The goal history is not a goal's History (slice 5 FR-009), which lists one goal's dates with
+  their records and states.
+- **FR-016**: Reading a goal's History, recent results, trend and recent notes (slices 5 to 7) MUST cover only
+  dates of its latest attempt. The History range of slice 5 FR-009 is limited to them. What can be recorded now
+  (slice 5 FR-011) MUST cover the latest attempt's dates and, while their grace period is open, the Pending
+  commitments and periods of an ended attempt, each with its attempt number and whether that attempt is the goal's
+  latest, and, for an attempt that is not the latest, that attempt's name and Build or Reduce as FR-019 gives them.
+  An earlier attempt's History and recent results are read through FR-014. The goal's current date (slice 4
+  FR-012) and the evaluation calendar (slice 4 FR-013) MUST give no commitment or period outside an attempt.
 - **FR-017**: Reading a goal (slice 4 FR-016) MUST return its latest attempt's number and start date, and, when
   the goal is ended, its ending date, last date, outcome and note.
 - **FR-018**: The goals overview (slice 6 FR-011) MUST give, for each goal, whether it is ended and, if so, its
   ending date and outcome. An ended goal's figures, results and strip are those of its latest attempt. It is never
   paused (slice 7 FR-018) and has no Due entry. The order rules are unchanged.
-- **FR-019**: The dashboard (slice 6 FR-012) MUST keep an ended goal's Pending entries (of its latest attempt)
-  in the Pending count and the Today list, in slice 6's order, each with whether its goal is ended, until their
-  grace period ends, so that the user can still record them. It MUST leave the rest of an ended goal out: it has
-  no Due, Upcoming or Missed entry, counted or listed, and no summary. The count of goals counts only goals that
-  are neither paused nor ended, and the recent notes leave out notes of ended goals.
-- **FR-020**: The catalog's goal counts and "Only habits I track" (slice 4 FR-031, FR-032) MUST count only goals
-  that are not ended.
+- **FR-019**: The dashboard (slice 6 FR-012) MUST keep the Pending entries of an ended attempt in the Pending count
+  and the Today list, in slice 6's order, until their grace period ends, so that the user can still record them:
+  those of any ended attempt of any of the user's goals, whether the goal is ended or has restarted. Each entry
+  gives its attempt number, whether that attempt is the goal's latest, and whether its goal is ended. An entry of
+  an attempt that is not the goal's latest gives that attempt's name (FR-004) and the Build or Reduce of the
+  version of its date in place of the goal's current ones (slice 6 FR-012). The dashboard MUST leave the rest
+  of an ended attempt out: no Missed entry of it is counted or listed. An ended goal has no Due or Upcoming entry
+  and no summary. The count of goals counts only goals that are neither paused nor ended, and the recent notes
+  leave out notes of ended goals.
+- **FR-020**: The catalog's goal counts, "Only habits I track" and the list of the user's goals in a habit's
+  details (slice 4 FR-031, FR-032) MUST count and list only goals that are not ended.
 - **FR-021**: A time zone change (slice 4 FR-026) MUST add no version to an ended goal. For a goal whose current
   attempt has not begun, it updates that attempt's first version, as it does for a goal that has not started.
 
@@ -674,8 +768,9 @@ reports.
   as the facts of FR-026. The limits on when a user can change, end or restart a goal apply to users, not to this
   task. "R − k" is the date k days before the run date R. Each goal is left out when its catalog habit is not
   Published (looked up by name, ignoring case), and its name follows FR-004:
-  - **On catalog habit "Reading"**: Build, duration, all seven days. Version 1 from R − 28 with 15 minutes, and
-    version 2 from R − 13 with 20 minutes. One attempt, not ended. Records: 15 minutes on each date from R − 28
+  - **On catalog habit "Reading"**: Build, duration, all seven days. Version 1 from R − 28 with 15 minutes,
+    version 2 from R − 13 with 20 minutes, and version 3 from R + 1 with 25 minutes, a change still waiting for
+    the next boundary. One attempt, not ended. Records: 15 minutes on each date from R − 28
     to R − 14; 20 minutes on each date from R − 13 to R − 2, except R − 9 with 15 minutes and the note "Short on
     time."; no record on R − 1 or R.
   - **On catalog habit "Meditation"**: two attempts.
@@ -698,9 +793,9 @@ reports.
     - "96% (25 of 26)", current streak "6 commitments", longest "19 commitments" (R − 28 to R − 10, across the
       change);
     - R − 2 and R − 1 Pending, R Due;
-    - the later settings: none.
+    - the settings in effect: 20 minutes from R − 13; the later settings: 25 minutes from R + 1.
   - **"Meditation, 5 min daily"**:
-    - attempt line "Attempt 2", started R − 14;
+    - latest attempt number 2, started R − 14;
     - "100% (12 of 12)", current and longest streak "12 commitments";
     - R − 2 and R − 1 Pending, R Due;
     - attempt 1: ended R − 21, last date R − 22, "Abandoned", "Too busy.", "52% (11 of 21)", longest streak "11
@@ -726,7 +821,8 @@ reports.
     attempt", and no "Record", "Edit settings", "Pause" or "End goal". The History card keeps its record and
     note actions for the ended attempt's dates (FR-010);
   - in the right column, after Recent notes, the "Earlier attempts" card: each ended attempt that is not the
-    latest, as "Attempt {n} · {2 Nov} – {15 Nov}" (start date to last date), its name (FR-004) when it differs from
+    latest, as "Attempt {n} · {2 Nov} – {15 Nov}" (start date to last date), or "Attempt {n} · ended before it
+    began" for an attempt with no date (a last date before its start date), its name (FR-004) when it differs from
     the goal's current name, its outcome Tag, its consistency, and its note (`ht-muted`) when it has one. "Attempt
     {n} · …" is a link to that attempt's view (HP-014). The card is absent when there is none.
 - **HP-002**: The Edit settings page (`/goals/{id}/edit`, new design page, see "Design changes before build") MUST
@@ -740,27 +836,33 @@ reports.
   - the title "End goal · {goal name}" and the sub line with the attempt line;
   - the effect first: "Ending stops new commitments. Your history stays and nothing is counted as failed. To try
     again later you start a new attempt.";
-  - "How did it end?" as ChoiceCards Achieved, Abandoned and No longer relevant, in one column, and "Note
-    (optional)";
+  - "How did it end?" as ChoiceCards Achieved, Abandoned and No longer relevant, in one column, none of them
+    chosen when the dialog opens, and "Note (optional)";
   - the primary "End goal" and "Cancel".
 
-  Refusals are shown under the field they are about.
+  Refusals are shown under the field they are about, so "End goal" with no choice shows "Choose how the goal
+  ended." under "How did it end?".
 - **HP-004**: The Start new attempt page (`/goals/{id}/new-attempt`, new design page) MUST reuse the New goal form
   (all schedule kinds, start date) without the habit chooser and the name. It opens with FR-011's starting
   values and has the line "Attempt {n} starts with its own history and a streak from zero.". It has the primary
-  "Start attempt" and the secondary "Cancel", and confirming opens the goal page.
+  "Start attempt" and the secondary "Cancel", and confirming opens the goal page. Refusals are shown under their
+  field, one at a time, with the result's message as it is. Another account's goal or an unknown goal shows the
+  Not found page, and a goal that is not ended returns to its goal page.
 - **HP-005**: The Goals page (`/goals`, `design/pages/PageGoals`) MUST show the Tabs "Active", "Paused" and "Ended"
   (`?tab=ended`). Active and Paused leave ended goals out. Ended lists the ended goals in the overview order, each
   with the outcome Tag, the meta "Ended {Mon 16 Nov}", its figures and strip, and the secondary "Start new
-  attempt". An empty Ended tab says "No ended goals.".
+  attempt". An ended item has no "Record" action; its Pending results show in its strip as Pending and are
+  recorded from the goal page or the signed-in Home. An empty Ended tab says "No ended goals.".
 - **HP-006**: The Profile (`design/pages/PageProfile`) MUST add the tab "Goal history" after "Account" (Community
-  comes in slice 9): a DataTable with the columns Goal (the attempt's name, FR-004, as a link to the attempt view, or to the goal page
-  when the goal's latest attempt is the one ended), Attempt, Ended ("Mon 16 Nov"),
+  comes in slice 9): a DataTable with the columns Goal (the attempt's name, FR-004, as a link to the attempt view,
+  or to the goal page when FR-015 gives the attempt as the goal's latest), Attempt, Ended ("Mon 16 Nov"),
   Outcome (Tag) and Note (`ht-muted`, or "—"), in FR-015's order. An empty table is replaced by "No ended goals
-  yet.". The selected tab is kept in the address (`?tab=history`).
-- **HP-007**: The signed-in Home (`design/pages/PageHomeSignedIn`) MUST keep an ended goal's Pending rows in the
-  Today list and the "Pending · still can record" tile, each row with the Tag "Ended" after the goal name, and
-  leave ended goals out of the other tiles, the Active goals card and recent notes (FR-019). Nothing else changes.
+  yet.". The selected tab is kept in the address (`?tab=history`). An administrator's Profile keeps its Account
+  content without Tabs and has no Goal history (FR-023).
+- **HP-007**: The signed-in Home (`design/pages/PageHomeSignedIn`) MUST keep the Pending rows of ended attempts in
+  the Today list and the "Pending · still can record" tile: a row of an attempt that is not the goal's latest with
+  the Tag "Attempt {n}" after the goal name, and otherwise a row of an ended goal with the Tag "Ended". It MUST leave ended goals
+  out of the other tiles, the Active goals card and recent notes (FR-019). Nothing else changes.
 - **HP-008**: The outcome texts, "Ended …", the attempt line and the Settings card's "From …" MUST come from the
   shared formatter and text source of slice 6 HP-005, so pages build none. Outcome Tags are never shown by colour
   alone.
@@ -779,6 +881,7 @@ reports.
   `demo7@example.com`:
   - "Sugar, at most 1 sweet a day" on the Goals page's Ended tab;
   - "Attempt 2" on the page of "Meditation, 5 min daily";
+  - the Settings card's "From …" row with "25 min daily" on the page of "Reading, 20 min daily";
   - "Goal history" with "Abandoned" on the Profile.
 
   Every data parameter of demo goal-change loading's port gets its `SmokeCheckCoverage` entry (slice 3 "Coverage
@@ -787,20 +890,24 @@ reports.
   - a new entry for Outcome (Achieved, Abandoned, No longer relevant; NOT an evaluation state, NOT a failure);
   - a new entry for Ended goal (NOT paused, NOT deleted);
   - a new entry for Settings change (from the next boundary; NOT a correction, NOT retroactive);
-  - Attempt sharpened with the last date and the ending date [D-2];
+  - a new entry for Goal history (a user's ended attempts across goals; NOT a goal's History, NOT an earlier
+    attempt's view);
+  - Attempt sharpened with the last date and the ending date, and a new attempt starting after the ending date
+    [D-2];
   - Goal settings version with "a change within one schedule kind" [D-1];
   - Streak with SPEC §11.7's answer [D-1];
   - Report range as "the latest attempt";
-  - Dashboard leaving ended goals out, except their Pending entries until their grace period ends;
+  - Dashboard leaving ended attempts out, except their Pending entries until their grace period ends;
   - Demo account listing `demo7@example.com`, a new entry for Demo goal-change loading, and Demo refresh listing
     it among the tasks that run again.
 
-  The entries were added on 2026-11-22: all but the three demo ones together with the answers to D-1 and D-2, and
-  the demo ones with the answer to D-3.
+  The entries were added on 2026-11-22: all but the three demo ones together with the answers to D-1 and D-2, the
+  demo ones with the answer to D-3, and Goal history and the restart date after the first spec review.
 
 - **HP-014**: The attempt view (`/goals/{id}/attempts/{n}`, new design page, see "Design changes before build")
   MUST show one earlier attempt of the goal (FR-014):
-  - "← {goal name}" back to the goal page, the heading "Attempt {n} · {2 Nov} – {15 Nov}", the attempt's name
+  - "← {goal name}" back to the goal page, the heading "Attempt {n} · {2 Nov} – {15 Nov}" (or "Attempt {n} ·
+    ended before it began", with an empty History, for an attempt with no date), the attempt's name
     (FR-004), the outcome Tag and the note (`ht-muted`) when it has one;
   - the GoalStats card with the eyebrow "Attempt {n}" and its figures and strip;
   - the History card of the goal page (slice 5 HP-002, slice 7 HP-001) over the attempt's dates, with the same
@@ -814,6 +921,11 @@ reports.
 - Slice 4 FR-016 (reading a goal: later version's time zone only), FR-017 (no edit, end, restart), FR-018 (one
   attempt), FR-015 ("all goals are active"), FR-026 (only time zone versions) and FR-031/FR-032 (catalog counts):
   extended or replaced by FR-001 to FR-021. F004 uses none of this slice's changes and passes unchanged (FR-024).
+- Slice 4 FR-012 (current date): extended for an ended goal and for a goal whose new attempt has not begun
+  ("Terms used below"), so slice 5 FR-002 accepts records of an earlier attempt's dates. A goal with one attempt
+  keeps slice 4's current date.
+- Slice 4 FR-006's start date checks: a new attempt adds "A new attempt starts after the day the goal ended."
+  (FR-012). Goal creation keeps them unchanged.
 - Slice 4 HP (goal page head without actions, Profile without Goal history): amended by HP-001 and HP-006.
 - Slice 5 FR-005 step (4), FR-009 (history range), FR-011 (what can be recorded now): limited to attempt dates by
   FR-010 and FR-016. F005 uses one attempt and passes unchanged.
@@ -837,12 +949,13 @@ Constitution IV and ADR 0008 require `design/` to change first:
   row, the ended Notice with "Start new attempt", and the Earlier attempts card.
 - A new design page for Edit settings (from `PageNewGoal`, without the habit chooser and start date, with the
   "Changes apply from …" line), and a new design page, or a state of `PageNewGoal`, for Start new attempt.
-- `design/components/EndGoalDialog`: the texts of HP-003 confirmed and the refusal placement.
+- `design/components/EndGoalDialog`: the texts of HP-003 confirmed, no outcome chosen when it opens (today the
+  design marks "Achieved" as chosen), and the refusal placement.
 - A new design page for the attempt view of HP-014 (from `PageGoalDetail`: head, GoalStats and History only).
 - `design/pages/PageGoals` and `components/GoalListItem`: the Ended tab, the ended item with its outcome Tag, "Ended
   …" and "Start new attempt", and "No ended goals.".
 - `design/pages/PageHomeSignedIn` and `components/CommitmentRow`: a Pending row of an ended goal with the Tag
-  "Ended".
+  "Ended", and a Pending row of a restarted goal's earlier attempt with the Tag "Attempt {n}".
 - `design/pages/PageProfile`: the Goal history tab in its slice-8 state, without the Community tab, with its empty
   text.
 - `design/pages.md` and `design/README.md`: the slice-8 structure of these pages.
@@ -854,7 +967,8 @@ Constitution IV and ADR 0008 require `design/` to change first:
 - **Attempt**: one continuous pursuit of a goal: its number, start date, and, once ended, its ending date, outcome
   and optional note; its last date is derived [D-2]. Its own settings versions, commitments or periods, and figures.
 - **Outcome**: how an attempt ended: Achieved, Abandoned or No longer relevant. It is never counted as a result.
-- **Goal history**: the list of a user's ended attempts across goals.
+- **Goal history**: the list of a user's ended attempts across goals, each with its goal, name, number, ending
+  date, outcome and note. Not a goal's History (one goal's dates with their records and states).
 
 All of them are private to the goal's owner and entered by the user. None of them is a derived figure.
 
@@ -872,8 +986,9 @@ All of them are private to the goal's owner and entered by the user. None of the
 - **SC-004**: In 100% of the restart tests, the new attempt's figures start at "N/A" and "0", and the earlier
   attempt's figures are unchanged by anything recorded in the new one.
 - **SC-005**: The tests cover a change made just before and just after midnight, before and after a per-week
-  boundary, and before a waiting version takes effect, and an ending on the start date, before it and later
-  (constitution II).
+  boundary, and before a waiting version takes effect, an ending on the start date, before it and later, and a
+  restart on the ending date and on the day after it, also with the account's today a day behind the goal's
+  timeline (constitution II).
 - **SC-006**: Every use case of this slice has negative tests for another registered user, an administrator and an
   anonymous visitor, and none reads or changes another account's goal, attempt, outcome or ending note
   (constitution III).
@@ -904,7 +1019,17 @@ the community slice (slice 9), so both are recorded in [ADR 0025](../../docs/adr
     Pending ones finalize as usual. Rejected: the attempt includes the ending date (a per-week goal ended mid-week
     gets a Failed week, so ending creates a failure, against SPEC §5.4); unrecorded Pending results left out too
     (days already missed vanish from the figures). Accepted cost: a commitment recorded on the ending date is not
-    counted.
+    counted. Consequence proposed by the author in the spec review and confirmed by the owner (Clarifications,
+    Session 2026-11-22 (spec review)): a new attempt starts after the ending date at the
+    earliest (FR-012), so that no date belongs to two attempts when the account's today is a day behind the
+    goal's timeline, and no record kept under the ended attempt's measurement falls into a new attempt with
+    another one. Rejected: a new attempt on the ending date (it reads a count record as minutes, or the reverse).
+    A second consequence, proposed and confirmed the same way (FR-009): ending keeps the attempt's first version, also when the
+    attempt ends before it begins, so the ended goal keeps its name, settings and starting values. Rejected:
+    removing it with the other later versions (the goal is left with no settings).
+  - **Confirmed by the owner** on 2026-11-22: the two consequences of D-2 above (a new attempt after the ending
+    date; the first version kept), recorded in `## Clarifications` (Session 2026-11-22 (spec review)) and in
+    ADR 0025.
   - **D-3** (FR-030, FR-031, HP-011; constitution VI, ADR 0023): where the demo goal changes live. The figures of
     `demo1` to `demo6` are locked by F001, F004, F005, F007 and F008, so any change there changes locked criteria.
     Decided in `/speckit-clarify`: a sixth startup task, demo goal-change loading, creating `demo7@example.com`,
@@ -914,8 +1039,9 @@ the community slice (slice 9), so both are recorded in [ADR 0025](../../docs/adr
 
 ## Assumptions
 
-- Community views (slice 9) are out of scope. A later community slice uses each goal's latest attempt, and leaves
-  out ended goals unless its own spec decides otherwise.
+- Community views (slice 9) are out of scope. Whether earlier attempts and ended goals contribute to community
+  figures is left to that slice's spec, with SPEC §11.5 and §11.6. This slice decides only how each attempt's
+  own results are judged (D-1, D-2), which that slice cites (ADR 0025).
 - The habit and the start date of a goal cannot be changed. A different habit is a different goal, and a goal
   created with the wrong start date is ended ("No longer relevant") and created again.
 - An ending cannot be undone. The user starts a new attempt instead.

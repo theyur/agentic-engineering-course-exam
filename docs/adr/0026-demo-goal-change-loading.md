@@ -22,7 +22,7 @@ the account), [ADR 0018](0018-evaluation-on-read-and-demo-history.md)'s run date
 ## Options
 
 1. **A sixth startup task, demo goal-change loading (chosen).** It runs after demo pause loading and creates
-   `demo7@example.com` with three goals relative to the run date: one whose target changed, one on its second
+   `demo7@example.com` with three goals relative to the run date: one whose target changed (with a further change waiting), one on its second
    attempt with an ended first attempt, and one ended. No locked criteria change.
 2. **Unlock F008 and extend demo pause loading.** One task fewer, but slice 7's demo criteria and `demo6`'s figures
    would be unlocked, re-translated, re-locked and re-run, for a shipped slice whose behaviour does not change.

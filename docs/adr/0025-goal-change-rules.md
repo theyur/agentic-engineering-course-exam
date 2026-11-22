@@ -1,7 +1,9 @@
 # 0025 — Goal change rules: streaks across settings changes, what an ended attempt contains
 
 **Status:** Accepted, 2026-11-22. Owner choices in slice 8, `specs/009-goal-changes`: spec D-1 and D-2
-(Clarifications 2026-11-22 (specify)). Decides SPEC §11.7, second part (the meaning of a streak when goal
+(Clarifications 2026-11-22 (specify)). The rule that a new attempt starts after the ending date, and the
+attempt's first version staying at an ending, are consequences of D-2 proposed in the spec review and confirmed
+by the owner on 2026-11-22 (spec Clarifications, Session 2026-11-22 (spec review); FR-009, FR-012). Decides SPEC §11.7, second part (the meaning of a streak when goal
 evaluation settings change). Builds on [ADR 0016](0016-time-zones.md) (a change applies from the goal's next
 commitment or evaluation period, and at most one settings version waits after the current date),
 [ADR 0018](0018-evaluation-on-read-and-demo-history.md) and [ADR 0020](0020-derived-figures-on-read.md): figures
@@ -55,8 +57,12 @@ are derived on read from stored settings versions, attempts and endings. Keeps
   gives it. The commitment or period in progress at the ending, and everything after it, belong to no attempt:
   they are never expected or counted, and their records are kept as stored facts. Pending results up to the last
   date can still be recorded, corrected or excused during their grace period, and then finalize as usual.
-- Ending cuts the goal's pauses to the last date and removes excusals and the waiting settings version after it.
-- A new attempt starts on a chosen date from today on, with any settings. Dates between attempts belong to none.
+- Ending cuts the goal's pauses to the last date and removes the excusals of later dates. It also removes every
+  settings version that takes effect after the last date, a version already in effect on the ending date
+  included, since it judged no date of the attempt. The attempt's first version always stays, as the record of
+  what the attempt measured, also when the attempt ends before it begins.
+- A new attempt starts on a chosen date from today on and after the ending date, with any settings. Dates
+  between attempts belong to none.
   Each attempt has its own figures, and the report range is the latest attempt.
 - Later slices, the community slice included, cite these rules rather than decide them again.
 
@@ -64,8 +70,13 @@ are derived on read from stored settings versions, attempts and endings. Keeps
 
 - A user who wants to switch between "daily" and "3 times a week" ends the goal and starts a new attempt. The
   streak then starts from zero, which matches SPEC §5.4's rule for new attempts.
-- A commitment recorded on the ending date is not counted. This is accepted: the record is kept, and a new
-  attempt that starts on that date counts it.
+- A commitment recorded on the ending date is not counted. This is accepted: the record is kept as a stored
+  fact, outside every attempt.
+- A new attempt cannot start on the ending date (spec FR-012, "A new attempt starts after the day the goal
+  ended."). The ending date is on the goal's timeline and the account's today can be a day behind it, so a start
+  date checked only against today could give one date to two attempts. A record kept under the ended attempt's
+  measurement would also fall into a new attempt with another measurement, which cannot tell a count from
+  minutes. Ending and restarting the same goal therefore leaves at least the ending date outside every attempt.
 - Streaks and consistency can mix results judged by different targets within one attempt. This is intended:
   each result reflects the commitment the user had made for its date.
 - Changing either rule later needs a superseding ADR, and it changes past figures, because figures are derived on
