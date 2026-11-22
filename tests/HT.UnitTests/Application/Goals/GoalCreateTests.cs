@@ -493,4 +493,19 @@ public sealed class GoalCreateTests
         Assert.Equal(GoalField.Habit, result.Field);
         Assert.Null(result.GoalId);
     }
+
+    /// <summary>
+    /// Slice 8 plan "Risks": every problem creation can produce parses as a <see cref="GoalCreateOutcome"/>, the name
+    /// <c>CreateAsync</c> gives its refusal. <see cref="GoalProblem.StartDateNotAfterEnding"/> belongs only to starting a
+    /// new attempt, so creation has no outcome for it.
+    /// </summary>
+    [Fact]
+    public void Every_problem_creation_can_produce_parses_as_an_outcome()
+    {
+        var creationProblems = Enum.GetValues<GoalProblem>()
+            .Where(problem => problem is not (GoalProblem.None or GoalProblem.StartDateNotAfterEnding));
+
+        Assert.All(creationProblems, problem => Assert.True(Enum.TryParse<GoalCreateOutcome>(problem.ToString(), out _), problem.ToString()));
+        Assert.False(Enum.TryParse<GoalCreateOutcome>(nameof(GoalProblem.StartDateNotAfterEnding), out _));
+    }
 }

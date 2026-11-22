@@ -32,7 +32,8 @@ public static class GoalDraft
         ArgumentNullException.ThrowIfNull(fields);
         start = default;
         ownName = null;
-        if (!GoalTarget.TryCreate(fields, out target, out var problem))
+        var problem = CheckTarget(fields, out target);
+        if (problem != GoalProblem.None)
         {
             return problem;
         }
@@ -55,6 +56,20 @@ public static class GoalDraft
         return GoalProblem.None;
     }
 
+    /// <summary>
+    /// The target steps of <see cref="TryCreate"/> alone, without the start date or the name (slice 8 FR-003 step 5):
+    /// the first problem of slice 2's target checks with the goal's yes/no problem, in their order, then
+    /// <see cref="GoalProblem.ReduceAmountNeedsOneTime"/>; otherwise <see cref="GoalProblem.None"/> with the target in
+    /// <paramref name="target"/>. Values that do not belong to the chosen measurement or schedule kind are ignored.
+    /// <see cref="TryCreate"/> calls it, so the order exists once.
+    /// </summary>
+    public static GoalProblem CheckTarget(GoalTargetFields fields, out GoalTarget? target)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        GoalTarget.TryCreate(fields, out target, out var problem);
+        return problem;
+    }
+
     /// <summary>The field a refusal is about (FR-006). <see cref="GoalProblem.None"/> has no field.</summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="problem"/> is <see cref="GoalProblem.None"/> or undefined.</exception>
     public static GoalField FieldOf(GoalProblem problem) => problem switch
@@ -75,6 +90,7 @@ public static class GoalDraft
         GoalProblem.ReduceAmountNeedsOneTime => GoalField.Times,
         GoalProblem.StartDateMissing => GoalField.StartDate,
         GoalProblem.StartDateInPast => GoalField.StartDate,
+        GoalProblem.StartDateNotAfterEnding => GoalField.StartDate,
         GoalProblem.StartDateTooFar => GoalField.StartDate,
         GoalProblem.NameTooLong => GoalField.Name,
         _ => throw new ArgumentOutOfRangeException(nameof(problem), problem, "Only a refusal has a field."),

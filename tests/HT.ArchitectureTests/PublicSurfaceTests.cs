@@ -32,7 +32,8 @@ public sealed class PublicSurfaceTests
     /// <c>NoteWrite</c> and <c>NoteWriteKind</c> join them with specs/006-note-editing (research R-11), and the report
     /// types of <c>HT.Domain.Reports</c> with specs/007-personal-reports (research R-14), and the exemption types of
     /// <c>HT.Domain.Exemptions</c> and <c>TrendMark</c> with specs/008-excusals-and-pauses (research R-11), with the
-    /// store write of <c>HT.Application.Records</c> and the texts of <c>HT.Application.Exemptions</c>.
+    /// store write of <c>HT.Application.Records</c> and the texts of <c>HT.Application.Exemptions</c>. The attempt and
+    /// ending types of <c>HT.Domain.Goals</c> join them with specs/009-goal-changes (research R-12).
     /// </summary>
     [Theory]
     [InlineData("HT.Domain.Records", "RecordValue")]
@@ -75,6 +76,12 @@ public sealed class PublicSurfaceTests
     [InlineData("HT.Application.Exemptions", "CancelPauseResult")]
     [InlineData("HT.Application.Exemptions", "PausesResult")]
     [InlineData("HT.Application.Exemptions", "PauseView")]
+    [InlineData("HT.Domain.Goals", "Outcome")]
+    [InlineData("HT.Domain.Goals", "EndingNote")]
+    [InlineData("HT.Domain.Goals", "GoalEnding")]
+    [InlineData("HT.Domain.Goals", "GoalAttemptVersions")]
+    [InlineData("HT.Domain.Goals", "GoalSettingsChange")]
+    [InlineData("HT.Domain.Goals", "GoalEndingEffect")]
     public void TheNewRecordingTypesHaveNoNodaTimeTypeInTheirSignatures(string ns, string typeName)
     {
         var types = new[] { ArchitectureModel.Domain, ArchitectureModel.Application }

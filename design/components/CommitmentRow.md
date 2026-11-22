@@ -68,3 +68,17 @@ The last part of the preview shows the rows as slice 7 builds them in the Home's
 - After "excused" the island reads the list again: the row leaves the Today list, and the "Pending · still can record" tile drops by 1. Focus goes to the nearest remaining control, as the row and its buttons are gone (HP-007).
 - Excused and Paused entries are never rows: they are not Due, Pending or Missed (FR-019). A goal's Upcoming row is its earliest Upcoming commitment or period that is not Paused, within slice 6's 6 days, so a goal paused for the whole window has none.
 - Still no "Add time" or "+1".
+
+## Slice 8 state
+
+The last part of the preview shows the rows as slice 8 builds them in the Home's Today card (HP-007, FR-019, US3-AS12, US4-AS2, contracts/host.md "Signed-in Home", ADR 0008). Everything of slice 7 stays: the parts, the meta lines, the progress bar, the chips, the actions, the accessible names, the order and "Nothing to record right now.".
+
+- A Pending row of an ended attempt stays a row until its grace period ends. It carries one Tag (`ht-chip`, `components/Tag.md`) in `ht-row__name`, directly after the name (HP-007):
+  - "Attempt 1" when its attempt is not the goal's latest (`IsLatestAttempt` false: the goal was restarted). The name before it is that attempt's name (FR-004, FR-019: as it was at its last date), and the row's Build or Reduce is that of the version of its date;
+  - otherwise "Ended" when its goal is ended (`TodayEntry.GoalEnded`).
+
+  A Reduce goal's "Reduce" Tag comes after it ("Coffee, at most 2 cups a day", "Ended", "Reduce"): the Tag belongs to the name, as HP-007 places it (settled here, T009). The texts come from `GoalChangeTexts` and `ReportText` (HP-008).
+- Such a row is shown and recorded with its own settings (`Entry.Goal.SettingsOf(Entry)`): the state words, the progress bar test, the RecordDialog's field and unit. An earlier attempt of another kind than the latest attempt keeps its own (AC-080).
+- Its actions are slice 7's for a Pending row: "Record" (or "Edit" with a record), and the ghost "Excuse" for a commitment without a record (FR-010 keeps excusals of an ended attempt's dates). The accessible names name the row's own name and date: "Record for Meditation, 10 min daily, Sun 15 Nov".
+- An ended attempt has no Due, Missed or Upcoming row (FR-019): once its grace period ends, the row leaves the list and is not counted in "Missed this week".
+- A restarted goal's new attempt has its own rows without a Tag, as any goal's (the second card: attempt 2's Due Tue 17 Nov).

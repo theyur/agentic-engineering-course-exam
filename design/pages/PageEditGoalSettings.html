@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/ht-components.css"><title>PageEditGoalSettings — preview</title></head>
+<body>
+<div class="ht ht-page">
+<header class="ht-nav"><div class="ht-nav__inner"><a class="ht-nav__brand" href="#">Habit Tracker</a><nav class="ht-nav__links" aria-label="Main"><a href="#">Today</a><a href="#" aria-current="page">Goals</a><a href="#">Catalog</a><a href="#">Community</a></nav><div class="ht-nav__end"><a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="#">+ New goal</a><span class="ht-avatar" aria-label="Account menu">Y</span><button class="ht-nav__menu-btn" aria-label="Menu" aria-expanded="false"><svg class="ht-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg></button></div></div></header>
+<main class="ht-container">
+  <a class="ht-back" href="#">← Reading, 15 min daily</a>
+  <div class="ht-page-head ht-detail-head"><div><h1>Edit settings</h1></div></div>
+  <div class="ht-grid-2">
+    <form class="ht-card">
+      <div class="ht-form-section">
+        <h2 class="ht-form-section__title">Do you want to build or reduce it?</h2>
+        <p class="ht-form-section__help">Build: do it at least the target. Reduce: stay at or below a limit.</p>
+        <div class="ht-seg" role="group" aria-label="Build or reduce"><button type="button" aria-pressed="true">Build</button><button type="button" aria-pressed="false">Reduce</button></div>
+      </div>
+      <div class="ht-form-section">
+        <h2 class="ht-form-section__title" id="eg-measure">How do you measure it?</h2>
+        <p class="ht-form-section__help">You can record partial amounts; the target decides the result.</p>
+        <div class="ht-choices" role="radiogroup" aria-labelledby="eg-measure"><label class="ht-choice"><input type="radio" name="eg-m"><span class="ht-choice__title">Yes / no</span><span class="ht-choice__desc">Did it or not</span></label><label class="ht-choice"><input type="radio" name="eg-m"><span class="ht-choice__title">Count</span><span class="ht-choice__desc">Times, pages, cups</span></label><label class="ht-choice"><input type="radio" name="eg-m" checked><span class="ht-choice__title">Duration</span><span class="ht-choice__desc">Minutes or hours</span></label></div>
+      </div>
+      <div class="ht-form-section">
+        <h2 class="ht-form-section__title">Target</h2>
+        <div class="ht-inline"><span>At least</span><span class="ht-stepper"><button type="button" aria-label="Less">−</button><input type="number" value="15" min="1" max="999" aria-label="Amount"><button type="button" aria-label="More">+</button></span><div class="ht-seg" role="group" aria-label="Unit"><button type="button" aria-pressed="true">Minutes</button><button type="button" aria-pressed="false">Hours</button></div></div>
+      </div>
+      <div class="ht-form-section">
+        <h2 class="ht-form-section__title">When?</h2>
+        <div class="ht-days" role="group" aria-label="Days"><button type="button" class="ht-day" aria-pressed="true">Mon</button><button type="button" class="ht-day" aria-pressed="true">Tue</button><button type="button" class="ht-day" aria-pressed="true">Wed</button><button type="button" class="ht-day" aria-pressed="true">Thu</button><button type="button" class="ht-day" aria-pressed="true">Fri</button><button type="button" class="ht-day" aria-pressed="true">Sat</button><button type="button" class="ht-day" aria-pressed="true">Sun</button></div>
+        <p class="ht-form-section__note">Each selected day is one commitment.</p>
+      </div>
+      <div class="ht-form-section">
+        <div class="ht-field-pair"><label class="ht-field"><span class="ht-field__label">Name <span class="ht-muted">(optional)</span></span><input class="ht-input" value=""></label></div>
+      </div>
+      <div class="ht-form-section"><div class="ht-notice ht-notice--neutral"><span>Changes apply from Thu 12 Nov. Past results keep their rules.</span></div></div>
+      <div class="ht-form-actions"><button type="submit" class="ht-btn ht-btn--primary">Save changes</button><a class="ht-btn ht-btn--secondary" href="#">Cancel</a></div>
+    </form>
+    <aside class="ht-card ht-sticky ht-summary" aria-label="Your goal"><div class="ht-eyebrow">Your goal</div><h2 class="ht-card__title">Reading: at least 15 min daily, starting Thu 12 Nov.</h2><dl class="ht-kv"><dt>Evaluated</dt><dd>Each scheduled day</dd><dt>Met when</dt><dd>At least 15 min that day</dd><dt>Streak counted in</dt><dd>Commitments</dd><dt>Late records</dt><dd>Up to 48 h after each day</dd></dl></aside>
+  </div>
+</main>
+<!-- Slice 8 state (HP-002, US1-AS7, US1-AS15): new in slice 8; the full preview above is the same page, opened from the goal page's "Edit settings" for "Reading, 15 min daily" on Wed 11 Nov 2026, 10:00. "← {goal name}" back to the goal page, the heading "Edit settings"; the New goal form's sections for Build or Reduce, measurement, target and schedule, and "Name (optional)", filled with the latest settings; no Habit section and no start date; "When?" offers only the goal's schedule kind (no "On fixed days" / "A number of times" ChoiceCards, and no "Per day" / "Per week" control for a goal counted per day or per week); above the actions the neutral Notice "Changes apply from Thu 12 Nov. Past results keep their rules."; the primary "Save changes" and the secondary "Cancel" (back to the goal page); the New goal page's summary card, its sentence ending with the date the change applies from. A refusal shows under its field, one at a time, with the result's message as it is. -->
+<header class="ht-nav"><div class="ht-nav__inner"><a class="ht-nav__brand" href="#">Habit Tracker</a><nav class="ht-nav__links" aria-label="Main"><a href="#">Today</a><a href="#" aria-current="page">Goals</a><a href="#">Catalog</a></nav><div class="ht-nav__end"><a class="ht-btn ht-btn--primary ht-btn--sm ht-hide-sm" href="#">+ New goal</a><div class="ht-account ht-layer-top"><button type="button" class="ht-avatar ht-avatar-btn" aria-label="Account menu for yuri@example.com" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu">Y</button></div><button class="ht-nav__menu-btn" aria-label="Menu" aria-expanded="false" aria-controls="mobile-menu"><svg class="ht-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg></button></div></div></header>
+<div class="ht-container" aria-label="Slice 8 state">
+<div class="ht-eyebrow" style="padding-top:28px">Slice 8 state · a goal counted per week, yes/no: "When?" keeps the number of times and the week, with no "Per day" / "Per week" control; 4 times entered (Yoga, 3 times a week, spec US1-AS7; today is Wed 18 Nov 2026)</div>
+<a class="ht-back" href="#">← Yoga, 3 times a week</a>
+<div class="ht-page-head ht-detail-head"><div><h1>Edit settings</h1></div></div>
+<div class="ht-grid-2">
+<form class="ht-card"><div class="ht-form-section"><h2 class="ht-form-section__title">Do you want to build or reduce it?</h2><p class="ht-form-section__help">Build: do it at least the target. Reduce: stay at or below a limit.</p><div class="ht-seg" role="group" aria-label="Build or reduce"><button type="button" aria-pressed="true">Build</button><button type="button" aria-pressed="false">Reduce</button></div></div><div class="ht-form-section"><h2 class="ht-form-section__title" id="eg-a-measure">How do you measure it?</h2><p class="ht-form-section__help">You can record partial amounts; the target decides the result.</p><div class="ht-choices" role="radiogroup" aria-labelledby="eg-a-measure"><label class="ht-choice"><input type="radio" name="eg-a-m" checked><span class="ht-choice__title">Yes / no</span><span class="ht-choice__desc">Did it or not</span></label><label class="ht-choice"><input type="radio" name="eg-a-m"><span class="ht-choice__title">Count</span><span class="ht-choice__desc">Times, pages, cups</span></label><label class="ht-choice"><input type="radio" name="eg-a-m"><span class="ht-choice__title">Duration</span><span class="ht-choice__desc">Minutes or hours</span></label></div></div><div class="ht-form-section"><h2 class="ht-form-section__title">When?</h2><div class="ht-inline"><span class="ht-stepper"><button type="button" aria-label="Less">−</button><input type="number" value="4" min="1" max="20" aria-label="Times"><button type="button" aria-label="More">+</button></span><span class="ht-unit">times</span></div><p class="ht-form-section__note">Each week, Monday to Sunday, is evaluated as a whole.</p></div><div class="ht-form-section"><div class="ht-field-pair"><label class="ht-field"><span class="ht-field__label">Name <span class="ht-muted">(optional)</span></span><input class="ht-input" value=""></label></div></div><div class="ht-form-section"><div class="ht-notice ht-notice--neutral"><span>Changes apply from Mon 23 Nov. Past results keep their rules.</span></div></div><div class="ht-form-actions"><button type="submit" class="ht-btn ht-btn--primary">Save changes</button><a class="ht-btn ht-btn--secondary" href="#">Cancel</a></div></form>
+<aside class="ht-card ht-sticky ht-summary" aria-label="Your goal"><div class="ht-eyebrow">Your goal</div><h2 class="ht-card__title">Yoga: 4 times a week, starting Mon 23 Nov.</h2><dl class="ht-kv"><dt>Evaluated</dt><dd>Each week</dd><dt>Met when</dt><dd>Done at least 4 times that week</dd><dt>Streak counted in</dt><dd>Weeks</dd><dt>Late records</dt><dd>Up to 48 h after each week</dd></dl></aside>
+</div>
+<div class="ht-eyebrow" style="margin:24px 0 8px">Slice 8 state · refusal under the schedule · A Reduce goal with an amount has 1 time per period. (Sugar, at most 1 sweet a day, 2 times per day entered)</div>
+<div class="ht-grid-2"><div class="ht-card"><div class="ht-form-section"><h2 class="ht-form-section__title">When?</h2><div class="ht-inline"><span class="ht-stepper"><button type="button" aria-label="Less">−</button><input type="number" value="2" min="1" max="20" aria-label="Times" aria-invalid="true" aria-describedby="eg-r1-times-error"><button type="button" aria-label="More">+</button></span><span class="ht-unit">times</span></div><p class="ht-form-section__note">Each day is evaluated as a whole.</p><span class="ht-field__error" id="eg-r1-times-error">A Reduce goal with an amount has 1 time per period.</span></div></div></div>
+<div class="ht-eyebrow" style="margin:24px 0 8px">Slice 8 state · a goal that has not begun: the change replaces its first version, from its start date (Reading, 15 min daily, created on Mon 16 Nov with the start date Mon 23 Nov, spec US1-AS12; today is Tue 17 Nov 2026)</div>
+<div class="ht-grid-2"><div class="ht-card"><div class="ht-form-section"><div class="ht-notice ht-notice--neutral"><span>Changes apply from Mon 23 Nov. Past results keep their rules.</span></div></div><div class="ht-form-actions"><button type="submit" class="ht-btn ht-btn--primary">Save changes</button><a class="ht-btn ht-btn--secondary" href="#">Cancel</a></div></div></div>
+</div>
+<footer class="ht-footer"><div class="ht-footer__inner"><span>Habit Tracker · Agentic Engineering course project</span><span class="ht-spacer"></span><a href="#">Privacy</a><a href="#">Send feedback</a></div></footer>
+</div>
+</body>
+</html>

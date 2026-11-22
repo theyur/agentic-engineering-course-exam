@@ -184,6 +184,19 @@ rule above. The public `GoalCalendarView(Kind, Commitments, Periods)` mirrors it
   `habitName`, ", " and the target text of that attempt's last version (FR-004). Used for every attempt that is not
   the latest.
 
+### `TrendBuilder` (changed, `HT.Domain.Reports`; research R-07)
+
+Its public signatures are unchanged. Each begun entry's own target already reaches the builder: both `Of` overloads
+take it as the `Target` of each item (`GoalEvaluation` passes the target of the entry's own version), so no new
+parameter or item type is needed (T021). The rule of R-07 is applied inside the builder:
+
+- An item whose `Target.Measurement` differs from the trend's target (`latest`) is "of another measurement".
+- In a commitment-based yes/no trend such an item counts one "Yes" in its week when it is Met by its own target (the
+  internal `Evaluator.Meets`, the final-evaluation rule with a record), and none otherwise. A yes/no item counts its
+  "Yes" record as before.
+- In every other trend its bar has no value, keeps its mark and its own target, and `Trend.Target` (the line) is the
+  target of the latest kept bar that is not marked and is of the trend's measurement.
+
 ## Application: `HT.Application.Goals` (research R-03, R-05, R-06)
 
 ### Inputs

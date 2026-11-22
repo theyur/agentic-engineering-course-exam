@@ -52,3 +52,15 @@ The last part of the preview shows the item as slice 7 builds it (HP-004, ADR 00
 - After "Resume" the island reads the overview again: the goal leaves the Paused tab for the Active tab. Focus goes to the nearest remaining control, the next item's "Resume", or the "Paused" tab when none is left (HP-007; settled here, T007). A refusal ("This goal is not paused.") shows as an `ht-field__error` paragraph with `role="alert"` above the list.
 - No "Add time", "+1", "Start new attempt" or outcome Tag (slice 8).
 - Every value comes from `ReportText` through the overview (HP-008); the item computes nothing.
+
+## Slice 8 state
+
+The last part of the preview shows the item as slice 8 builds it (HP-005, US2-AS3, US4-AS6, ADR 0008): slice 7's item on the Active and Paused tabs, and its Ended form on the Ended tab. One Razor component (`GoalItem`) renders all three. Today is Mon 16 Nov 2026, 12:00 in the first list and Wed 18 Nov 2026, 12:00 in the second.
+
+- Active and Paused forms: slice 7's, unchanged.
+- Ended form, for a goal whose latest attempt is ended (`GoalListItem` with an ending):
+  - column 1: the name link and the meta line (`ht-goalitem__meta`), in this order: the Build or Reduce Tag; the outcome Tag (`ht-chip`, "Achieved", "Abandoned" or "No longer relevant", always with its word, HP-008); the Pending StatusChip when the ended attempt still has a Pending result; then the text "Ended Mon 16 Nov" (`ReportText`). The text replaces slice 6's whole meta text (the schedule, "next …" and the progress), as "Paused until …" does in the Paused form. The order of the Tags is settled here (T008): the goal's own Tag first, as in every form, then the outcome, then the state;
+  - columns 2 to 4: "Consistency", "Current streak" and the mini strip of the latest attempt, as in slice 6 (FR-018). A Pending result shows as a Pending cell; once its grace period ends it shows as Missed (the second list, "85% (12 of 14)", "0 commitments");
+  - column 5: one action, the secondary "Start new attempt" (`a.ht-btn.ht-btn--secondary.ht-btn--sm`, a link to `/goals/{id}/new-attempt`, `aria-label="Start new attempt for {goal name}"`; settled here, T008, after slice 6's "Record for {goal name}"). No `aria-haspopup`: it opens a page. No "Record": an ended goal has no Due entry, and its Pending results are recorded from its goal page or the signed-in Home (HP-005; settled here, T008: the item keeps one action).
+- No "Add time" or "+1" (later slices).
+- Every value comes from `ReportText` and `GoalChangeTexts` through the overview (HP-008); the item computes nothing.

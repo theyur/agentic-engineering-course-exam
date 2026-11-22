@@ -1,5 +1,7 @@
 using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.Domain.Time;
+using HT.UnitTests.Domain.Time;
 using static HT.UnitTests.Domain.Goals.GoalSamples;
 
 namespace HT.UnitTests.Domain.Goals;
@@ -196,5 +198,92 @@ public class GoalTextTests
 
         Assert.Equal("20 pages, 3 times a week", GoalText.TargetText(Target(CountTimes(20, "pages", 3, SchedulePeriod.Week))));
         Assert.Equal("Flexible · 12 times a week", GoalText.ScheduleText(Target(YesNoTimes(12, SchedulePeriod.Week))));
+    }
+
+    // Slice 8 FR-004, research R-08: names at an instant and names of attempts. Every goal is in UTC.
+    private static readonly DateOnly Nov2 = Date(2026, 11, 2);
+    private static readonly DateOnly Nov16 = Date(2026, 11, 16);
+    private static readonly DateOnly Nov23 = Date(2026, 11, 23);
+
+    private static GoalSettingsVersion Daily(int minutes, DateOnly from) =>
+        SettingsFrom(Target(DurationDays(minutes, DurationUnit.Minutes, BuildOrReduce.Build, AllDays)), from, NamedTimeZone.Utc);
+
+    /// <summary>US1: "Reading, 15 min daily" from 2 November, changed to 20 min from 12 November.</summary>
+    private static Goal Changed(GoalName? ownName = null) =>
+        GoalOf(ownName, AttemptFrom(1, Nov2, null, Daily(15, Nov2), Daily(20, Date(2026, 11, 12))));
+
+    [Fact]
+    public void AC_001_AC_002_the_name_follows_the_settings_in_effect_at_the_boundary()
+    {
+        var goal = Changed();
+
+        Assert.Equal("Reading, 15 min daily", GoalText.Name(goal, "Reading", Instants.Utc("2026-11-11T23:59:59Z")));
+        Assert.Equal("Reading, 20 min daily", GoalText.Name(goal, "Reading", Instants.Utc("2026-11-12T00:00:00Z")));
+    }
+
+    [Fact]
+    public void An_ended_goal_is_named_by_its_last_version()
+    {
+        var goal = GoalOf(AttemptFrom(1, Nov2, EndedOn(Nov16), Daily(10, Nov2), Daily(12, Date(2026, 11, 10))));
+
+        Assert.Equal("Meditation, 12 min daily", GoalText.Name(goal, "Meditation", Instants.Utc("2026-12-01T10:00:00Z")));
+    }
+
+    [Fact]
+    public void US3_AS4_a_waiting_attempt_is_named_by_its_first_version()
+    {
+        var goal = GoalOf(
+            AttemptFrom(1, Nov2, EndedOn(Nov16), Daily(10, Nov2)),
+            AttemptFrom(2, Nov23, null, Daily(5, Nov23)));
+
+        Assert.Equal("Meditation, 5 min daily", GoalText.Name(goal, "Meditation", Instants.Utc("2026-11-20T10:00:00Z")));
+        Assert.Equal("Meditation, 10 min daily", GoalText.AttemptName(goal, 1, "Meditation"));
+    }
+
+    [Fact]
+    public void The_own_name_wins()
+    {
+        Assert.True(GoalName.TryCreate("Evening reading", out var name, out _));
+        var goal = Changed(name);
+
+        Assert.Equal("Evening reading", GoalText.Name(goal, "Reading", Instants.Utc("2026-11-12T00:00:00Z")));
+        Assert.Equal("Evening reading", GoalText.AttemptName(goal, 1, "Reading"));
+        Assert.Equal("Evening reading", GoalText.Name(goal, "Reading"));
+    }
+
+    [Fact]
+    public void AC_103_an_attempt_is_named_by_its_last_version_and_the_habits_current_name()
+    {
+        // Attempt 1 changed from 10 to 12 min on 10 November and ended on 16 November; the habit was renamed afterwards.
+        var goal = GoalOf(
+            AttemptFrom(1, Nov2, EndedOn(Nov16), Daily(10, Nov2), Daily(12, Date(2026, 11, 10))),
+            AttemptFrom(2, Nov23, null, Daily(5, Nov23)));
+
+        Assert.Equal("Mindfulness, 12 min daily", GoalText.AttemptName(goal, 1, "Mindfulness"));
+        Assert.Equal("Mindfulness, 5 min daily", GoalText.AttemptName(goal, 2, "Mindfulness"));
+        Assert.Throws<ArgumentOutOfRangeException>(() => GoalText.AttemptName(goal, 3, "Mindfulness"));
+    }
+
+    [Fact]
+    public void An_attempt_with_no_date_is_named_by_its_first_version()
+    {
+        var goal = GoalOf(
+            AttemptFrom(1, Nov23, EndedOn(Date(2026, 11, 17)), Daily(10, Nov23)),
+            AttemptFrom(2, Date(2026, 11, 18), null, Daily(5, Date(2026, 11, 18))));
+
+        Assert.Equal("Meditation, 10 min daily", GoalText.AttemptName(goal, 1, "Meditation"));
+    }
+
+    [Fact]
+    public void The_two_argument_name_of_a_one_attempt_goal_is_unchanged()
+    {
+        var goal = Goal(Target(DurationDays(15, DurationUnit.Minutes, BuildOrReduce.Build, AllDays)), Start, Kyiv);
+        var changedZone = GoalVersionChange.Add(Start.AddDays(2), NewYork).ApplyTo(goal);
+
+        Assert.Equal("Reading, 15 min daily", GoalText.Name(goal, "Reading"));
+        Assert.Equal("Reading, 15 min daily", GoalText.Name(changedZone, "Reading"));
+        Assert.Equal("Reading, 15 min daily", GoalText.Name(changedZone, "Reading", Instants.Utc("2026-11-25T10:00:00Z")));
+        Assert.Throws<ArgumentNullException>(() => GoalText.Name(goal, null!, Instants.Utc("2026-11-25T10:00:00Z")));
+        Assert.Throws<ArgumentNullException>(() => GoalText.AttemptName(null!, 1, "Reading"));
     }
 }

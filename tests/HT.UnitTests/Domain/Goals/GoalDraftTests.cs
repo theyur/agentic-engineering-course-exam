@@ -56,6 +56,74 @@ public class GoalDraftTests
         Assert.Null(name);
     }
 
+    /// <summary>Slice 8 FR-003 step 5: the target steps alone give each target refusal, one case per message, in TryCreate's order.</summary>
+    [Theory]
+    [MemberData(nameof(TargetRefusals))]
+    public void CheckTarget_gives_each_target_problem_as_TryCreate_does(GoalTargetFields fields, GoalProblem expected)
+    {
+        Assert.Equal(expected, GoalDraft.CheckTarget(fields, out var target));
+        Assert.Null(target);
+        Assert.Equal(expected, GoalDraft.TryCreate(fields, Today, Today, null, out _, out _, out _));
+    }
+
+    [Fact]
+    public void CheckTarget_gives_the_first_problem_when_several_fields_are_wrong()
+    {
+        var everythingWrong = new GoalTargetFields { Amount = 0, CountUnit = new string('u', 21), Times = 0 };
+
+        Assert.Equal(GoalProblem.BuildOrReduceMissing, GoalDraft.CheckTarget(everythingWrong, out _));
+        Assert.Equal(GoalProblem.MeasurementMissing, GoalDraft.CheckTarget(everythingWrong with { BuildOrReduce = BuildOrReduce.Build }, out _));
+        Assert.Equal(GoalProblem.BuildAmountOutOfRange, GoalDraft.CheckTarget(Valid with { Amount = 0, Times = 0, Period = null }, out _));
+        Assert.Equal(GoalProblem.TimesOutOfRange, GoalDraft.CheckTarget(Valid with { Times = 0, Period = null }, out _));
+    }
+
+    [Fact]
+    public void CheckTarget_gives_None_and_the_target_for_a_valid_target()
+    {
+        Assert.Equal(GoalProblem.None, GoalDraft.CheckTarget(Valid, out var target));
+        Assert.Equal(Target(Valid), target);
+    }
+
+    [Fact]
+    public void CheckTarget_ignores_values_outside_the_chosen_measurement_or_schedule()
+    {
+        // AC-021: a duration target keeps no count unit, a yes/no one no amount, and N times keeps no days.
+        Assert.Equal(GoalProblem.None, GoalDraft.CheckTarget(DurationTimes(20, DurationUnit.Minutes, 1, SchedulePeriod.Day) with { CountUnit = "pages" }, out var duration));
+        Assert.Null(duration!.CountUnit);
+        Assert.Equal(GoalProblem.None, GoalDraft.CheckTarget(YesNoDays(BuildOrReduce.Build, MonWedFri) with { Times = 0, Period = SchedulePeriod.Week }, out var days));
+        Assert.Null(days!.Schedule.Times);
+        Assert.Equal(GoalProblem.None, GoalDraft.CheckTarget(Valid with { Days = new HashSet<DayOfWeek>() }, out var times));
+        Assert.Empty(times!.Schedule.Days);
+        Assert.Throws<ArgumentNullException>(() => GoalDraft.CheckTarget(null!, out _));
+    }
+
+    public static TheoryData<GoalTarget, GoalTarget, bool> ScheduleKindPairs => new()
+    {
+        { OnDays(MonWedFri), OnDays(DayOfWeek.Tuesday), true },
+        { OnDays(MonWedFri), Target(DurationDays(30, DurationUnit.Minutes, BuildOrReduce.Reduce, Weekdays)), true },
+        { PerDay(), Target(YesNoTimes(2, SchedulePeriod.Day)), true },
+        { PerDay(), Target(CountTimes(20, "pages", 1, SchedulePeriod.Day)), true },
+        { PerWeek(), Target(YesNoTimes(1, SchedulePeriod.Week)), true },
+        { OnDays(AllDays), PerDay(), false },
+        { PerDay(), PerWeek(), false },
+        { PerWeek(), OnDays(MonWedFri), false },
+    };
+
+    [Theory]
+    [MemberData(nameof(ScheduleKindPairs))]
+    public void HasSameScheduleKind_for_fixed_days_per_day_and_per_week(GoalTarget a, GoalTarget b, bool same)
+    {
+        Assert.Equal(same, a.HasSameScheduleKind(b));
+        Assert.Equal(same, b.HasSameScheduleKind(a));
+        Assert.True(a.HasSameScheduleKind(a));
+    }
+
+    [Fact]
+    public void HasSameScheduleKind_needs_a_target()
+    {
+        Assert.Throws<ArgumentNullException>(() => PerDay().HasSameScheduleKind(null!));
+    }
+
     [Fact]
     public void StartDateMissing_comes_before_the_name()
     {
@@ -258,6 +326,7 @@ public class GoalDraftTests
         { GoalProblem.ReduceAmountNeedsOneTime, GoalField.Times },
         { GoalProblem.StartDateMissing, GoalField.StartDate },
         { GoalProblem.StartDateInPast, GoalField.StartDate },
+        { GoalProblem.StartDateNotAfterEnding, GoalField.StartDate },
         { GoalProblem.StartDateTooFar, GoalField.StartDate },
         { GoalProblem.NameTooLong, GoalField.Name },
     };

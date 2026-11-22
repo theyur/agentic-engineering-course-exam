@@ -36,3 +36,22 @@ The last part of the preview shows Profile as slice 4 builds it (HP-015, HP-017,
   - "Name (optional)" with the help "Only you can see it. Home uses it to greet you.". After Save: the Notice "Your name is changed." (`role="status"`) above the field, and the avatar letter follows the new name. A name of more than 60 characters: "The name can have at most 60 characters." under the field. An empty name removes the name.
   - "Time zone": a select with "UTC" first, then the named time zones of the installation's time zone data in ordinal order ("America/New_York", "Asia/Tokyo", "Europe/Kyiv", …), plus the current value when it is not among them ("Europe/Kiev"), so the current value is always selected. The help: "Your goals' days and weeks start at midnight in this time zone.". After Save: the Notice "Your time zone is changed. Your goals use it from their next day or week; earlier days keep their time zone." (`role="status"`). A value that is not a named time zone: "Choose a time zone from the list." under the field.
 - The full preview's avatar shows one letter ("Y"), not initials.
+
+## Slice 8 state
+
+The last part of the preview shows Profile as slice 8 builds it (HP-006, US4-AS3, US4-AS7, contracts/host.md "Profile", ADR 0008). Today is Mon 16 Nov 2026, 12:00 in the preview (spec US4): "Meditation, 10 min daily" ended at 10:00 with "Abandoned"; "Sugar, at most 1 sweet a day" ended on Sat 14 Nov with "Achieved" and a note, and was restarted today.
+
+- Header: slice 4's, unchanged.
+- Registered users: slice 2's link Tabs (`nav.ht-tabs`, `aria-label="Profile sections"`) with the tab "Goal history" after "Account": "Account" (`/profile`), "Goal history" (`/profile?tab=history`) and "Custom habits" (`/profile?tab=custom-habits`). No Community tab (slice 9) and no counts. The selected tab is kept in the address; `?tab=history` shows Goal history.
+- Goal history: a DataTable (`components/DataTable.md`: `ht-table-wrap`, `table.ht-table` with `aria-label="Goal history"`, `th scope="col"`), with no card title (the tab names it; settled here, T010). The columns, in this order:
+  1. Goal: the attempt's name (FR-004, as it was at its last date), in bold, as a link to the attempt view (`/goals/{id}/attempts/{n}`), or to the goal page (`/goals/{id}`) when the attempt is the goal's latest (`IsLatestAttempt`; Meditation in the preview);
+  2. Attempt: its number ("1");
+  3. Ended: the ending date, "Mon 16 Nov" (`DateTexts`);
+  4. Outcome: the outcome Tag (`ht-chip`, "Achieved", "Abandoned" or "No longer relevant", always with its word);
+  5. Note: the ending note as plain text in `td.ht-muted`, or "—" without one.
+
+  The rows are in `GetGoalHistoryAsync`'s order (FR-015): the latest ending date first, then by the attempt's name and number. No row actions.
+- With no ended attempt: a Card with the sentence "No ended goals yet." (`ht-card__sub`) in place of the table (settled here, T010, as the Goals page's empty tabs).
+- Account and Custom habits: unchanged (slice 4 and slice 2).
+- An administrator's Profile keeps its Account content without Tabs (slice 4), and has no Goal history; `?tab=history` is ignored there (FR-023).
+- Every text comes from `ReportText`, `GoalChangeTexts` and `DateTexts` (HP-008); the page builds none.

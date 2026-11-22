@@ -3,9 +3,10 @@ using HT.Domain.Time;
 namespace HT.Domain.Goals;
 
 /// <summary>
-/// The effect of a change of the owner's time zone on one goal (FR-026), as <see cref="GoalTimeline.ChangeOf"/> decides
-/// it: <see cref="None"/>, <see cref="ReplaceFirst"/>, <see cref="ReplacePending"/> or <see cref="Add"/>. Two changes
-/// with the same values are equal.
+/// The effect of a change of the owner's time zone on one goal's latest attempt (FR-026; slice 8 FR-021), as
+/// <see cref="GoalTimeline.ChangeOf"/> decides it: <see cref="None"/> (also for an ended goal), <see cref="ReplaceFirst"/>
+/// (while the latest attempt has not begun), <see cref="ReplacePending"/> or <see cref="Add"/>. Two changes with the
+/// same values are equal.
 /// </summary>
 public sealed record GoalVersionChange
 {
@@ -27,11 +28,11 @@ public sealed record GoalVersionChange
     /// <summary>The date E from which the changed or added version applies; null for None and ReplaceFirst.</summary>
     public DateOnly? AppliesFrom { get; }
 
-    /// <summary>The goal has no current date: its first version gets <paramref name="zone"/>.</summary>
+    /// <summary>The latest attempt has not begun: its first version gets <paramref name="zone"/>.</summary>
     public static GoalVersionChange ReplaceFirst(NamedTimeZone zone) =>
         new(GoalVersionChangeKind.ReplaceFirst, Named(zone), null);
 
-    /// <summary>The goal's version after its current date (its last version) gets <paramref name="zone"/> and <paramref name="appliesFrom"/>.</summary>
+    /// <summary>The latest attempt's version after its current date (its last version) gets <paramref name="zone"/> and <paramref name="appliesFrom"/>.</summary>
     public static GoalVersionChange ReplacePending(NamedTimeZone zone, DateOnly appliesFrom) =>
         new(GoalVersionChangeKind.ReplacePending, Named(zone), appliesFrom);
 
@@ -40,7 +41,7 @@ public sealed record GoalVersionChange
         new(GoalVersionChangeKind.Add, Named(zone), appliesFrom);
 
     /// <summary>
-    /// The goal with this change applied: ReplaceFirst changes the first version's zone, ReplacePending the last
+    /// The goal with this change applied to its latest attempt's versions: ReplaceFirst changes the first version's zone, ReplacePending the last
     /// version's zone and date, and Add appends a version with the last version's target. The result is checked by
     /// the <see cref="Goal"/> constructor.
     /// </summary>

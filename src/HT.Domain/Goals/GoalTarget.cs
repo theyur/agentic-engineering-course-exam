@@ -46,6 +46,16 @@ public sealed class GoalTarget : IEquatable<GoalTarget>
     public SchedulePeriod? PeriodLength => Schedule.Kind == ScheduleKind.Times ? Schedule.Period : null;
 
     /// <summary>
+    /// Whether <paramref name="other"/> has this target's schedule kind (slice 8 D-1, FR-001): both fixed days, or both
+    /// N times with the same <see cref="SchedulePeriod"/>. The days, N and every other value may differ.
+    /// </summary>
+    public bool HasSameScheduleKind(GoalTarget other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return Schedule.Kind == other.Schedule.Kind && PeriodLength == other.PeriodLength;
+    }
+
+    /// <summary>
     /// Checks the target fields in FR-006's order: slice 2's target checks (<see cref="GoalProblem.BuildOrReduceMissing"/>
     /// to <see cref="GoalProblem.PeriodMissing"/>), then <see cref="GoalProblem.ReduceAmountNeedsOneTime"/>: a Reduce
     /// count or duration target of N times with N other than 1 (FR-004). It also rebuilds a stored target.
