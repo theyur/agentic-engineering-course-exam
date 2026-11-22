@@ -36,7 +36,11 @@ public sealed record PauseView
     };
 }
 
-/// <summary>The outcomes of pausing a goal, in FR-006's check order (contracts/application-api.md).</summary>
+/// <summary>
+/// The outcomes of pausing a goal, in FR-006's check order (contracts/application-api.md). Slice 8 (FR-010):
+/// <see cref="GoalEnded"/>, "This goal has ended.", is checked right after the goal (step 3); it is appended last, so the
+/// existing values keep their numbers.
+/// </summary>
 public enum PauseOutcome
 {
     NotSignedIn,
@@ -48,6 +52,7 @@ public enum PauseOutcome
     Overlaps,
     ReasonTooLong,
     Paused,
+    GoalEnded,
 }
 
 /// <summary>

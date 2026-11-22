@@ -68,7 +68,45 @@ public sealed record GoalDetails
 
     public DateOnly? LaterTimeZoneAppliesFrom { get; init; }
 
+    /// <summary>The latest attempt's number (slice 8: of the latest attempt).</summary>
     public required int AttemptNumber { get; init; }
 
+    /// <summary>The latest attempt's start date (slice 8: of the latest attempt).</summary>
     public required DateOnly AttemptStartDate { get; init; }
+
+    /// <summary>
+    /// Slice 8 (FR-005): all settings of the version after the settings in effect, with its date; null when there is
+    /// none, and always for an ended goal. <see cref="LaterTimeZone"/> and <see cref="LaterTimeZoneAppliesFrom"/> come
+    /// from the same version.
+    /// </summary>
+    public GoalSettingsView? Later { get; init; }
+
+    /// <summary>Slice 8 (FR-017): the latest attempt has ended.</summary>
+    public bool IsEnded { get; init; }
+
+    /// <summary>Slice 8 (FR-017): the ending date E of an ended goal; null otherwise.</summary>
+    public DateOnly? EndingDate { get; init; }
+
+    /// <summary>Slice 8 (FR-008, FR-017): the last date L of an ended goal; null otherwise.</summary>
+    public DateOnly? LastDate { get; init; }
+
+    /// <summary>Slice 8 (FR-017): how an ended goal ended; null otherwise.</summary>
+    public Outcome? Outcome { get; init; }
+
+    /// <summary>Slice 8 (FR-017): the ending note of an ended goal, private to its owner; null when it has none.</summary>
+    public string? EndingNote { get; init; }
+
+    /// <summary>
+    /// Slice 8 (HP-002): the date a settings change made at the read's instant would apply from
+    /// (<c>GoalTimeline.SettingsChangeOf</c>, nothing written): the next boundary, or a waiting attempt's start date.
+    /// Null for an ended goal.
+    /// </summary>
+    public DateOnly? ChangesApplyFrom { get; init; }
+
+    /// <summary>
+    /// Slice 8 (HP-001, research R-02): whether the latest attempt has begun at the read's instant
+    /// (<c>GoalTimeline.LatestAttemptHasBegun</c>). The attempt line and the Settings card's start row read it;
+    /// <see cref="HasStarted"/> keeps its meaning, "the goal has a current date".
+    /// </summary>
+    public bool AttemptHasBegun { get; init; }
 }

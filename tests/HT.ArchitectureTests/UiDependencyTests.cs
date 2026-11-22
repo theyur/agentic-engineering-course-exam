@@ -119,12 +119,21 @@ public sealed class UiDependencyTests
     }
 
     [Fact]
+    public void NoUiTypeMayDependOnTheDemoGoalChangeStorePort()
+    {
+        Types().That().ResideInAssembly(ArchitectureModel.Ui)
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(IDemoGoalChangeStore)))
+            .Because("the port writes private demo settings versions, attempts, endings, records and notes without an acting user; the host reaches it only through DemoGoalChangeService (ADR 0010, ADR 0013, ADR 0026, slice 8 research R-09)")
+            .Check(ArchitectureModel.Architecture);
+    }
+
+    [Fact]
     public void OnlyTheHostsOperatorTypesMayDependOnTheOperatorServices()
     {
         Types().That().ResideInAssembly(ArchitectureModel.Ui)
             .And().DoNotResideInNamespaceMatching(@"^HT\.Ui\.Operator(\..*)?$")
-            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService), typeof(DemoDataService), typeof(DemoHistoryService), typeof(DemoReportService), typeof(DemoPauseService)))
-            .Because("no page offers administrator creation, demo loading, demo history loading, demo report loading or demo pause loading; only the startup tasks run them (FR-014, FR-016, research R-13, slice 5 research R-13, slice 6 research R-14, slice 7 research R-08)")
+            .Should().NotDependOnAny(Types(true).That().Are(typeof(OperatorService), typeof(DemoDataService), typeof(DemoHistoryService), typeof(DemoReportService), typeof(DemoPauseService), typeof(DemoGoalChangeService)))
+            .Because("no page offers administrator creation, demo loading, demo history loading, demo report loading, demo pause loading or demo goal-change loading; only the startup tasks run them (FR-014, FR-016, research R-13, slice 5 research R-13, slice 6 research R-14, slice 7 research R-08, slice 8 research R-09)")
             .Check(ArchitectureModel.Architecture);
     }
 }

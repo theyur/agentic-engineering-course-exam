@@ -9,11 +9,11 @@ namespace HT.UiTests.Host;
 /// HP-017, SC-005 (research R-11): the smoke check in process against a real host on database <c>HT-UI-SMOKE</c>,
 /// reset before each case, with check 2 skipped (no HTTP front end). A freshly seeded host passes every check; a
 /// demo password that fails the password rule (no demo accounts, no seed catalog) fails <c>catalog</c>, every
-/// <c>demo</c> check, <c>demo history</c>, <c>demo report</c> and <c>demo pause</c>; a demo account that lost a custom
-/// habit or a goal fails that account's check only. The output never contains a password, the administrator email, a
-/// demo custom-habit name, a demo goal name, demo1's account name (slice 4 HP-018), demo4's goal names, notes and amounts
-/// (slice 5 HP-008), demo5's goal names and notes (slice 6 HP-008), or demo6's goal names, reasons and notes (slice 7
-/// HP-011).
+/// <c>demo</c> check, <c>demo history</c>, <c>demo report</c>, <c>demo pause</c> and <c>demo goal changes</c>; a demo
+/// account that lost a custom habit or a goal fails that account's check only. The output never contains a password, the
+/// administrator email, a demo custom-habit name, a demo goal name, demo1's account name (slice 4 HP-018), demo4's goal
+/// names, notes and amounts (slice 5 HP-008), demo5's goal names and notes (slice 6 HP-008), demo6's goal names, reasons
+/// and notes (slice 7 HP-011), or demo7's goal names, notes, ending notes, outcomes and later target (slice 8 HP-012).
 /// </summary>
 [Collection(DerivedDatabaseHostCollection.Name)]
 public sealed partial class SmokeCheckHostTests
@@ -38,7 +38,7 @@ public sealed partial class SmokeCheckHostTests
             [
                 "home", "https-redirect", "catalog", "administrator", .. DemoDataService.DemoEmails.Select(e => "demo " + e),
                 "demo history " + DemoHistoryService.DemoEmail, "demo report " + DemoReportService.DemoEmail,
-                "demo pause " + DemoPauseService.DemoEmail,
+                "demo pause " + DemoPauseService.DemoEmail, "demo goal changes " + DemoGoalChangeService.DemoEmail,
             ],
             result.CheckLines.Select(CheckName));
 
@@ -57,6 +57,10 @@ public sealed partial class SmokeCheckHostTests
 
         // Slice 7 HP-011: "Excused" on Meditation's page, and on the Paused tab the paused goal with its "Paused until" meta.
         Assert.Equal("PASS demo pause demo6@example.com (3 of 3)", Line(result, "demo pause " + DemoPauseService.DemoEmail));
+
+        // Slice 8 HP-012: the ended goal on the Ended tab, "Attempt 2" on Meditation's page, the "From …" row with the later
+        // target on Reading's page, and "Abandoned" in the Profile's Goal history.
+        Assert.Equal("PASS demo goal changes demo7@example.com (4 of 4)", Line(result, "demo goal changes " + DemoGoalChangeService.DemoEmail));
         Assert.Matches(LaterTiming(), result.TimingLine);
         Assert.True(result.LaterRequests >= 1);
     }
@@ -86,6 +90,7 @@ public sealed partial class SmokeCheckHostTests
         Assert.StartsWith("FAIL demo history demo4@example.com: ", Line(result, "demo history " + DemoHistoryService.DemoEmail), StringComparison.Ordinal);
         Assert.Equal("FAIL demo report demo5@example.com: the sign-in was refused", Line(result, "demo report " + DemoReportService.DemoEmail));
         Assert.Equal("FAIL demo pause demo6@example.com: the sign-in was refused", Line(result, "demo pause " + DemoPauseService.DemoEmail));
+        Assert.Equal("FAIL demo goal changes demo7@example.com: the sign-in was refused", Line(result, "demo goal changes " + DemoGoalChangeService.DemoEmail));
         Assert.EndsWith(", later n/a", result.TimingLine, StringComparison.Ordinal);
     }
 
@@ -166,6 +171,18 @@ public sealed partial class SmokeCheckHostTests
             DemoPauses.OversleptNote,
             DemoPauses.BusyDayNote,
             "Paused until",
+
+            // Slice 8 HP-012: demo7's goal names, the earlier attempt's name, the note, the ending notes, the outcomes, the
+            // later target and the texts check 9 finds.
+            .. DemoGoalChanges.GoalNames,
+            DemoGoalChanges.EarlierAttemptName,
+            DemoGoalChanges.ShortOnTimeNote,
+            DemoGoalChanges.TooBusyEndingNote,
+            DemoGoalChanges.SugarEndingNote,
+            DemoGoalChanges.WaitingTargetText,
+            "Abandoned",
+            "Achieved",
+            "Attempt 2",
         ];
         Assert.All(forbidden, value => Assert.DoesNotContain(value, text, StringComparison.OrdinalIgnoreCase));
         return (result, text);

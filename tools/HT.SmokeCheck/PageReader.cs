@@ -6,8 +6,8 @@ namespace HT.SmokeCheck;
 /// <summary>
 /// Reads what the smoke check needs from a server-rendered page (contracts/smoke-check.md): the antiforgery token
 /// and handler names of a form, the first heading, the names on habit cards and goal items, the goal items' links, the
-/// text of a card, the stat labels, tile labels and status chips (slice 6), the goal items' meta texts (slice 7), and the
-/// linked stylesheets and scripts.
+/// text of a card, the stat labels, tile labels and status chips (slice 6), the goal items' meta texts (slice 7), the
+/// attempt lines and the text of a labelled table (slice 8), and the linked stylesheets and scripts.
 /// Every value is HTML-decoded. Names and texts are compared in memory and never printed.
 /// </summary>
 public static partial class PageReader
@@ -146,6 +146,44 @@ public static partial class PageReader
     public static IReadOnlyList<string> ReadStatusChips(string html) => ReadLeafTexts(html, StatusChipPattern());
 
     /// <summary>
+    /// The text of every attempt line, in document order: each <c>&lt;span&gt;</c> whose class list holds <c>ht-attempt</c>, such as
+    /// "Attempt 2 · started 8 Nov" under the goal page's title (smoke check 9, slice 8 HP-012).
+    /// </summary>
+    public static IReadOnlyList<string> ReadAttemptLines(string html) => ReadLeafTexts(html, AttemptLinePattern());
+
+    /// <summary>
+    /// The text of the first table <c>&lt;table class="ht-table"&gt;</c> whose decoded <c>aria-label</c> is
+    /// <paramref name="label"/> (ordinal), up to that table's <c>&lt;/table&gt;</c>: each tag made one space, entities
+    /// decoded and every run of white space made one space, such as the Profile's "Goal history" DataTable (smoke check 9,
+    /// slice 8 HP-012). Null when no such table is on the page, or when it has no <c>&lt;/table&gt;</c>. Another table's
+    /// words are never part of it.
+    /// </summary>
+    public static string? ReadTableText(string html, string label)
+    {
+        ArgumentNullException.ThrowIfNull(html);
+        ArgumentNullException.ThrowIfNull(label);
+        foreach (Match table in TablePattern().Matches(html))
+        {
+            if (!string.Equals(Attribute(table.Groups["attributes"].Value, "aria-label"), label, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var start = table.Index + table.Length;
+            var end = html.IndexOf("</table", start, StringComparison.OrdinalIgnoreCase);
+            if (end < 0)
+            {
+                return null;
+            }
+
+            var text = WebUtility.HtmlDecode(InnerTagPattern().Replace(html[start..end], " "));
+            return WhiteSpacePattern().Replace(text, " ").Trim();
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// The <c>href</c> of every <c>&lt;link rel="stylesheet"&gt;</c> and the <c>src</c> of every
     /// <c>&lt;script src&gt;</c>, in document order, as written on the page; inline scripts have no <c>src</c> and are
     /// left out.
@@ -237,6 +275,12 @@ public static partial class PageReader
 
     [GeneratedRegex("""<(?<tag>[a-z][a-z0-9]*)\b[^>]*\bclass="(?:[^"]*\s)?ht-status(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</\k<tag>\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex StatusChipPattern();
+
+    [GeneratedRegex("""<span\b[^>]*\bclass="(?:[^"]*\s)?ht-attempt(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</span\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex AttemptLinePattern();
+
+    [GeneratedRegex("""<table\b(?<attributes>[^>]*\bclass="(?:[^"]*\s)?ht-table(?:\s[^"]*)?"[^>]*)>""", RegexOptions.IgnoreCase)]
+    private static partial Regex TablePattern();
 
     [GeneratedRegex("""name="__RequestVerificationToken"[^>]*value="(?<value>[^"]*)"|value="(?<value>[^"]*)"[^>]*name="__RequestVerificationToken"(?=[\s/>])""")]
     private static partial Regex TokenPattern();

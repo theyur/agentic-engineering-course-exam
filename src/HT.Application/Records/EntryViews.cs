@@ -1,3 +1,4 @@
+using HT.Application.Goals;
 using HT.Domain.Evaluation;
 using HT.Domain.Exemptions;
 using HT.Domain.Goals;
@@ -25,15 +26,23 @@ internal static class EntryViews
     /// never a correction; an Excused one also has its excusal's reason and whether the excusal can still be removed
     /// (<paramref name="now"/> before its grace end, FR-004).
     /// </para>
+    /// <para>
+    /// Slice 8 (research R-07, FR-016, FR-019): the entry carries the number of the attempt that contains it, whether
+    /// that is the latest attempt, that attempt's name when it is not (<see cref="GoalText.AttemptName"/>, with the habit's
+    /// current name), and the settings of its date's version (<see cref="HistoryEntry.Settings"/>).
+    /// </para>
     /// </summary>
     internal static HistoryEntry Of(
-        Goal goal, CalendarEntry entry, IReadOnlyList<GoalRecord> records, NoteText? note, GoalExemptions exemptions, DateTimeOffset now)
+        StoredGoal stored, CalendarEntry entry, IReadOnlyList<GoalRecord> records, NoteText? note, GoalExemptions exemptions, DateTimeOffset now)
     {
+        var goal = stored.Goal;
         var target = TargetOf(goal, entry);
         var exemption = exemptions.ExemptionOf(entry, target.ScheduleKindOf);
         var evaluation = Evaluator.Evaluate(target, entry.Starts, entry.Ends, records.Select(record => record.Value).ToList(), now, exemption);
         var graceEnds = GracePeriod.EndOf(entry.Ends);
         var excused = exemption == EvaluationState.Excused;
+        var number = AttemptEntries.NumberOf(goal, entry);
+        var isLatest = number == goal.Attempt.Number;
         return new HistoryEntry
         {
             FirstDate = entry.FirstDate,
@@ -48,17 +57,24 @@ internal static class EntryViews
             IsCorrection = exemption is null && now >= graceEnds,
             ExcusalReason = excused ? exemptions.ExcusalOf(entry.Key)?.Reason?.Value : null,
             CanRemoveExcusal = excused && now < graceEnds,
+            AttemptNumber = number,
+            IsLatestAttempt = isLatest,
+            AttemptName = isLatest ? null : GoalText.AttemptName(goal, number, stored.Habit.Name),
+            Settings = EntrySettings.Of(target),
         };
     }
 
     /// <summary>
-    /// The goal's settings as the pages need them to show <paramref name="entries"/> (FR-009, FR-011): those of the
-    /// version of <paramref name="currentDate"/>, or of the start date when there is none, and the instant the clock was
-    /// read. No goal or habit name.
+    /// The goal's settings as the pages need them to show <paramref name="entries"/> (FR-009, FR-011): the goal-level
+    /// fields of <paramref name="version"/>, the goal's current date and the instant the clock was read. No goal or habit
+    /// name. Slice 8 (research R-07, "The goal-level settings of an attempt's History"): every caller passes
+    /// <see cref="GoalTimeline.VersionInEffect(Goal, int, DateTimeOffset)"/> of the attempt it shows, which for a goal
+    /// with one attempt is the version of its current date, or its first version when it has none, as before.
     /// </summary>
-    internal static GoalHistory HistoryOf(Goal goal, DateOnly? currentDate, IReadOnlyList<HistoryEntry> entries, DateTimeOffset now)
+    internal static GoalHistory HistoryOf(
+        Goal goal, GoalSettingsVersion version, DateOnly? currentDate, IReadOnlyList<HistoryEntry> entries, DateTimeOffset now)
     {
-        var target = GoalTimeline.VersionOf(goal, currentDate ?? goal.StartDate).Settings.Target;
+        var target = version.Settings.Target;
         return new GoalHistory
         {
             GoalId = goal.Id,
@@ -77,7 +93,7 @@ internal static class EntryViews
         };
     }
 
-    /// <summary>The target of the settings version in effect for the entry's date (FR-015).</summary>
+    /// <summary>The target of the settings version in effect for the entry's date (FR-015), in the attempt that contains it.</summary>
     internal static GoalTarget TargetOf(Goal goal, CalendarEntry entry) => GoalTimeline.VersionOf(goal, entry.FirstDate).Settings.Target;
 
     /// <summary>The records read with <paramref name="stored"/> that are dated in <paramref name="entry"/>, in their order.</summary>

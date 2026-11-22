@@ -54,3 +54,18 @@ The last part of the preview shows the page as slice 7 builds it (HP-004, US4-AS
 - Under the list, on either tab, the footnote (`ht-footnote`): "Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out." It replaces slice 6's footnote.
 - After "Resume", the list is read again and the goal moves to the Active tab; after a record is saved on the Active tab, slice 6's behaviour.
 - No goals: slice 4's EmptyState "No goals yet", unchanged, in place of the tabs, with no footnote.
+
+## Slice 8 state
+
+The last part of the preview shows the page as slice 8 builds it (HP-005, US4-AS1, US4-AS6, contracts/host.md "Goals page", ADR 0008). Today is Mon 16 Nov 2026, 12:00 in the preview (spec US4): "Reading, 15 min daily" is active, "Meditation, 10 min daily" ended at 10:00 with "Abandoned", and "Sugar, at most 1 sweet a day" ended on Sat 14 Nov and was restarted today.
+
+- `/goals` for registered users; an administrator gets the Not found page, as before.
+- Page head: `heading-1` "Goals" only.
+- Under it, slice 7's link Tabs (`nav.ht-tabs`, `aria-label="Goal lists"`) with a third tab: "Active" (`/goals`), "Paused" (`/goals?tab=paused`) and "Ended" (`/goals?tab=ended`); the current one has `aria-current="page"`. Still no counts. `?tab=ended` shows Ended, `?tab=paused` Paused, any other value or none Active.
+- Active: slice 7's list of the goals that are neither paused nor ended (the same items, the same order). A restarted goal is active again: Sugar is listed with its attempt 2's figures ("N/A", "0 days") and "Record".
+- Paused: slice 7's list; an ended goal is never paused (FR-018), so it never appears there.
+- Ended: one `ht-list` of the ended goals, in the overview's order (slice 6's: Pending results first, then by name), each in the Ended form of the GoalListItem (`components/GoalListItem.md`, "Slice 8 state"): the name link, the Build or Reduce Tag, the outcome Tag, the Pending StatusChip when it has a Pending result, the meta "Ended Mon 16 Nov", its figures and mini strip (a Pending result shown as Pending), and the secondary "Start new attempt".
+- An empty Ended tab: a Card with the sentence "No ended goals." (`ht-card__sub`), as the empty Paused tab (settled here, T008).
+- Under the list, on every tab, slice 7's footnote: "Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out." (settled here, T008: an ended goal's figures follow the same rule).
+- "Start new attempt" opens the Start new attempt page (`pages/PageNewAttempt.md`); after "attempt started" the goal is on the Active tab again.
+- No goals at all: slice 4's EmptyState "No goals yet", unchanged, in place of the tabs, with no footnote. A user whose goals are all ended has goals: the tabs, an Active tab with no list, and the footnote, as slice 7 does when every goal is paused (settled here, T008).

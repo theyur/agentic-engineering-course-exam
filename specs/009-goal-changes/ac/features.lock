@@ -1,0 +1,7 @@
+{
+  "group": "features",
+  "feature": "specs/009-goal-changes",
+  "files": {
+    "tests/HT.AcceptanceTests/Features/F009/goal-changes.feature": "3cee01523b4ec4e92f6b9980577c1c66a48edaae38e1421f8c1654b8e864aa91"
+  }
+}

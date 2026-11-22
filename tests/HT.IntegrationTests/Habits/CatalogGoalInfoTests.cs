@@ -192,4 +192,45 @@ public sealed class CatalogGoalInfoTests(DatabaseFixture database)
         Assert.Equal(("NotSignedIn", (string?)"You are not signed in.", 0), (refusedVisitor.Outcome.ToString(), refusedVisitor.Message, refusedVisitor.Count));
         Assert.Equal(("NotForAdministrators", (string?)"Goals are for registered users.", 0), (refusedAdmin.Outcome.ToString(), refusedAdmin.Message, refusedAdmin.Count));
     }
+
+    [Fact]
+    public async Task Slice_8_an_ended_goal_leaves_the_counts_and_the_goal_list_and_stays_used_by_goals()
+    {
+        var world = await WorldAsync();
+        var filter = new CatalogFilter { Search = world.Suffix };
+
+        await EndAsync(world.A, world.AReading);
+        var browsed = await BrowseAsync(world.A, filter);
+        var details = await DetailsAsync(world.A, world.Reading);
+
+        Assert.Equal(1, CountOf(browsed, world.Reading));
+        Assert.Equal(1, details.Details!.GoalCount);
+        Assert.Equal([world.AMorningPages], details.Details.Goals!.Select(g => g.Id));
+
+        await EndAsync(world.A, world.AMorningPages);
+        var tracked = await BrowseAsync(world.A, filter, onlyTracked: true);
+
+        Assert.Equal([world.Yoga], tracked.Habits.Select(h => h.Id));
+        Assert.Equal(0, CountOf(await BrowseAsync(world.A, filter), world.Reading));
+        Assert.Empty((await DetailsAsync(world.A, world.Reading)).Details!.Goals!);
+        Assert.Equal(2, await RowsAsync(world.A, world.Reading));
+        Assert.Equal(2, await InScopeAsync<IGoalStore, int>(s => s.CountUsingCatalogHabitAsync(world.Reading, CancellationToken.None)));
+    }
+
+    /// <summary>
+    /// Ends <paramref name="goal"/> with the ending date Wednesday 11 November (its current date at the fixture's clock)
+    /// straight through <see cref="IGoalStore.TryEndAsync"/>, with what <see cref="GoalTimeline.EndingOf"/> gives after
+    /// <see cref="IGoalStore.ReadOwnerGoalAsync"/> (the use case that ends comes with US2).
+    /// </summary>
+    private async Task EndAsync(ActingUser user, GoalId goal)
+    {
+        await using var scope = database.CreateScope();
+        var goals = scope.ServiceProvider.GetRequiredService<IGoalStore>();
+        var owner = user.AccountId!.Value;
+        var read = (await goals.ReadOwnerGoalAsync(owner, goal, CancellationToken.None))!;
+        var stored = read.Goal!.Goal;
+        var effect = GoalTimeline.EndingOf(stored, Wed11);
+        var write = new GoalEndingWrite(goal, stored.Attempt.Number, new GoalEnding(Wed11, Outcome.Abandoned, null), effect.LastDate, effect.KeptVersions);
+        Assert.Equal(GoalChangeWriteOutcome.Written, await goals.TryEndAsync(owner, read.StoredTimeZone, read.GoalsRevision, write, CancellationToken.None));
+    }
 }

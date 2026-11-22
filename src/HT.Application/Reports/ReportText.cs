@@ -1,5 +1,6 @@
 using System.Globalization;
 using HT.Application.Accounts;
+using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Domain.Evaluation;
 using HT.Domain.Goals;
@@ -77,10 +78,69 @@ public static class ReportText
     /// <summary>Slice 7 (HP-004): the Goals page's empty Paused tab.</summary>
     public const string NoPausedGoals = "No paused goals.";
 
+    /// <summary>Slice 8 (HP-005): the Goals page's empty Ended tab.</summary>
+    public const string NoEndedGoals = "No ended goals.";
+
+    /// <summary>Slice 8 (HP-006): the Profile's empty Goal history.</summary>
+    public const string NoEndedGoalsYet = "No ended goals yet.";
+
+    /// <summary>Slice 8 (HP-007): the Tag after the goal name of a Pending row of an ended goal.</summary>
+    public const string EndedTag = "Ended";
+
+    /// <summary>
+    /// Slice 8 (FR-007, HP-008): an outcome's word, "Achieved", "Abandoned" or "No longer relevant", from
+    /// <see cref="GoalChangeTexts"/>.
+    /// </summary>
+    public static string OutcomeText(Outcome outcome) => outcome switch
+    {
+        Outcome.Achieved => GoalChangeTexts.Achieved,
+        Outcome.Abandoned => GoalChangeTexts.Abandoned,
+        Outcome.NoLongerRelevant => GoalChangeTexts.NoLongerRelevant,
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome), "The outcome is not defined."),
+    };
+
+    /// <summary>Slice 8 (HP-001, HP-008): the ended goal's Notice, "Ended Mon 16 Nov · Abandoned", the date as <see cref="DateTexts.ShortDate"/> gives it.</summary>
+    public static string Ended(DateOnly endingDate, Outcome outcome) => Ended(endingDate) + Separator + OutcomeText(outcome);
+
+    /// <summary>Slice 8 (HP-005, HP-008): an ended goal's meta line, "Ended Mon 16 Nov".</summary>
+    public static string Ended(DateOnly endingDate) => "Ended " + DateTexts.ShortDate(endingDate);
+
+    /// <summary>
+    /// Slice 8 (HP-007, HP-014): "Attempt 2", the Tag of a Pending row of an attempt that is not the latest and the
+    /// eyebrow of the attempt view's GoalStats.
+    /// </summary>
+    public static string Attempt(int number) => "Attempt " + Number(number);
+
+    /// <summary>Slice 8 (HP-001, HP-008): the attempt line of an attempt that has begun, "Attempt 2 · started 18 Nov".</summary>
+    public static string AttemptStarted(int number, DateOnly startDate) => Attempt(number) + Separator + "started " + DateTexts.DayMonth(startDate);
+
+    /// <summary>Slice 8 (HP-001, HP-008): the attempt line of an attempt that has not begun, "Attempt 2 · starts 23 Nov".</summary>
+    public static string AttemptStarts(int number, DateOnly startDate) => Attempt(number) + Separator + "starts " + DateTexts.DayMonth(startDate);
+
+    /// <summary>
+    /// Slice 8 (HP-001, HP-014): an ended attempt with its first and last date, "Attempt 1 · 2 Nov – 15 Nov", the
+    /// dates as <see cref="DateTexts.DayMonth"/> gives them.
+    /// </summary>
+    public static string AttemptSpan(int number, DateOnly first, DateOnly last) =>
+        Attempt(number) + Separator + DateTexts.DayMonth(first) + " – " + DateTexts.DayMonth(last);
+
+    /// <summary>Slice 8 (HP-001, HP-014; plan "Spec discrepancies" 5): an attempt with no date, "Attempt 1 · ended before it began".</summary>
+    public static string AttemptWithoutDate(int number) => Attempt(number) + Separator + "ended before it began";
+
+    /// <summary>Slice 8 (FR-005, HP-001): the Settings card's row of the later settings, "From Thu 12 Nov".</summary>
+    public static string From(DateOnly appliesFrom) => "From " + DateTexts.ShortDate(appliesFrom);
+
+    /// <summary>Slice 8 (HP-002): the edit page's line above its actions, "Changes apply from Thu 12 Nov. Past results keep their rules.".</summary>
+    public static string ChangesApplyFrom(DateOnly appliesFrom) =>
+        "Changes apply from " + DateTexts.ShortDate(appliesFrom) + ". Past results keep their rules.";
+
+    /// <summary>Slice 8 (HP-004): the new-attempt page's line, "Attempt 2 starts with its own history and a streak from zero.".</summary>
+    public static string NewAttemptLine(int number) => Attempt(number) + " starts with its own history and a streak from zero.";
+
     /// <summary>
     /// The progress of a Due entry with a record in a meta line (HP-002, HP-003), followed by " today" for a commitment
     /// or a day and " this week" for a week: "12 of 20 min today", "2 of at most 3 cups today" (amounts, as
-    /// <see cref="RecordingText.Progress"/> gives them); "1 of 3 this week", "1 of at most 2 today" (numbers of records);
+    /// <see cref="RecordingText.Progress(EntrySettings, Progress)"/> gives them); "1 of 3 this week", "1 of at most 2 today" (numbers of records);
     /// "Yes today" or "No today" for a yes/no commitment, whose value is its answer.
     /// </summary>
     /// <exception cref="ArgumentException">A commitment with no recorded value; the message names no value.</exception>
@@ -88,9 +148,21 @@ public static class ReportText
     {
         ArgumentNullException.ThrowIfNull(goal);
         ArgumentNullException.ThrowIfNull(entry);
+        return ProgressText(goal.SettingsOf(entry), entry);
+    }
+
+    /// <summary>
+    /// Slice 8 (research R-07): the same progress text with the row's own <paramref name="settings"/>
+    /// (<see cref="GoalHistory.SettingsOf"/>): their Build or Reduce, measurement and unit.
+    /// </summary>
+    /// <exception cref="ArgumentException">A commitment with no recorded value; the message names no value.</exception>
+    public static string ProgressText(EntrySettings settings, HistoryEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(entry);
         var progress = entry.Progress;
         var when = entry.FirstDate == entry.LastDate ? " today" : " this week";
-        var reduce = goal.BuildOrReduce == BuildOrReduce.Reduce;
+        var reduce = settings.BuildOrReduce == BuildOrReduce.Reduce;
         switch (progress.Kind)
         {
             case ProgressKind.RecordedValue:
@@ -99,14 +171,14 @@ public static class ReportText
                     throw new ArgumentException("The commitment has no recorded value.", nameof(entry));
                 }
 
-                if (goal.Measurement == Measurement.YesNo)
+                if (settings.Measurement == Measurement.YesNo)
                 {
                     return (value > 0 ? "Yes" : "No") + when;
                 }
 
-                return RecordingText.Progress(goal, progress) + when;
+                return RecordingText.Progress(settings, progress) + when;
             case ProgressKind.Total:
-                return RecordingText.Progress(goal, progress) + when;
+                return RecordingText.Progress(settings, progress) + when;
             case ProgressKind.RecordsReachingAmount:
             case ProgressKind.YesRecords:
                 return Number(progress.Value ?? 0) + (reduce ? " of at most " : " of ") + Number(progress.Of) + when;

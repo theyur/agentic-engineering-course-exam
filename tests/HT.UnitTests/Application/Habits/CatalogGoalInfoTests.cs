@@ -5,6 +5,8 @@ using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.UnitTests.Application.Goals;
 using HT.UnitTests.Fakes;
+using static HT.UnitTests.Domain.Goals.GoalSamples;
+using static HT.UnitTests.Domain.Time.Instants;
 
 namespace HT.UnitTests.Application.Habits;
 
@@ -20,7 +22,7 @@ public sealed class CatalogGoalInfoTests
     private CatalogService Service => new(_world.CatalogHabits, _world.Goals);
 
     private static readonly GoalTargetFields ThreeTimesAWeek =
-        HT.UnitTests.Domain.Goals.GoalSamples.YesNoTimes(3, SchedulePeriod.Week);
+        YesNoTimes(3, SchedulePeriod.Week);
 
     private async Task<GoalId> CreateAsync(ActingUser user, CatalogHabit habit, string? name = null, GoalTargetFields? target = null)
     {
@@ -115,8 +117,8 @@ public sealed class CatalogGoalInfoTests
         var stretching = _world.CatalogHabits.Add(HabitSamples.Catalog("Stretching", CatalogHabitState.Unpublished));
         var user = GoalInputs.RegisteredUser(_world.Accounts);
         await CreateAsync(user, reading);
-        _world.AddGoal(user.AccountId!.Value, stretching, HT.UnitTests.Domain.Goals.GoalSamples.PerWeek(),
-            (GoalWorld.Today, HT.UnitTests.Domain.Goals.GoalSamples.Kyiv));
+        _world.AddGoal(user.AccountId!.Value, stretching, PerWeek(),
+            (GoalWorld.Today, Kyiv));
 
         var result = await BrowseAsync(user, onlyTracked: true);
 
@@ -177,8 +179,8 @@ public sealed class CatalogGoalInfoTests
     {
         var stretching = _world.CatalogHabits.Add(HabitSamples.Catalog("Stretching", CatalogHabitState.Unpublished));
         var user = GoalInputs.RegisteredUser(_world.Accounts);
-        _world.AddGoal(user.AccountId!.Value, stretching, HT.UnitTests.Domain.Goals.GoalSamples.PerWeek(),
-            (GoalWorld.Today, HT.UnitTests.Domain.Goals.GoalSamples.Kyiv));
+        _world.AddGoal(user.AccountId!.Value, stretching, PerWeek(),
+            (GoalWorld.Today, Kyiv));
 
         var result = await DetailsAsync(user, stretching);
 
@@ -287,5 +289,55 @@ public sealed class CatalogGoalInfoTests
         Assert.Null(details.Details!.GoalCount);
         Assert.Null(details.Details.Goals);
         Assert.Equivalent(await Service.GetDetailsAsync(ActingUser.Anonymous, reading.Id, CancellationToken.None), details, strict: true);
+    }
+
+    // ---- Slice 8: ended goals and names at one time read (FR-004, FR-020, research R-08; T056) ----
+
+    private static GoalTargetFields MinutesDaily(int minutes) =>
+        DurationDays(minutes, DurationUnit.Minutes, BuildOrReduce.Build, AllDays);
+
+    private static DateTimeOffset At(string literal) => Utc(literal);
+
+    [Fact]
+    public async Task Slice_8_the_counts_only_habits_I_track_and_the_goal_list_leave_out_an_ended_goal_which_stays_used_by_goals()
+    {
+        var world = new AttemptWorld();
+        var ended = await world.CreateGoalAsync(MinutesDaily(15), new DateOnly(2026, 11, 2), At("2026-11-01T10:00:00Z"));
+        var running = await world.CreateGoalAsync(MinutesDaily(15), new DateOnly(2026, 11, 2), At("2026-11-01T10:00:00Z"));
+        world.At(At("2026-11-16T10:00:00Z"));
+        await world.EndAsync(ended);
+
+        var browsed = await world.Catalog.BrowseAsync(world.User, new CatalogFilter(), true, CancellationToken.None);
+        var details = await world.Catalog.GetDetailsAsync(world.User, world.Habit.Id, CancellationToken.None);
+
+        Assert.Equal(1, Assert.Single(browsed.Habits).GoalCount);
+        Assert.Equal(1, details.Details!.GoalCount);
+        Assert.Equal([running], details.Details.Goals!.Select(g => g.Id));
+        Assert.Equal(2, await world.Goals.CountUsingCatalogHabitAsync(world.Habit.Id, CancellationToken.None));
+
+        await world.EndAsync(running);
+        Assert.Empty((await world.Catalog.BrowseAsync(world.User, new CatalogFilter(), true, CancellationToken.None)).Habits);
+        Assert.Empty((await world.Catalog.GetDetailsAsync(world.User, world.Habit.Id, CancellationToken.None)).Details!.Goals!);
+        Assert.Equal(2, await world.Goals.CountUsingCatalogHabitAsync(world.Habit.Id, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Slice_8_the_details_built_with_the_clock_name_each_goal_at_one_time_read()
+    {
+        // "Reading, 15 min daily" from Monday 2 November, changed at 2026-11-11T10:00:00Z to 20 min from Thursday 12.
+        var world = new AttemptWorld();
+        var goal = await world.CreateGoalAsync(MinutesDaily(15), new DateOnly(2026, 11, 2), At("2026-11-01T10:00:00Z"));
+        world.At(At("2026-11-11T10:00:00Z"));
+        await world.ChangeSettingsAsync(goal, MinutesDaily(20));
+
+        world.At(At("2026-11-11T23:59:59Z"));
+        var before = await world.Catalog.GetDetailsAsync(world.User, world.Habit.Id, CancellationToken.None);
+        world.At(At("2026-11-12T00:00:00Z"));
+        var after = await world.Catalog.GetDetailsAsync(world.User, world.Habit.Id, CancellationToken.None);
+        var withoutClock = await new CatalogService(world.CatalogHabits, world.Goals).GetDetailsAsync(world.User, world.Habit.Id, CancellationToken.None);
+
+        Assert.Equal(["Reading, 15 min daily"], before.Details!.Goals!.Select(g => g.Name));
+        Assert.Equal(["Reading, 20 min daily"], after.Details!.Goals!.Select(g => g.Name));
+        Assert.Equal(["Reading, 15 min daily"], withoutClock.Details!.Goals!.Select(g => g.Name));
     }
 }

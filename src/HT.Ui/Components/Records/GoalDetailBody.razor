@@ -1,6 +1,4 @@
 @rendermode InteractiveServer
-@using System.Globalization
-@using HT.Application.Accounts
 @using HT.Application.Goals
 @using HT.Application.Records
 @using HT.Application.Reports
@@ -46,6 +44,19 @@
    right column (in the Settings column of a goal with no begun entry), with "Resume now" and "Cancel pause"; their
    refusals show under its title. After any of these the page reads everything again, and the focus goes to "Pause", or,
    when a current pause removed it, to the Notice's "Resume now".
+   Slice 8 (HP-001, design/pages/PageGoalDetail "Slice 8 state"): the head of a goal that is not ended always has its
+   actions in one ht-inline group after ht-spacer, the ghost link "Edit settings" (to /goals/{id}/edit) first, then
+   "Pause" and "Record" as above, whatever the goal's state (paused or not started included).
+   Slice 8 US2 (HP-001, HP-003, HP-009): the ghost "End goal" (aria-haspopup="dialog") follows "Pause" and comes before
+   "Record", and opens the EndGoalDialog. The attempt line comes from ReportText and GoalDetails.AttemptHasBegun ("started",
+   "starts", or "ended before it began" for an ended latest attempt that never began). An ended goal has no head actions
+   and no ht-spacer; directly under the head it has the Notice "Ended Mon 16 Nov · Abandoned" with the link "Start new
+   attempt" (/goals/{id}/new-attempt), and never the paused Notice; its History card keeps its record and note actions.
+   After "goal ended" the page reads the goal and everything else again, and the focus goes to the Notice's "Start new
+   attempt"; after Esc, × or Cancel it goes back to "End goal".
+   Slice 8 US3 (HP-001): the goal's attempts are read with the pauses, on every read, and the Earlier attempts card
+   follows Recent notes in the right column; for a goal with no begun entry it follows Settings (and Pauses) in the
+   Settings column. It is absent when the goal has no earlier attempt.
    Every use case runs in its own scope. *@
 @if (_goal is { } goal)
 {
@@ -60,28 +71,36 @@
                 <span class="ht-attempt">@AttemptLine(goal)</span>
             </div>
         </div>
-        @if (CanPause)
+        @if (!goal.IsEnded)
         {
             <span class="ht-spacer"></span>
             <div class="ht-inline">
-                <button type="button" class="ht-btn ht-btn--secondary" aria-haspopup="dialog" @ref="_pauseButton" @onclick="OpenPause">Pause</button>
+                <a class="ht-btn ht-btn--ghost" href="@($"/goals/{Id}/edit")">Edit settings</a>
+                @if (CanPause)
+                {
+                    <button type="button" class="ht-btn ht-btn--secondary" aria-haspopup="dialog" @ref="_pauseButton" @onclick="OpenPause">Pause</button>
+                }
+                <button type="button" class="ht-btn ht-btn--ghost" aria-haspopup="dialog" @ref="_endButton" @onclick="OpenEnd">End goal</button>
                 @if (CanRecord)
                 {
                     <button type="button" class="ht-btn ht-btn--primary" aria-haspopup="dialog" @ref="_recordButton" @onclick="OpenRecord">Record</button>
                 }
             </div>
         }
-        else if (CanRecord)
-        {
-            <span class="ht-spacer"></span>
-            <button type="button" class="ht-btn ht-btn--primary" aria-haspopup="dialog" @ref="_recordButton" @onclick="OpenRecord">Record</button>
-        }
     </div>
+    @if (goal is { IsEnded: true, EndingDate: { } endingDate, Outcome: { } outcome })
+    {
+        <div class="ht-notice">
+            <span>@ReportText.Ended(endingDate, outcome)</span>
+            <span aria-hidden="true">·</span>
+            <a class="ht-btn ht-btn--primary ht-btn--sm" href="@($"/goals/{Id}/new-attempt")" @ref="_startNewAttemptLink">Start new attempt</a>
+        </div>
+    }
     @if (_resumeRefusal is { } resumeRefusal)
     {
         <p class="ht-field__error" role="alert">@resumeRefusal</p>
     }
-    else if (CurrentPause is { } current)
+    else if (!goal.IsEnded && CurrentPause is { } current)
     {
         <div class="ht-notice">
             <span>@ReportText.PausedUntil(current.LastDay)</span>
@@ -109,17 +128,20 @@
                 <GoalSettingsCard Details="goal" />
                 <PausesCard Pauses="_pauses" OnResume="ResumeFromCardAsync" OnCancel="CancelPauseAsync" Refusal="@_pausesRefusal" />
                 <RecentNotesCard Notes="_recentNotes" ScheduleKind="_history!.GoalScheduleKind" Period="_history.Period" />
+                <EarlierAttemptsCard Attempts="_attempts" GoalId="Id" GoalName="@goal.Name" />
             </div>
         </div>
     }
-    else if (_pauses.Count > 0)
+    else if (_pauses.Count > 0 || EarlierAttemptsCard.HasEarlier(_attempts))
     {
         @* A goal with no begun entry keeps the Settings card in ht-grid-2; with a pause, the Pauses card follows it in the
-           same column (design/pages/PageGoalDetail, slice 7 state, settled in T003). *@
+           same column (design/pages/PageGoalDetail, slice 7 state, settled in T003), and so does the Earlier attempts
+           card (slice 8 state: a restarted goal whose new attempt has not begun). *@
         <div class="ht-grid-2">
             <div class="ht-stack">
                 <GoalSettingsCard Details="goal" />
                 <PausesCard Pauses="_pauses" OnResume="ResumeFromCardAsync" OnCancel="CancelPauseAsync" Refusal="@_pausesRefusal" />
+                <EarlierAttemptsCard Attempts="_attempts" GoalId="Id" GoalName="@goal.Name" />
             </div>
         </div>
     }
@@ -145,6 +167,8 @@
         <NoteDialog Open="_noteOpen" OnClose="CloseNote" FocusOnClose="FocusNoteRowAsync" GoalId="goal.Id" GoalName="@goal.Name"
                     History="history" Row="noteRow" ActingUser="_actingUser" OnSaved="NoteSavedAsync" />
     }
+    <EndGoalDialog Open="_endOpen" OnClose="CloseEnd" FocusOnClose="FocusEndOrStartAsync" GoalId="goal.Id" GoalName="@goal.Name"
+                   SubLine="@AttemptLine(goal)" ActingUser="_actingUser" OnSaved="EndedAsync" />
     @if (_pauseDate is { } pauseDate)
     {
         <PauseDialog Open="_pauseOpen" OnClose="ClosePause" FocusOnClose="FocusPauseOrResumeAsync" GoalId="goal.Id" GoalName="@goal.Name"
@@ -210,6 +234,15 @@
     /// <summary>Whether the head's "Pause", or else the Notice's "Resume now", gets the focus after the next render.</summary>
     private bool _focusPauseAfterRender;
 
+    private bool _endOpen;
+    private ElementReference _endButton;
+
+    /// <summary>The ended Notice's "Start new attempt"; the focus goes there after an ending removed "End goal" (HP-009).</summary>
+    private ElementReference _startNewAttemptLink;
+
+    /// <summary>The goal's attempts, the latest first (slice 8 FR-014), for the Earlier attempts card; empty until read.</summary>
+    private IReadOnlyList<AttemptView> _attempts = [];
+
     /// <summary>The goal's identifier; the page shell has already found it among the acting user's goals.</summary>
     [Parameter]
     public Guid Id { get; set; }
@@ -226,17 +259,52 @@
     protected override async Task OnInitializedAsync()
     {
         _actingUser = await ActingUsers.GetAsync();
-        var read = await UseCases.RunAsync<GoalService, GoalReadResult>(
-            (service, token) => service.GetAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
-        if (read.Goal is not { } goal)
+        if (!await ReadGoalAsync())
         {
             Navigation.NotFound();
             return;
         }
 
-        _goal = goal;
         await ReadRecordsAsync();
     }
+
+    /// <summary>The goal's details (slice 4 FR-020, slice 8 FR-017); false when the acting user has no such goal.</summary>
+    private async Task<bool> ReadGoalAsync()
+    {
+        var read = await UseCases.RunAsync<GoalService, GoalReadResult>(
+            (service, token) => service.GetAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        if (read.Goal is not { } goal)
+        {
+            return false;
+        }
+
+        _goal = goal;
+        return true;
+    }
+
+    private void OpenEnd() => _endOpen = true;
+
+    private void CloseEnd() => _endOpen = false;
+
+    /// <summary>
+    /// "goal ended" (slice 8 FR-007, HP-001): reads everything again first, the goal's details included, so the closing
+    /// render has the ended Notice, no head actions and the ended attempt's cards; the dialog then gives the focus back
+    /// through <see cref="FocusEndOrStartAsync"/>. A goal that is gone after the ending keeps the last details read.
+    /// </summary>
+    private async Task EndedAsync()
+    {
+        await ReadGoalAsync();
+        await ReadRecordsAsync();
+        _removeRefusal = null;
+        _endOpen = false;
+    }
+
+    /// <summary>
+    /// Gives the focus to the head's "End goal" while the page shows it; otherwise, as the ending removed it, to the
+    /// nearest remaining control, the ended Notice's "Start new attempt" (HP-009).
+    /// </summary>
+    private ValueTask FocusEndOrStartAsync() =>
+        _goal is { IsEnded: true } ? _startNewAttemptLink.FocusAsync() : _endButton.FocusAsync();
 
     /// <summary>
     /// What can be recorded now, then, with its current date D, the history of D − 365 to D (366 days; research R-12),
@@ -251,6 +319,9 @@
         _pauseDate = pauses.PauseDate;
         _resumeRefusal = null;
         _pausesRefusal = null;
+        var attempts = await UseCases.RunAsync<AttemptService, AttemptListResult>(
+            (service, token) => service.GetAttemptsAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        _attempts = attempts.Attempts;
         var recordable = await UseCases.RunAsync<RecordingService, RecordableResult>(
             (service, token) => service.GetRecordableAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
         _recordable = recordable.History;
@@ -477,7 +548,16 @@
     private static IReadOnlyList<EvaluationState> StripOf(GoalReport report) =>
         report.Recent.Results.Select(result => result.State).ToList();
 
-    /// <summary>"Attempt 1 · started 14 Jul" once the goal has started, "Attempt 1 · starts 23 Nov" before (slice 4 HP-004).</summary>
-    private static string AttemptLine(GoalDetails goal) =>
-        "Attempt " + goal.AttemptNumber.ToString(CultureInfo.InvariantCulture) + " · " + (goal.HasStarted ? "started " : "starts ") + DateTexts.DayMonth(goal.AttemptStartDate);
+    /// <summary>
+    /// The latest attempt's line (slice 4 HP-004, slice 8 HP-001, HP-008), from <see cref="ReportText"/>: "Attempt 2 ·
+    /// started 18 Nov" once it has begun, "Attempt 2 · starts 23 Nov" while it has not (<see cref="GoalDetails.AttemptHasBegun"/>,
+    /// not <see cref="GoalDetails.HasStarted"/>), and "Attempt 1 · ended before it began" for an ended latest attempt that
+    /// never began (it has no date; plan "Spec discrepancies" 5).
+    /// </summary>
+    private static string AttemptLine(GoalDetails goal) => goal switch
+    {
+        { IsEnded: true, AttemptHasBegun: false } => ReportText.AttemptWithoutDate(goal.AttemptNumber),
+        { AttemptHasBegun: true } => ReportText.AttemptStarted(goal.AttemptNumber, goal.AttemptStartDate),
+        _ => ReportText.AttemptStarts(goal.AttemptNumber, goal.AttemptStartDate),
+    };
 }

@@ -28,6 +28,12 @@ public enum ExemptionStoreWriteOutcome
 
     /// <summary>The write was made.</summary>
     Written,
+
+    /// <summary>
+    /// Slice 8 (research R-05, FR-009): the goal's latest attempt is ended, so no pause is added and no date on or after
+    /// its ending date is excused.
+    /// </summary>
+    GoalEnded,
 }
 
 /// <summary>
@@ -66,6 +72,9 @@ public sealed class ExemptionStoreWrite
 
     /// <summary>The pause is not among the goal's pauses: nothing was written.</summary>
     public static ExemptionStoreWrite PauseNotFound { get; } = new(ExemptionStoreWriteOutcome.PauseNotFound, null);
+
+    /// <summary>Slice 8: the goal's latest attempt is ended: nothing was written.</summary>
+    public static ExemptionStoreWrite GoalEnded { get; } = new(ExemptionStoreWriteOutcome.GoalEnded, null);
 
     public ExemptionStoreWriteOutcome Outcome { get; }
 

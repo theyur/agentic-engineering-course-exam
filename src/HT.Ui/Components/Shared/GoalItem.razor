@@ -2,6 +2,7 @@
 @using HT.Application.Goals
 @using HT.Application.Reports
 @using HT.Domain.Evaluation
+@using HT.Domain.Goals
 @* design/components/GoalListItem, slice 6 state (HP-002, research R-12): the full item, five columns, which replaces
    slice 4's reduced item. Column 1: the name linking to the goal page (ht-goalitem__name, read by the smoke check),
    then the meta line: the Build or Reduce Tag, a Pending StatusChip when the goal has a Pending result, and slice 4's
@@ -15,12 +16,22 @@
    Slice 7 (HP-004; design/components/GoalListItem, slice 7 state): the Paused form, for a goal with PausedUntil. Its
    meta text is ReportText.PausedUntil alone ("Paused until Sun 22 Nov"), in place of slice 6's whole meta text; the
    Tag, the Pending StatusChip, the figures and the strip stay; its one action is the secondary "Resume" (no
-   aria-haspopup: it resumes at once, FR-010), in place of "Record", and raises OnResume. *@
+   aria-haspopup: it resumes at once, FR-010), in place of "Record", and raises OnResume.
+   Slice 8 (HP-005; design/components/GoalListItem, slice 8 state): the Ended form, for a goal the overview flags as ended
+   (GoalListItem.IsEnded). After the Build or Reduce Tag, the outcome Tag (ReportText.OutcomeText), then the Pending
+   StatusChip when the ended attempt still has a Pending result; its meta text is ReportText.Ended alone ("Ended Mon 16
+   Nov"), in place of slice 6's whole meta text; the figures and the strip stay (the latest attempt's, FR-018); its one
+   action is the secondary link "Start new attempt" to /goals/{id}/new-attempt (no aria-haspopup: it opens a page), and
+   it has no "Record". *@
 <div class="ht-goalitem">
     <div>
         <a class="ht-goalitem__name" href="@($"/goals/{Item.Id.Value}")" @ref="_nameLink">@Item.Name</a>
         <div class="ht-goalitem__meta">
             <Tag Text="@Item.BuildOrReduce.ToString()" />
+            @if (EndedOutcome is { } outcome)
+            {
+                <Tag Text="@ReportText.OutcomeText(outcome)" />
+            }
             @if (Goal.HasPending)
             {
                 <StatusChip State="EvaluationState.Pending" ScheduleKind="Item.ScheduleKind" Period="Goal.Recordable.Period" />
@@ -32,7 +43,12 @@
     <div><div class="ht-goalitem__value">@Goal.Stats.CurrentStreakText</div><div class="ht-goalitem__label">Current streak</div></div>
     <div><ConsistencyStrip States="Strip" Unit="Goal.Stats.Unit" Mini="true" /></div>
     <div class="ht-goalitem__actions">
-        @if (Goal.PausedUntil is not null)
+        @if (Item.IsEnded)
+        {
+            <a class="ht-btn ht-btn--secondary ht-btn--sm" href="@($"/goals/{Item.Id.Value}/new-attempt")"
+               aria-label="@($"Start new attempt for {Item.Name}")" @ref="_startButton">Start new attempt</a>
+        }
+        else if (Goal.PausedUntil is not null)
         {
             <button type="button" class="ht-btn ht-btn--secondary ht-btn--sm" aria-label="@($"Resume {Item.Name}")" @ref="_resumeButton"
                     @onclick="() => OnResume.InvokeAsync(Goal)">Resume</button>
@@ -50,6 +66,7 @@
     private ElementReference _nameLink;
     private ElementReference _recordButton;
     private ElementReference _resumeButton;
+    private ElementReference _startButton;
 
     /// <summary>The goal as the overview gives it.</summary>
     [Parameter, EditorRequired]
@@ -77,26 +94,33 @@
     private IReadOnlyList<EvaluationState> Strip => Goal.Recent.Results.Select(result => result.State).ToList();
 
     /// <summary>
-    /// Gives the focus to the item's action: "Resume" in the Paused form, otherwise "Record", or the name link when the
-    /// item has no action. The island calls it after it has read the overview again: when the RecordDialog closes, and
-    /// after a "Resume" for the nearest remaining paused item (constitution IV, HP-007).
+    /// Gives the focus to the item's action: "Start new attempt" in the Ended form, "Resume" in the Paused form, otherwise
+    /// "Record", or the name link when the item has no action. The island calls it after it has read the overview again:
+    /// when the RecordDialog closes, and after a "Resume" for the nearest remaining paused item (constitution IV, HP-007).
     /// </summary>
     public ValueTask FocusAsync() =>
-        Goal.PausedUntil is not null ? _resumeButton.FocusAsync()
+        Item.IsEnded ? _startButton.FocusAsync()
+        : Goal.PausedUntil is not null ? _resumeButton.FocusAsync()
         : Goal.CanRecord ? _recordButton.FocusAsync()
         : _nameLink.FocusAsync();
 
-    /// <summary>
-    /// The Paused form's "Paused until …" (slice 7 HP-004), otherwise slice 4's text, then " · " and the progress of the
-    /// newest Due entry that has a record.
-    /// </summary>
-    private string MetaLine => Goal.PausedUntil is { } lastDay
-        ? ReportText.PausedUntil(lastDay)
-        : DueProgress is { } progress ? SliceFourText + " · " + progress : SliceFourText;
+    /// <summary>Slice 8 (HP-005): the outcome of the Ended form's Tag; null for a goal that is not ended.</summary>
+    private Outcome? EndedOutcome => Item.IsEnded ? Item.Outcome : null;
 
+    /// <summary>
+    /// The Ended form's "Ended …" (slice 8 HP-005), the Paused form's "Paused until …" (slice 7 HP-004), otherwise slice
+    /// 4's text, then " · " and the progress of the newest Due entry that has a record.
+    /// </summary>
+    private string MetaLine => Item is { IsEnded: true, EndingDate: { } endingDate }
+        ? ReportText.Ended(endingDate)
+        : Goal.PausedUntil is { } lastDay
+            ? ReportText.PausedUntil(lastDay)
+            : DueProgress is { } progress ? SliceFourText + " · " + progress : SliceFourText;
+
+    /// <summary>The progress text of the newest Due entry with a record, with that entry's own settings (slice 8, research R-07).</summary>
     private string? DueProgress =>
         Goal.Recordable.Entries.FirstOrDefault(entry => entry.State == EvaluationState.Due && entry.Records.Count > 0) is { } due
-            ? ReportText.ProgressText(Goal.Recordable, due)
+            ? ReportText.ProgressText(Goal.Recordable.SettingsOf(due), due)
             : null;
 
     /// <summary>The schedule, then " · " and the first variant that applies, or the schedule alone (slice 4 HP-003).</summary>

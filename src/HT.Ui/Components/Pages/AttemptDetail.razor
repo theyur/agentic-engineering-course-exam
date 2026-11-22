@@ -1,0 +1,47 @@
+@page "/goals/{Id:guid}/attempts/{Number:int}"
+@attribute [Authorize]
+@using HT.Application.Goals
+@using HT.Domain.Goals
+@using HT.Ui.Account
+@using HT.Ui.Components.Records
+@using Microsoft.AspNetCore.Authorization
+@inject GoalService GoalService
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageAttemptDetail, slice 8 state (HP-014, research R-12, contracts/host.md "Attempt view"): the static
+   shell of the attempt view, as GoalDetail is the goal page's. It looks the goal up: an administrator, an unknown goal
+   and another account's goal get the Not found page with 404, and so do the latest attempt's number (the goal page
+   shows the latest attempt) and a number that is not one of the goal's attempts (attempts are numbered from 1 to the
+   latest). The page title names no goal until the owner's goal is found. For an earlier attempt of the owner's goal it
+   renders AttemptDetailBody, the interactive, prerendered part, with the goal identifier and the number only. *@
+<PageTitle>@(_name ?? "Attempt") · Habit Tracker</PageTitle>
+
+@if (_name is not null)
+{
+    <div class="ht-container">
+        <AttemptDetailBody Id="Id" Number="Number" />
+    </div>
+}
+
+@code {
+    private string? _name;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    /// <summary>The attempt's number from the address.</summary>
+    [Parameter]
+    public int Number { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await GoalService.GetAsync(await ActingUsers.GetAsync(), new GoalId(Id), CancellationToken.None);
+        if (result.Goal is not { } goal || Number < GoalAttempt.First || Number >= goal.AttemptNumber)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        _name = goal.Name;
+    }
+}

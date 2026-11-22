@@ -69,6 +69,13 @@ public static class TrendBuilder
     /// </list>
     /// <see cref="Trend.Target"/> is the target of the latest kept bar that is not marked, or 0 when every bar is
     /// marked or there is none. With no exemption anywhere, the result equals the overload without exemptions.
+    /// <para>
+    /// Every bar and week is drawn in the trend's kind (slice 8 research R-07). An entry whose own target has another
+    /// measurement than <paramref name="latest"/> (a settings change within the attempt) contributes only its result:
+    /// in a commitment-based yes/no week one "Yes" when it is Met and none otherwise, never its amount; in any other
+    /// trend its bar has no value, exactly like an entry without a record, keeps its mark, and is skipped by
+    /// <see cref="Trend.Target"/>. A goal without such a change gets exactly slice 7's bars.
+    /// </para>
     /// </summary>
     /// <exception cref="ArgumentException">A record does not match its target's measurement, or a commitment has more than one record.</exception>
     /// <exception cref="ArgumentOutOfRangeException">An item's exemption is a state other than Excused, Paused or null.</exception>
@@ -86,25 +93,29 @@ public static class TrendBuilder
         var span = SpanOf(latest);
         var maxBars = span == TrendSpan.Week ? MaxWeekBars : MaxOtherBars;
         var bars = latest.ScheduleKindOf == GoalScheduleKind.CommitmentBased && latest.Measurement == Measurement.YesNo
-            ? CommitmentWeeks(begun, currentWeekUpcoming, exemptions)
-            : begun.Select(item => BarOf(item.Entry, item.Target, item.Records, item.Exemption)).ToList();
+            ? CommitmentWeeks(begun, currentWeekUpcoming, exemptions).Select(bar => (Bar: bar, OfTrend: true)).ToList()
+            : begun.Select(item => BarOf(item.Entry, item.Target, item.Records, item.Exemption, latest.Measurement)).ToList();
 
         var kept = bars.Skip(Math.Max(0, bars.Count - maxBars)).ToArray();
-        var line = Array.FindLast(kept, bar => bar.Mark is null)?.Target ?? 0;
-        return new Trend(KindOf(latest), span, kept, line, maxBars);
+        var line = Array.FindLast(kept, bar => bar.Bar.Mark is null && bar.OfTrend).Bar?.Target ?? 0;
+        return new Trend(KindOf(latest), span, [.. kept.Select(bar => bar.Bar)], line, maxBars);
     }
 
     /// <summary>
     /// A commitment's or a period's bar: its progress, with no value when it has no record; marked, with no value,
-    /// when it is exempt.
+    /// when it is exempt. An entry whose own measurement is not <paramref name="trendMeasurement"/> has no value either,
+    /// exactly like an entry without a record, and keeps its mark (slice 8 R-07); <c>OfTrend</c> is false for it, so the
+    /// trend line skips it.
     /// </summary>
-    private static TrendBar BarOf(CalendarEntry entry, GoalTarget target, IReadOnlyList<RecordValue> records, EvaluationState? exemption)
+    private static (TrendBar Bar, bool OfTrend) BarOf(
+        CalendarEntry entry, GoalTarget target, IReadOnlyList<RecordValue> records, EvaluationState? exemption, Measurement trendMeasurement)
     {
         ArgumentNullException.ThrowIfNull(entry);
         var mark = MarkOf(exemption);
         var progress = Evaluator.ProgressOf(target, records);
-        int? value = mark is not null || records.Count == 0 ? null : progress.Value;
-        return new TrendBar(entry.FirstDate, entry.LastDate, value, progress.Of) { Mark = mark };
+        var ofTrend = target.Measurement == trendMeasurement;
+        int? value = mark is not null || records.Count == 0 || !ofTrend ? null : progress.Value;
+        return (new TrendBar(entry.FirstDate, entry.LastDate, value, progress.Of) { Mark = mark }, ofTrend);
     }
 
     private static List<TrendBar> CommitmentWeeks(
@@ -132,7 +143,7 @@ public static class TrendBuilder
             var recorded = week.Where(item => item.Exemption is null && item.Records.Count > 0).ToList();
             int? value = recorded.Count == 0
                 ? null
-                : recorded.Sum(item => Evaluator.ProgressOf(item.Target, item.Records).Value ?? 0);
+                : recorded.Sum(item => YesCountOf(item.Target, item.Records));
             // Stryker disable once Linq : a GroupBy group is never empty, so FirstOrDefault gives the same element as First
             var target = week.First().Target.BuildOrReduce == BuildOrReduce.Build
                 ? commitments.Values.Count(mark => mark is null)
@@ -145,6 +156,16 @@ public static class TrendBuilder
 
         return bars;
     }
+
+    /// <summary>
+    /// A commitment's "Yes" count in a commitment-based yes/no week: its "Yes" record (1 or 0) for a yes/no commitment;
+    /// for a commitment of another measurement (a change within the attempt, slice 8 R-07) one when it is Met and none
+    /// otherwise, never its amount.
+    /// </summary>
+    private static int YesCountOf(GoalTarget target, IReadOnlyList<RecordValue> records) =>
+        target.Measurement == Measurement.YesNo
+            ? Evaluator.ProgressOf(target, records).Value ?? 0
+            : Evaluator.Meets(target, records) ? 1 : 0;
 
     /// <summary>The mark of an exemption: none for null, else Excused or Paused.</summary>
     /// <exception cref="ArgumentOutOfRangeException">A state other than Excused, Paused or null.</exception>

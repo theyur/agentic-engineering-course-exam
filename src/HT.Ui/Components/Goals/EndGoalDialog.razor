@@ -1,0 +1,180 @@
+@using HT.Application.Goals
+@using HT.Application.Reports
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@* design/components/EndGoalDialog, slice 8 state (HP-003, HP-009; contracts/host.md "EndGoalDialog"): ends the goal's
+   current attempt. The title "End goal · {goal name}"; the sub line the page gives, the goal page's attempt line
+   (ReportText); the effect first; "How did it end?" as ChoiceCards Achieved, Abandoned and No longer relevant in one
+   column, none chosen on open, their titles the outcome words (ReportText.OutcomeText) and their one-line descriptions
+   the design's; "Note (optional)" as a TextArea, empty on open, with the design's placeholder and no maxlength; the
+   primary "End goal" and "Cancel". The dialog reads no clock and decides nothing: "End goal" calls EndAsync in a scope
+   of its own and raises OnSaved on "goal ended"; a refusal shows with the result's message as it is, one at a time:
+   OutcomeMissing under the ChoiceCards (the radiogroup described by it), NoteTooLong under the note (aria-invalid and
+   aria-describedby), any other as an alert above "How did it end?". The choice and the note keep what was entered.
+   Focus moves to the first radio on open; Esc, × and Cancel close the dialog, and focus returns to the opener
+   (FocusOnClose, or ReturnFocus): the page gives it back to "End goal", or after an ending to the Notice's "Start new
+   attempt". It logs nothing. *@
+<HtDialog Open="Open" OnClose="OnClose" ReturnFocus="ReturnFocus" FocusOnOpen="FocusFirstChoiceAsync" FocusOnClose="FocusOnClose">
+    <Title>@TitlePrefix@GoalName</Title>
+    <Subtitle>@SubLine</Subtitle>
+    <ChildContent>
+        <p>Ending stops new commitments. Your history stays and nothing is counted as failed. To try again later you start a new attempt.</p>
+        @if (ErrorFor(Field.None) is { } alert)
+        {
+            <p class="ht-field__error" role="alert">@alert</p>
+        }
+        <div class="ht-field">
+            <span class="ht-field__label" id="@OutcomeLabelId">How did it end?</span>
+            <ChoiceCard @ref="_choices" TValue="Outcome" Name="@OutcomeLabelId" LabelledBy="@OutcomeLabelId" Options="Outcomes" OneColumn="true"
+                        Value="_outcome" ValueChanged="value => _outcome = value" DescribedBy="@DescribedBy(Field.Outcome)" />
+            @if (ErrorFor(Field.Outcome) is { } outcomeError)
+            {
+                <span class="ht-field__error" id="@ErrorId(Field.Outcome)">@outcomeError</span>
+            }
+        </div>
+        <TextArea Id="@NoteId" Label="Note" Optional="true" Placeholder="What happened? Only you can see notes."
+                  Value="@_note" ValueChanged="value => _note = value" Error="@ErrorFor(Field.Note)" />
+    </ChildContent>
+    <Footer>
+        <HtButton @onclick="EndAsync" disabled="@_saving">End goal</HtButton>
+        <HtButton Variant="HtButton.ButtonVariant.Secondary" @onclick="() => OnClose.InvokeAsync()">Cancel</HtButton>
+    </Footer>
+</HtDialog>
+
+@code {
+    /// <summary>The title: "End goal · " and the goal's name (HP-003).</summary>
+    private const string TitlePrefix = "End goal · ";
+
+    /// <summary>
+    /// The three ChoiceCards in the outcome's order: the outcome words of <see cref="ReportText.OutcomeText"/> and the
+    /// design's one-line descriptions (design/components/EndGoalDialog, settled in T007).
+    /// </summary>
+    private static readonly IReadOnlyList<(Outcome Value, string Title, string Description)> Outcomes =
+    [
+        (Outcome.Achieved, ReportText.OutcomeText(Outcome.Achieved), "I reached what I wanted"),
+        (Outcome.Abandoned, ReportText.OutcomeText(Outcome.Abandoned), "I stopped trying"),
+        (Outcome.NoLongerRelevant, ReportText.OutcomeText(Outcome.NoLongerRelevant), "My plans changed"),
+    ];
+
+    private readonly string _id = $"end-goal-dialog-{Guid.NewGuid():N}";
+    private ChoiceCard<Outcome>? _choices;
+    private Outcome? _outcome;
+    private string? _note;
+    private string? _error;
+    private Field _errorField;
+    private bool _saving;
+    private bool _wasOpen;
+
+    /// <summary>The field a refusal is shown under; <see cref="None"/> for a refusal about no field.</summary>
+    private enum Field
+    {
+        None,
+        Outcome,
+        Note,
+    }
+
+    /// <summary>Whether the dialog is shown; the page owns this value.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Esc, × or Cancel: the page should close the dialog.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>The control that opened the dialog ("End goal"); it gets the focus back when the dialog closes.</summary>
+    [Parameter]
+    public ElementReference? ReturnFocus { get; set; }
+
+    /// <summary>
+    /// Gives the focus back when the dialog closes, in place of <see cref="ReturnFocus"/>: for an opener that the re-read
+    /// after "goal ended" removes ("End goal" leaves the head of an ended goal).
+    /// </summary>
+    [Parameter]
+    public Func<ValueTask>? FocusOnClose { get; set; }
+
+    /// <summary>The goal to end.</summary>
+    [Parameter, EditorRequired]
+    public GoalId GoalId { get; set; }
+
+    /// <summary>The goal's name, for the title.</summary>
+    [Parameter, EditorRequired]
+    public string GoalName { get; set; } = string.Empty;
+
+    /// <summary>The sub line: the goal page's attempt line, as <see cref="ReportText"/> gives it.</summary>
+    [Parameter, EditorRequired]
+    public string SubLine { get; set; } = string.Empty;
+
+    /// <summary>The acting user the page read.</summary>
+    [Parameter, EditorRequired]
+    public ActingUser ActingUser { get; set; } = ActingUser.Anonymous;
+
+    /// <summary>The goal was ended: the page reads everything again and closes the dialog.</summary>
+    [Parameter]
+    public EventCallback OnSaved { get; set; }
+
+    private string OutcomeLabelId => _id + "-outcome";
+
+    private string NoteId => _id + "-note";
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !_wasOpen)
+        {
+            _outcome = null;
+            _note = null;
+            _error = null;
+            _errorField = Field.None;
+            _saving = false;
+        }
+
+        _wasOpen = Open;
+    }
+
+    /// <summary>The id of the outcome's error text; the note's is the TextArea's own (its id and "-error").</summary>
+    private string ErrorId(Field field) => _id + "-" + field.ToString().ToLowerInvariant() + "-error";
+
+    private string? ErrorFor(Field field) => _error is not null && _errorField == field ? _error : null;
+
+    private string? DescribedBy(Field field) => ErrorFor(field) is null ? null : ErrorId(field);
+
+    private ValueTask FocusFirstChoiceAsync() => _choices?.FocusFirstAsync() ?? ValueTask.CompletedTask;
+
+    private async Task EndAsync()
+    {
+        if (_saving)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var goal = GoalId;
+            var outcome = _outcome;
+            var note = _note;
+            var result = await UseCases.RunAsync<GoalChangeService, GoalEndResult>(
+                (service, token) => service.EndAsync(ActingUser, goal, outcome, note, token), CancellationToken.None);
+            if (result.Outcome == GoalEndOutcome.Ended)
+            {
+                _error = null;
+                _errorField = Field.None;
+                await OnSaved.InvokeAsync();
+                return;
+            }
+
+            _error = result.Message;
+            _errorField = result.Outcome switch
+            {
+                GoalEndOutcome.OutcomeMissing => Field.Outcome,
+                GoalEndOutcome.NoteTooLong => Field.Note,
+                _ => Field.None,
+            };
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

@@ -18,8 +18,8 @@ namespace HT.Application.Reports;
 /// </summary>
 public sealed class ReportService
 {
-    /// <summary>How many ended results the goal report gives at most (FR-005).</summary>
-    private const int GoalReportRecentCount = 30;
+    /// <summary>How many ended results the goal report gives at most (FR-005); slice 8: also an attempt's (FR-014).</summary>
+    internal const int GoalReportRecentCount = 30;
 
     /// <summary>How many ended results each goal of the overview gives at most, the Goals page's mini strip (FR-011).</summary>
     private const int OverviewRecentCount = 15;
@@ -146,10 +146,12 @@ public sealed class ReportService
             evaluated.Add(await GoalEvaluation.OfAsync(_records, access.Owner, goal, now, cancellationToken).ConfigureAwait(false));
         }
 
+        // Slice 8 (FR-019, research R-07): an ended goal keeps only its Pending entries; earlier attempts give their
+        // open Pending entries; every other list and count leaves ended goals out.
         var ordered = GoalOrder.Of(evaluated, evaluation => evaluation);
         var missedThisWeek = ordered
             .SelectMany((evaluation, rank) => evaluation.Entries
-                .Where(entry => entry.State == EvaluationState.Missed)
+                .Where(entry => entry.State == EvaluationState.Missed && !evaluation.Goal.IsEnded)
                 .Select(entry => (Evaluation: evaluation, Rank: rank, Entry: entry, GraceEnds: GracePeriod.EndOf(entry.Ends))))
             .Where(missed => missed.GraceEnds >= weekStarts && missed.GraceEnds <= now)
             .OrderByDescending(missed => missed.GraceEnds)
@@ -157,15 +159,19 @@ public sealed class ReportService
             .Select(missed => TodayEntryOf(missed.Evaluation, missed.Entry))
             .ToList();
         var pending = ordered
-            .SelectMany((evaluation, rank) => evaluation.Pending.Select(entry => (Evaluation: evaluation, Rank: rank, Entry: entry)))
+            .SelectMany((evaluation, rank) => evaluation.Pending.Concat(evaluation.EarlierPending)
+                .Select(entry => (Evaluation: evaluation, Rank: rank, Entry: entry)))
             .OrderBy(item => item.Entry.GraceEnds)
             .ThenBy(item => item.Rank)
             .Select(item => TodayEntryOf(item.Evaluation, item.Entry))
             .ToList();
-        var due = ordered.SelectMany(evaluation => evaluation.Due.Select(entry => TodayEntryOf(evaluation, entry))).ToList();
+        var due = ordered
+            .Where(evaluation => !evaluation.Goal.IsEnded)
+            .SelectMany(evaluation => evaluation.Due.Select(entry => TodayEntryOf(evaluation, entry)))
+            .ToList();
         var upcoming = ordered
             .Select((evaluation, rank) => (Evaluation: evaluation, Rank: rank))
-            .Where(item => item.Evaluation.Due.Count == 0)
+            .Where(item => item.Evaluation.Due.Count == 0 && !item.Evaluation.Goal.IsEnded)
             .Select(item => (item.Evaluation, item.Rank, Entry: item.Evaluation.NextUpcoming(item.Evaluation.CurrentDate ?? today)))
             .Where(item => item.Entry is not null)
             .OrderBy(item => item.Entry!.Starts)
@@ -173,7 +179,9 @@ public sealed class ReportService
             .Select(item => TodayEntryOf(item.Evaluation, item.Entry!))
             .ToList();
         var notes = ordered
-            .SelectMany((evaluation, rank) => evaluation.Notes.Select(entry => (Evaluation: evaluation, Rank: rank, Entry: entry)))
+            .Select((evaluation, rank) => (Evaluation: evaluation, Rank: rank))
+            .Where(item => !item.Evaluation.Goal.IsEnded)
+            .SelectMany(item => item.Evaluation.Notes.Select(entry => (item.Evaluation, item.Rank, Entry: entry)))
             .OrderByDescending(item => item.Entry.FirstDate)
             .ThenBy(item => item.Rank)
             .Take(DashboardNoteCount)
@@ -189,6 +197,7 @@ public sealed class ReportService
             .ToList();
 
         var goals = ordered
+            .Where(evaluation => !evaluation.Goal.IsEnded)
             .Select(evaluation => new DashboardGoal
             {
                 GoalId = evaluation.Goal.Id,
@@ -209,6 +218,7 @@ public sealed class ReportService
             },
             Today = [.. pending, .. due, .. missedThisWeek, .. upcoming],
             Goals = goals,
+            EndedGoalCount = ordered.Count(evaluation => evaluation.Goal.IsEnded),
             Notes = notes,
             AccountToday = today,
             WeekStarts = weekStarts,
@@ -219,30 +229,45 @@ public sealed class ReportService
     /// <summary>The days from this week's Monday to <paramref name="date"/>: 0 on a Monday, 6 on a Sunday.</summary>
     private static int DaysSinceMonday(DateOnly date) => ((int)date.DayOfWeek + 6) % 7;
 
-    /// <summary>One row of the Today list (FR-012, research R-06): its goal, the goal's settings and what can be recorded now, and the entry.</summary>
-    private static TodayEntry TodayEntryOf(GoalEvaluation evaluation, HistoryEntry entry) => new()
+    /// <summary>
+    /// One row of the Today list (FR-012, research R-06): its goal, the goal's settings and what can be recorded now, and
+    /// the entry. Slice 8 (FR-019, research R-07): <see cref="TodayEntry.GoalEnded"/> for an ended goal's entry; an entry
+    /// of an attempt that is not the latest has that attempt's name, and its Build or Reduce and schedule text from its
+    /// own settings.
+    /// </summary>
+    private static TodayEntry TodayEntryOf(GoalEvaluation evaluation, HistoryEntry entry)
     {
-        GoalId = evaluation.Goal.Id,
-        GoalName = evaluation.Name,
-        BuildOrReduce = evaluation.BuildOrReduce,
-        ScheduleText = GoalText.ScheduleText(evaluation.LatestTarget),
-        Goal = evaluation.Recordable,
-        Entry = entry,
-    };
+        var recordable = evaluation.Recordable;
+        var settings = recordable.SettingsOf(entry);
+        return new TodayEntry
+        {
+            GoalId = evaluation.Goal.Id,
+            // Stryker disable once Conditional : an entry of the latest attempt has no AttemptName, so the fallback gives evaluation.Name as well
+            GoalName = entry.IsLatestAttempt ? evaluation.Name : entry.AttemptName ?? evaluation.Name,
+            BuildOrReduce = entry.IsLatestAttempt ? evaluation.BuildOrReduce : settings.BuildOrReduce,
+            ScheduleText = GoalText.ScheduleText(entry.IsLatestAttempt ? evaluation.LatestTarget : settings.Target),
+            Goal = recordable,
+            Entry = entry,
+            GoalEnded = evaluation.Goal.IsEnded,
+        };
+    }
 
     /// <summary>
     /// One goal of the overview (FR-011, research R-07), with slice 7's <see cref="OverviewGoal.PausedUntil"/> at the
-    /// pause date (<paramref name="accountToday"/> for a goal that has not started; research R-03, FR-018).
+    /// pause date (<paramref name="accountToday"/> for a goal that has not started; research R-03, FR-018). Slice 8
+    /// (FR-018, research R-07): <see cref="OverviewGoal.HasPending"/>, <see cref="OverviewGoal.CanRecord"/> and
+    /// <see cref="OverviewGoal.Recordable"/> include the earlier attempts' open Pending entries; an ended goal is never
+    /// paused.
     /// </summary>
     private static OverviewGoal OverviewGoalOf(StoredGoal stored, GoalEvaluation evaluation, DateOnly accountToday) => new()
     {
         Item = GoalListItems.Of(stored, evaluation.Now),
         Stats = StatsOf(evaluation),
         Recent = RecentOf(evaluation, OverviewRecentCount),
-        HasPending = evaluation.Pending.Count > 0,
-        CanRecord = evaluation.Due.Count > 0 || evaluation.Pending.Count > 0,
+        HasPending = evaluation.HasPending,
+        CanRecord = evaluation.RecordableEntries.Count > 0,
         Recordable = evaluation.Recordable,
-        PausedUntil = evaluation.PausedUntil(accountToday),
+        PausedUntil = evaluation.Goal.IsEnded ? null : evaluation.PausedUntil(accountToday),
     };
 
     private static GoalReport ReportOf(GoalEvaluation evaluation) => new()
@@ -259,8 +284,8 @@ public sealed class ReportService
         ReadAt = evaluation.Now,
     };
 
-    /// <summary>The goal's figures with their texts (FR-002 to FR-004, HP-005).</summary>
-    private static GoalStatsView StatsOf(GoalEvaluation evaluation) => new()
+    /// <summary>The goal's figures with their texts (FR-002 to FR-004, HP-005); slice 8: also an attempt's (<see cref="AttemptService"/>).</summary>
+    internal static GoalStatsView StatsOf(GoalEvaluation evaluation) => new()
     {
         Consistency = evaluation.Consistency,
         ConsistencyText = ReportText.Consistency(evaluation.Consistency),
@@ -274,9 +299,10 @@ public sealed class ReportService
     /// <summary>
     /// The latest <paramref name="count"/> ended results, oldest first, with the count of each ended state (FR-005).
     /// Slice 7 (FR-015, FR-023): the exempt results are among them, and the keys Excused and Paused are added only when
-    /// their count is above 0, so a goal without exemptions keeps slice 6's four keys.
+    /// their count is above 0, so a goal without exemptions keeps slice 6's four keys. Slice 8: also an attempt's
+    /// (<see cref="AttemptService"/>).
     /// </summary>
-    private static RecentResults RecentOf(GoalEvaluation evaluation, int count)
+    internal static RecentResults RecentOf(GoalEvaluation evaluation, int count)
     {
         var results = evaluation.Ended
             .TakeLast(count)

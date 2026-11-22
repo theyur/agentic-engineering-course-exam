@@ -375,6 +375,21 @@ public sealed class TimeZoneChangeTests(DatabaseFixture database)
             return await inner.TryChangeTimeZoneAsync(owner, expectedStoredZone, expectedRevision, next, writes, cancellationToken);
         }
 
+        public Task<OwnerGoal?> ReadOwnerGoalAsync(AccountId owner, GoalId goal, CancellationToken cancellationToken) =>
+            inner.ReadOwnerGoalAsync(owner, goal, cancellationToken);
+
+        public Task<GoalChangeWriteOutcome> TryChangeSettingsAsync(
+            AccountId owner, string? expectedStoredZone, int expectedRevision, GoalSettingsWrite write, CancellationToken cancellationToken) =>
+            inner.TryChangeSettingsAsync(owner, expectedStoredZone, expectedRevision, write, cancellationToken);
+
+        public Task<GoalChangeWriteOutcome> TryEndAsync(
+            AccountId owner, string? expectedStoredZone, int expectedRevision, GoalEndingWrite write, CancellationToken cancellationToken) =>
+            inner.TryEndAsync(owner, expectedStoredZone, expectedRevision, write, cancellationToken);
+
+        public Task<GoalChangeWriteOutcome> TryStartAttemptAsync(
+            AccountId owner, string? expectedStoredZone, int expectedRevision, GoalAttemptWrite write, CancellationToken cancellationToken) =>
+            inner.TryStartAttemptAsync(owner, expectedStoredZone, expectedRevision, write, cancellationToken);
+
         public Task<IReadOnlyList<StoredGoal>> ListAsync(AccountId owner, CancellationToken cancellationToken) =>
             inner.ListAsync(owner, cancellationToken);
 

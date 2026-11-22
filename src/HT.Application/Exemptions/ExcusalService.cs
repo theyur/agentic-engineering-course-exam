@@ -40,7 +40,14 @@ public sealed class ExcusalService
     /// in FR-002's order after access: (4) a period-based goal; (5) a date that is not a commitment; (6) a date in a
     /// pause; (7) an excusal of the date; (8) the commitment's state without exemption, which must be Due or Pending
     /// (D-2); (9) a record of the commitment (D-3); (10) a reason over 200 characters after trimming. The store
-    /// re-checks steps 6, 7 and 9 under the goal-row lock, and a concurrent write there gives that step's refusal.
+    /// re-checks steps 6, 7 and 9 under the goal-row lock, and a concurrent write there gives that step's refusal. Slice
+    /// 8: it also re-checks an ending, and an ending on or before the date between the checks and the write gives step
+    /// 5's "Nothing is scheduled on this date.", as the same call made after the ending does.
+    /// <para>
+    /// Slice 8 (plan "Spec discrepancies" 2, FR-010): step 4 judges "period-based" by the schedule kind of the attempt
+    /// that contains the date (every version of one attempt has its schedule kind). A date between two attempts, or after
+    /// an ended latest attempt, is in no attempt and goes on to step 5's "Nothing is scheduled on this date.".
+    /// </para>
     /// </summary>
     public async Task<ExcuseResult> ExcuseAsync(
         ActingUser actingUser, GoalId goal, DateOnly date, string? reason, CancellationToken cancellationToken)
@@ -53,10 +60,11 @@ public sealed class ExcusalService
         }
 
         var now = _clock.GetUtcNow();
-        var found = access.Goal!;
+        var found = access.Goal!.Goal;
 
-        // The versions differ only in their time zone, so every version has the same schedule kind.
-        if (GoalTimeline.VersionOf(found, date).Settings.Target.ScheduleKindOf != GoalScheduleKind.CommitmentBased)
+        // VersionOf gives the version of the attempt that contains the date, so its schedule kind is that attempt's.
+        if (!IsAfterAnAttempt(found, date)
+            && GoalTimeline.VersionOf(found, date).Settings.Target.ScheduleKindOf != GoalScheduleKind.CommitmentBased)
         {
             return ExcuseResult.Refused(ExcuseOutcome.NotACommitment, ExcusalTexts.NotACommitment);
         }
@@ -111,6 +119,10 @@ public sealed class ExcusalService
             ExemptionStoreWriteOutcome.HasRecord => ExcuseResult.Refused(ExcuseOutcome.HasRecord, ExcusalTexts.HasRecord),
             ExemptionStoreWriteOutcome.Paused => ExcuseResult.Refused(ExcuseOutcome.DatePaused, PauseTexts.DatePaused),
 
+            // The goal was ended on or before the date between the checks above and the write (slice 8 FR-009): the date
+            // is now after the ended attempt, which step 5 refuses.
+            ExemptionStoreWriteOutcome.GoalEnded => ExcuseResult.Refused(ExcuseOutcome.NothingScheduled, RecordTexts.NothingScheduled),
+
             // The goal was removed between the lookup and the write.
             ExemptionStoreWriteOutcome.GoalNotFound => ExcuseResult.Refused(ExcuseOutcome.NotFound, GoalTexts.NotFound),
             _ => throw new InvalidOperationException("The record store gave an outcome that excusing does not have."),
@@ -139,7 +151,7 @@ public sealed class ExcusalService
 
         // An excusal is stored only for a commitment's date, and while versions differ only in their time zone that date
         // stays one; a date with no commitment therefore has no excusal to remove.
-        if (!exemptions.IsExcused(date) || GoalTimeline.EntryOf(found, date) is not { } entry)
+        if (!exemptions.IsExcused(date) || GoalTimeline.EntryOf(found.Goal, date) is not { } entry)
         {
             return RemoveExcusalResult.Refused(RemoveExcusalOutcome.NotExcused, ExcusalTexts.NotExcused);
         }
@@ -193,8 +205,28 @@ public sealed class ExcusalService
         }
 
         return await _goals.FindAsync(owner, goal, cancellationToken).ConfigureAwait(false) is { } stored
-            ? new Access(owner, stored.Goal, null, null)
+            ? new Access(owner, stored, null, null)
             : Access.Refused(AccessRefusal.NotFound, GoalTexts.NotFound);
+    }
+
+    /// <summary>
+    /// Slice 8 (plan "Spec discrepancies" 2): whether <paramref name="date"/> lies after an ended attempt's last date and
+    /// before the next attempt's start date, or after the last date of an ended latest attempt, so it is in no attempt.
+    /// </summary>
+    private static bool IsAfterAnAttempt(Goal goal, DateOnly date)
+    {
+        var attempts = goal.Attempts;
+        for (var i = 0; i < attempts.Count; i++)
+        {
+            if (GoalTimeline.LastDate(goal, attempts[i].Attempt.Number) is { } last
+                && last < date
+                && (i == attempts.Count - 1 || date < attempts[i + 1].Attempt.StartDate))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static ExcuseOutcome ExcuseOutcomeOf(AccessRefusal refusal) => refusal switch
@@ -219,7 +251,7 @@ public sealed class ExcusalService
     }
 
     /// <summary>The acting user's account and goal, or why the use case refuses before anything else is looked at.</summary>
-    private sealed record Access(AccountId Owner, Goal? Goal, AccessRefusal? Refusal, string? Message)
+    private sealed record Access(AccountId Owner, StoredGoal? Goal, AccessRefusal? Refusal, string? Message)
     {
         public static Access Refused(AccessRefusal refusal, string message) => new(default, null, refusal, message);
     }

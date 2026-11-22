@@ -86,7 +86,21 @@ Every page follows layout A: TopNav, a page head, content centered at `container
 
 ## More dialogs
 - PauseDialog (From, Until, reason), EndGoalDialog (outcome + note), FeedbackDialog (topic + message), SuggestDialog (custom habit → catalog), DeactivateDialog (admin, reason required).
-- Edit goal settings reuses the New goal form with the title "Edit goal" and a Notice: "Changes apply from the next commitment. Past results keep their rules."
+- Edit settings and Start new attempt reuse the New goal form on pages of their own (`PageEditGoalSettings`, `PageNewAttempt`, below). Changed 2026-11-22 for slice 8: this line said that Edit goal settings reuses the form "with the title 'Edit goal' and a Notice: 'Changes apply from the next commitment. Past results keep their rules.'", which disagreed with the spec (HP-002: "Changes apply from {Thu 12 Nov}. Past results keep their rules." above the actions).
+
+## Edit settings (`PageEditGoalSettings`)
+1. BackLink "← {goal name}", `heading-1` "Edit settings".
+2. The New goal form card without Habit and Start date: Build / Reduce · Measure · Target · When (the goal's schedule kind only) · optional name · the neutral Notice "Changes apply from Thu 12 Nov. Past results keep their rules." · Save changes / Cancel.
+3. The New goal page's sticky summary card.
+
+## Start new attempt (`PageNewAttempt`)
+1. BackLink "← {goal name}", `heading-1` "Start new attempt", the line "Attempt 2 starts with its own history and a streak from zero.".
+2. The New goal form card without Habit and Name: Build / Reduce · Measure · Target · When (every schedule kind) · Start date · Start attempt / Cancel.
+3. The New goal page's sticky summary card.
+
+## Attempt view (`PageAttemptDetail`)
+1. BackLink "← {goal name}", `heading-1` "Attempt 1 · 2 Nov – 15 Nov" (or "Attempt 1 · ended before it began"), the attempt's name, the outcome Tag and the ending note.
+2. One column: GoalStats with the eyebrow "Attempt 1" · History table with the goal page's record and note actions. No actions, trend, Settings, Pauses or Recent notes.
 
 ## Privacy (`PagePrivacy`)
 1. TopNav (the variant of the session), page head `heading-1` "Privacy", one lead sentence.
@@ -193,3 +207,25 @@ What slice 7 builds of the pages and dialogs above, on top of slices 1, 2 and 4 
 - RecordDialog (`components/RecordDialog`): "For" lists no Excused or Paused entry; the ghost "Excuse instead", pushed right, shows only for a commitment-based goal whose selected "For" entry is Due or Pending with no record, and opens the Excuse dialog in the RecordDialog's place.
 - StatusChip, ConsistencyStrip, GoalStats, GoalListItem, CommitmentRow and TrendChart (`components/`): each has a "Slice 7 state" block: the chips "Excused" (`ht-status--excused`) and "Paused" (`ht-status--paused`); the cells `ht-cell--excused` and `ht-cell--paused` with their shapes and the strip label that counts them ("Last 17 commitments: 10 met, 1 missed, 1 excused, 3 paused, 2 pending"); the item's Paused form; the row's "Excuse"; the marked bars and the new `ht-bar--excused` class in `css/ht-components.css`.
 - The other pages and dialogs: unchanged in slice 7.
+
+## Slice 8 (goal changes)
+
+What slice 8 builds of the pages and dialogs above, on top of slices 1, 2 and 4 to 7. A page shows only the sections and links whose slice has shipped (ADR 0008); the full previews stay as they are, and each preview's "Slice 8 state" block shows the built state. Texts that disagreed with the spec were replaced in the full previews too: the EndGoalDialog opens with no outcome chosen (it marked "Achieved") and its title names the goal ("End goal · Yoga, 3 days a week", not "End goal · Yoga"); the goal page's Earlier attempts card shows "Attempt 1 · 2 Mar – 30 Jun" as a link with the outcome Tag (not "Attempt 1" with "2 Mar – 30 Jun 2026 · Abandoned"); and the Edit settings page is a page of its own with the line "Changes apply from Thu 12 Nov. Past results keep their rules." (not "Edit goal" with "Changes apply from the next commitment."). Every outcome word, "Ended …", attempt line, "From …", "Changes apply from …" and "Attempt n starts with …" comes from `ReportText` or `GoalChangeTexts` (HP-008), and an outcome Tag always carries its word.
+
+- Goal page (`PageGoalDetail`, `/goals/{id}`): slice 7's page, with:
+  1. in the head of a goal that is not ended, the ghost "Edit settings" first (a link to the Edit settings page), slice 7's "Pause", the ghost "End goal" (opens the EndGoalDialog), then "Record";
+  2. the attempt line for the latest attempt: "Attempt 2 · started 16 Nov", "Attempt 2 · starts 23 Nov", or "Attempt 1 · ended before it began" for an ended latest attempt that never began;
+  3. in the Settings card, the row "From Thu 12 Nov" with the later target text after the Target row when a later version exists, and the start row "Started" or "Starts" with the latest attempt's date, absent for an ended goal that never began;
+  4. for an ended goal, under the head, the Notice "Ended Mon 16 Nov · Abandoned" with "Start new attempt", and no "Record", "Edit settings", "Pause" or "End goal"; the History card keeps its record and note actions for the ended attempt's dates;
+  5. in the right column after Recent notes, the "Earlier attempts" card: each ended attempt that is not the latest, latest first, "Attempt 1 · 2 Nov – 13 Nov" (or "Attempt 1 · ended before it began") as a link to the attempt view, the outcome Tag, the consistency, the attempt's name when it differs from the goal's, and the note in `ht-muted`; absent with one attempt;
+  6. each History row, and the RecordDialog and NoteDialog fixed to it, use that row's own settings.
+- Edit settings (`PageEditGoalSettings`, new, `/goals/{id}/edit`): "← {goal name}", "Edit settings"; the New goal form's Build or Reduce, measurement, target, schedule (the goal's kind only: no "On fixed days" / "A number of times" choice, no "Per day" / "Per week" control) and "Name (optional)", filled with the latest settings; no Habit and no start date; above the actions the neutral Notice "Changes apply from Thu 12 Nov. Past results keep their rules."; "Save changes" and "Cancel"; the summary card, its sentence with the date the change applies from; one refusal at a time under its field. An ended goal returns to its goal page.
+- Start new attempt (`PageNewAttempt`, new, `/goals/{id}/new-attempt`): "← {goal name}", "Start new attempt" with the line "Attempt 2 starts with its own history and a streak from zero." under it; the New goal form with every schedule kind and the start date, filled with the starting values; no Habit and no name; "Start attempt" and "Cancel"; the summary card; one refusal at a time under its field, with "A new attempt starts after the day the goal ended." under the start date. A goal that is not ended returns to its goal page. It is a page of its own, not a state of `PageNewGoal` (HP-004 allows either): its address, its head line and its missing fields differ, and it starts from an existing goal rather than a habit (settled in T005).
+- Attempt view (`PageAttemptDetail`, new, `/goals/{id}/attempts/{n}`): "← {goal name}", the heading "Attempt 1 · 2 Nov – 15 Nov" or "Attempt 1 · ended before it began", the attempt's name, the outcome Tag and the note; one column with GoalStats ("Attempt 1") and the History card with the goal page's record and note actions; no head actions, trend, Settings, Pauses or Recent notes card. An attempt with no date shows "N/A" and no History card. The latest attempt's number shows the Not found page.
+- EndGoalDialog (`components/EndGoalDialog`): the title "End goal · {goal name}", the attempt line as sub line, the effect first, "How did it end?" as ChoiceCards Achieved, Abandoned and No longer relevant in one column with none chosen, "Note (optional)", "End goal" and "Cancel"; "Choose how the goal ended." under "How did it end?" and "The note can have at most 500 characters." under the note; after an ending the focus goes to the Notice's "Start new attempt".
+- Goals (`PageGoals`, `/goals`): the link Tabs "Active", "Paused" and "Ended" (`/goals?tab=ended`). Active and Paused leave ended goals out. Ended lists the ended goals in the overview's order, each with the outcome Tag, the Pending StatusChip when it has a Pending result, the meta "Ended Mon 16 Nov", its figures and mini strip, and the secondary "Start new attempt" in place of "Record". An empty Ended tab says "No ended goals.". The footnote is slice 7's under every tab.
+- Home, signed in (`PageHomeSignedIn`): the Today list and the "Pending · still can record" tile keep the Pending rows of ended attempts until their grace period ends, a row of an ended goal with the Tag "Ended" after its name, a row of a restarted goal's earlier attempt with the Tag "Attempt 1" after that attempt's name; ended goals have no other row and are left out of the other tiles, the "Active goals" card and the recent notes.
+- Profile (`PageProfile`): registered users get the tab "Goal history" (`/profile?tab=history`) between "Account" and "Custom habits", no Community tab; a DataTable with Goal (a link to the attempt view, or to the goal page for the goal's latest attempt), Attempt, Ended ("Mon 16 Nov"), Outcome (Tag) and Note (`ht-muted`, or "—"), the latest ending first; "No ended goals yet." in place of an empty table. An administrator's Profile keeps its Account content without Tabs.
+- GoalListItem and CommitmentRow (`components/`): each has a "Slice 8 state" block: the item's Ended form; the row's "Ended" and "Attempt n" Tags, before a Reduce goal's "Reduce" Tag.
+- No `design/css` change: every part uses existing tokens and `ht-` classes.
+- The other pages and dialogs: unchanged in slice 8.

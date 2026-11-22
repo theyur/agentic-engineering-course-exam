@@ -1,0 +1,260 @@
+@rendermode InteractiveServer
+@using HT.Application.Exemptions
+@using HT.Application.Goals
+@using HT.Application.Records
+@using HT.Application.Reports
+@using HT.Domain.Accounts
+@using HT.Domain.Evaluation
+@using HT.Domain.Goals
+@using HT.Ui.Account
+@using HT.Ui.Components.Exemptions
+@using HT.Ui.Components.Goals
+@using HT.Ui.Habits
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageAttemptDetail, slice 8 state (HP-014, FR-010, FR-014, US3-AS11, US3-AS15; contracts/host.md
+   "Attempt view"): the interactive part of the attempt view, prerendered, with the goal identifier and the attempt's
+   number as its only parameters. It reads the goal (for the BackLink's current name) and the attempt
+   (AttemptService.GetAttemptAsync); an unknown goal or attempt, and the latest attempt, give the Not found page.
+   "← {goal name}" to the goal page; the head (no action) with the heading "Attempt {n} · {2 Nov} – {15 Nov}" or "Attempt
+   {n} · ended before it began", one ht-inline line with the attempt's name (always shown, T006) and its outcome Tag,
+   and the ending note in ht-muted when it has one; then one column (ht-stack): the GoalStats card with the eyebrow
+   "Attempt {n}" and the strip of the attempt's latest ended results, and the History card over the attempt's History
+   (absent without rows, so an attempt with no date has none). No "Record", "Edit settings", "Pause", "End goal", trend,
+   Settings, Pauses, Recent notes or Earlier attempts card.
+   A History row's "Add record", "Edit" or record button opens the RecordDialog fixed to that row, and "Add note" or
+   "Edit note" the NoteDialog, both with the row's own settings (History.SettingsOf) and the attempt's name in their
+   title (T091). The RecordDialog's "Excuse instead" opens the Excuse dialog in its place, and an Excused row's "Remove
+   excusal" removes the excusal (FR-010 keeps excusals working for an ended attempt's dates), with a refusal under the
+   History card head, as on the goal page. After every write the attempt is read again before the dialog closes, so the
+   History, the figures and the strip agree, and the focus goes back to the row's control as the card now shows it.
+   Every use case runs in its own scope. *@
+@if (_details is { } details && _goalName is { } goalName)
+{
+    var attempt = details.Attempt;
+    <BackLink Href="@GoalAddress" Text="@goalName" />
+    <div class="ht-page-head ht-detail-head">
+        <div>
+            <h1>@EarlierAttemptsCard.Heading(attempt)</h1>
+            <div class="ht-inline ht-head-tags">
+                <span class="ht-attempt">@attempt.Name</span>
+                @if (attempt.Outcome is { } outcome)
+                {
+                    <Tag Text="@ReportText.OutcomeText(outcome)" />
+                }
+            </div>
+            @if (attempt.EndingNote is { } note)
+            {
+                <div class="ht-muted ht-head-tags">@note</div>
+            }
+        </div>
+    </div>
+    <div class="ht-stack">
+        <GoalStats View="attempt.Stats" Strip="StripOf(details)" Unit="attempt.Stats.Unit" Eyebrow="@ReportText.Attempt(attempt.Number)"
+                   Title="Consistency and streaks" />
+        <HistoryCard @ref="_historyCard" History="details.History" OnAction="OpenRow" OnNote="OpenNote"
+                     OnRemoveExcusal="RemoveExcusalAsync" Refusal="@_removeRefusal" />
+    </div>
+    @if (_row is { } row)
+    {
+        <RecordDialog Open="_recordOpen" OnClose="CloseRecord" FocusOnClose="FocusRowAsync" GoalId="GoalId" GoalName="@attempt.Name"
+                      Recordable="details.History" Row="row" Editing="_editing" ActingUser="_actingUser" OnSaved="SavedAsync"
+                      OnExcuseInstead="OpenExcuse" />
+    }
+    @if (_excuseEntry is { } excuseEntry)
+    {
+        <ExcuseDialog Open="_excuseOpen" OnClose="CloseExcuse" FocusOnClose="FocusAfterExcuseAsync" GoalId="GoalId" Date="excuseEntry.FirstDate"
+                      GoalName="@attempt.Name" SubLine="@_excuseSubLine" ActingUser="_actingUser" OnSaved="ExcusedAsync" />
+    }
+    @if (_noteRow is { } noteRow)
+    {
+        <NoteDialog Open="_noteOpen" OnClose="CloseNote" FocusOnClose="FocusNoteRowAsync" GoalId="GoalId" GoalName="@attempt.Name"
+                    History="details.History" Row="noteRow" ActingUser="_actingUser" OnSaved="NoteSavedAsync" />
+    }
+}
+
+@code {
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private string? _goalName;
+    private AttemptDetails? _details;
+    private HistoryCard? _historyCard;
+
+    /// <summary>The History row the RecordDialog was opened from; kept after it closes, so the focus can go back to it.</summary>
+    private HistoryEntry? _row;
+
+    /// <summary>The record of <see cref="_row"/> that "Edit" opened; null for "Add record".</summary>
+    private RecordView? _editing;
+
+    private bool _recordOpen;
+
+    /// <summary>The History row the NoteDialog was opened for; kept after it closes, so the focus can go back to it.</summary>
+    private HistoryEntry? _noteRow;
+
+    private bool _noteOpen;
+
+    /// <summary>The commitment "Excuse instead" opened the Excuse dialog for; kept after it closes, so the focus can go back.</summary>
+    private HistoryEntry? _excuseEntry;
+
+    /// <summary>The History row whose RecordDialog "Excuse instead" replaced.</summary>
+    private HistoryEntry? _excuseRow;
+
+    private bool _excuseOpen;
+    private string _excuseSubLine = string.Empty;
+
+    /// <summary>A refusal of a History row's "Remove excusal", shown under the History card head; null for none.</summary>
+    private string? _removeRefusal;
+
+    /// <summary>The History row whose control gets the focus after the next render ("Remove excusal" and its re-read).</summary>
+    private DateOnly? _focusRowAfterRender;
+
+    /// <summary>The goal's identifier; the page shell has already found it among the acting user's goals.</summary>
+    [Parameter]
+    public Guid Id { get; set; }
+
+    /// <summary>The attempt's number; the page shell has already checked it is an earlier attempt of the goal.</summary>
+    [Parameter]
+    public int Number { get; set; }
+
+    private GoalId GoalId => new(Id);
+
+    private string GoalAddress => $"/goals/{Id}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _actingUser = await ActingUsers.GetAsync();
+        var goal = await UseCases.RunAsync<GoalService, GoalReadResult>(
+            (service, token) => service.GetAsync(_actingUser, GoalId, token), CancellationToken.None);
+        if (goal.Goal is not { } details || !await ReadAttemptAsync())
+        {
+            _details = null;
+            Navigation.NotFound();
+            return;
+        }
+
+        _goalName = details.Name;
+    }
+
+    /// <summary>
+    /// The attempt with its recent results and History at the time of the read (FR-014); false when the acting user has no
+    /// such goal or attempt, or when it is the goal's latest attempt (the goal page shows that one). A failed read after a
+    /// write keeps the last attempt read.
+    /// </summary>
+    private async Task<bool> ReadAttemptAsync()
+    {
+        var number = Number;
+        var read = await UseCases.RunAsync<AttemptService, AttemptReadResult>(
+            (service, token) => service.GetAttemptAsync(_actingUser, GoalId, number, token), CancellationToken.None);
+        if (read.Details is not { Attempt.IsLatest: false } details)
+        {
+            return false;
+        }
+
+        _details = details;
+        return true;
+    }
+
+    private void OpenRow(HistoryCard.RowAction action)
+    {
+        _row = action.Entry;
+        _editing = action.Record;
+        _recordOpen = true;
+    }
+
+    private void CloseRecord() => _recordOpen = false;
+
+    /// <summary>Reads again first, so the render that closes the dialog has the new rows to give the focus back to.</summary>
+    private async Task SavedAsync(HistoryEntry entry)
+    {
+        await ReadAttemptAsync();
+        _removeRefusal = null;
+        _recordOpen = false;
+    }
+
+    /// <summary>
+    /// The RecordDialog's "Excuse instead" (slice 7 HP-003): the Excuse dialog opens for that commitment in the
+    /// RecordDialog's place, and its opener is the row that opened the RecordDialog. The sub line is that commitment's
+    /// "For" label, at the instant the attempt was read.
+    /// </summary>
+    private void OpenExcuse(HistoryEntry entry)
+    {
+        var read = _details!.History;
+        _excuseEntry = entry;
+        _excuseRow = _row;
+        _excuseSubLine = RecordingText.ForLabel(entry, read.CurrentDate ?? entry.LastDate, read.ReadAt);
+        _recordOpen = false;
+        _excuseOpen = true;
+    }
+
+    private void CloseExcuse() => _excuseOpen = false;
+
+    /// <summary>"excused": reads the attempt again first, so the closing render has the Excused row and the new figures.</summary>
+    private async Task ExcusedAsync()
+    {
+        await ReadAttemptAsync();
+        _removeRefusal = null;
+        _excuseOpen = false;
+    }
+
+    /// <summary>
+    /// Gives the focus back after the Excuse dialog closes: to the row's "Add record" while the card still shows it,
+    /// otherwise to the row's note control (an excused row has no "Add record").
+    /// </summary>
+    private ValueTask FocusAfterExcuseAsync() =>
+        (_excuseRow ?? _excuseEntry) is { } row && _historyCard is { } card
+            ? card.FocusRecordOrNoteAsync(row.FirstDate)
+            : ValueTask.CompletedTask;
+
+    /// <summary>
+    /// A History row's "Remove excusal" (slice 7 FR-004, slice 8 FR-010): removes the excusal, then reads the attempt
+    /// again, also after a refusal, which shows under the History card head; the focus then goes to the row's "Add
+    /// record", or to its note control when it has none.
+    /// </summary>
+    private async Task RemoveExcusalAsync(HistoryEntry row)
+    {
+        var date = row.FirstDate;
+        var result = await UseCases.RunAsync<ExcusalService, RemoveExcusalResult>(
+            (service, token) => service.RemoveExcusalAsync(_actingUser, GoalId, date, token), CancellationToken.None);
+        await ReadAttemptAsync();
+        _removeRefusal = result.Outcome == RemoveExcusalOutcome.Removed ? null : result.Message;
+        _focusRowAfterRender = date;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusRowAfterRender is { } row)
+        {
+            _focusRowAfterRender = null;
+            if (_historyCard is { } card)
+            {
+                await card.FocusRecordOrNoteAsync(row);
+            }
+        }
+    }
+
+    private void OpenNote(HistoryEntry row)
+    {
+        _noteRow = row;
+        _noteOpen = true;
+    }
+
+    private void CloseNote() => _noteOpen = false;
+
+    /// <summary>Reads again first, so the render that closes the dialog has the row's new note.</summary>
+    private async Task NoteSavedAsync(HistoryEntry entry)
+    {
+        await ReadAttemptAsync();
+        _removeRefusal = null;
+        _noteOpen = false;
+    }
+
+    private ValueTask FocusNoteRowAsync() =>
+        _noteRow is { } row && _historyCard is { } card ? card.FocusNoteAsync(row.FirstDate) : ValueTask.CompletedTask;
+
+    private ValueTask FocusRowAsync() =>
+        _row is { } row && _historyCard is { } card ? card.FocusAsync(row.FirstDate, _editing?.Id) : ValueTask.CompletedTask;
+
+    /// <summary>The GoalStats strip: the states of the attempt's latest ended results, oldest first (FR-014).</summary>
+    private static IReadOnlyList<EvaluationState> StripOf(AttemptDetails details) =>
+        details.Recent.Results.Select(result => result.State).ToList();
+}

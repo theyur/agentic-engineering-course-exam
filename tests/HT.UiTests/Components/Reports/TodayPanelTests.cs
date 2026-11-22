@@ -358,4 +358,108 @@ public sealed class TodayPanelTests : BunitContext
 
         Assert.Equal("Nothing to record right now.", cut.Find("section.ht-card > p.ht-card__sub").TextContent);
     }
+
+    // ---- slice 8: the rows of ended attempts (HP-007, FR-019, design/pages/PageHomeSignedIn "Slice 8 state"; T099) ----
+
+    private const string Meditation = "Meditation, 20 min daily";
+    private const string Walking = "Walking, 20 min daily";
+
+
+    /// <summary>
+    /// Three daily goals from Monday 9 November, created that day at 08:00Z: "Reading" with 20 minutes on 9 to 16 (Sunday
+    /// 15 and Monday 16 Pending with their record until their grace periods end, Tuesday 17 Due); "Walking" and
+    /// "Meditation" with 20 minutes on 9 to 14. "Walking" is ended through the GoalChangeService on Monday 16 at 09:00Z
+    /// (last date Sunday 15, Pending until Wednesday 18 00:00Z) and restarted on Tuesday 17 at 09:00Z from that day;
+    /// "Meditation" is ended on Monday 16 at 10:00Z (the same last date). Read on Tuesday 17 at 10:00Z: Pending Meditation's
+    /// Sunday 15 ("Ended"), Reading's Sunday 15, Walking's attempt 1 Sunday 15 ("Attempt 1") and Reading's Monday 16; Due
+    /// Reading's and Walking's attempt 2 Tuesday 17, without a Tag.
+    /// </summary>
+    private async Task ArrangeEndedAsync()
+    {
+        var user = SignInUser();
+        var reading = await CreateAsync(user, "Reading", MinutesOn(Enum.GetValues<DayOfWeek>()), Mon9);
+        var walking = await CreateAsync(user, "Walking", MinutesOn(Enum.GetValues<DayOfWeek>()), Mon9);
+        var meditation = await CreateAsync(user, "Meditation", MinutesOn(Enum.GetValues<DayOfWeek>()), Mon9);
+        for (var day = 9; day <= 16; day++)
+        {
+            _records.Seed(reading, new DateOnly(2026, 11, day), RecordValue.FromAmount(20));
+            if (day <= 14)
+            {
+                _records.Seed(walking, new DateOnly(2026, 11, day), RecordValue.FromAmount(20));
+                _records.Seed(meditation, new DateOnly(2026, 11, day), RecordValue.FromAmount(20));
+            }
+        }
+
+        await using var scope = Services.CreateAsyncScope();
+        var changes = scope.ServiceProvider.GetRequiredService<GoalChangeService>();
+        _clock.SetUtcNow(new DateTimeOffset(2026, 11, 16, 9, 0, 0, TimeSpan.Zero));
+        Assert.Equal(GoalEndOutcome.Ended, (await changes.EndAsync(user, walking, Outcome.Abandoned, null, CancellationToken.None)).Outcome);
+        _clock.SetUtcNow(new DateTimeOffset(2026, 11, 16, 10, 0, 0, TimeSpan.Zero));
+        Assert.Equal(GoalEndOutcome.Ended, (await changes.EndAsync(user, meditation, Outcome.Abandoned, null, CancellationToken.None)).Outcome);
+        _clock.SetUtcNow(new DateTimeOffset(2026, 11, 17, 9, 0, 0, TimeSpan.Zero));
+        var started = await changes.StartAttemptAsync(
+            user, walking, new NewAttemptInput { Target = MinutesOn(Enum.GetValues<DayOfWeek>()), StartDate = new DateOnly(2026, 11, 17) }, CancellationToken.None);
+        Assert.Equal(AttemptStartOutcome.Started, started.Outcome);
+        _clock.SetUtcNow(Tue17TenOClock);
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_007_the_Pending_rows_of_ended_attempts_stay_with_their_Tags_and_count_only_as_Pending()
+    {
+        await ArrangeEndedAsync();
+
+        var cut = Render<TodayPanel>();
+
+        // "Active goals" counts Reading and Walking (restarted), not the ended Meditation; nothing is Missed this week.
+        Assert.Equal(["2", "4", "0", "2"], cut.FindAll(".ht-tile__value").Select(v => v.TextContent));
+        Assert.Equal(
+            [
+                (Meditation + " Ended", "Sun 15 Nov · 14 h left to record", "Pending"),
+                (Reading, "Sun 15 Nov · 14 h left to record", "Pending"),
+                (Walking + " Attempt 1", "Sun 15 Nov · 14 h left to record", "Pending"),
+                (Reading, "Mon 16 Nov · 38 h left to record", "Pending"),
+                (Reading, "Every day", "Due today"),
+                (Walking, "Every day", "Due today"),
+            ],
+            Rows(cut));
+        // Each Tag is a word in a chip directly after the name, never a colour alone (HP-008).
+        Assert.Equal(
+            [["Ended"], [], ["Attempt 1"], [], [], []],
+            cut.FindAll(".ht-row__name").Select(n => n.QuerySelectorAll(".ht-chip").Select(c => c.TextContent).ToArray()));
+        Assert.Equal(
+            [
+                $"Record for {Meditation}, Sun 15 Nov", $"Excuse {Meditation}, Sun 15 Nov",
+                $"Edit record of {Reading}, Sun 15 Nov",
+                $"Record for {Walking}, Sun 15 Nov", $"Excuse {Walking}, Sun 15 Nov",
+                $"Edit record of {Reading}, Mon 16 Nov",
+                $"Record for {Reading}, Tue 17 Nov", $"Record for {Walking}, Tue 17 Nov",
+            ],
+            cut.FindAll(".ht-row button").Select(b => b.GetAttribute("aria-label")));
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_007_an_ended_goals_row_is_recorded_from_the_Home_and_leaves_the_list_once_excused()
+    {
+        await ArrangeEndedAsync();
+        var cut = Render<TodayPanel>();
+
+        // Recording keeps the row Pending, with its record ("Edit") and its Tag, until its grace period ends.
+        await ActionOf(cut, $"Record for {Meditation}, Sun 15 Nov").ClickAsync(new MouseEventArgs());
+        cut.Find(".ht-stepper input").Change("20");
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Equal((Meditation + " Ended", "Sun 15 Nov · 14 h left to record", "Pending"), Rows(cut)[0]);
+        Assert.NotNull(ActionOf(cut, $"Edit record of {Meditation}, Sun 15 Nov"));
+        Assert.Equal("4", Tile(cut, "Pending · still can record").QuerySelector(".ht-tile__value")!.TextContent);
+
+        // Excusing Walking's attempt 1 commitment removes its row, and the tile drops by 1.
+        await ActionOf(cut, $"Excuse {Walking}, Sun 15 Nov").ClickAsync(new MouseEventArgs());
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.DoesNotContain(Rows(cut), r => r.Name == Walking + " Attempt 1");
+        Assert.Equal("3", Tile(cut, "Pending · still can record").QuerySelector(".ht-tile__value")!.TextContent);
+        Assert.Equal("2", Tile(cut, "Active goals").QuerySelector(".ht-tile__value")!.TextContent);
+    }
 }

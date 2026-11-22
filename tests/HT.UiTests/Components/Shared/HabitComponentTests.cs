@@ -590,6 +590,91 @@ public sealed class HabitComponentTests : BunitContext
         Assert.Equal(cut.Find(".ht-goalitem__actions button").GetAttribute("blazor:elementReference"), focused.Id);
     }
 
+    // ---- slice 8: the Ended form (design/components/GoalListItem, "Slice 8 state"; HP-005; T099) ----
+
+    /// <summary>Monday 16 November 2026, the ending date of the ended goal.</summary>
+    private static readonly DateOnly EndedOn = new(2026, 11, 16);
+
+    /// <summary>The goal of <paramref name="goal"/>, ended on <see cref="EndedOn"/> with <paramref name="outcome"/>.</summary>
+    private static OverviewGoal Ended(OverviewGoal goal, Outcome outcome = Outcome.Abandoned) =>
+        goal with { Item = goal.Item with { IsEnded = true, EndingDate = EndedOn, Outcome = outcome } };
+
+    private IRenderedComponent<GoalItem> RenderEnded(OverviewGoal goal, Action<OverviewGoal>? onRecord = null) =>
+        Render<GoalItem>(p => p
+            .Add(x => x.Goal, goal)
+            .Add(x => x.Today, GoalToday)
+            .Add(x => x.OnRecord, g => onRecord?.Invoke(g)));
+
+    [Fact]
+    public void GoalItem_Ended_form_has_the_outcome_Tag_the_Pending_chip_Ended_alone_as_its_meta_text_its_figures_and_strip()
+    {
+        // An ended goal with a Pending result of its ended attempt: neither the schedule, nor "next today" shows.
+        var cut = RenderEnded(Ended(OverviewOf(
+            GoalAt("Every day", GoalScheduleKind.CommitmentBased, next: GoalToday), Day(new DateOnly(2026, 11, 15), EvaluationState.Pending))));
+
+        var root = cut.Find("div.ht-goalitem");
+        Assert.Equal(5, root.Children.Length);
+        var link = cut.Find("a.ht-goalitem__name");
+        Assert.Equal(("Reading, 15 min, 5 days a week", "/goals/4b1d0c9e-0000-4000-8000-000000000001"), (link.TextContent, link.GetAttribute("href")));
+        Assert.Equal(["Build", "Abandoned", "Pending"], cut.FindAll(".ht-goalitem__meta .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Ended Mon 16 Nov", cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
+        Assert.Equal(["90% (18 of 20)", "6 commitments"], cut.FindAll(".ht-goalitem__value").Select(v => v.TextContent));
+        Assert.Equal("Last 15 commitments: 12 met, 1 missed, 2 pending", cut.Find(".ht-strip.ht-strip--mini").GetAttribute("aria-label"));
+    }
+
+    [Theory]
+    [InlineData(Outcome.Achieved, "Achieved")]
+    [InlineData(Outcome.Abandoned, "Abandoned")]
+    [InlineData(Outcome.NoLongerRelevant, "No longer relevant")]
+    public void GoalItem_Ended_form_shows_each_outcome_as_its_word_and_no_Pending_chip_without_a_Pending_result(Outcome outcome, string word)
+    {
+        var cut = RenderEnded(Ended(OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased)), outcome));
+
+        Assert.Equal(["Build", word], cut.FindAll(".ht-goalitem__meta .ht-chip").Select(c => c.TextContent));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void GoalItem_Ended_form_has_one_secondary_Start_new_attempt_link_and_no_Record(bool canRecord)
+    {
+        HistoryEntry[] entries = canRecord ? [Day(new DateOnly(2026, 11, 15), EvaluationState.Pending)] : [];
+
+        var cut = RenderEnded(Ended(OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased), entries)));
+
+        var link = Assert.Single(cut.FindAll(".ht-goalitem__actions > *"));
+        Assert.Equal(("A", "Start new attempt"), (link.TagName, link.TextContent));
+        Assert.Equal(["ht-btn", "ht-btn--secondary", "ht-btn--sm"], link.ClassList);
+        Assert.Equal(
+            ("/goals/4b1d0c9e-0000-4000-8000-000000000001/new-attempt", null, "Start new attempt for Reading, 15 min, 5 days a week"),
+            (link.GetAttribute("href"), link.GetAttribute("aria-haspopup"), link.GetAttribute("aria-label")));
+        Assert.DoesNotContain("Record", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Resume", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GoalItem_FocusAsync_of_the_Ended_form_focuses_Start_new_attempt()
+    {
+        var cut = RenderEnded(Ended(OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased), Day(new DateOnly(2026, 11, 15), EvaluationState.Pending))));
+
+        await cut.InvokeAsync(() => cut.Instance.FocusAsync().AsTask());
+
+        var focused = Assert.IsType<Microsoft.AspNetCore.Components.ElementReference>(JSInterop.VerifyFocusAsyncInvoke().Arguments[0]);
+        Assert.Equal(cut.Find(".ht-goalitem__actions a").GetAttribute("blazor:elementReference"), focused.Id);
+    }
+
+    [Fact]
+    public void GoalItem_of_a_goal_that_is_not_ended_has_no_outcome_Tag_even_with_an_outcome_value()
+    {
+        // The flag decides the form; an item that is not ended shows slice 6's form.
+        var goal = OverviewOf(GoalAt("Every day", GoalScheduleKind.CommitmentBased));
+        var cut = RenderEnded(goal with { Item = goal.Item with { Outcome = Outcome.Achieved } });
+
+        Assert.Equal(["Build"], cut.FindAll(".ht-goalitem__meta .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Every day", cut.Find(".ht-goalitem__meta span:not(.ht-chip)").TextContent);
+        Assert.DoesNotContain("Start new attempt", cut.Markup, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void BackLink_names_the_parent_page()
     {

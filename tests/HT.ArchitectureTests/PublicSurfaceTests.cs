@@ -32,7 +32,10 @@ public sealed class PublicSurfaceTests
     /// <c>NoteWrite</c> and <c>NoteWriteKind</c> join them with specs/006-note-editing (research R-11), and the report
     /// types of <c>HT.Domain.Reports</c> with specs/007-personal-reports (research R-14), and the exemption types of
     /// <c>HT.Domain.Exemptions</c> and <c>TrendMark</c> with specs/008-excusals-and-pauses (research R-11), with the
-    /// store write of <c>HT.Application.Records</c> and the texts of <c>HT.Application.Exemptions</c>.
+    /// store write of <c>HT.Application.Records</c> and the texts of <c>HT.Application.Exemptions</c>. The attempt and
+    /// ending types of <c>HT.Domain.Goals</c> join them with specs/009-goal-changes (research R-12), with the use cases,
+    /// views and results of <c>HT.Application.Goals</c> and <c>HT.Application.Reports</c> and the demo goal-change types
+    /// of <c>HT.Application.Operator</c> (research R-09).
     /// </summary>
     [Theory]
     [InlineData("HT.Domain.Records", "RecordValue")]
@@ -75,6 +78,46 @@ public sealed class PublicSurfaceTests
     [InlineData("HT.Application.Exemptions", "CancelPauseResult")]
     [InlineData("HT.Application.Exemptions", "PausesResult")]
     [InlineData("HT.Application.Exemptions", "PauseView")]
+    [InlineData("HT.Domain.Goals", "Outcome")]
+    [InlineData("HT.Domain.Goals", "EndingNote")]
+    [InlineData("HT.Domain.Goals", "GoalEnding")]
+    [InlineData("HT.Domain.Goals", "GoalAttemptVersions")]
+    [InlineData("HT.Domain.Goals", "GoalSettingsChange")]
+    [InlineData("HT.Domain.Goals", "GoalEndingEffect")]
+    [InlineData("HT.Application.Goals", "GoalChangeTexts")]
+    [InlineData("HT.Application.Records", "EntrySettings")]
+    [InlineData("HT.Application.Goals", "GoalSettingsView")]
+    [InlineData("HT.Application.Goals", "GoalChangeService")]
+    [InlineData("HT.Application.Goals", "GoalSettingsInput")]
+    [InlineData("HT.Application.Goals", "SettingsChangeResult")]
+    [InlineData("HT.Application.Goals", "SettingsChangeOutcome")]
+    [InlineData("HT.Application.Goals", "GoalEndResult")]
+    [InlineData("HT.Application.Goals", "GoalEndOutcome")]
+    [InlineData("HT.Application.Goals", "NewAttemptInput")]
+    [InlineData("HT.Application.Goals", "NewAttemptValues")]
+    [InlineData("HT.Application.Goals", "NewAttemptValuesResult")]
+    [InlineData("HT.Application.Goals", "NewAttemptValuesOutcome")]
+    [InlineData("HT.Application.Goals", "AttemptStartResult")]
+    [InlineData("HT.Application.Goals", "AttemptStartOutcome")]
+    [InlineData("HT.Application.Reports", "AttemptService")]
+    [InlineData("HT.Application.Reports", "AttemptView")]
+    [InlineData("HT.Application.Reports", "AttemptDetails")]
+    [InlineData("HT.Application.Reports", "AttemptListResult")]
+    [InlineData("HT.Application.Reports", "AttemptListOutcome")]
+    [InlineData("HT.Application.Reports", "AttemptReadResult")]
+    [InlineData("HT.Application.Reports", "AttemptReadOutcome")]
+    [InlineData("HT.Application.Reports", "EndedAttemptView")]
+    [InlineData("HT.Application.Reports", "GoalHistoryListResult")]
+    [InlineData("HT.Application.Reports", "GoalHistoryListOutcome")]
+    [InlineData("HT.Application.Operator", "DemoVersion")]
+    [InlineData("HT.Application.Operator", "DemoAttempt")]
+    [InlineData("HT.Application.Operator", "DemoGoalChangeGoal")]
+    [InlineData("HT.Application.Operator", "DemoGoalChanges")]
+    [InlineData("HT.Application.Operator", "IDemoGoalChangeStore")]
+    [InlineData("HT.Application.Operator", "DemoGoalChangeService")]
+    [InlineData("HT.Application.Operator", "DemoGoalChangeLoadingResult")]
+    [InlineData("HT.Application.Operator", "DemoGoalChangeLoadingOutcome")]
+    [InlineData("HT.Application.Operator", "DemoGoalChangeAccountResult")]
     public void TheNewRecordingTypesHaveNoNodaTimeTypeInTheirSignatures(string ns, string typeName)
     {
         var types = new[] { ArchitectureModel.Domain, ArchitectureModel.Application }

@@ -275,10 +275,10 @@ public sealed class GoalsListTests : BunitContext
 
         var cut = RenderTab(null);
 
-        Assert.Equal([("Active", "/goals", "page"), ("Paused", "/goals?tab=paused", null)], TabsOf(cut));
+        Assert.Equal([("Active", "/goals", "page"), ("Paused", "/goals?tab=paused", null), ("Ended", "/goals?tab=ended", null)], TabsOf(cut));
         Assert.Equal([ReadingName], Names(cut));
         Assert.Equal("Record", RecordOf(cut, ReadingName)!.TextContent);
-        Assert.DoesNotContain("Ended", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Start new attempt", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Paused until", cut.Markup, StringComparison.Ordinal);
     }
 
@@ -289,7 +289,7 @@ public sealed class GoalsListTests : BunitContext
 
         var cut = RenderTab("paused");
 
-        Assert.Equal([("Active", "/goals", null), ("Paused", "/goals?tab=paused", "page")], TabsOf(cut));
+        Assert.Equal([("Active", "/goals", null), ("Paused", "/goals?tab=paused", "page"), ("Ended", "/goals?tab=ended", null)], TabsOf(cut));
         Assert.Equal([YogaName, WalkingName], Names(cut));
         Assert.Equal(
             [["Build", "Pending"], ["Build"]],
@@ -384,8 +384,118 @@ public sealed class GoalsListTests : BunitContext
 
         var cut = RenderTab("paused");
 
-        Assert.Equal([("Active", "/goals", null), ("Paused", "/goals?tab=paused", "page")], TabsOf(cut));
+        Assert.Equal([("Active", "/goals", null), ("Paused", "/goals?tab=paused", "page"), ("Ended", "/goals?tab=ended", null)], TabsOf(cut));
         Assert.Empty(cut.FindAll(".ht-list"));
         Assert.Equal("No paused goals.", cut.Find(".ht-tabs + div.ht-card > p.ht-card__sub").TextContent);
+    }
+
+    // ---- slice 8: the Ended tab (HP-005, US4-AS6, design/pages/PageGoals "Slice 8 state"; T099) ----
+
+    /// <summary>
+    /// Three goals created on Monday 16 at 08:00Z: "Reading" daily from Monday 16 (Monday 16 Pending, Tuesday 17 Due),
+    /// "Yoga" on Mondays from Monday 16 and "Walking" daily from Tuesday 17. At 10:00Z on Tuesday 17 "Yoga" is ended through
+    /// the GoalChangeService with "Abandoned" (ending date Tuesday 17, last date Monday 16, so its Monday 16 stays Pending)
+    /// and "Walking" with "Achieved" (ending date Tuesday 17, its start date: no date). The overview's order is Reading and
+    /// Yoga (Pending, by name), then Walking. The clock is left at 10:00Z on Tuesday 17.
+    /// </summary>
+    private async Task<(GoalId Reading, GoalId Yoga, GoalId Walking)> TwoEndedGoalsAsync()
+    {
+        var user = SignInUser();
+        var walking = await CreateAsync(user, "Walking", EveryDay, Tue17);
+        var reading = await CreateAsync(user, "Reading", EveryDay, Mon16);
+        var yoga = await CreateAsync(user, "Yoga", MinutesOn(DayOfWeek.Monday), Mon16);
+        _clock.SetUtcNow(Tue17TenOClock);
+        await EndAsync(user, yoga, Outcome.Abandoned);
+        await EndAsync(user, walking, Outcome.Achieved);
+        return (reading, yoga, walking);
+    }
+
+    private async Task EndAsync(ActingUser user, GoalId goal, Outcome outcome)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var ended = await scope.ServiceProvider.GetRequiredService<GoalChangeService>().EndAsync(user, goal, outcome, null, CancellationToken.None);
+        Assert.Equal((GoalEndOutcome.Ended, (DateOnly?)Tue17), (ended.Outcome, ended.EndingDate));
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_005_US4_AS6_the_Ended_tab_lists_the_ended_goals_in_the_overviews_order_in_their_Ended_form()
+    {
+        var (_, yoga, walking) = await TwoEndedGoalsAsync();
+
+        var cut = RenderTab("ended");
+
+        Assert.Equal(
+            [("Active", "/goals", null), ("Paused", "/goals?tab=paused", null), ("Ended", "/goals?tab=ended", "page")],
+            TabsOf(cut));
+        Assert.Equal([YogaName, WalkingName], Names(cut));
+        // The outcome Tag after the Build or Reduce Tag, always as a word (HP-008), then the Pending chip of Yoga's Monday 16.
+        Assert.Equal(
+            [["Build", "Abandoned", "Pending"], ["Build", "Achieved"]],
+            cut.FindAll(".ht-list > .ht-goalitem").Select(i => i.QuerySelectorAll(".ht-goalitem__meta .ht-chip").Select(c => c.TextContent).ToList()));
+        Assert.Equal(["Ended Tue 17 Nov", "Ended Tue 17 Nov"], cut.FindAll(".ht-goalitem__meta span:not(.ht-chip)").Select(Text));
+        Assert.Equal(
+            ["N/A", "0 commitments", "N/A", "0 commitments"],
+            cut.FindAll(".ht-goalitem__value").Select(v => v.TextContent));
+        Assert.Equal(
+            ["Last 1 commitment: 1 pending", "Last 0 commitments"],
+            cut.FindAll(".ht-strip.ht-strip--mini").Select(s => s.GetAttribute("aria-label")));
+        Assert.Equal(
+            [
+                ("Start new attempt", $"/goals/{yoga.Value}/new-attempt", "Start new attempt for " + YogaName),
+                ("Start new attempt", $"/goals/{walking.Value}/new-attempt", "Start new attempt for " + WalkingName),
+            ],
+            cut.FindAll(".ht-goalitem__actions a").Select(a => (a.TextContent, a.GetAttribute("href"), a.GetAttribute("aria-label"))));
+        Assert.All(cut.FindAll(".ht-goalitem__actions a"), a => Assert.Equal(["ht-btn", "ht-btn--secondary", "ht-btn--sm"], a.ClassList));
+        Assert.Empty(cut.FindAll(".ht-goalitem__actions button"));
+        Assert.DoesNotContain("Record", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(ReadingName, cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_005_Active_and_Paused_leave_the_ended_goals_out()
+    {
+        await TwoEndedGoalsAsync();
+
+        var active = RenderTab(null);
+        var paused = RenderTab("paused");
+
+        Assert.Equal([ReadingName], Names(active));
+        Assert.Equal("Record", RecordOf(active, ReadingName)!.TextContent);
+        Assert.DoesNotContain("Start new attempt", active.Markup, StringComparison.Ordinal);
+        Assert.Empty(paused.FindAll(".ht-list"));
+        Assert.Equal("No paused goals.", paused.Find(".ht-tabs + div.ht-card > p.ht-card__sub").TextContent);
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_005_the_Ended_tab_with_no_ended_goal_says_No_ended_goals()
+    {
+        var user = SignInUser();
+        await CreateAsync(user, "Reading", EveryDay, Mon16);
+        _clock.SetUtcNow(Tue17TenOClock);
+
+        var cut = RenderTab("ended");
+
+        Assert.Equal(
+            [("Active", "/goals", null), ("Paused", "/goals?tab=paused", null), ("Ended", "/goals?tab=ended", "page")],
+            TabsOf(cut));
+        Assert.Empty(cut.FindAll(".ht-list"));
+        Assert.Equal("No ended goals.", cut.Find(".ht-tabs + div.ht-card > p.ht-card__sub").TextContent);
+        Assert.DoesNotContain(ReadingName, cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Ended")]
+    [InlineData("ENDED")]
+    [InlineData("ended ")]
+    public async Task Slice_8_HP_005_only_the_exact_value_ended_shows_the_Ended_tab(string tab)
+    {
+        await TwoEndedGoalsAsync();
+
+        var cut = RenderTab(tab);
+
+        Assert.Equal(
+            [("Active", "/goals", "page"), ("Paused", "/goals?tab=paused", null), ("Ended", "/goals?tab=ended", null)],
+            TabsOf(cut));
+        Assert.Equal([ReadingName], Names(cut));
     }
 }

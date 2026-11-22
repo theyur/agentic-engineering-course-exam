@@ -15,7 +15,10 @@
    (?tab=paused), never a view (slice 6 research R-12). Then the static footnote (ReportText.GoalsFootnote), under
    either tab. For a user with no goals, slice 4's EmptyState in place of the tabs, with no footnote. The shell reads
    slice 4's goal list only to tell these apart. An administrator gets the Not found page; the use case refuses on its
-   own (FR-021). An anonymous request never gets here: the endpoint's [Authorize] sends it to Sign in. *@
+   own (FR-021). An anonymous request never gets here: the endpoint's [Authorize] sends it to Sign in.
+   Slice 8 (HP-005; design/pages/PageGoals, slice 8 state): the island also has the tab "Ended" (?tab=ended), which the
+   shell passes on in the same way; the footnote stays under every tab. A user whose goals are all ended has goals, so
+   the shell keeps the island and the footnote. *@
 <PageTitle>Goals · Habit Tracker</PageTitle>
 
 @if (_result is { } result)
@@ -37,7 +40,10 @@
 @code {
     private GoalListResult? _result;
 
-    /// <summary>The selected tab from the address: "paused" for the Paused tab; any other value, or none, is Active.</summary>
+    /// <summary>
+    /// The selected tab from the address: "paused" for the Paused tab, "ended" for the Ended tab (slice 8); any other
+    /// value, or none, is Active.
+    /// </summary>
     [SupplyParameterFromQuery(Name = "tab")]
     public string? Tab { get; set; }
 

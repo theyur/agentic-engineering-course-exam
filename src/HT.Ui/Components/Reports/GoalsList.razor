@@ -21,12 +21,17 @@
    dialog for that commitment in its place; after "excused" the overview is read again before it closes, and the focus
    goes back as for the RecordDialog.
    Slice 7 (HP-004; design/pages/PageGoals, slice 7 state): the link Tabs "Active" (/goals) and "Paused"
-   (/goals?tab=paused), with no counts and no "Ended". The page passes the address's tab value, the only parameter, so
+   (/goals?tab=paused), with no counts (and no "Ended" until slice 8). The page passes the address's tab value, the only parameter, so
    the tab works prerendered: "paused" shows Paused, any other value, or none, Active. Active lists the goals with no
    PausedUntil, Paused the others, both in the overview's order; an empty Paused tab is a Card with
    ReportText.NoPausedGoals. A Paused item's "Resume" resumes the goal through UseCaseScope, then the overview is read
    again, also after a refusal, which shows above the list (role="alert"); the focus goes to the nearest remaining
-   paused item's "Resume" (the next one, else the one before), or to the "Paused" tab when none is left (HP-007). *@
+   paused item's "Resume" (the next one, else the one before), or to the "Paused" tab when none is left (HP-007).
+   Slice 8 (HP-005; design/pages/PageGoals, slice 8 state): the third link tab "Ended" (/goals?tab=ended); "ended" shows
+   it, "paused" Paused, any other value, or none, Active. Active and Paused leave out the goals the overview flags as
+   ended (GoalListItem.IsEnded); Ended lists those, in the overview's order, each in GoalItem's Ended form, whose
+   "Start new attempt" is a link to the Start new attempt page; an empty Ended tab is a Card with
+   ReportText.NoEndedGoals. *@
 @if (_overview is { } overview)
 {
     <Tabs @ref="_tabs" Links="true" Label="Goal lists" Items="TabItems" />
@@ -34,7 +39,23 @@
     {
         <p class="ht-field__error" role="alert">@refusal</p>
     }
-    @if (ShowsPaused)
+    @if (ShowsEnded)
+    {
+        @if (EndedGoals is { Count: > 0 } ended)
+        {
+            <div class="ht-list">
+                @foreach (var goal in ended)
+                {
+                    <GoalItem @key="goal.Item.Id" @ref="_items[goal.Item.Id]" Goal="goal" Today="overview.Today" />
+                }
+            </div>
+        }
+        else
+        {
+            <div class="ht-card"><p class="ht-card__sub">@ReportText.NoEndedGoals</p></div>
+        }
+    }
+    else if (ShowsPaused)
     {
         @if (PausedGoals is { Count: > 0 } paused)
         {
@@ -101,25 +122,36 @@
     private GoalId? _recording;
 
     /// <summary>
-    /// The tab value of the page's address (<c>?tab=paused</c>; contracts/host.md "Routes"): "paused" shows the Paused
-    /// tab, any other value, or none, the Active tab.
+    /// The tab value of the page's address (<c>?tab=paused</c>, <c>?tab=ended</c>; contracts/host.md "Routes"): "paused"
+    /// shows the Paused tab, "ended" the Ended tab, any other value, or none, the Active tab.
     /// </summary>
     [Parameter]
     public string? Tab { get; set; }
 
     private bool ShowsPaused => string.Equals(Tab, "paused", StringComparison.Ordinal);
 
+    private bool ShowsEnded => string.Equals(Tab, "ended", StringComparison.Ordinal);
+
     private IReadOnlyList<Tabs.TabItem> TabItems =>
     [
-        new Tabs.TabItem("Active", "/goals", null, !ShowsPaused),
+        new Tabs.TabItem("Active", "/goals", null, !ShowsPaused && !ShowsEnded),
         new Tabs.TabItem(PausedTab, "/goals?tab=paused", null, ShowsPaused),
+        new Tabs.TabItem("Ended", "/goals?tab=ended", null, ShowsEnded),
     ];
 
-    /// <summary>The goals that are not paused, in the overview's order (the Active tab).</summary>
-    private List<OverviewGoal> ActiveGoals => _overview?.Goals.Where(goal => goal.PausedUntil is null).ToList() ?? [];
+    /// <summary>The goals that are neither paused nor ended, in the overview's order (the Active tab).</summary>
+    private List<OverviewGoal> ActiveGoals =>
+        _overview?.Goals.Where(goal => goal.PausedUntil is null && !goal.Item.IsEnded).ToList() ?? [];
 
-    /// <summary>The paused goals, in the overview's order (the Paused tab).</summary>
-    private List<OverviewGoal> PausedGoals => _overview?.Goals.Where(goal => goal.PausedUntil is not null).ToList() ?? [];
+    /// <summary>
+    /// The paused goals, in the overview's order (the Paused tab); an ended goal is never paused (FR-018), and is left out
+    /// all the same.
+    /// </summary>
+    private List<OverviewGoal> PausedGoals =>
+        _overview?.Goals.Where(goal => goal.PausedUntil is not null && !goal.Item.IsEnded).ToList() ?? [];
+
+    /// <summary>Slice 8 (HP-005): the goals the overview flags as ended, in its order (the Ended tab).</summary>
+    private List<OverviewGoal> EndedGoals => _overview?.Goals.Where(goal => goal.Item.IsEnded).ToList() ?? [];
 
     /// <summary>The goal the dialog records for, as the latest read gives it; none before a "Record" was chosen.</summary>
     private OverviewGoal? DialogGoal =>

@@ -13,10 +13,25 @@
    ghost; none for Upcoming. Slice 7 (HP-005, design/components/CommitmentRow, slice 7 state): a Pending commitment
    without a record gets the ghost "Excuse" after "Record" ("Excuse {goal name}, {date}"). Each action's accessible
    name starts with its text and names the row. The row raises OnAction; the island opens the dialog. Every text and value comes from ReportText, RecordingText and the entry; the
-   row computes no figure. *@
+   row computes no figure. Slice 8 (research R-07): the state words, the bar test, the commitment rules and the progress
+   text read the row's own settings (Entry.Goal.SettingsOf(Entry)), never the goal-level ones (AC-080). Slice 8 (HP-007;
+   design/components/CommitmentRow, slice 8 state): one Tag directly after the name, before the "Reduce" Tag:
+   ReportText.Attempt(n) for a row whose attempt is not the goal's latest, otherwise ReportText.EndedTag for a row of an
+   ended goal (TodayEntry.GoalEnded); none for any other row. *@
 <div class="ht-row">
     <div class="ht-row__main">
-        @if (Entry.BuildOrReduce == BuildOrReduce.Reduce)
+        @if (AttemptTag is { } attemptTag)
+        {
+            @if (Entry.BuildOrReduce == BuildOrReduce.Reduce)
+            {
+                <div class="ht-row__name">@Entry.GoalName <Tag Text="@attemptTag" /> <Tag Text="Reduce" /></div>
+            }
+            else
+            {
+                <div class="ht-row__name">@Entry.GoalName <Tag Text="@attemptTag" /></div>
+            }
+        }
+        else if (Entry.BuildOrReduce == BuildOrReduce.Reduce)
         {
             <div class="ht-row__name">@Entry.GoalName <Tag Text="Reduce" /></div>
         }
@@ -31,7 +46,7 @@
                  aria-valuemax="@Number(Progress.Of)" aria-label="@($"{Entry.GoalName} progress")"><span style="@Width"></span></div>
         }
     </div>
-    <StatusChip State="State" ScheduleKind="Entry.Goal.GoalScheduleKind" Period="Entry.Goal.Period" />
+    <StatusChip State="State" ScheduleKind="Settings.GoalScheduleKind" Period="Settings.Period" />
     @if (Action is { } action)
     {
         <button type="button" class="@(action == ActionKind.Note ? "ht-btn ht-btn--ghost ht-btn--sm" : "ht-btn ht-btn--secondary ht-btn--sm")"
@@ -87,19 +102,35 @@
 
     private EvaluationState State => Entry.Entry.State;
 
+    /// <summary>
+    /// Slice 8 (HP-007): the Tag after the name: "Attempt n" for a row of an attempt that is not the goal's latest,
+    /// otherwise "Ended" for a row of an ended goal; null for any other row.
+    /// </summary>
+    private string? AttemptTag =>
+        !Entry.Entry.IsLatestAttempt ? ReportText.Attempt(Entry.Entry.AttemptNumber)
+        : Entry.GoalEnded ? ReportText.EndedTag
+        : null;
+
     private Progress Progress => Entry.Entry.Progress;
 
     private string Date => RecordingText.EntryDate(Entry.Entry);
 
-    private bool IsCommitment => Entry.Goal.GoalScheduleKind == GoalScheduleKind.CommitmentBased;
+    /// <summary>
+    /// Slice 8 (research R-07, contracts/host.md "Signed-in Home"): the row's own settings, which word its state, decide
+    /// its commitment rules, its bar and its progress text; an earlier attempt's row of another kind than the latest
+    /// attempt keeps its own.
+    /// </summary>
+    private EntrySettings Settings => Entry.Goal.SettingsOf(Entry.Entry);
 
-    private bool HasBar => State == EvaluationState.Due && Entry.HasRecord && Entry.Goal.Measurement != Measurement.YesNo;
+    private bool IsCommitment => Settings.GoalScheduleKind == GoalScheduleKind.CommitmentBased;
+
+    private bool HasBar => State == EvaluationState.Due && Entry.HasRecord && Settings.Measurement != Measurement.YesNo;
 
     private string Width => "width:" + RecordingText.ProgressFill(Progress).ToString(CultureInfo.InvariantCulture) + "%";
 
     private string MetaLine => State switch
     {
-        EvaluationState.Due => Entry.HasRecord ? ReportText.ProgressText(Entry.Goal, Entry.Entry) : Entry.ScheduleText,
+        EvaluationState.Due => Entry.HasRecord ? ReportText.ProgressText(Settings, Entry.Entry) : Entry.ScheduleText,
         EvaluationState.Pending => Date + " · " + ReportText.PendingLeft(Entry.Entry.GraceEnds!.Value, Now),
         EvaluationState.Missed => Date + " · no record",
         _ => Date,

@@ -110,6 +110,14 @@ public static class Evaluator
             : new Progress(ProgressKind.Total, records.Sum(record => record.Amount!.Value), amount);
     }
 
+    /// <summary>
+    /// Whether an entry with <paramref name="records"/> meets <paramref name="target"/>, as a final evaluation with a
+    /// record would judge it; false with no record. The trend's count of an entry of another measurement (slice 8 R-07).
+    /// </summary>
+    // Stryker disable once Equality : the only caller, TrendBuilder.YesCountOf, passes only commitments with a record, so >= gives the same
+    internal static bool Meets(GoalTarget target, IReadOnlyList<RecordValue> records) =>
+        records.Count > 0 && IsMet(target, ProgressOf(target, records));
+
     /// <summary>Research R-01's table: Build at least, Reduce at most; a Reduce yes/no commitment is met by "No".</summary>
     private static bool IsMet(GoalTarget target, Progress progress)
     {

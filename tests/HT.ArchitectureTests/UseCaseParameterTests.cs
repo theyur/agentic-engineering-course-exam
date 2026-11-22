@@ -31,7 +31,67 @@ public sealed class UseCaseParameterTests
 
     public static TheoryData<Type> SignedInServices =>
         new(typeof(CatalogAdministrationService), typeof(CustomHabitService), typeof(GoalService), typeof(ProfileService),
-            typeof(RecordingService), typeof(ReportService), typeof(ExcusalService), typeof(PauseService));
+            typeof(RecordingService), typeof(ReportService), typeof(ExcusalService), typeof(PauseService), typeof(GoalChangeService),
+            typeof(AttemptService));
+
+    [Fact]
+    public void Every_public_method_of_GoalChangeService_takes_the_acting_user_first_and_the_cancellation_token_last()
+    {
+        // Slice 8 (T061, contracts/application-api.md "GoalChangeService"): every use case is async, the acting user
+        // first and the token last.
+        var methods = PublicMethods(typeof(GoalChangeService)).ToList();
+        Assert.NotEmpty(methods);
+
+        var offenders = methods
+            .Where(m => m.GetParameters() is not [{ } first, .., { } last]
+                || first.ParameterType != typeof(ActingUser)
+                || last.ParameterType != typeof(CancellationToken)
+                || !typeof(Task).IsAssignableFrom(m.ReturnType))
+            .Select(m => m.Name)
+            .ToList();
+        Assert.Empty(offenders);
+    }
+
+    [Theory]
+    [InlineData(nameof(GoalChangeService.ChangeSettingsAsync))]
+    [InlineData(nameof(GoalChangeService.EndAsync))]
+    [InlineData(nameof(GoalChangeService.GetNewAttemptValuesAsync))]
+    [InlineData(nameof(GoalChangeService.StartAttemptAsync))]
+    public void GoalChangeService_has_the_use_case(string name)
+    {
+        // Slice 8 (T061, T071): each use case of contracts/application-api.md "GoalChangeService" is a public method, so
+        // the rule above covers it.
+        Assert.Single(PublicMethods(typeof(GoalChangeService)), m => m.Name == name);
+    }
+
+    [Fact]
+    public void Every_public_method_of_AttemptService_takes_the_acting_user_first_and_the_cancellation_token_last()
+    {
+        // Slice 8 (T083, contracts/application-api.md "AttemptService"): every use case is async, the acting user first and
+        // the token last.
+        var methods = PublicMethods(typeof(AttemptService)).ToList();
+        Assert.NotEmpty(methods);
+
+        var offenders = methods
+            .Where(m => m.GetParameters() is not [{ } first, .., { } last]
+                || first.ParameterType != typeof(ActingUser)
+                || last.ParameterType != typeof(CancellationToken)
+                || !typeof(Task).IsAssignableFrom(m.ReturnType))
+            .Select(m => m.Name)
+            .ToList();
+        Assert.Empty(offenders);
+    }
+
+    [Theory]
+    [InlineData(nameof(AttemptService.GetAttemptsAsync))]
+    [InlineData(nameof(AttemptService.GetAttemptAsync))]
+    [InlineData(nameof(AttemptService.GetGoalHistoryAsync))]
+    public void AttemptService_has_the_use_case(string name)
+    {
+        // Slice 8 (T083, T093): each use case of contracts/application-api.md "AttemptService" is a public method,
+        // so the rule above covers it.
+        Assert.Single(PublicMethods(typeof(AttemptService)), m => m.Name == name);
+    }
 
     [Fact]
     public void Every_method_of_the_custom_habit_port_takes_the_owner_first()

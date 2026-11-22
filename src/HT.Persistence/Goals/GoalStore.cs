@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Linq.Expressions;
 using HT.Application.Goals;
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
@@ -22,6 +23,13 @@ namespace HT.Persistence.Goals;
 internal sealed class GoalStore : IGoalStore
 {
     private static readonly string Published = CatalogHabitState.Published.ToString();
+
+    /// <summary>
+    /// Slice 8 (FR-020): a goal that is not ended, i.e. whose latest attempt has no ending date. Every goal has an
+    /// attempt, so the latest one's ending date is null exactly when the goal is not ended.
+    /// </summary>
+    private static readonly Expression<Func<GoalRow, bool>> IsNotEnded =
+        g => g.Attempts.OrderByDescending(a => a.Number).Select(a => a.EndingDate).FirstOrDefault() == null;
 
     private readonly HtDbContext _db;
 
@@ -87,6 +95,125 @@ internal sealed class GoalStore : IGoalStore
         }
     }
 
+    /// <summary>
+    /// Slice 8 (research R-05): the read order of <see cref="ReadOwnerGoalsAsync"/> for one goal, the account row first,
+    /// then the goal, owner-scoped in the statement. Do not reorder the two reads.
+    /// </summary>
+    public async Task<OwnerGoal?> ReadOwnerGoalAsync(AccountId owner, GoalId goal, CancellationToken cancellationToken)
+    {
+        var account = await _db.Users.AsNoTracking()
+            .Where(u => u.Id == owner.Value)
+            .Select(u => new { u.TimeZone, u.GoalsRevision })
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (account is null)
+        {
+            return null;
+        }
+
+        var row = await Read(owner).Where(r => r.Goal.Id == goal.Value).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        return new OwnerGoal(account.TimeZone, account.GoalsRevision, row is null ? null : GoalMapping.ToStoredGoal(row));
+    }
+
+    /// <summary>Slice 8 (FR-001 to FR-006): the latest attempt is the one changed and is not ended; then the name and, when given, its versions.</summary>
+    public Task<GoalChangeWriteOutcome> TryChangeSettingsAsync(
+        AccountId owner, string? expectedStoredZone, int expectedRevision, GoalSettingsWrite write, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+        var goal = write.Goal.Value;
+        return ChangeGoalAsync(
+            owner,
+            expectedStoredZone,
+            expectedRevision,
+            goal,
+            latest => latest.Number == write.Attempt && latest.EndingDate is null,
+            async () =>
+            {
+                var name = write.Name?.Value;
+                await _db.Goals
+                    .Where(g => g.Id == goal && g.OwnerId == owner.Value)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(g => g.Name, name), cancellationToken)
+                    .ConfigureAwait(false);
+                if (write.Versions is { } versions)
+                {
+                    await ReplaceVersionsAsync(goal, write.Attempt, versions, cancellationToken).ConfigureAwait(false);
+                }
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Slice 8 (FR-007 to FR-009, research R-04): the latest attempt is the one ended and is not ended yet; then the
+    /// ending, the kept versions, and the cuts of the goal's pauses and excusals after the last date, in the same
+    /// transaction. Records and notes stay.
+    /// </summary>
+    public Task<GoalChangeWriteOutcome> TryEndAsync(
+        AccountId owner, string? expectedStoredZone, int expectedRevision, GoalEndingWrite write, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+        ArgumentNullException.ThrowIfNull(write.Ending);
+        var goal = write.Goal.Value;
+        return ChangeGoalAsync(
+            owner,
+            expectedStoredZone,
+            expectedRevision,
+            goal,
+            latest => latest.Number == write.Attempt && latest.EndingDate is null,
+            async () =>
+            {
+                var endingDate = write.Ending.Date;
+                Outcome? outcome = write.Ending.Outcome;
+                var note = write.Ending.Note?.Value;
+                await _db.GoalAttempts
+                    .Where(a => a.GoalId == goal && a.Number == write.Attempt)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(a => a.EndingDate, endingDate)
+                            .SetProperty(a => a.Outcome, outcome)
+                            .SetProperty(a => a.EndingNote, note),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                await ReplaceVersionsAsync(goal, write.Attempt, write.KeptVersions, cancellationToken).ConfigureAwait(false);
+
+                var last = write.LastDate;
+                await _db.GoalPauses
+                    .Where(p => p.GoalId == goal && p.FirstDay > last)
+                    .ExecuteDeleteAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                await _db.GoalPauses
+                    .Where(p => p.GoalId == goal && p.FirstDay <= last && p.LastDay > last)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(p => p.LastDay, last), cancellationToken)
+                    .ConfigureAwait(false);
+                await _db.GoalExcusals
+                    .Where(e => e.GoalId == goal && e.Date > last)
+                    .ExecuteDeleteAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            },
+            cancellationToken);
+    }
+
+    /// <summary>Slice 8 (FR-012): the latest attempt is ended and numbered one below the new one; then the attempt and its first version.</summary>
+    public Task<GoalChangeWriteOutcome> TryStartAttemptAsync(
+        AccountId owner, string? expectedStoredZone, int expectedRevision, GoalAttemptWrite write, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+        ArgumentNullException.ThrowIfNull(write.First);
+        var goal = write.Goal.Value;
+        return ChangeGoalAsync(
+            owner,
+            expectedStoredZone,
+            expectedRevision,
+            goal,
+            latest => latest.Number == write.Number - 1 && latest.EndingDate is not null,
+            () =>
+            {
+                _db.GoalAttempts.Add(new GoalAttemptRow { GoalId = goal, Number = write.Number, StartDate = write.First.AppliesFrom });
+                _db.GoalSettingsVersions.Add(GoalMapping.ToRow(goal, write.Number, write.First));
+                return Task.CompletedTask;
+            },
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<StoredGoal>> ListAsync(AccountId owner, CancellationToken cancellationToken)
     {
         var rows = await Read(owner).ToListAsync(cancellationToken).ConfigureAwait(false);
@@ -103,10 +230,12 @@ internal sealed class GoalStore : IGoalStore
         _db.Goals.AsNoTracking()
             .CountAsync(g => g.OwnerId == owner.Value && g.CustomHabitId == habit.Value, cancellationToken);
 
+    /// <summary>Slice 8 (FR-020): goals whose latest attempt has an ending date are left out.</summary>
     public async Task<IReadOnlyDictionary<HabitId, int>> CountByCatalogHabitAsync(AccountId owner, CancellationToken cancellationToken)
     {
         var counts = await _db.Goals.AsNoTracking()
             .Where(g => g.OwnerId == owner.Value && g.CatalogHabitId != null)
+            .Where(IsNotEnded)
             .GroupBy(g => g.CatalogHabitId!.Value)
             .Select(group => new { Habit = group.Key, Count = group.Count() })
             .ToListAsync(cancellationToken)
@@ -114,9 +243,13 @@ internal sealed class GoalStore : IGoalStore
         return counts.ToDictionary(c => new HabitId(c.Habit), c => c.Count);
     }
 
+    /// <summary>Slice 8 (FR-020): goals whose latest attempt has an ending date are left out.</summary>
     public async Task<IReadOnlyList<StoredGoal>> ListOnCatalogHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken)
     {
-        var rows = await Read(owner).Where(r => r.Goal.CatalogHabitId == habit.Value).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var onHabit = habit.Value;
+        var rows = await Read(owner, _db.Goals.Where(g => g.CatalogHabitId == onHabit).Where(IsNotEnded))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
         return rows.Select(GoalMapping.ToStoredGoal).ToList();
     }
 
@@ -243,14 +376,20 @@ internal sealed class GoalStore : IGoalStore
     }
 
     /// <summary>
-    /// One goal's version rows for a change: ReplaceFirst updates version 1's zone; ReplacePending deletes the last
-    /// version's row and adds one with the new zone and date; Add adds a row with the last version's target. The rows to
-    /// add are saved by the caller, after every delete has run.
+    /// One goal's version rows for a change, on its latest attempt's versions only (slice 8, FR-021): ReplaceFirst
+    /// updates that attempt's first version's zone; ReplacePending deletes its last version's row and adds one with the
+    /// new zone and date; Add adds a row with its last version's target. The rows to add are saved by the caller, after
+    /// every delete has run.
     /// </summary>
     private async Task ApplyAsync(Guid goal, GoalVersionChange change, CancellationToken cancellationToken)
     {
+        var attempt = await _db.GoalAttempts.AsNoTracking()
+            .Where(a => a.GoalId == goal)
+            .MaxAsync(a => (int?)a.Number, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidOperationException("A stored goal has no attempt.");
         var versions = await _db.GoalSettingsVersions.AsNoTracking()
-            .Where(v => v.GoalId == goal)
+            .Where(v => v.GoalId == goal && v.AttemptNumber == attempt)
             .OrderBy(v => v.AppliesFrom)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -265,7 +404,7 @@ internal sealed class GoalStore : IGoalStore
             case GoalVersionChangeKind.ReplaceFirst:
                 var first = versions[0].AppliesFrom;
                 await _db.GoalSettingsVersions
-                    .Where(v => v.GoalId == goal && v.AppliesFrom == first)
+                    .Where(v => v.GoalId == goal && v.AttemptNumber == attempt && v.AppliesFrom == first)
                     .ExecuteUpdateAsync(setters => setters.SetProperty(v => v.TimeZone, zone), cancellationToken)
                     .ConfigureAwait(false);
                 return;
@@ -277,7 +416,7 @@ internal sealed class GoalStore : IGoalStore
 
                 var pending = versions[^1].AppliesFrom;
                 await _db.GoalSettingsVersions
-                    .Where(v => v.GoalId == goal && v.AppliesFrom == pending)
+                    .Where(v => v.GoalId == goal && v.AttemptNumber == attempt && v.AppliesFrom == pending)
                     .ExecuteDeleteAsync(cancellationToken)
                     .ConfigureAwait(false);
                 _db.GoalSettingsVersions.Add(CopyOf(versions[^1], change.AppliesFrom!.Value, zone));
@@ -294,6 +433,7 @@ internal sealed class GoalStore : IGoalStore
     private static GoalSettingsVersionRow CopyOf(GoalSettingsVersionRow row, DateOnly appliesFrom, string zone) => new()
     {
         GoalId = row.GoalId,
+        AttemptNumber = row.AttemptNumber,
         AppliesFrom = appliesFrom,
         BuildOrReduce = row.BuildOrReduce,
         Measurement = row.Measurement,
@@ -322,11 +462,107 @@ internal sealed class GoalStore : IGoalStore
     }
 
     /// <summary>
+    /// Slice 8 (research R-05), one transaction for each conditional goal-change write: the account row under its
+    /// update lock first, as in creation and the time-zone change, checking the stored zone and the revision; then the
+    /// owner's goal row under its update lock, then its latest attempt, checked by <paramref name="precondition"/>.
+    /// A failed check gives <see cref="GoalChangeWriteOutcome.Stale"/>, no goal of the owner
+    /// <see cref="GoalChangeWriteOutcome.GoalNotFound"/>, both with nothing written. Otherwise <paramref name="write"/>
+    /// runs, the revision is incremented, and the added rows are saved before commit. Logs nothing; a fault names the SQL
+    /// error number only.
+    /// </summary>
+    private async Task<GoalChangeWriteOutcome> ChangeGoalAsync(
+        AccountId owner,
+        string? expectedStoredZone,
+        int expectedRevision,
+        Guid goal,
+        Func<LatestAttemptRow, bool> precondition,
+        Func<Task> write,
+        CancellationToken cancellationToken)
+    {
+        _db.ChangeTracker.Clear();
+        try
+        {
+            return await WriteAsync(async () =>
+            {
+                await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+                var accounts = await _db.Database.SqlQuery<AccountRevisionRow>(
+                        $"SELECT [TimeZone], [GoalsRevision] FROM [AspNetUsers] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {owner.Value}")
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                if (accounts is not [var account]
+                    || !string.Equals(account.TimeZone, expectedStoredZone, StringComparison.Ordinal)
+                    || account.GoalsRevision != expectedRevision)
+                {
+                    await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                    return GoalChangeWriteOutcome.Stale;
+                }
+
+                var locked = await _db.Database.SqlQuery<int>(
+                        $"SELECT 1 AS [Value] FROM [Goals] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {goal} AND [OwnerId] = {owner.Value}")
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                if (locked.Count != 1)
+                {
+                    await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                    return GoalChangeWriteOutcome.GoalNotFound;
+                }
+
+                var latest = await _db.GoalAttempts.AsNoTracking()
+                    .Where(a => a.GoalId == goal)
+                    .OrderByDescending(a => a.Number)
+                    .Select(a => new LatestAttemptRow { Number = a.Number, EndingDate = a.EndingDate })
+                    .FirstOrDefaultAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                if (latest is null || !precondition(latest))
+                {
+                    await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                    return GoalChangeWriteOutcome.Stale;
+                }
+
+                await write().ConfigureAwait(false);
+                await _db.Users
+                    .Where(u => u.Id == owner.Value)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(u => u.GoalsRevision, u => u.GoalsRevision + 1), cancellationToken)
+                    .ConfigureAwait(false);
+                await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                return GoalChangeWriteOutcome.Written;
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            _db.ChangeTracker.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Replaces the version rows of the locked goal's attempt <paramref name="attempt"/> with <paramref name="versions"/>;
+    /// the new rows are saved by the caller.
+    /// </summary>
+    private async Task ReplaceVersionsAsync(
+        Guid goal, int attempt, IReadOnlyList<GoalSettingsVersion> versions, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(versions);
+        await _db.GoalSettingsVersions
+            .Where(v => v.GoalId == goal && v.AttemptNumber == attempt)
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false);
+        _db.GoalSettingsVersions.AddRange(versions.Select(version => GoalMapping.ToRow(goal, attempt, version)));
+    }
+
+    /// <summary>
     /// The owner's goals in creation order, each with its versions, its attempts and its habit's current name,
     /// category and state, as one query with left joins on both habit tables.
     /// </summary>
-    private IQueryable<GoalReadRow> Read(AccountId owner) =>
-        _db.Goals.AsNoTracking()
+    private IQueryable<GoalReadRow> Read(AccountId owner) => Read(owner, _db.Goals);
+
+    /// <summary>
+    /// The owner's goals among <paramref name="goals"/>, read as <see cref="Read(AccountId)"/> reads them; the filter is
+    /// applied to the goal rows before the projection.
+    /// </summary>
+    private static IQueryable<GoalReadRow> Read(AccountId owner, IQueryable<GoalRow> goals) =>
+        goals.AsNoTracking()
             .AsSingleQuery()
             .Where(g => g.OwnerId == owner.Value)
             .OrderBy(g => g.CreationSequence)

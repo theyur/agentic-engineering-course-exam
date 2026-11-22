@@ -50,15 +50,46 @@ public static class GoalText
     }
 
     /// <summary>
-    /// The goal's name (FR-010): its own name, or the habit's current name, ", " and the target text, produced when
-    /// read so that a renamed habit renames the goal.
+    /// The goal's name (FR-010): its own name, or the habit's current name, ", " and the target text of the latest
+    /// attempt's first version, produced when read so that a renamed habit renames the goal. For every goal of slices 4
+    /// to 7 that is its one target; a goal whose target changes is named at an instant by
+    /// <see cref="Name(Goal, string, DateTimeOffset)"/> (slice 8 R-08).
     /// </summary>
     public static string Name(Goal goal, string habitName)
     {
         ArgumentNullException.ThrowIfNull(goal);
         ArgumentNullException.ThrowIfNull(habitName);
-        return goal.OwnName is { } own ? own.Value : habitName + ", " + TargetText(goal.Target);
+        return NameOf(goal, habitName, goal.Versions[0]);
     }
+
+    /// <summary>
+    /// The goal's name at <paramref name="instant"/> (slice 8 FR-004, research R-08): its own name, or the habit's
+    /// current name, ", " and the target text of the settings in effect (<see cref="GoalTimeline.VersionInEffect(Goal, DateTimeOffset)"/>):
+    /// the version of the current date, an ended goal's last version, or the first version of a latest attempt that has
+    /// not begun.
+    /// </summary>
+    public static string Name(Goal goal, string habitName, DateTimeOffset instant)
+    {
+        ArgumentNullException.ThrowIfNull(goal);
+        ArgumentNullException.ThrowIfNull(habitName);
+        return NameOf(goal, habitName, GoalTimeline.VersionInEffect(goal, instant));
+    }
+
+    /// <summary>
+    /// The name of attempt <paramref name="number"/> (slice 8 FR-004, research R-08): the goal's own name, or the
+    /// habit's current name, ", " and the target text of that attempt's last version (the version of its last date, or
+    /// its first when it has no date). Used for every attempt that is not the latest.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The goal has no attempt with that number.</exception>
+    public static string AttemptName(Goal goal, int number, string habitName)
+    {
+        ArgumentNullException.ThrowIfNull(goal);
+        ArgumentNullException.ThrowIfNull(habitName);
+        return NameOf(goal, habitName, GoalTimeline.LastVersionOf(goal, number));
+    }
+
+    private static string NameOf(Goal goal, string habitName, GoalSettingsVersion version) =>
+        goal.OwnName is { } own ? own.Value : habitName + ", " + TargetText(version.Settings.Target);
 
     /// <summary>
     /// The schedule of the Goals page's meta line and the Settings card's "Schedule" row (HP-003, HP-004):

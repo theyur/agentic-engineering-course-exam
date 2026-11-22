@@ -40,8 +40,9 @@ public sealed class RecordsMigrationTests(MigrationDatabaseFixture database)
         var goal = await InsertGoalAsync();
         var before = await GoalStateAsync(goal);
 
-        // The remaining migrations through the public entry point.
-        Assert.True(await HtDatabase.MigrateAsync(provider, CancellationToken.None) > 0);
+        // Records itself, not the latest: a later migration (slice 8, GoalChanges) adds columns to the goal's tables,
+        // which the before-and-after comparison below would see. The public entry point runs at the end.
+        await MigrateToAsync(provider, "Records", deleteFirst: false);
 
         Assert.True(await Sql.TableExistsAsync(database.ConnectionString, "GoalRecords"));
         Assert.True(await Sql.TableExistsAsync(database.ConnectionString, "GoalNotes"));

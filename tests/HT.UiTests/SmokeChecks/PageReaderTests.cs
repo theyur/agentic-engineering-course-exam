@@ -321,6 +321,57 @@ public sealed class PageReaderTests
     }
 
     [Fact]
+    public void ReadAttemptLines_returns_every_attempt_line_decoded_and_not_other_chips_or_classes()
+    {
+        // Slice 8 HP-012: the goal page's head as GoalDetailBody renders it, with the attempt line after the Tag; a class that
+        // only starts with ht-attempt and a plain chip are not attempt lines.
+        const string html = """
+            <div class="ht-page-head ht-detail-head"><div><h1>Meditation, 5 min daily</h1>
+            <div class="ht-inline ht-head-tags"><span class="ht-chip">Build</span><span class="ht-attempt">Attempt 2 &#xB7; started 8 Nov</span></div></div></div>
+            <span class="extra ht-attempt"><b>Attempt</b> 1 · ended before it began</span>
+            <span class="ht-attempts">Attempt 3 · started 1 Dec</span>
+            <span class="ht-chip">Attempt 2</span>
+            """;
+
+        Assert.Equal(["Attempt 2 · started 8 Nov", "Attempt 1 · ended before it began"], PageReader.ReadAttemptLines(html));
+    }
+
+    [Fact]
+    public void ReadAttemptLines_is_empty_without_an_attempt_line()
+    {
+        Assert.Empty(PageReader.ReadAttemptLines("<h1>Goal</h1><p>Attempt 2 · started 8 Nov</p>"));
+    }
+
+    [Fact]
+    public void ReadTableText_reads_only_the_table_with_that_label()
+    {
+        // Slice 8 HP-012: the Profile's Goal history as DataTable renders it, after another table and before a second one.
+        const string html = """
+            <table class="ht-table" aria-label="Custom habits"><tbody><tr><td>Abandoned</td></tr></tbody></table>
+            <div class="ht-table-wrap"><table aria-label="Goal history" class="ht-table wide"><thead><tr><th scope="col">Goal</th><th scope="col">Outcome</th></tr></thead>
+            <tbody><tr><td><a href="/goals/7/attempts/1">Meditation, 10 min daily</a></td><td><span class="ht-chip">Abandoned</span></td>
+            <td class="ht-muted">Too busy &amp; tired.</td></tr></tbody></table></div>
+            <table class="ht-table" aria-label="Goal history"><tbody><tr><td>A second table</td></tr></tbody></table>
+            <p>After the table: Achieved</p>
+            """;
+
+        Assert.Equal(
+            "Goal Outcome Meditation, 10 min daily Abandoned Too busy & tired.",
+            PageReader.ReadTableText(html, "Goal history"));
+    }
+
+    [Theory]
+    [InlineData("""<p>Goal history</p><span class="ht-chip">Abandoned</span>""")]
+    [InlineData("""<table aria-label="Goal history"><tr><td>Abandoned</td></tr></table>""")]
+    [InlineData("""<table class="ht-table" aria-label="Goal history overview"><tr><td>Abandoned</td></tr></table>""")]
+    [InlineData("""<table class="ht-table-wide" aria-label="Goal history"><tr><td>Abandoned</td></tr></table>""")]
+    [InlineData("""<table class="ht-table" aria-label="Goal history"><tr><td>Abandoned</td></tr>""")]
+    public void ReadTableText_is_null_without_a_closed_ht_table_of_that_label(string html)
+    {
+        Assert.Null(PageReader.ReadTableText(html, "Goal history"));
+    }
+
+    [Fact]
     public void ReadAssetUrls_returns_stylesheets_and_scripts_in_document_order_without_inline_scripts()
     {
         const string html = """

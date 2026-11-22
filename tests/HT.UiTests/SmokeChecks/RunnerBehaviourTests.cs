@@ -14,7 +14,8 @@ namespace HT.UiTests.SmokeChecks;
 /// check 3 <c>catalog</c>, check 4 <c>administrator</c>, check 5 <c>demo &lt;email&gt;</c> (with slice 4's goal names and
 /// account name, HP-018), check 6 <c>demo history demo4@example.com</c> (slice 5 HP-008, research R-10, with slice 6's
 /// stat labels and tile label), check 7 <c>demo report demo5@example.com</c> (slice 6 HP-008, research R-11), check 8
-/// <c>demo pause demo6@example.com</c> (slice 7 HP-011), the <c>TIMING</c> line and the result.
+/// <c>demo pause demo6@example.com</c> (slice 7 HP-011), check 9 <c>demo goal changes demo7@example.com</c> (slice 8
+/// HP-012), the <c>TIMING</c> line and the result.
 /// </summary>
 public sealed class RunnerBehaviourTests
 {
@@ -108,9 +109,29 @@ public sealed class RunnerBehaviourTests
     /// <summary>The meta text of a paused goal item, as <c>GoalItem</c> renders it (slice 7 HP-004).</summary>
     private const string PausedMeta = "Paused until Sun 22 Nov";
 
-    /// <summary>The good site's Goals page: every demo goal of checks 5, 6, 7 and 8, then a reviewer's goal.</summary>
+    /// <summary>
+    /// The names of demo7's goals: "Reading", whose page check 9 reads, "Meditation", whose page check 9 reads, and the
+    /// ended "Sugar" (slice 8 HP-012).
+    /// </summary>
+    private static readonly IReadOnlyList<string> GoalChangeGoalNames = DemoGoalChanges.GoalNames;
+
+    /// <summary>
+    /// The good site's Goals page: every demo goal of checks 5, 6, 7, 8 and 9, then a reviewer's goal. demo7's "Reading, 20
+    /// min daily" has demo4's name, so on this one-page site it is listed once and check 9 reaches demo4's Reading page,
+    /// whose Settings card has the later settings row (slice 8).
+    /// </summary>
     private static readonly IReadOnlyList<string> AllGoalNames =
-        [.. DemoGoalNames, .. HistoryGoalNames, .. ReportGoalNames, .. PauseGoalNames, "A reviewer's goal"];
+        [.. DemoGoalNames, .. HistoryGoalNames, .. ReportGoalNames, .. PauseGoalNames, .. GoalChangeGoalNames.Except(HistoryGoalNames), "A reviewer's goal"];
+
+    /// <summary>The Settings card rows of "Reading"'s page: its target, the later settings row and its schedule (slice 8 HP-001).</summary>
+    private static readonly IReadOnlyList<(string Label, string Value)> LaterSettingsRows =
+        [("Target", "20 min daily"), ("From Mon 23 Nov", "25 min daily"), ("Schedule", "Every day")];
+
+    /// <summary>The attempt line of demo7's "Meditation, 5 min daily", as <c>GoalDetailBody</c> renders it (slice 8 HP-001).</summary>
+    private const string RestartedAttemptLine = "Attempt 2 · started 8 Nov";
+
+    /// <summary>The outcomes of demo7's Goal history, as the Profile's DataTable shows them (slice 8 HP-006).</summary>
+    private static readonly IReadOnlyList<string> GoalHistoryOutcomes = ["Achieved", "Abandoned"];
 
     /// <summary>The goal page paths of "Reading" and "Yoga" on the good site, as <see cref="GoalsPage"/> links them.</summary>
     private static readonly string ReadingPath = GoalPath(DemoGoalNames.Count);
@@ -123,6 +144,9 @@ public sealed class RunnerBehaviourTests
     /// <summary>The goal page path of "Meditation, 10 min daily" on the good site (slice 7).</summary>
     private static readonly string MeditationPath = GoalPath(DemoGoalNames.Count + HistoryGoalNames.Count + ReportGoalNames.Count);
 
+    /// <summary>The goal page path of demo7's "Meditation, 5 min daily" on the good site (slice 8).</summary>
+    private static readonly string RestartedMeditationPath = GoalPath(AllGoalNames.ToList().IndexOf(GoalChangeGoalNames[1]));
+
     /// <summary>
     /// The good site: the visitor Home, the redirect, the catalog with every Published seed habit, the sign-in form
     /// (every sign-in is accepted), the admin page, a custom-habits page with every demo custom habit that links one
@@ -131,7 +155,10 @@ public sealed class RunnerBehaviourTests
     /// a Settings card, "Reading"'s with its GoalStats stat labels, the goal page of "Strength training" with its stat
     /// labels (slice 6), and the goal page of "Meditation" with an "Excused" status chip in its History card, while the
     /// Goals page, which also answers <c>?tab=paused</c> (the script ignores the query), shows "Drinking water" with the
-    /// meta "Paused until Sun 22 Nov" (slice 7).
+    /// meta "Paused until Sun 22 Nov" (slice 7). Slice 8: the Goals page, which also answers <c>?tab=ended</c>, shows demo7's
+    /// goals, the ended "Sugar" among them; "Reading"'s Settings card has the row "From Mon 23 Nov" with "25 min daily"; the
+    /// goal page of demo7's "Meditation" has the attempt line "Attempt 2 · started 8 Nov"; and the Profile page, which also
+    /// answers <c>?tab=history</c>, has the Goal history table with "Achieved" and "Abandoned".
     /// </summary>
     private static ScriptedHandler GoodSite() => new ScriptedHandler()
         .On(HttpMethod.Get, Https, ScriptedHandler.Html(VisitorHome))
@@ -143,10 +170,12 @@ public sealed class RunnerBehaviourTests
         .On(HttpMethod.Get, Https + "custom-habits", ScriptedHandler.Html(CardsPage(DemoHabitNames)))
         .On(HttpMethod.Get, Https + "goals", ScriptedHandler.Html(GoalsPage(AllGoalNames)))
         .On(HttpMethod.Get, Https + "profile", ScriptedHandler.Html(ProfilePage("Demo One")))
-        .On(HttpMethod.Get, Https + ReadingPath[1..], ScriptedHandler.Html(GoalPage(["Sat 7", "20 min", .. ReadingTexts, "Show all 28 →"], statLabels: ReadingStatLabels)))
+        .On(HttpMethod.Get, Https + ReadingPath[1..], ScriptedHandler.Html(GoalPage(
+            ["Sat 7", "20 min", .. ReadingTexts, "Show all 28 →"], statLabels: ReadingStatLabels, settingsRows: LaterSettingsRows)))
         .On(HttpMethod.Get, Https + YogaPath[1..], ScriptedHandler.Html(GoalPage(["Mon 2", "Yes", .. YogaTexts])))
         .On(HttpMethod.Get, Https + StrengthPath[1..], ScriptedHandler.Html(GoalPage(["Mon 9", "Yes"], statLabels: StrengthStatLabels)))
         .On(HttpMethod.Get, Https + MeditationPath[1..], ScriptedHandler.Html(GoalPage(["Mon 16", "—"], statusChips: ["Due today", "Pending", "Excused", "Met"])))
+        .On(HttpMethod.Get, Https + RestartedMeditationPath[1..], ScriptedHandler.Html(GoalPage(["Sun 22", "5 min"], attemptLine: RestartedAttemptLine)))
         .On(HttpMethod.Get, Stylesheet, ScriptedHandler.Html("body {}"))
         .On(HttpMethod.Get, Script, ScriptedHandler.Html("// script"));
 
@@ -180,20 +209,29 @@ public sealed class RunnerBehaviourTests
 
                 // Slice 7 HP-011: "Excused" on Meditation's page, and on the Paused tab the paused goal with its meta.
                 "PASS demo pause demo6@example.com (3 of 3)",
+
+                // Slice 8 HP-012: the ended goal on the Ended tab, Meditation's attempt line, Reading's later settings row
+                // and "Abandoned" in the Goal history.
+                "PASS demo goal changes demo7@example.com (4 of 4)",
             ],
-            lines.Take(10));
-        Assert.Matches(FirstTiming, lines[10]);
-        Assert.Equal("RESULT PASS", lines[11]);
-        Assert.Equal(12, lines.Count);
+            lines.Take(11));
+        Assert.Matches(FirstTiming, lines[11]);
+        Assert.Equal("RESULT PASS", lines[12]);
+        Assert.Equal(13, lines.Count);
         Assert.Single(site.Requests, r => r == "GET " + Stylesheet);
         Assert.Single(site.Requests, r => r == "GET " + Script);
-        Assert.Equal(6, site.Requests.Count(r => r == "GET " + Https + "goals"));
+        Assert.Equal(7, site.Requests.Count(r => r == "GET " + Https + "goals"));
         Assert.Single(site.Requests, r => r == "GET " + Https + "goals?tab=paused");
+        Assert.Single(site.Requests, r => r == "GET " + Https + "goals?tab=ended");
         Assert.Equal(1, site.Requests.Count(r => r == "GET " + Https + "profile"));
-        Assert.Single(site.Requests, r => r == "GET " + Https + ReadingPath[1..]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + "profile?tab=history");
+
+        // Checks 6 and 9 both reach "Reading, 20 min daily", which on this one-page site is one goal page.
+        Assert.Equal(2, site.Requests.Count(r => r == "GET " + Https + ReadingPath[1..]));
         Assert.Single(site.Requests, r => r == "GET " + Https + YogaPath[1..]);
         Assert.Single(site.Requests, r => r == "GET " + Https + StrengthPath[1..]);
         Assert.Single(site.Requests, r => r == "GET " + Https + MeditationPath[1..]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + RestartedMeditationPath[1..]);
         Assert.Equal(3, site.Requests.Count(r => r == "GET " + Https));
         Assert.All(
             DemoHabitNames.Concat(PublishedNames).Concat(DemoGoalNames).Append("Demo One"),
@@ -201,6 +239,7 @@ public sealed class RunnerBehaviourTests
         AssertNoDemoHistoryContent(lines);
         AssertNoDemoReportContent(lines);
         AssertNoDemoPauseContent(lines);
+        AssertNoDemoGoalChangeContent(lines);
     }
 
     [Fact]
@@ -236,7 +275,8 @@ public sealed class RunnerBehaviourTests
     [Fact]
     public async Task Demo_report_fails_when_its_sign_in_is_refused_and_the_other_checks_pass()
     {
-        // The administrator and demo1 to demo4 sign in; demo5 goes back to Sign in; demo6, the last sign-in, signs in.
+        // The administrator and demo1 to demo4 sign in; demo5 goes back to Sign in; demo6 and demo7, after the last scripted
+        // answer, sign in.
         var accepted = ScriptedHandler.Redirect(HttpStatusCode.Found, "/");
         var site = GoodSite().On(HttpMethod.Post, Https + "sign-in",
             accepted, accepted, accepted, accepted, accepted, ScriptedHandler.Redirect(HttpStatusCode.Found, "/sign-in"), accepted);
@@ -247,7 +287,8 @@ public sealed class RunnerBehaviourTests
         Assert.Equal("PASS demo history demo4@example.com (14 of 14)", lines[7]);
         Assert.Equal("FAIL demo report demo5@example.com: the sign-in was refused", lines[8]);
         Assert.Equal("PASS demo pause demo6@example.com (3 of 3)", lines[9]);
-        Assert.Matches(FirstTiming, lines[10]);
+        Assert.Equal("PASS demo goal changes demo7@example.com (4 of 4)", lines[10]);
+        Assert.Matches(FirstTiming, lines[11]);
         Assert.Equal("RESULT FAIL", lines[^1]);
     }
 
@@ -339,7 +380,8 @@ public sealed class RunnerBehaviourTests
     [Fact]
     public async Task Demo_pause_fails_when_its_sign_in_is_refused_and_the_other_checks_pass()
     {
-        // The administrator and demo1 to demo5 sign in; demo6, the last sign-in, goes back to Sign in.
+        // The administrator and demo1 to demo5 sign in; demo6 goes back to Sign in, and so does demo7, after the last
+        // scripted answer.
         var accepted = ScriptedHandler.Redirect(HttpStatusCode.Found, "/");
         var site = GoodSite().On(HttpMethod.Post, Https + "sign-in",
             accepted, accepted, accepted, accepted, accepted, accepted, ScriptedHandler.Redirect(HttpStatusCode.Found, "/sign-in"));
@@ -349,7 +391,8 @@ public sealed class RunnerBehaviourTests
         Assert.Equal(1, exitCode);
         Assert.Equal("PASS demo report demo5@example.com (6 of 6)", lines[8]);
         Assert.Equal("FAIL demo pause demo6@example.com: the sign-in was refused", lines[9]);
-        Assert.Matches(FirstTiming, lines[10]);
+        Assert.Equal("FAIL demo goal changes demo7@example.com: the sign-in was refused", lines[10]);
+        Assert.Matches(FirstTiming, lines[11]);
         Assert.Equal("RESULT FAIL", lines[^1]);
         Assert.DoesNotContain(site.Requests, r => r == "GET " + Https + "goals?tab=paused");
     }
@@ -429,6 +472,141 @@ public sealed class RunnerBehaviourTests
     }
 
     [Fact]
+    public async Task Demo_goal_changes_fails_when_its_sign_in_is_refused_and_the_other_checks_pass()
+    {
+        // The administrator and demo1 to demo6 sign in; demo7, the last sign-in, goes back to Sign in.
+        var accepted = ScriptedHandler.Redirect(HttpStatusCode.Found, "/");
+        var site = GoodSite().On(HttpMethod.Post, Https + "sign-in",
+            accepted, accepted, accepted, accepted, accepted, accepted, accepted, ScriptedHandler.Redirect(HttpStatusCode.Found, "/sign-in"));
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("PASS demo pause demo6@example.com (3 of 3)", lines[9]);
+        Assert.Equal("FAIL demo goal changes demo7@example.com: the sign-in was refused", lines[10]);
+        Assert.Matches(FirstTiming, lines[11]);
+        Assert.Equal("RESULT FAIL", lines[^1]);
+        Assert.DoesNotContain(site.Requests, r => r == "GET " + Https + "goals?tab=ended");
+        Assert.DoesNotContain(site.Requests, r => r == "GET " + Https + "profile?tab=history");
+    }
+
+    public static TheoryData<string, string> DemoGoalChangesEndedTabFailures => new()
+    {
+        { "status", "FAIL demo goal changes demo7@example.com: GET /goals?tab=ended gave status 500" },
+        { "name", "FAIL demo goal changes demo7@example.com: 0 of 1 goal names on the Ended tab shown" },
+    };
+
+    [Theory]
+    [MemberData(nameof(DemoGoalChangesEndedTabFailures))]
+    public async Task Demo_goal_changes_fails_when_the_Ended_tab_misses_the_ended_goal_or_is_not_shown_and_still_reads_every_page(
+        string failure, string expected)
+    {
+        // Goals is one page on this site, which also answers ?tab=ended: checks 5 to 8 read it first (7 times), then check 9
+        // reads the 8th answer for its Ended tab and the 9th for its Goals page.
+        var good = ScriptedHandler.Html(GoalsPage(AllGoalNames));
+        var bad = failure == "status"
+            ? ScriptedHandler.Status(HttpStatusCode.InternalServerError)
+            : ScriptedHandler.Html(GoalsPage([.. AllGoalNames.Where(n => n != GoalChangeGoalNames[2])]));
+        var site = GoodSite().On(HttpMethod.Get, Https + "goals", good, good, good, good, good, good, good, bad, good);
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("PASS demo pause demo6@example.com (3 of 3)", lines[9]);
+        Assert.Equal(expected, lines[10]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + RestartedMeditationPath[1..]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + "profile?tab=history");
+        AssertNoDemoGoalChangeContent(lines);
+    }
+
+    public static TheoryData<string, string> DemoGoalChangesGoalPageFailures => new()
+    {
+        { "goals status", "FAIL demo goal changes demo7@example.com: GET /goals gave status 500" },
+        { "no link", "FAIL demo goal changes demo7@example.com: no link for goal page 2" },
+        { "page status", "FAIL demo goal changes demo7@example.com: GET goal page 2 gave status 404" },
+        { "attempt line", "FAIL demo goal changes demo7@example.com: 0 of 1 attempt lines on goal page 2 shown" },
+        { "reading status", "FAIL demo goal changes demo7@example.com: GET goal page 1 gave status 404" },
+        { "no later row", "FAIL demo goal changes demo7@example.com: 0 of 1 later settings rows on goal page 1 shown" },
+        { "target before From", "FAIL demo goal changes demo7@example.com: 0 of 1 later settings rows on goal page 1 shown" },
+    };
+
+    [Theory]
+    [MemberData(nameof(DemoGoalChangesGoalPageFailures))]
+    public async Task Demo_goal_changes_fails_when_a_goal_page_misses_its_text_or_cannot_be_reached_and_still_reads_the_Goal_history(
+        string failure, string expected)
+    {
+        var good = ScriptedHandler.Html(GoalsPage(AllGoalNames));
+        var site = failure switch
+        {
+            // Only the 9th answer of Goals, check 9's Goals page, is changed.
+            "goals status" => GoodSite().On(HttpMethod.Get, Https + "goals", good, good, good, good, good, good, good, good, ScriptedHandler.Status(HttpStatusCode.InternalServerError)),
+            "no link" => GoodSite().On(HttpMethod.Get, Https + "goals", good, good, good, good, good, good, good, good,
+                ScriptedHandler.Html(GoalsPage(AllGoalNames).Replace($" href=\"{RestartedMeditationPath}\"", string.Empty, StringComparison.Ordinal))),
+            "page status" => GoodSite().On(HttpMethod.Get, Https + RestartedMeditationPath[1..], ScriptedHandler.Status(HttpStatusCode.NotFound)),
+
+            // An attempt line of attempt 1, and "Attempt 2 · started" only in a plain chip and the History card: none counts.
+            "attempt line" => GoodSite().On(HttpMethod.Get, Https + RestartedMeditationPath[1..], ScriptedHandler.Html(GoalPage(
+                ["Attempt 2 · started 8 Nov"], settings: ["Attempt 2 · started 8 Nov"], attemptLine: "Attempt 1 · started 2 Nov"))),
+
+            // Reading's page is check 6's too: its 2nd answer is check 9's.
+            "reading status" => GoodSite().On(HttpMethod.Get, Https + ReadingPath[1..],
+                ScriptedHandler.Html(GoalPage(["Sat 7", "20 min", .. ReadingTexts], statLabels: ReadingStatLabels)), ScriptedHandler.Status(HttpStatusCode.NotFound)),
+
+            // "From …" and the later target only outside the Settings card, in the History card and after every card.
+            "no later row" => GoodSite().On(HttpMethod.Get, Https + ReadingPath[1..], ScriptedHandler.Html(GoalPage(
+                ["Sat 7", "20 min", .. ReadingTexts, "From Mon 23 Nov", "25 min daily"], statLabels: ReadingStatLabels,
+                settingsRows: [("Target", "20 min daily")], after: ["From Mon 23 Nov", "25 min daily"]))),
+
+            // The later target in the Target row, before a "From …" row with another target, does not count.
+            _ => GoodSite().On(HttpMethod.Get, Https + ReadingPath[1..], ScriptedHandler.Html(GoalPage(
+                ["Sat 7", "20 min", .. ReadingTexts], statLabels: ReadingStatLabels,
+                settingsRows: [("Target", "25 min daily"), ("From Mon 23 Nov", "30 min daily")]))),
+        };
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("PASS demo pause demo6@example.com (3 of 3)", lines[9]);
+        Assert.Equal(expected, lines[10]);
+        Assert.Single(site.Requests, r => r == "GET " + Https + "goals?tab=ended");
+        Assert.Single(site.Requests, r => r == "GET " + Https + "profile?tab=history");
+        AssertNoDemoGoalChangeContent(lines);
+    }
+
+    public static TheoryData<string, string> DemoGoalChangesGoalHistoryFailures => new()
+    {
+        { "status", "FAIL demo goal changes demo7@example.com: GET /profile?tab=history gave status 500" },
+        { "no outcome", "FAIL demo goal changes demo7@example.com: 0 of 1 outcomes in the Goal history shown" },
+        { "other table", "FAIL demo goal changes demo7@example.com: 0 of 1 outcomes in the Goal history shown" },
+    };
+
+    [Theory]
+    [MemberData(nameof(DemoGoalChangesGoalHistoryFailures))]
+    public async Task Demo_goal_changes_fails_when_the_Goal_history_misses_Abandoned_or_is_not_shown(string failure, string expected)
+    {
+        // Profile is one page on this site, which also answers ?tab=history: check 5 reads it first for demo1, then check 9
+        // reads the 2nd answer.
+        var good = ScriptedHandler.Html(ProfilePage("Demo One"));
+        var bad = failure switch
+        {
+            "status" => ScriptedHandler.Status(HttpStatusCode.InternalServerError),
+            "no outcome" => ScriptedHandler.Html(ProfilePage("Demo One", ["Achieved"])),
+
+            // "Abandoned" only in another table and outside every table does not count.
+            _ => ScriptedHandler.Html(ProfilePage("Demo One", ["Achieved"])
+                .Replace("</body>", GoalHistoryTable("Custom habits", ["Abandoned"]) + "<span class=\"ht-chip\">Abandoned</span></body>", StringComparison.Ordinal)),
+        };
+        var site = GoodSite().On(HttpMethod.Get, Https + "profile", good, bad);
+
+        var (exitCode, lines) = await RunAsync(site);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("PASS demo demo1@example.com (5 of 5)", lines[4]);
+        Assert.Equal(expected, lines[10]);
+        AssertNoDemoGoalChangeContent(lines);
+    }
+
+    [Fact]
     public async Task Demo_history_fails_when_its_sign_in_is_refused_and_the_other_checks_pass()
     {
         // The administrator and demo1 to demo3 sign in; demo4, the last sign-in, goes back to Sign in.
@@ -442,10 +620,11 @@ public sealed class RunnerBehaviourTests
         Assert.Equal("PASS demo demo3@example.com (5 of 5)", lines[6]);
         Assert.Equal("FAIL demo history demo4@example.com: the sign-in was refused", lines[7]);
 
-        // The last scripted answer repeats, so demo5's and demo6's sign-ins, after it, are refused too.
+        // The last scripted answer repeats, so demo5's, demo6's and demo7's sign-ins, after it, are refused too.
         Assert.Equal("FAIL demo report demo5@example.com: the sign-in was refused", lines[8]);
         Assert.Equal("FAIL demo pause demo6@example.com: the sign-in was refused", lines[9]);
-        Assert.Matches(FirstTiming, lines[10]);
+        Assert.Equal("FAIL demo goal changes demo7@example.com: the sign-in was refused", lines[10]);
+        Assert.Matches(FirstTiming, lines[11]);
         Assert.Equal("RESULT FAIL", lines[^1]);
     }
 
@@ -473,7 +652,9 @@ public sealed class RunnerBehaviourTests
 
         Assert.Equal(1, exitCode);
         Assert.Equal("FAIL demo history demo4@example.com: 2 of 3 goal names shown", lines[7]);
-        Assert.Single(site.Requests, r => r == "GET " + Https + ReadingPath[1..]);
+
+        // Check 9 reaches "Reading, 20 min daily" too, which on this one-page site is demo4's goal page (slice 8).
+        Assert.Equal(2, site.Requests.Count(r => r == "GET " + Https + ReadingPath[1..]));
         Assert.Single(site.Requests, r => r == "GET " + Https + YogaPath[1..]);
         AssertNoDemoHistoryContent(lines);
     }
@@ -576,9 +757,11 @@ public sealed class RunnerBehaviourTests
         Assert.Equal(1, exitCode);
         Assert.Equal("FAIL demo demo1@example.com: 0 of 2 custom habits shown", lines[4]);
         Assert.Equal("FAIL demo demo2@example.com: 0 of 2 custom habits shown", lines[5]);
-        Assert.Equal(6, site.Requests.Count(r => r == "GET " + Https + "goals"));
+        Assert.Equal(7, site.Requests.Count(r => r == "GET " + Https + "goals"));
         Assert.Single(site.Requests, r => r == "GET " + Https + "goals?tab=paused");
+        Assert.Single(site.Requests, r => r == "GET " + Https + "goals?tab=ended");
         Assert.Equal(1, site.Requests.Count(r => r == "GET " + Https + "profile"));
+        Assert.Single(site.Requests, r => r == "GET " + Https + "profile?tab=history");
     }
 
     [Fact]
@@ -636,9 +819,10 @@ public sealed class RunnerBehaviourTests
                 "FAIL demo history demo4@example.com: the sign-in was refused",
                 "FAIL demo report demo5@example.com: the sign-in was refused",
                 "FAIL demo pause demo6@example.com: the sign-in was refused",
+                "FAIL demo goal changes demo7@example.com: the sign-in was refused",
             ],
-            lines.Skip(4).Take(6));
-        Assert.Matches(NoLaterTiming, lines[10]);
+            lines.Skip(4).Take(7));
+        Assert.Matches(NoLaterTiming, lines[11]);
         Assert.Equal("RESULT FAIL", lines[^1]);
     }
 
@@ -773,20 +957,24 @@ public sealed class RunnerBehaviourTests
     /// A goal page as <c>GoalDetail</c> renders it: the GoalStats card with <paramref name="statLabels"/>, each with a
     /// value (slice 6), a Settings card with <paramref name="settings"/>, then the History card (<c>HistoryCard</c>), one
     /// cell per text of <paramref name="history"/> and one StatusChip cell per word of <paramref name="statusChips"/>
-    /// (slice 7), then <paramref name="after"/> outside every card.
+    /// (slice 7), then <paramref name="after"/> outside every card. Slice 8: the attempt line <paramref name="attemptLine"/>
+    /// under the title, and the Settings card's KeyValue rows <paramref name="settingsRows"/> before its other texts.
     /// </summary>
     private static string GoalPage(
         IEnumerable<string> history,
         IEnumerable<string>? settings = null,
         IEnumerable<string>? after = null,
         IEnumerable<string>? statLabels = null,
-        IEnumerable<string>? statusChips = null) =>
+        IEnumerable<string>? statusChips = null,
+        string? attemptLine = null,
+        IEnumerable<(string Label, string Value)>? settingsRows = null) =>
         $"""
-         <!DOCTYPE html><html><body><h1>Goal</h1>
+         <!DOCTYPE html><html><body><h1>Goal</h1>{(attemptLine is null ? string.Empty : $"<div class=\"ht-inline ht-head-tags\"><span class=\"ht-attempt\">{WebUtility.HtmlEncode(attemptLine)}</span></div>")}
          <section class="ht-card"><div class="ht-eyebrow">This attempt</div><h2 class="ht-card__title">Consistency and streaks</h2><div class="ht-stats">
          {string.Concat((statLabels ?? []).Select(l => $"<div class=\"ht-stat\"><div class=\"ht-stat__value\">3</div><div class=\"ht-stat__label\">{WebUtility.HtmlEncode(l)}</div></div>"))}
          </div></section>
          <section class="ht-card"><div class="ht-card__head"><h2 class="ht-card__title">Settings</h2></div>
+         <dl class="ht-kv">{string.Concat((settingsRows ?? []).Select(r => $"<dt>{WebUtility.HtmlEncode(r.Label)}</dt><dd>{WebUtility.HtmlEncode(r.Value)}</dd>"))}</dl>
          {Cells(settings ?? ["Changes apply from the next commitment."])}
          </section>
          <section class="ht-card">
@@ -831,9 +1019,41 @@ public sealed class RunnerBehaviourTests
             value => Assert.DoesNotContain(value, text, StringComparison.Ordinal));
     }
 
-    /// <summary>A Profile page whose header's <c>h1</c> is <paramref name="heading"/>, as <c>Profile</c> renders it.</summary>
-    private static string ProfilePage(string heading) =>
-        $"""<!DOCTYPE html><html><body><div class="ht-profile__head"><h1>{WebUtility.HtmlEncode(heading)}</h1><span class="ht-muted">member since November 2026</span></div></body></html>""";
+    /// <summary>
+    /// No line holds a demo7 goal name, note, ending note, outcome, target, date, goal path or text read from a page
+    /// (slice 8 HP-012).
+    /// </summary>
+    private static void AssertNoDemoGoalChangeContent(IReadOnlyList<string> lines)
+    {
+        var text = string.Join('\n', lines);
+        Assert.All(
+            [
+                .. GoalChangeGoalNames, DemoGoalChanges.EarlierAttemptName, DemoGoalChanges.ShortOnTimeNote,
+                DemoGoalChanges.TooBusyEndingNote, DemoGoalChanges.SugarEndingNote, .. GoalHistoryOutcomes, RestartedAttemptLine,
+                "Attempt 2", "From ", "Mon 23 Nov", "25 min daily", "8 Nov", RestartedMeditationPath,
+            ],
+            value => Assert.DoesNotContain(value, text, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A Profile page whose header's <c>h1</c> is <paramref name="heading"/>, as <c>Profile</c> renders it, with the Goal
+    /// history DataTable, one row per outcome of <paramref name="outcomes"/> (default <see cref="GoalHistoryOutcomes"/>), as
+    /// its <c>?tab=history</c> shows it (slice 8 HP-006).
+    /// </summary>
+    private static string ProfilePage(string heading, IEnumerable<string>? outcomes = null) =>
+        $"""
+         <!DOCTYPE html><html><body><div class="ht-profile__head"><h1>{WebUtility.HtmlEncode(heading)}</h1><span class="ht-muted">member since November 2026</span></div>
+         {GoalHistoryTable("Goal history", outcomes ?? GoalHistoryOutcomes)}
+         </body></html>
+         """;
+
+    /// <summary>A DataTable with this label and one row per outcome, the outcome as a Tag, as the Profile's Goal history renders it.</summary>
+    private static string GoalHistoryTable(string label, IEnumerable<string> outcomes) =>
+        $"""
+         <div class="ht-table-wrap"><table class="ht-table" aria-label="{WebUtility.HtmlEncode(label)}"><thead><tr><th scope="col">Goal</th><th scope="col">Outcome</th></tr></thead><tbody>
+         {string.Concat(outcomes.Select(o => $"<tr><td><a href=\"/goals/1\">A goal</a></td><td><span class=\"ht-chip\">{WebUtility.HtmlEncode(o)}</span></td></tr>"))}
+         </tbody></table></div>
+         """;
 
     private static async Task<(int ExitCode, IReadOnlyList<string> Lines)> RunAsync(ScriptedHandler site, params string[] options)
     {

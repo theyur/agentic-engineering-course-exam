@@ -278,4 +278,125 @@ public sealed class CommitmentRowTests : BunitContext
             [pending.FindAll("button")[1].GetAttribute("blazor:elementReference"), due.Find("button").GetAttribute("blazor:elementReference")],
             focused);
     }
+
+    // ---- slice 8: the row's own settings (research R-07, AC-080, contracts/host.md "Signed-in Home"; T059) ----
+
+    private static EntrySettings SettingsOf(GoalTarget target) => new()
+    {
+        GoalScheduleKind = target.ScheduleKindOf, Period = target.PeriodLength, BuildOrReduce = target.BuildOrReduce,
+        Measurement = target.Measurement, Amount = target.Amount, CountUnit = target.CountUnit, DurationUnit = target.DurationUnit,
+        Times = target.ScheduleKindOf == GoalScheduleKind.PeriodBased ? target.Schedule.Times : null, Target = target,
+    };
+
+    /// <summary>
+    /// A row of attempt 1, a "Reading, 20 min, 3 days a week" commitment with its own settings, of a goal whose latest
+    /// attempt has <paramref name="latest"/>: the goal-level settings of the row's <see cref="TodayEntry.Goal"/>, as the
+    /// dashboard gives an earlier attempt's Pending entry (FR-019).
+    /// </summary>
+    private static TodayEntry EarlierReading(GoalTarget latest, DateOnly date, EvaluationState state, int? minutes, DateTimeOffset graceEnds)
+    {
+        var row = Reading(date, state, minutes, graceEnds);
+        var entry = row.Entry with { AttemptNumber = 1, IsLatestAttempt = false, Settings = SettingsOf(Reading20MinOnMonWedFri) };
+        var goal = row.Goal with
+        {
+            GoalScheduleKind = latest.ScheduleKindOf, Period = latest.PeriodLength, BuildOrReduce = latest.BuildOrReduce,
+            Measurement = latest.Measurement, Amount = latest.Amount, CountUnit = latest.CountUnit, DurationUnit = latest.DurationUnit,
+            Times = latest.ScheduleKindOf == GoalScheduleKind.PeriodBased ? latest.Schedule.Times : null, Target = latest,
+            Entries = [entry],
+        };
+        return row with { Goal = goal, Entry = entry };
+    }
+
+    [Fact]
+    public void AC_080_an_earlier_attempts_Pending_commitment_under_a_per_day_attempt_has_its_own_commitment_actions()
+    {
+        // Under a latest attempt of Reduce, at most 2 cups a day (period-based), attempt 1's commitment keeps "Excuse",
+        // which only a commitment has, and with a record "Edit", where a period would have "Record".
+        var cut = RenderRow(EarlierReading(CoffeeAtMost2Cups, new DateOnly(2026, 11, 16), EvaluationState.Pending, null, ReadAt.AddHours(5)));
+        var recorded = RenderRow(EarlierReading(CoffeeAtMost2Cups, new DateOnly(2026, 11, 16), EvaluationState.Pending, 10, ReadAt.AddHours(5)));
+
+        Assert.Equal(
+            ("Mon 16 Nov · 5 h left to record", "Pending", "Record + Excuse",
+                "Record for Reading, 20 min, 3 days a week, Mon 16 Nov + Excuse Reading, 20 min, 3 days a week, Mon 16 Nov"),
+            Parts(cut));
+        Assert.Equal(("Mon 16 Nov · 5 h left to record", "Pending", "Edit", "Edit record of Reading, 20 min, 3 days a week, Mon 16 Nov"), Parts(recorded));
+        // Slice 8 (T099, HP-007): the row of an attempt that is not the latest now carries its "Attempt 1" Tag.
+        Assert.Equal(["Attempt 1"], cut.FindAll(".ht-row__name .ht-chip").Select(c => c.TextContent));
+    }
+
+    // ---- slice 8: the Tag after the name (HP-007, design/components/CommitmentRow "Slice 8 state"; T099) ----
+
+    [Fact]
+    public void HP_007_a_Pending_row_of_an_ended_goal_has_the_Ended_Tag_after_the_name()
+    {
+        var row = Reading(new DateOnly(2026, 11, 16), EvaluationState.Pending, graceEnds: ReadAt.AddHours(5)) with { GoalEnded = true };
+
+        var cut = RenderRow(row);
+
+        Assert.Equal(["Ended"], cut.FindAll(".ht-row__name .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Reading, 20 min, 3 days a week Ended", cut.Find(".ht-row__name").TextContent);
+        Assert.Equal(
+            ("Mon 16 Nov · 5 h left to record", "Pending", "Record + Excuse",
+                "Record for Reading, 20 min, 3 days a week, Mon 16 Nov + Excuse Reading, 20 min, 3 days a week, Mon 16 Nov"),
+            Parts(cut));
+    }
+
+    [Fact]
+    public void HP_007_a_Reduce_row_of_an_ended_goal_has_the_Ended_Tag_before_the_Reduce_Tag()
+    {
+        var row = EntryOf("Coffee, at most 2 cups a day", CoffeeAtMost2Cups, "Every day", new DateOnly(2026, 11, 16), new DateOnly(2026, 11, 16),
+            EvaluationState.Pending, new Progress(ProgressKind.Total, null, 2), ReadAt.AddHours(5)) with { GoalEnded = true };
+
+        var cut = RenderRow(row);
+
+        Assert.Equal(["Ended", "Reduce"], cut.FindAll(".ht-row__name .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Coffee, at most 2 cups a day Ended Reduce", cut.Find(".ht-row__name").TextContent);
+    }
+
+    [Fact]
+    public void HP_007_a_row_of_an_earlier_attempt_has_Attempt_n_and_not_Ended_even_when_the_goal_is_ended()
+    {
+        var row = EarlierReading(Reading20MinOnMonWedFri, new DateOnly(2026, 11, 16), EvaluationState.Pending, null, ReadAt.AddHours(5));
+        var second = row with { Entry = row.Entry with { AttemptNumber = 2 }, GoalEnded = true };
+
+        var cut = RenderRow(second);
+
+        Assert.Equal(["Attempt 2"], cut.FindAll(".ht-row__name .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Reading, 20 min, 3 days a week Attempt 2", cut.Find(".ht-row__name").TextContent);
+    }
+
+    [Fact]
+    public void HP_007_a_Reduce_row_of_an_earlier_attempt_has_Attempt_n_before_the_Reduce_Tag()
+    {
+        var row = EntryOf("Coffee, at most 2 cups a day", CoffeeAtMost2Cups, "Every day", new DateOnly(2026, 11, 16), new DateOnly(2026, 11, 16),
+            EvaluationState.Pending, new Progress(ProgressKind.Total, null, 2), ReadAt.AddHours(5));
+        var earlier = row with { Entry = row.Entry with { AttemptNumber = 1, IsLatestAttempt = false } };
+
+        var cut = RenderRow(earlier);
+
+        Assert.Equal(["Attempt 1", "Reduce"], cut.FindAll(".ht-row__name .ht-chip").Select(c => c.TextContent));
+    }
+
+    [Fact]
+    public void HP_007_a_row_of_the_latest_attempt_of_a_goal_that_is_not_ended_has_no_Tag()
+    {
+        var row = Reading(Wed18, EvaluationState.Due, graceEnds: ReadAt.AddHours(53));
+        var restarted = row with { Entry = row.Entry with { AttemptNumber = 2, IsLatestAttempt = true } };
+
+        var cut = RenderRow(restarted);
+
+        Assert.Empty(cut.FindAll(".ht-row__name .ht-chip"));
+        Assert.Equal("Reading, 20 min, 3 days a week", cut.Find(".ht-row__name").TextContent);
+    }
+
+    [Fact]
+    public void A_Due_commitment_under_goal_level_settings_of_a_yes_no_week_shows_its_own_state_word_progress_and_bar()
+    {
+        // The row's own settings, a duration commitment, give "Due today", "15 of 20 min today" and the bar; the goal-level
+        // yes/no week would give "Due this week" and no bar.
+        var cut = RenderRow(EarlierReading(RunningTwiceAWeek, Wed18, EvaluationState.Due, 15, ReadAt.AddHours(53)));
+
+        Assert.Equal(("15 of 20 min today", "Due today", "Edit", "Edit record of Reading, 20 min, 3 days a week, Wed 18 Nov"), Parts(cut));
+        Assert.Equal("width:75%", cut.Find(".ht-row__main .ht-progress span").GetAttribute("style"));
+    }
 }

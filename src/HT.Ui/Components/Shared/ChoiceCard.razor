@@ -2,12 +2,23 @@
 @* design/components/ChoiceCard: radio options shown as cards with a title and one line of description, in
    div.ht-choices[role=radiogroup]: label.ht-choice with a native input[type=radio], ht-choice__title and
    ht-choice__desc. The native radio shows the choice and takes the keyboard (Tab into the group, arrows between
-   its options); the accent border and fill only repeat it. None is checked until the user chooses. *@
-<div class="ht-choices" role="radiogroup" aria-labelledby="@LabelledBy" aria-describedby="@DescribedBy">
-    @foreach (var option in Options)
+   its options); the accent border and fill only repeat it. None is checked until the user chooses. Slice 8
+   (design/components/EndGoalDialog): OneColumn stacks the cards in one column, as the design's inline
+   grid-template-columns:1fr does, and FocusFirstAsync moves the focus to the first radio for a dialog whose first
+   field the group is. *@
+<div class="ht-choices" style="@(OneColumn ? OneColumnStyle : null)" role="radiogroup" aria-labelledby="@LabelledBy" aria-describedby="@DescribedBy">
+    @for (var index = 0; index < Options.Count; index++)
     {
+        var option = Options[index];
         <label class="ht-choice">
-            <input type="radio" name="@Name" checked="@Equals(option.Value, Value)" @onchange="() => ValueChanged.InvokeAsync(option.Value)" />
+            @if (index == 0)
+            {
+                <input type="radio" name="@Name" checked="@Equals(option.Value, Value)" @ref="_first" @onchange="() => ValueChanged.InvokeAsync(option.Value)" />
+            }
+            else
+            {
+                <input type="radio" name="@Name" checked="@Equals(option.Value, Value)" @onchange="() => ValueChanged.InvokeAsync(option.Value)" />
+            }
             <span class="ht-choice__title">@option.Title</span>
             <span class="ht-choice__desc">@option.Description</span>
         </label>
@@ -15,6 +26,11 @@
 </div>
 
 @code {
+    /// <summary>The design's one-column grid (design/components/EndGoalDialog).</summary>
+    private const string OneColumnStyle = "grid-template-columns:1fr";
+
+    private ElementReference _first;
+
     /// <summary>The 2 to 4 options in order, each with its title and a few words of description.</summary>
     [Parameter, EditorRequired]
     public IReadOnlyList<(TValue Value, string Title, string Description)> Options { get; set; } = [];
@@ -37,4 +53,11 @@
     /// <summary>The id of an error text about this choice.</summary>
     [Parameter]
     public string? DescribedBy { get; set; }
+
+    /// <summary>Stacks the cards in one column instead of the auto-fit grid (slice 8, EndGoalDialog).</summary>
+    [Parameter]
+    public bool OneColumn { get; set; }
+
+    /// <summary>Moves the focus to the first radio, for a dialog whose first field the group is (design/components/Dialog).</summary>
+    public ValueTask FocusFirstAsync() => _first.FocusAsync();
 }

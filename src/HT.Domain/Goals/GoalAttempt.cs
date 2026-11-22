@@ -1,8 +1,8 @@
 namespace HT.Domain.Goals;
 
 /// <summary>
-/// An attempt of a goal (FR-018): its number, from 1, and the date it begins. This slice has only attempt 1, beginning
-/// on the goal's start date and not ended.
+/// An attempt of a goal (FR-018; slice 8 FR-007, FR-012): its number, from 1, the date it begins and, once ended, its
+/// <see cref="Ending"/>. Two attempts with the same values, the ending included, are equal.
 /// </summary>
 public sealed record GoalAttempt
 {
@@ -18,4 +18,7 @@ public sealed record GoalAttempt
     public int Number { get; }
 
     public DateOnly StartDate { get; }
+
+    /// <summary>The attempt's ending; null while it is not ended.</summary>
+    public GoalEnding? Ending { get; init; }
 }

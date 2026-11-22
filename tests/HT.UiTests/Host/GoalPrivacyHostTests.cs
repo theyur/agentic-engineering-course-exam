@@ -23,7 +23,10 @@ namespace HT.UiTests.Host;
 /// page and Home hold none of A's goal names, and an administrator's Home has no tile and no row. Slice 7 (US5, FR-021,
 /// FR-022, HP-009): that Not found page has no Pause, Notice, Pauses card, reason or Excused row of A's paused goal, B's
 /// Paused tab lists none of A's goals, an administrator gets the Not found page for it, and no host log entry holds a
-/// reason. Shared database: own prefixes ("ui-gp-", "Ui-Gp").
+/// reason. Slice 8 (US5, HP-002, HP-004, HP-006, HP-010, HP-014): another account and an administrator get the Not found
+/// page for <c>/goals/{id}/edit</c>, <c>/goals/{id}/new-attempt</c> and <c>/goals/{id}/attempts/{n}</c> of A's goals, an
+/// anonymous visitor is sent to sign-in, their Profile holds none of A's attempts, and no host log entry holds the ending
+/// note, a goal name or the habit name. Shared database: own prefixes ("ui-gp-", "Ui-Gp").
 /// </summary>
 [Collection(HostCollection.Name)]
 public sealed class GoalPrivacyHostTests(HostFixture host)
@@ -322,6 +325,109 @@ public sealed class GoalPrivacyHostTests(HostFixture host)
             Assert.DoesNotContain(habitName, html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain($"{aGoal.Value}", html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("ht-status--excused", html, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Slice_8_US5_the_goal_change_pages_of_As_goals_reach_neither_B_nor_an_administrator_nor_an_anonymous_visitor()
+    {
+        // Through the host's GoalChangeService, as the three pages' interactive saves call it (at the host's clock, read once
+        // here; the tests of the collection run one at a time): A's "edit" goal gets a settings change, A's "ended" goal is
+        // ended with a marked ending note, and A's "restarted" goal is ended likewise and restarted from tomorrow. A's own
+        // pages show them, so their absence is the refusal.
+        var habitName = Unique("Ui-Gp Changes");
+        var goalPrefix = Unique("Ui-Gp A change");
+        var endingNote = $"Uigpendingmark {Guid.NewGuid():N}";
+        var habit = new GoalHabit(await host.ArrangeCatalogHabitAsync(Definition(habitName)), HabitKind.Catalog);
+        var (aBrowser, a) = await host.SignedInAccountAsync(Email("changes-a"), Role.RegisteredUser);
+        var owner = ActingUser.ForAccount(a, Role.RegisteredUser);
+        var edited = await CreateAsync(a, habit, $"{goalPrefix} edit");
+        var ended = await CreateAsync(a, habit, $"{goalPrefix} ended");
+        var restarted = await CreateAsync(a, habit, $"{goalPrefix} restarted");
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            var services = scope.ServiceProvider;
+            var changes = services.GetRequiredService<GoalChangeService>();
+            var tomorrow = NamedTimeZone.Utc.DateAt(services.GetRequiredService<TimeProvider>().GetUtcNow()).AddDays(1);
+            var fourTimes = new GoalTargetFields
+            {
+                BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.YesNo, ScheduleKind = ScheduleKind.Times, Times = 4, Period = SchedulePeriod.Week,
+            };
+            var changed = await changes.ChangeSettingsAsync(owner, edited, new GoalSettingsInput { Target = fourTimes, Name = $"{goalPrefix} edit" }, CancellationToken.None);
+            Assert.Equal(SettingsChangeOutcome.Changed, changed.Outcome);
+            foreach (var goal in new[] { ended, restarted })
+            {
+                var result = await changes.EndAsync(owner, goal, Outcome.Abandoned, endingNote, CancellationToken.None);
+                Assert.Equal(GoalEndOutcome.Ended, result.Outcome);
+            }
+
+            var started = await changes.StartAttemptAsync(owner, restarted, new NewAttemptInput { Target = fourTimes, StartDate = tomorrow }, CancellationToken.None);
+            Assert.Equal(AttemptStartOutcome.Started, started.Outcome);
+        }
+
+        var addresses = new[] { $"/goals/{edited.Value}/edit", $"/goals/{ended.Value}/new-attempt", $"/goals/{restarted.Value}/attempts/1" };
+        using (aBrowser)
+        {
+            foreach (var address in addresses)
+            {
+                var (status, html) = await aBrowser.GetPageAsync(address);
+
+                Assert.Equal(HttpStatusCode.OK, status);
+                Assert.Contains(goalPrefix, html, StringComparison.Ordinal);
+            }
+
+            var (attemptStatus, attempt) = await aBrowser.GetPageAsync(addresses[2]);
+            Assert.Equal(HttpStatusCode.OK, attemptStatus);
+            Assert.Contains(endingNote, attempt, StringComparison.Ordinal);
+            var (historyStatus, history) = await aBrowser.GetPageAsync("/profile?tab=history");
+            Assert.Equal(HttpStatusCode.OK, historyStatus);
+            Assert.Contains(endingNote, history, StringComparison.Ordinal);
+        }
+
+        using var other = await host.SignedInBrowserAsync(Email("changes-b"), Role.RegisteredUser);
+        using var administrator = await host.SignedInBrowserAsync(Email("changes-admin"), Role.Administrator);
+        foreach (var browser in new[] { other, administrator })
+        {
+            foreach (var address in addresses)
+            {
+                var (status, html) = await browser.GetPageAsync(address);
+
+                Assert.Equal(HttpStatusCode.NotFound, status);
+                Assert.Contains("Page not found", html, StringComparison.Ordinal);
+                AssertNothingOfAsGoals(html);
+                Assert.DoesNotContain(">Save changes</button>", html, StringComparison.Ordinal);
+                Assert.DoesNotContain(">Start attempt</button>", html, StringComparison.Ordinal);
+            }
+
+            // B's Goal history and an administrator's Profile (which has no Goal history) hold none of A's attempts.
+            var (profileStatus, profile) = await browser.GetPageAsync("/profile?tab=history");
+            Assert.Equal(HttpStatusCode.OK, profileStatus);
+            AssertNothingOfAsGoals(profile);
+        }
+
+        using var anonymous = host.CreateBrowser();
+        foreach (var address in addresses)
+        {
+            using var response = await anonymous.GetAsync(new Uri(address, UriKind.Relative));
+
+            Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+            Assert.Equal("https://localhost/sign-in?returnUrl=" + Uri.EscapeDataString(address), response.RedirectTarget(anonymous));
+        }
+
+        Assert.DoesNotContain(host.Logs.Entries, entry =>
+            new[] { "Uigpendingmark", goalPrefix, habitName }.Any(value =>
+                entry.Message.Contains(value, StringComparison.OrdinalIgnoreCase)
+                || (entry.Exception?.ToString().Contains(value, StringComparison.OrdinalIgnoreCase) ?? false)));
+
+        void AssertNothingOfAsGoals(string html)
+        {
+            Assert.DoesNotContain("Uigpendingmark", html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(goalPrefix, html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(habitName, html, StringComparison.OrdinalIgnoreCase);
+            foreach (var goal in new[] { edited, ended, restarted })
+            {
+                Assert.DoesNotContain($"{goal.Value}", html, StringComparison.OrdinalIgnoreCase);
+            }
         }
     }
 

@@ -26,7 +26,10 @@
    CanRemoveExcusal. The card raises OnRemoveExcusal; the page removes the excusal, reads everything again and gives the
    focus to FocusRecordOrNoteAsync. A refusal the page passes as Refusal shows under the card head with role="alert".
    A Paused row (FR-009) has its StatusChip and its note control, never "Add record"; a commitment's record kept on it
-   keeps its "Edit", and a period's kept records stay their own buttons. *@
+   keeps its "Edit", and a period's kept records stay their own buttons.
+   Slice 8 (research R-07, contracts/host.md "History card and dialogs"): each row reads its own settings through
+   History.SettingsOf(entry), never the History's goal-level fields: its Recorded cell, its StatusChip and its record
+   controls, so after a change of measurement 11 Nov reads "12 min" and 12 Nov "12 pages" (AC-020). *@
 @if (_rows.Count > 0)
 {
     <section class="ht-card">
@@ -43,6 +46,7 @@
             @foreach (var entry in ShownRows)
             {
                 var date = RecordingText.EntryDate(entry);
+                var settings = History.SettingsOf(entry);
                 <tr @key="entry.FirstDate">
                     <td><b>@date</b></td>
                     <td>
@@ -50,9 +54,9 @@
                         {
                             @NoRecord
                         }
-                        else if (IsCommitment)
+                        else if (IsCommitment(settings))
                         {
-                            @RecordingText.Recorded(History, entry.Records[0])
+                            @RecordingText.Recorded(settings, entry.Records[0])
                         }
                         else
                         {
@@ -60,7 +64,7 @@
                                 @for (var i = 0; i < entry.Records.Count; i++)
                                 {
                                     var record = entry.Records[i];
-                                    var text = RecordingText.Recorded(History, record);
+                                    var text = RecordingText.Recorded(settings, record);
                                     var name = text + ", edit record " + (i + 1).ToString(CultureInfo.InvariantCulture) + " of " + date;
                                     <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog" aria-label="@name"
                                             @key="record.Id" @ref="_recordButtons[record.Id]"
@@ -72,11 +76,11 @@
                     <td>
                         @if (entry.ExcusalReason is { } reason)
                         {
-                            <span class="ht-inline"><StatusChip State="entry.State" ScheduleKind="History.GoalScheduleKind" Period="History.Period" /><span class="ht-muted">@reason</span></span>
+                            <span class="ht-inline"><StatusChip State="entry.State" ScheduleKind="settings.GoalScheduleKind" Period="settings.Period" /><span class="ht-muted">@reason</span></span>
                         }
                         else
                         {
-                            <StatusChip State="entry.State" ScheduleKind="History.GoalScheduleKind" Period="History.Period" />
+                            <StatusChip State="entry.State" ScheduleKind="settings.GoalScheduleKind" Period="settings.Period" />
                         }
                     </td>
                     <td class="ht-muted">@(entry.Note ?? NoNote)</td>
@@ -104,7 +108,7 @@
                                         @onclick="() => OnRemoveExcusal.InvokeAsync(entry)">@RemoveExcusal</button>
                             }
                         }
-                        else if (IsCommitment && HasRecordControl(entry))
+                        else if (IsCommitment(settings) && HasRecordControl(entry))
                         {
                             @* A Paused commitment takes no new record (FR-009), so it keeps only the "Edit" of a record kept on it. *@
                             var record = entry.Records.Count == 0 ? null : entry.Records[0];
@@ -113,7 +117,7 @@
                                     @ref="_actionButtons[entry.FirstDate]"
                                     @onclick="() => OnAction.InvokeAsync(new RowAction(entry, record))">@(record is null ? AddRecord : "Edit")</button>
                         }
-                        else if (!IsCommitment && HasRecordControl(entry))
+                        else if (!IsCommitment(settings) && HasRecordControl(entry))
                         {
                             <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog" aria-label="@(AddRecord + " for " + date)"
                                     @ref="_actionButtons[entry.FirstDate]"
@@ -197,7 +201,7 @@
             return ValueTask.CompletedTask;
         }
 
-        if (!IsCommitment && record is { } id && entry.Records.Any(r => r.Id == id) && _recordButtons.TryGetValue(id, out var recordButton))
+        if (!IsCommitment(entry) && record is { } id && entry.Records.Any(r => r.Id == id) && _recordButtons.TryGetValue(id, out var recordButton))
         {
             return recordButton.FocusAsync();
         }
@@ -229,7 +233,13 @@
 
     protected override void OnParametersSet() => _rows = RowsOf(History).ToList();
 
-    private bool IsCommitment => History.GoalScheduleKind == GoalScheduleKind.CommitmentBased;
+    /// <summary>
+    /// Whether <paramref name="entry"/> is a commitment, by its own settings (slice 8, research R-07): the Recorded cell,
+    /// the record controls and the focus follow the row's schedule kind, never the History's goal-level one.
+    /// </summary>
+    private bool IsCommitment(HistoryEntry entry) => IsCommitment(History.SettingsOf(entry));
+
+    private static bool IsCommitment(EntrySettings settings) => settings.GoalScheduleKind == GoalScheduleKind.CommitmentBased;
 
     private IEnumerable<HistoryEntry> ShownRows => _expanded ? _rows : _rows.Take(FirstRows);
 
@@ -245,8 +255,8 @@
     private bool HasRecordControl(HistoryEntry entry) => entry.State switch
     {
         EvaluationState.Excused => false,
-        EvaluationState.Paused => IsCommitment && entry.Records.Count > 0,
-        _ => IsCommitment || TakesRecord(entry),
+        EvaluationState.Paused => IsCommitment(entry) && entry.Records.Count > 0,
+        _ => IsCommitment(entry) || TakesRecord(entry),
     };
 
     /// <summary>

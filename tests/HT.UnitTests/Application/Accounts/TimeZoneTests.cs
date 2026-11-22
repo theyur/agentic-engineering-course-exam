@@ -431,4 +431,32 @@ public sealed class TimeZoneTests
         Assert.Equal((KyivId, KyivId), (StoredZoneOf(a), StoredZoneOf(b)));
         Assert.Equal(0, _world.Goals.RevisionOf(owner));
     }
+
+    // ---- Slice 8: ended goals and waiting attempts (FR-021; T056) ----
+
+    [Fact]
+    public async Task Slice_8_a_time_zone_change_adds_no_version_to_an_ended_goal_and_replaces_a_waiting_attempts_first_version()
+    {
+        // Both goals start on Monday 2 November in Kyiv; both are ended at 2026-11-16T10:00:00Z (Monday 16 there), and
+        // the second gets a waiting attempt 2 from Wednesday 18. The zone changes at 2026-11-17T10:00:00Z.
+        var world = new AttemptWorld();
+        var user = world.UserIn(KyivId);
+        var daily = DurationDays(10, DurationUnit.Minutes, BuildOrReduce.Build, AllDays);
+        var created = new DateTimeOffset(2026, 11, 1, 10, 0, 0, TimeSpan.Zero);
+        var ended = await world.CreateGoalAsync(daily, Date(2026, 11, 2), created, user);
+        var restarted = await world.CreateGoalAsync(daily, Date(2026, 11, 2), created, user);
+        world.At(new DateTimeOffset(2026, 11, 16, 10, 0, 0, TimeSpan.Zero));
+        await world.EndAsync(ended, user: user);
+        await world.EndAsync(restarted, user: user);
+        await world.StartAttemptAsync(restarted, daily, Date(2026, 11, 18), user);
+        world.At(new DateTimeOffset(2026, 11, 17, 10, 0, 0, TimeSpan.Zero));
+
+        var result = await world.Profiles.ChangeTimeZoneAsync(user, "America/New_York", CancellationToken.None);
+
+        Assert.Equal(TimeZoneChangeOutcome.Changed, result.Outcome);
+        Assert.Equal([(KyivId, Date(2026, 11, 2))], world.GoalOf(ended).Versions.Select(v => (v.Settings.TimeZone.Id, v.AppliesFrom)));
+        var restartedGoal = world.GoalOf(restarted);
+        Assert.Equal([("America/New_York", Date(2026, 11, 18))], restartedGoal.Versions.Select(v => (v.Settings.TimeZone.Id, v.AppliesFrom)));
+        Assert.Equal([(KyivId, Date(2026, 11, 2))], restartedGoal.VersionsOf(1).Select(v => (v.Settings.TimeZone.Id, v.AppliesFrom)));
+    }
 }

@@ -1,3 +1,4 @@
+using HT.Application.Records;
 using HT.Domain.Goals;
 
 namespace HT.Application.Goals;
@@ -9,16 +10,21 @@ namespace HT.Application.Goals;
 /// </summary>
 internal static class GoalListItems
 {
-    /// <summary>The list fields of FR-015 and FR-014 at <paramref name="now"/>.</summary>
+    /// <summary>
+    /// The list fields of FR-015 and FR-014 at <paramref name="now"/>. Slice 8 (FR-004, FR-018, AC-035, research R-07,
+    /// R-08): the target fields and the name of the latest attempt's settings in effect at <paramref name="now"/>; the
+    /// ending fields; the start date of a latest attempt that has not begun, unless the goal is ended; no next commitment
+    /// and no first-week date for an ended goal (<see cref="GoalTimeline"/> gives none).
+    /// </summary>
     internal static GoalListItem Of(StoredGoal stored, DateTimeOffset now)
     {
         var goal = stored.Goal;
-        var current = GoalTimeline.CurrentDate(goal, now);
-        var target = GoalTimeline.VersionOf(goal, current ?? goal.StartDate).Settings.Target;
+        var target = GoalTimeline.VersionInEffect(goal, now).Settings.Target;
+        var ending = goal.Attempt.Ending;
         return new GoalListItem
         {
             Id = goal.Id,
-            Name = GoalText.Name(goal, stored.Habit.Name),
+            Name = GoalText.Name(goal, stored.Habit.Name, now),
             HabitName = stored.Habit.Name,
             HabitKind = stored.Habit.Kind,
             BuildOrReduce = target.BuildOrReduce,
@@ -26,9 +32,12 @@ internal static class GoalListItems
             TargetText = GoalText.TargetText(target),
             ScheduleText = GoalText.ScheduleText(target),
             ScheduleKind = target.ScheduleKindOf,
-            StartDate = current is null ? goal.StartDate : null,
+            StartDate = ending is null && !GoalTimeline.LatestAttemptHasBegun(goal, now) ? AttemptEntries.TimingDateOf(goal, goal.Attempt.Number) : null,
             NextCommitment = GoalTimeline.NextCommitment(goal, now),
             FirstWeekStarts = FirstWeekNotBegun(goal, now),
+            IsEnded = ending is not null,
+            EndingDate = ending?.Date,
+            Outcome = ending?.Outcome,
         };
     }
 

@@ -53,3 +53,20 @@ The last part of the preview shows the signed-in Home as slice 7 builds it (HP-0
 - Excused and Paused entries are not rows and are not counted in "Due now", "Pending · still can record" or "Missed this week" (FR-019). In the preview Meditation has no row: its days from Mon 16 Nov are Paused. A paused goal's Pending results from before its pause are still listed (spec US4-AS2).
 - The "Recent notes" card is unchanged: a note of an Excused or Paused commitment or period is listed as any other note.
 - A registered user with no goals keeps slice 4's EmptyState; an administrator keeps the page head only. Still no reminder of any kind. A user whose goals are all paused has goals: the dashboard, with "Active goals" at 0 and no goal in the card (settled here, T078).
+
+## Slice 8 state
+
+The last part of the preview shows the signed-in Home as slice 8 builds it (HP-007, FR-019, US3-AS12, US4-AS2, contracts/host.md "Signed-in Home", ADR 0008). Today is Mon 16 Nov 2026, 12:00 in the first example (spec US4): "Reading, 15 min daily" is active, "Meditation, 10 min daily" ended at 10:00 with "Abandoned", and "Sugar, at most 1 sweet a day" ended on Sat 14 Nov and was restarted at 09:00. The second example is the Today card of spec US3-AS12 on Tue 17 Nov 2026, 10:00.
+
+- Everything of slice 7 stays: the page head, the four StatTiles, the Today card with its order, filters, actions and dialogs, the "Active goals" card and the "Recent notes" card. The changes:
+  1. Today card: the Pending rows of an ended attempt stay in the list, in slice 6's order, until their grace period ends, so they can still be recorded (and excused, for a commitment-based goal) from here. Each carries a Tag after the name (`components/CommitmentRow.md`, "Slice 8 state"):
+     - "Attempt 1" for a row of an attempt that is not the goal's latest (a restarted goal), after that attempt's name;
+     - otherwise "Ended" for a row of an ended goal.
+
+     In the first example: Meditation's Sat 14 and Sun 15 Nov, "Ended". In the second: attempt 1's Sun 15 Nov with "Attempt 1", then attempt 2's Due Tue 17 Nov without a Tag.
+  2. The "Pending · still can record" tile counts those rows (4 in the first example: Meditation's two and Reading's two).
+  3. An ended attempt has no other row: no Due, Missed or Upcoming row. Its Missed results are neither listed nor counted in "Missed this week" (Meditation's Sat 14 Nov in the second example is Missed and absent).
+  4. "Active goals": the tile counts only the goals that are neither paused nor ended (2 in the first example), and the card lists only those. A restarted goal is active again (Sugar, with "N/A").
+  5. "Recent notes" leaves out the notes of ended goals.
+- After a record or an excusal of such a row, the island reads the list again, as in slices 6 and 7: the row leaves the list once it is recorded or excused, and the tile drops by 1.
+- Nothing else changes. A registered user with no goals keeps slice 4's EmptyState; an administrator keeps the page head only. A user whose goals are all ended has goals: the dashboard, with "Active goals" at 0 and no goal in the card, as slice 7 settles for paused goals (settled here, T009).

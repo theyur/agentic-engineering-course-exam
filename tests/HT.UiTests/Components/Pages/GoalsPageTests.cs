@@ -102,8 +102,8 @@ public sealed class GoalsPageTests : BunitContext
 
         Assert.Equal(0, _notFound);
         Assert.Equal("Goals", cut.Find(".ht-page-head h1").TextContent);
-        // Slice 7 (HP-004): the link Tabs "Active" (current) and "Paused" above the list, with no counts and no "Ended".
-        Assert.Equal([("Active", "/goals", "page"), ("Paused", "/goals?tab=paused", null)], TabsOf(cut));
+        // Slice 8 (HP-005; was slice 7 HP-004 without "Ended"): the link Tabs "Active" (current), "Paused" and "Ended" above the list, with no counts.
+        Assert.Equal([("Active", "/goals", "page"), ("Paused", "/goals?tab=paused", null), ("Ended", "/goals?tab=ended", null)], TabsOf(cut));
         Assert.Single(cut.FindAll(".ht-list"));
         var items = cut.FindAll(".ht-list > .ht-goalitem");
         Assert.Empty(cut.FindAll(".ht-goalitem--reduced"));
@@ -126,7 +126,7 @@ public sealed class GoalsPageTests : BunitContext
             "Each goal is counted on its own. Consistency counts only finalized results; pending, excused and paused ones are left out.",
             cut.Find(".ht-list + p.ht-footnote").TextContent);
         Assert.Empty(cut.FindAll(".ht-empty"));
-        foreach (var absent in new[] { "Ended", "Excuse" })
+        foreach (var absent in new[] { "Start new attempt", "Excuse" })
         {
             Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
         }
@@ -162,7 +162,7 @@ public sealed class GoalsPageTests : BunitContext
 
         var cut = Render<Goals>();
 
-        Assert.Equal([("Active", "/goals", null), ("Paused", "/goals?tab=paused", "page")], TabsOf(cut));
+        Assert.Equal([("Active", "/goals", null), ("Paused", "/goals?tab=paused", "page"), ("Ended", "/goals?tab=ended", null)], TabsOf(cut));
         var item = Assert.Single(cut.FindAll(".ht-list > .ht-goalitem"));
         var link = item.QuerySelector("a.ht-goalitem__name")!;
         Assert.Equal(("Reading, 15 min, 5 days a week", $"/goals/{reading.Value}"), (link.TextContent, link.GetAttribute("href")));
@@ -173,7 +173,7 @@ public sealed class GoalsPageTests : BunitContext
         var resume = Assert.Single(item.QuerySelectorAll(".ht-goalitem__actions button"));
         Assert.Equal(("Resume", "Resume Reading, 15 min, 5 days a week"), (resume.TextContent, resume.GetAttribute("aria-label")));
         Assert.Equal(Footnote, cut.Find(".ht-list + p.ht-footnote").TextContent);
-        Assert.DoesNotContain("Ended", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Start new attempt", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Coffee", cut.Markup, StringComparison.Ordinal);
     }
 
@@ -181,16 +181,15 @@ public sealed class GoalsPageTests : BunitContext
     [InlineData("/goals")]
     [InlineData("/goals?tab=active")]
     [InlineData("/goals?tab=Paused")]
-    [InlineData("/goals?tab=ended")]
     [InlineData("/goals?tab=")]
-    public async Task Slice_7_HP_004_any_tab_value_but_paused_shows_the_Active_tab_without_the_paused_goal(string address)
+    public async Task Slice_7_HP_004_any_tab_value_but_paused_or_ended_shows_the_Active_tab_without_the_paused_goal(string address)
     {
         await CoffeeAndPausedReadingAsync();
         Services.GetRequiredService<BunitNavigationManager>().NavigateTo(address);
 
         var cut = Render<Goals>();
 
-        Assert.Equal([("Active", "/goals", "page"), ("Paused", "/goals?tab=paused", null)], TabsOf(cut));
+        Assert.Equal([("Active", "/goals", "page"), ("Paused", "/goals?tab=paused", null), ("Ended", "/goals?tab=ended", null)], TabsOf(cut));
         var item = Assert.Single(cut.FindAll(".ht-list > .ht-goalitem"));
         Assert.Equal("Coffee, at most 2 cups a day", item.QuerySelector("a.ht-goalitem__name")!.TextContent);
         Assert.Equal("Record", item.QuerySelector(".ht-goalitem__actions button")!.TextContent);
@@ -209,10 +208,40 @@ public sealed class GoalsPageTests : BunitContext
 
         var cut = Render<Goals>();
 
-        Assert.Equal([("Active", "/goals", null), ("Paused", "/goals?tab=paused", "page")], TabsOf(cut));
+        Assert.Equal([("Active", "/goals", null), ("Paused", "/goals?tab=paused", "page"), ("Ended", "/goals?tab=ended", null)], TabsOf(cut));
         Assert.Empty(cut.FindAll(".ht-list"));
         Assert.Equal("No paused goals.", cut.Find(".ht-tabs + .ht-card > p.ht-card__sub").TextContent);
         Assert.Equal(Footnote, cut.Find(".ht-card + p.ht-footnote").TextContent);
+        Assert.Empty(cut.FindAll(".ht-empty"));
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_005_a_user_whose_goals_are_all_ended_has_the_tabs_the_Ended_list_and_the_footnote()
+    {
+        // design/pages/PageGoals, slice 8 state (settled in T008): such a user has goals, so the page keeps the tabs and
+        // the footnote; "Coffee", ended through the GoalChangeService at 10:00 today, is on the Ended tab.
+        var user = SignInUser();
+        var coffee = _catalog.Add(HabitSamples.Catalog("Coffee", category: Category.Health, intent: Intent.Reduce));
+        var id = await CreateAsync(user, coffee, Times(BuildOrReduce.Reduce, Measurement.Count, 2, "cups", 1, SchedulePeriod.Day), Today);
+        await using (var scope = Services.CreateAsyncScope())
+        {
+            var ended = await scope.ServiceProvider.GetRequiredService<GoalChangeService>().EndAsync(
+                user, id, Outcome.NoLongerRelevant, null, CancellationToken.None);
+            Assert.Equal(GoalEndOutcome.Ended, ended.Outcome);
+        }
+
+        Services.GetRequiredService<BunitNavigationManager>().NavigateTo("/goals?tab=ended");
+
+        var cut = Render<Goals>();
+
+        Assert.Equal(
+            [("Active", "/goals", null), ("Paused", "/goals?tab=paused", null), ("Ended", "/goals?tab=ended", "page")],
+            TabsOf(cut));
+        var item = Assert.Single(cut.FindAll(".ht-list > .ht-goalitem"));
+        Assert.Equal(["Reduce", "No longer relevant"], item.QuerySelectorAll(".ht-goalitem__meta .ht-chip").Select(c => c.TextContent));
+        Assert.Equal("Ended Tue 17 Nov", Text(item.QuerySelector(".ht-goalitem__meta span:not(.ht-chip)")!));
+        Assert.Equal($"/goals/{id.Value}/new-attempt", item.QuerySelector(".ht-goalitem__actions a")!.GetAttribute("href"));
+        Assert.Equal(Footnote, cut.Find(".ht-list + p.ht-footnote").TextContent);
         Assert.Empty(cut.FindAll(".ht-empty"));
     }
 

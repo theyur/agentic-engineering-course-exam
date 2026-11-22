@@ -13,7 +13,9 @@ namespace HT.Application.Records;
 /// label and help texts, worded as the design's slice-5 state words them (<c>design/components/RecordDialog.md</c>,
 /// <c>RecordForms.md</c>, <c>StatusChip.md</c>). Pure and culture-invariant: numbers use the invariant culture, dates
 /// come only from <see cref="DateTexts"/>, and the time is a parameter, never a clock. It takes the goal's measurement
-/// and unit from <see cref="GoalHistory"/>, so no text but <see cref="Title"/> names a goal (HP-006). A count unit is
+/// and unit from <see cref="GoalHistory"/> or, since slice 8, from one entry's <see cref="EntrySettings"/> (research
+/// R-07; each <see cref="GoalHistory"/> member delegates to its <see cref="EntrySettings"/> overload with the goal-level
+/// settings), so no text but <see cref="Title"/> names a goal (HP-006). A count unit is
 /// written as stored, never inflected ("3 sweet", "1 of at most 2 cups").
 /// </summary>
 public static class RecordingText
@@ -51,22 +53,29 @@ public static class RecordingText
     public static string? Progress(GoalHistory history, Progress progress)
     {
         ArgumentNullException.ThrowIfNull(history);
+        return Progress(history.GoalLevelSettings(), progress);
+    }
+
+    /// <summary>Slice 8 (research R-07): the progress line with one entry's <paramref name="settings"/>.</summary>
+    public static string? Progress(EntrySettings settings, Progress progress)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(progress);
-        var reduce = history.BuildOrReduce == BuildOrReduce.Reduce;
+        var reduce = settings.BuildOrReduce == BuildOrReduce.Reduce;
         switch (progress.Kind)
         {
             case ProgressKind.RecordedValue:
-                if (history.Measurement == Measurement.YesNo || progress.Value is not { } value)
+                if (settings.Measurement == Measurement.YesNo || progress.Value is not { } value)
                 {
                     return null;
                 }
 
-                return Number(value) + Of(reduce) + Amount(history.Measurement, history.CountUnit, progress.Of);
+                return Number(value) + Of(reduce) + Amount(settings.Measurement, settings.CountUnit, progress.Of);
             case ProgressKind.RecordsReachingAmount:
             case ProgressKind.YesRecords:
                 return Number(progress.Value ?? 0) + Of(reduce) + Times(progress.Of);
             case ProgressKind.Total:
-                return Number(progress.Value ?? 0) + Of(reduce) + Amount(history.Measurement, history.CountUnit, progress.Of);
+                return Number(progress.Value ?? 0) + Of(reduce) + Amount(settings.Measurement, settings.CountUnit, progress.Of);
             default:
                 throw new ArgumentOutOfRangeException(nameof(progress), "The progress kind is not defined.");
         }
@@ -102,9 +111,17 @@ public static class RecordingText
     public static string Recorded(GoalHistory history, RecordView record)
     {
         ArgumentNullException.ThrowIfNull(history);
+        return Recorded(history.GoalLevelSettings(), record);
+    }
+
+    /// <summary>Slice 8 (research R-07): the Recorded cell with the measurement and unit of the record's entry.</summary>
+    /// <exception cref="ArgumentException">The record has neither an answer nor an amount; the message names no value.</exception>
+    public static string Recorded(EntrySettings settings, RecordView record)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(record);
         return record.Answer is { } answer ? (answer == YesNoAnswer.Yes ? "Yes" : "No")
-            : record.Amount is { } amount ? Amount(history.Measurement, history.CountUnit, amount)
+            : record.Amount is { } amount ? Amount(settings.Measurement, settings.CountUnit, amount)
             : throw new ArgumentException("The record has no value.", nameof(record));
     }
 
@@ -126,12 +143,19 @@ public static class RecordingText
     public static string FieldLabel(GoalHistory history)
     {
         ArgumentNullException.ThrowIfNull(history);
-        return history.Measurement switch
+        return FieldLabel(history.GoalLevelSettings());
+    }
+
+    /// <summary>Slice 8 (research R-07): the field's label by the measurement of the chosen entry's <paramref name="settings"/>.</summary>
+    public static string FieldLabel(EntrySettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return settings.Measurement switch
         {
             Measurement.YesNo => "Did you do it?",
             Measurement.Count => "Amount",
             Measurement.Duration => "Time spent",
-            _ => throw new ArgumentOutOfRangeException(nameof(history), "The measurement is not defined."),
+            _ => throw new ArgumentOutOfRangeException(nameof(settings), "The measurement is not defined."),
         };
     }
 
@@ -143,14 +167,21 @@ public static class RecordingText
     public static string? ReduceHelp(GoalHistory history)
     {
         ArgumentNullException.ThrowIfNull(history);
-        if (history.BuildOrReduce != BuildOrReduce.Reduce)
+        return ReduceHelp(history.GoalLevelSettings());
+    }
+
+    /// <summary>Slice 8 (research R-07): the Reduce help with the chosen entry's <paramref name="settings"/>.</summary>
+    public static string? ReduceHelp(EntrySettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (settings.BuildOrReduce != BuildOrReduce.Reduce)
         {
             return null;
         }
 
-        return history.Target.Measurement == Measurement.YesNo
+        return settings.Target.Measurement == Measurement.YesNo
             ? "Choose No if you avoided it: " + EmptyDayCannotProve
-            : "At most " + GoalText.AmountText(history.Target) + ". Enter 0 if you had none: " + EmptyDayCannotProve;
+            : "At most " + GoalText.AmountText(settings.Target) + ". Enter 0 if you had none: " + EmptyDayCannotProve;
     }
 
     /// <summary>
@@ -162,13 +193,20 @@ public static class RecordingText
     public static string NoteHelp(GoalHistory history)
     {
         ArgumentNullException.ThrowIfNull(history);
-        return history.GoalScheduleKind switch
+        return NoteHelp(history.GoalLevelSettings());
+    }
+
+    /// <summary>Slice 8 (research R-07): the note help with the schedule kind and period of the chosen entry's <paramref name="settings"/>.</summary>
+    public static string NoteHelp(EntrySettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return settings.GoalScheduleKind switch
         {
             GoalScheduleKind.CommitmentBased => "Clear the field to remove the note.",
-            GoalScheduleKind.PeriodBased => history.Period == SchedulePeriod.Week
+            GoalScheduleKind.PeriodBased => settings.Period == SchedulePeriod.Week
                 ? "This note is for the whole week. Clear the field to remove it."
                 : "This note is for the whole day. Clear the field to remove it.",
-            _ => throw new ArgumentOutOfRangeException(nameof(history), "The schedule kind is not defined."),
+            _ => throw new ArgumentOutOfRangeException(nameof(settings), "The schedule kind is not defined."),
         };
     }
 
@@ -221,7 +259,14 @@ public static class RecordingText
     public static string TargetLine(GoalHistory history)
     {
         ArgumentNullException.ThrowIfNull(history);
-        var target = history.Target;
+        return TargetLine(history.GoalLevelSettings());
+    }
+
+    /// <summary>Slice 8 (research R-07): the sub line from the chosen entry's target and Build or Reduce.</summary>
+    public static string TargetLine(EntrySettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var target = settings.Target;
         if (target.BuildOrReduce == BuildOrReduce.Reduce)
         {
             return "Reduce" + Separator + GoalText.TargetText(target);
@@ -239,7 +284,14 @@ public static class RecordingText
     public static string? PartialNote(GoalHistory history)
     {
         ArgumentNullException.ThrowIfNull(history);
-        var target = history.Target;
+        return PartialNote(history.GoalLevelSettings());
+    }
+
+    /// <summary>Slice 8 (research R-07): the partial-progress sentence from the chosen entry's target.</summary>
+    public static string? PartialNote(EntrySettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var target = settings.Target;
         if (target.BuildOrReduce != BuildOrReduce.Build || target.Measurement == Measurement.YesNo)
         {
             return null;

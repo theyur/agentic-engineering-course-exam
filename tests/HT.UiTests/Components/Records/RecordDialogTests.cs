@@ -6,6 +6,7 @@ using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
+using HT.Domain.Time;
 using HT.Ui.Components.Records;
 using HT.UiTests.Components.Pages;
 using HT.UnitTests.Fakes;
@@ -958,5 +959,180 @@ public sealed class RecordDialogTests : BunitContext
         Assert.Equal("Better today.", Assert.Single(_saved).Note);
         Assert.Equal("Better today.", StoredNote(goal, Mon16));
         Assert.Equal(50, _records.RecordsOfGoal(goal).Count);
+    }
+
+    // ---- slice 8: the chosen entry's own settings (research R-07, AC-020, AC-080, contracts/host.md; T059) ----
+
+    private const string CommitmentNoteHelp = "Clear the field to remove the note.";
+    private const string DayNoteHelp = "This note is for the whole day. Clear the field to remove it.";
+
+    private static readonly DateOnly Mon2 = new(2026, 11, 2);
+    private static readonly DateOnly Wed11 = new(2026, 11, 11);
+    private static readonly DateOnly Thu12 = new(2026, 11, 12);
+    private static readonly DateOnly Sun15 = new(2026, 11, 15);
+    private static readonly DateOnly Tue17 = new(2026, 11, 17);
+
+    private static GoalTargetFields Minutes12Daily(BuildOrReduce side) => new()
+    {
+        BuildOrReduce = side, Measurement = Measurement.Duration, Amount = 12, DurationUnit = DurationUnit.Minutes,
+        ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+    };
+
+    private static GoalTargetFields Meditation10MinDaily => new()
+    {
+        BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 10, DurationUnit = DurationUnit.Minutes,
+        ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+    };
+
+    private static GoalSettingsVersion VersionOf(GoalTargetFields fields, DateOnly from)
+    {
+        Assert.True(GoalTarget.TryCreate(fields, out var target, out _));
+        return new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), from);
+    }
+
+    /// <summary>
+    /// Stores a goal of the user straight in the goal fake, through the attempts constructor, so it can have changes and
+    /// earlier attempts made while they were current, as the change, ending and new-attempt use cases will write them.
+    /// </summary>
+    private GoalId SeedGoal(params GoalAttemptVersions[] attempts)
+    {
+        var habit = _catalog.Add(HabitSamples.Catalog("Reading"));
+        var owner = _user.AccountId!.Value;
+        var goal = new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(habit.Id, HabitKind.Catalog), null, attempts);
+        ((FakeGoalStore)Services.GetRequiredService<IGoalStore>()).Add(
+            owner, goal, new GoalHabitView(habit.Id, HabitKind.Catalog, "Reading", habit.Definition.Category, true));
+        return goal.Id;
+    }
+
+    private static List<string> Helps(AngleSharp.Dom.IElement field) =>
+        field.QuerySelectorAll(".ht-field__help").Select(h => h.TextContent).ToList();
+
+    [Fact]
+    public async Task AC_020_after_a_change_to_Reduce_the_row_of_11_Nov_keeps_the_Build_sub_line_field_and_help_and_12_Nov_has_the_Reduce_ones()
+    {
+        // "12 min daily", Build from Monday 2 November, changed on Wednesday 11 November to Reduce, at most 12 min a day,
+        // from Thursday 12 November. At 10:00 on Monday 16 November Wednesday 11 and Thursday 12 are Missed; each History
+        // row's "Add record" opens the dialog fixed to it, with the History's goal-level settings the Reduce ones.
+        var goal = SeedGoal(new GoalAttemptVersions(new GoalAttempt(GoalAttempt.First, Mon2),
+            [VersionOf(Minutes12Daily(BuildOrReduce.Build), Mon2), VersionOf(Minutes12Daily(BuildOrReduce.Reduce), Thu12)]));
+        _clock.SetUtcNow(Utc(16, 10));
+        await using var scope = Services.CreateAsyncScope();
+        var read = await scope.ServiceProvider.GetRequiredService<RecordingService>()
+            .GetHistoryAsync(_user, goal, Mon2, Mon16, CancellationToken.None);
+        Assert.Equal(HistoryOutcome.Found, read.Outcome);
+        var history = read.History!;
+        Assert.Equal(BuildOrReduce.Reduce, history.BuildOrReduce);
+
+        var build = RenderExcusable(goal, "12 min daily", history, history.Entries.Single(e => e.FirstDate == Wed11));
+        var reduce = RenderExcusable(goal, "12 min daily", history, history.Entries.Single(e => e.FirstDate == Thu12));
+
+        Assert.Equal("Build · at least 12 min · every day", build.Find(".ht-dialog__sub").TextContent);
+        Assert.Equal(
+            ["Partial time is kept. Below 12 min the day counts as Failed when it is finalized."],
+            Helps(Field(build, "Time spent")));
+        Assert.Equal("Reduce · at most 12 min daily", reduce.Find(".ht-dialog__sub").TextContent);
+        Assert.Equal(
+            ["At most 12 min. Enter 0 if you had none: an empty day cannot prove you stayed under the limit."],
+            Helps(Field(reduce, "Time spent")));
+    }
+
+    /// <summary>
+    /// AC-080: "Meditation, 10 min daily" (Build, duration, all seven days) from Monday 2 November, ended on Monday 16
+    /// November; attempt 2 from Tuesday 17 November is Reduce, at most 2 cups a day. At 10:00 on Tuesday 17 November what
+    /// can be recorded is attempt 2's Due Tuesday 17 and attempt 1's Pending Sunday 15 (its grace period ends at 00:00 on
+    /// Wednesday 18); Saturday 14's ended at 00:00 that day.
+    /// </summary>
+    private async Task<(IRenderedComponent<RecordDialog> Cut, GoalHistory Recordable)> AttemptTwoOfReduceAsync()
+    {
+        var goal = SeedGoal(
+            new GoalAttemptVersions(new GoalAttempt(GoalAttempt.First, Mon2) { Ending = new GoalEnding(Mon16, Outcome.Abandoned, null) },
+                [VersionOf(Meditation10MinDaily, Mon2)]),
+            new GoalAttemptVersions(new GoalAttempt(2, Tue17), [VersionOf(CoffeeAtMost2Cups, Tue17)]));
+        _clock.SetUtcNow(Utc(17, 10));
+        var recordable = await RecordableAsync(goal);
+        Assert.Equal([Tue17, Sun15], recordable.Entries.Select(e => e.FirstDate).OrderDescending());
+        return (RenderExcusable(goal, "Meditation, 10 min daily", recordable), recordable);
+    }
+
+    [Fact]
+    public async Task AC_080_attempt_1s_row_under_an_attempt_2_of_Reduce_per_day_has_the_Build_sub_line_the_duration_field_and_the_commitment_note_help()
+    {
+        var (cut, recordable) = await AttemptTwoOfReduceAsync();
+        Assert.Equal(GoalScheduleKind.PeriodBased, recordable.GoalScheduleKind);
+
+        Field(cut, "For").QuerySelector("select")!.Change("2026-11-15");
+
+        Assert.Equal("Build · at least 10 min · every day", cut.Find(".ht-dialog__sub").TextContent);
+        Assert.Equal(["For", "Time spent", "Note (optional)"], cut.FindAll(".ht-field__label").Select(Text));
+        var field = Field(cut, "Time spent");
+        Assert.Equal("Time spent", field.QuerySelector(".ht-stepper input")!.GetAttribute("aria-label"));
+        Assert.Equal("minutes", field.QuerySelector(".ht-unit")!.TextContent);
+        Assert.Equal(["Partial time is kept. Below 10 min the day counts as Failed when it is finalized."], Helps(field));
+        AssertNoteWithHelp(cut, string.Empty, CommitmentNoteHelp);
+        Assert.Contains("Excuse instead", cut.Markup, StringComparison.Ordinal);
+
+        cut.Find(".ht-stepper input").Change("5");
+
+        Assert.Equal("5 of 10 min", Text(cut.Find(".ht-target")));
+    }
+
+    [Fact]
+    public async Task AC_080_choosing_attempt_2s_row_switches_the_sub_line_field_unit_help_and_note_help_and_back()
+    {
+        var (cut, _) = await AttemptTwoOfReduceAsync();
+        var select = () => Field(cut, "For").QuerySelector("select")!;
+        select().Change("2026-11-15");
+        cut.Find(".ht-stepper input").Change("5");
+
+        select().Change("2026-11-17");
+
+        Assert.Equal("Reduce · at most 2 cups a day", cut.Find(".ht-dialog__sub").TextContent);
+        Assert.Equal(["For", "Amount", "Note (optional)"], cut.FindAll(".ht-field__label").Select(Text));
+        var field = Field(cut, "Amount");
+        Assert.Equal("cups", field.QuerySelector(".ht-unit")!.TextContent);
+        Assert.Null(field.QuerySelector(".ht-stepper input")!.GetAttribute("value"));
+        Assert.Equal("0 of at most 2 cups", Text(field.QuerySelector(".ht-target")!));
+        Assert.Equal(["At most 2 cups. Enter 0 if you had none: an empty day cannot prove you stayed under the limit."], Helps(field));
+        AssertNoteWithHelp(cut, string.Empty, DayNoteHelp);
+        Assert.DoesNotContain("Excuse instead", cut.Markup, StringComparison.Ordinal);
+
+        select().Change("2026-11-15");
+
+        Assert.Equal("Build · at least 10 min · every day", cut.Find(".ht-dialog__sub").TextContent);
+        Assert.Equal("minutes", Field(cut, "Time spent").QuerySelector(".ht-unit")!.TextContent);
+        AssertNoteWithHelp(cut, string.Empty, CommitmentNoteHelp);
+    }
+
+    // ---- slice 8: the attempt view as an opener (HP-014, US3-AS4, US3-AS15, FR-014; T092) ----
+
+    [Fact]
+    public async Task HP_014_US3_AS15_from_the_attempt_views_Add_record_the_dialog_uses_attempt_1s_settings_and_the_save_counts_in_attempt_1_only()
+    {
+        // US3-AS4: "Meditation, 10 min daily" ended on Monday 16 November, restarted with 5 minutes from Monday 23 November;
+        // attempt 1's History read on Thursday 19 November at 10:00, as the attempt view reads it.
+        var goal = MeditationAttempts.SeedRestarted(this, _user, MeditationAttempts.MinutesDaily(5), MeditationAttempts.Mon23);
+        _clock.SetUtcNow(MeditationAttempts.Utc(19, 10));
+        var attempt = await MeditationAttempts.AttemptAsync(this, _user, goal, 1);
+        var row = attempt.History.Entries.Single(e => e.FirstDate == MeditationAttempts.Sat14);
+        Assert.Equal(EvaluationState.Missed, row.State);
+
+        var cut = RenderExcusable(goal, attempt.Attempt.Name, attempt.History, row);
+
+        Assert.Equal("Record · Meditation, 10 min daily", cut.Find(".ht-dialog__head h2").TextContent);
+        Assert.Equal("Build · at least 10 min · every day", cut.Find(".ht-dialog__sub").TextContent);
+        Assert.Equal("Sat 14 Nov", Text(Field(cut, "For").QuerySelector("span:not(.ht-field__label)")!));
+        Assert.Equal("minutes", Field(cut, "Time spent").QuerySelector(".ht-unit")!.TextContent);
+        Assert.DoesNotContain("Excuse instead", cut.Markup, StringComparison.Ordinal);
+
+        cut.Find(".ht-stepper input").Change("10");
+        Assert.Equal("10 of 10 min", Text(cut.Find(".ht-target")));
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        var saved = Assert.Single(_saved);
+        Assert.Equal((MeditationAttempts.Sat14, EvaluationState.Met, true), (saved.FirstDate, saved.State, saved.IsCorrection));
+        Assert.Contains(_records.RecordsOfGoal(goal), r => r.Date == MeditationAttempts.Sat14 && r.Value.Amount == 10);
+        Assert.Equal("92% (13 of 14)", (await MeditationAttempts.AttemptAsync(this, _user, goal, 1)).Attempt.Stats.ConsistencyText);
+        var latest = (await MeditationAttempts.AttemptsAsync(this, _user, goal))[0];
+        Assert.Equal((2, "N/A"), (latest.Number, latest.Stats.ConsistencyText));
     }
 }

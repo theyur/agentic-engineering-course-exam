@@ -27,13 +27,19 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<DemoHistoryService>();
         services.AddScoped<DemoReportService>();
         services.AddScoped<DemoPauseService>();
-        services.AddScoped<CatalogService>();
+        services.AddScoped<DemoGoalChangeService>();
+        // Slice 8 (research R-08): the catalog names goals at one time read, so the host builds it with the clock and
+        // never falls back to the two-argument constructor. Only the clock is passed; the stores are resolved by the
+        // constructor that takes it, so this file names no store port.
+        services.AddScoped(provider => ActivatorUtilities.CreateInstance<CatalogService>(provider, provider.GetRequiredService<TimeProvider>()));
         services.AddScoped<CatalogAdministrationService>();
         services.AddScoped<CustomHabitService>();
         services.AddScoped<GoalService>();
+        services.AddScoped<GoalChangeService>();
         services.AddScoped<ProfileService>();
         services.AddScoped<RecordingService>();
         services.AddScoped<ReportService>();
+        services.AddScoped<AttemptService>();
         services.AddScoped<ExcusalService>();
         services.AddScoped<PauseService>();
         services.TryAddSingleton(TimeProvider.System);

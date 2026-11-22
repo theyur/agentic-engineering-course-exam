@@ -265,6 +265,50 @@ public sealed class HomeSignedInTests : BunitContext
         Assert.DoesNotContain("No goals yet", cut.Markup, StringComparison.Ordinal);
     }
 
+    /// <summary>Ends <paramref name="goal"/> through the GoalChangeService at the current time, as Abandoned with no note.</summary>
+    private async Task EndAsync(Guid accountId, GoalId goal)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var ended = await scope.ServiceProvider.GetRequiredService<GoalChangeService>().EndAsync(
+            ActingUser.ForAccount(new AccountId(accountId), Role.RegisteredUser), goal, Outcome.Abandoned, null, CancellationToken.None);
+        Assert.Equal(GoalEndOutcome.Ended, ended.Outcome);
+    }
+
+    [Fact]
+    public async Task Slice_8_a_user_whose_goals_are_all_ended_keeps_the_dashboard_with_the_ended_goals_Pending_entries()
+    {
+        // Design slice 8 state (T009): as for a user whose goals are all paused. The goal starts on Tuesday 17 November and
+        // ends on Thursday 19; at 10:00 that day the 17th's and 18th's grace periods have not ended, so both stay Pending.
+        var accountId = _authorization.SignIn("RegisteredUser");
+        var goal = await CreateGoalAsync(accountId);
+        ((FakeTimeProvider)Services.GetRequiredService<TimeProvider>()).SetUtcNow(new DateTimeOffset(2026, 11, 19, 10, 0, 0, TimeSpan.Zero));
+        await EndAsync(accountId, goal);
+
+        var cut = Render<Home>();
+
+        Assert.Equal(["ht-page-head", "ht-home"], cut.Find(".ht-container").Children.Select(c => c.ClassName));
+        Assert.Equal(["0", "2", "0", "0"], cut.FindAll(".ht-home__panel .ht-tile__value").Select(v => v.TextContent));
+        var card = cut.Find(".ht-home > .ht-stack > .ht-card");
+        Assert.Equal("Active goals", card.QuerySelector(".ht-card__title")!.TextContent);
+        Assert.Empty(card.QuerySelectorAll(".ht-goal"));
+        Assert.DoesNotContain("No goals yet", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Slice_8_a_user_whose_only_goal_ended_on_its_start_date_keeps_the_dashboard_with_nothing_to_record()
+    {
+        var accountId = _authorization.SignIn("RegisteredUser");
+        var goal = await CreateGoalAsync(accountId);
+        await EndAsync(accountId, goal);
+
+        var cut = Render<Home>();
+
+        Assert.Equal(["ht-page-head", "ht-home"], cut.Find(".ht-container").Children.Select(c => c.ClassName));
+        Assert.Equal(["0", "0", "0", "0"], cut.FindAll(".ht-home__panel .ht-tile__value").Select(v => v.TextContent));
+        Assert.Empty(cut.Find(".ht-home > .ht-stack > .ht-card").QuerySelectorAll(".ht-goal"));
+        Assert.DoesNotContain("No goals yet", cut.Markup, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void HP_013_an_administrators_home_has_nothing_but_its_page_head()
     {

@@ -93,6 +93,14 @@ public interface IRecordStore
     Task<IReadOnlyList<DateOnly>> ReadRecentNoteKeysAsync(AccountId owner, GoalId goal, int count, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Slice 8 (FR-016, research R-05): the keys of the goal's <paramref name="count"/> notes with the latest keys from
+    /// <paramref name="from"/> through <paramref name="through"/> (no upper bound when null), newest first. Empty when
+    /// the goal is not one of the owner's, and for a <paramref name="count"/> of 0 or less.
+    /// </summary>
+    Task<IReadOnlyList<DateOnly>> ReadRecentNoteKeysAsync(
+        AccountId owner, GoalId goal, DateOnly from, DateOnly? through, int count, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Slice 7 (research R-04): all of the goal's excusals and pauses, in one round trip, owner-scoped in the same
     /// statement. <see cref="GoalExemptions.None"/> when the goal is not one of the owner's. Excused and Paused are
     /// derived from them on read (FR-025).
@@ -101,7 +109,9 @@ public interface IRecordStore
 
     /// <summary>
     /// Excuses the goal's commitment of <paramref name="date"/> with an optional reason (FR-001). Re-checked under the
-    /// goal lock, in this order: an excusal of the date gives <see cref="ExemptionStoreWrite.AlreadyExcused"/>, a record
+    /// goal lock, in this order: the goal's latest attempt ended on or before the date gives
+    /// <see cref="ExemptionStoreWrite.GoalEnded"/> (slice 8 FR-009: an ending removes those excusals, so a concurrent
+    /// one must not add one back), an excusal of the date <see cref="ExemptionStoreWrite.AlreadyExcused"/>, a record
     /// dated on it <see cref="ExemptionStoreWrite.HasRecord"/> (D-3), a pause covering it
     /// <see cref="ExemptionStoreWrite.Paused"/>. Every refusal, <see cref="ExemptionStoreWrite.GoalNotFound"/> included,
     /// writes nothing.
@@ -118,7 +128,9 @@ public interface IRecordStore
     /// <summary>
     /// Adds a pause from <paramref name="firstDay"/> to <paramref name="lastDay"/> (FR-006); the store makes its
     /// identifier, which <see cref="ExemptionStoreWrite.PauseId"/> carries. <see cref="ExemptionStoreWrite.Overlaps"/>
-    /// when it would share a date with one of the goal's pauses. Every refusal writes nothing.
+    /// when it would share a date with one of the goal's pauses. Slice 8 (research R-05): re-checked first under the goal
+    /// lock, <see cref="ExemptionStoreWrite.GoalEnded"/> when the goal's latest attempt is ended. Every refusal writes
+    /// nothing.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="lastDay"/> is before <paramref name="firstDay"/>.</exception>
     Task<ExemptionStoreWrite> AddPauseAsync(

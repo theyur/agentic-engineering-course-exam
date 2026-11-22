@@ -1,4 +1,5 @@
 using HT.Domain.Evaluation;
+using HT.Domain.Goals;
 
 namespace HT.Application.Records;
 
@@ -48,4 +49,26 @@ public sealed record HistoryEntry
     /// so its excusal can still be removed; false for any other state.
     /// </summary>
     public bool CanRemoveExcusal { get; init; }
+
+    /// <summary>
+    /// Slice 8 (FR-016, FR-019): the number of the attempt the entry belongs to; 1 when it is not set, as for every
+    /// entry of slices 5 to 7.
+    /// </summary>
+    public int AttemptNumber { get; init; } = GoalAttempt.First;
+
+    /// <summary>Slice 8 (FR-016, FR-019): whether the entry belongs to the goal's latest attempt; true when it is not set.</summary>
+    public bool IsLatestAttempt { get; init; } = true;
+
+    /// <summary>
+    /// Slice 8 (FR-004, FR-016, FR-019): the name of the entry's attempt (<c>GoalText.AttemptName</c>), set only for an
+    /// attempt that is not the latest; null otherwise.
+    /// </summary>
+    public string? AttemptName { get; init; }
+
+    /// <summary>
+    /// Slice 8 (research R-07): the settings of the version of the entry's date. Always set by the use cases; null on an
+    /// entry built without it, for which <see cref="GoalHistory.SettingsOf"/> gives the history's goal-level settings.
+    /// Readers call <see cref="GoalHistory.SettingsOf"/>, never this property.
+    /// </summary>
+    public EntrySettings? Settings { get; init; }
 }

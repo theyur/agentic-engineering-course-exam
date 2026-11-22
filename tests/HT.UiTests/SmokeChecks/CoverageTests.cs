@@ -8,7 +8,8 @@ namespace HT.UiTests.SmokeChecks;
 /// <summary>
 /// The coverage rule of contracts/smoke-check.md (research R-06, R-11; slice 5 research R-10): every data parameter of
 /// every method of the demo data ports <see cref="IDemoDataStore"/>, <see cref="IDemoHistoryStore"/>,
-/// <see cref="IDemoReportStore"/> (slice 6 research R-11) and <see cref="IDemoPauseStore"/> (slice 7 HP-011) has an entry in
+/// <see cref="IDemoReportStore"/> (slice 6 research R-11), <see cref="IDemoPauseStore"/> (slice 7 HP-011) and
+/// <see cref="IDemoGoalChangeStore"/> (slice 8 HP-012) has an entry in
 /// <see cref="SmokeCheckCoverage.Entries"/> with its port, and every entry still matches a parameter of its port. A slice
 /// that adds demo data changes a port, so this test fails until it extends the smoke check.
 /// </summary>
@@ -18,7 +19,7 @@ public sealed class CoverageTests
 
     /// <summary>The demo data ports: every demo write goes through one of them.</summary>
     private static readonly IReadOnlyList<Type> Ports =
-        [typeof(IDemoDataStore), typeof(IDemoHistoryStore), typeof(IDemoReportStore), typeof(IDemoPauseStore)];
+        [typeof(IDemoDataStore), typeof(IDemoHistoryStore), typeof(IDemoReportStore), typeof(IDemoPauseStore), typeof(IDemoGoalChangeStore)];
 
     public static TheoryData<string, string, string> PortParameters()
     {
@@ -94,7 +95,8 @@ public sealed class CoverageTests
         ];
 
         Assert.Equal(expected, SmokeCheckCoverage.Entries.Where(e => e.Port == typeof(IDemoHistoryStore)));
-        Assert.Equal(10, SmokeCheckCoverage.Entries.Count(e => e.Port != typeof(IDemoReportStore) && e.Port != typeof(IDemoPauseStore)));
+        Assert.Equal(10, SmokeCheckCoverage.Entries.Count(e =>
+            e.Port != typeof(IDemoReportStore) && e.Port != typeof(IDemoPauseStore) && e.Port != typeof(IDemoGoalChangeStore)));
     }
 
     [Fact]
@@ -112,7 +114,7 @@ public sealed class CoverageTests
         ];
 
         Assert.Equal(expected, SmokeCheckCoverage.Entries.Where(e => e.Port == typeof(IDemoReportStore)));
-        Assert.Equal(14, SmokeCheckCoverage.Entries.Count(e => e.Port != typeof(IDemoPauseStore)));
+        Assert.Equal(14, SmokeCheckCoverage.Entries.Count(e => e.Port != typeof(IDemoPauseStore) && e.Port != typeof(IDemoGoalChangeStore)));
     }
 
     [Fact]
@@ -130,7 +132,25 @@ public sealed class CoverageTests
         ];
 
         Assert.Equal(expected, SmokeCheckCoverage.Entries.Where(e => e.Port == typeof(IDemoPauseStore)));
-        Assert.Equal(18, SmokeCheckCoverage.Entries.Count);
+        Assert.Equal(18, SmokeCheckCoverage.Entries.Count(e => e.Port != typeof(IDemoGoalChangeStore)));
+    }
+
+    [Fact]
+    public void Slice_8_adds_the_demo_goal_change_port_with_check_9()
+    {
+        // Slice 8 contracts/host.md "Smoke check": the 4 data parameters of CreateDemoGoalChangeAccountAsync, 22 entries in all.
+        const string method = nameof(IDemoGoalChangeStore.CreateDemoGoalChangeAccountAsync);
+        CoverageEntry[] expected =
+        [
+            new(typeof(IDemoGoalChangeStore), method, "email", typeof(Email), "9 demo goal changes: the sign-in"),
+            new(typeof(IDemoGoalChangeStore), method, "password", typeof(string), "9 demo goal changes: the sign-in"),
+            new(typeof(IDemoGoalChangeStore), method, "profile", typeof(DemoAccountProfile), "9 demo goal changes: the sign-in"),
+            new(typeof(IDemoGoalChangeStore), method, "goals", typeof(IReadOnlyList<DemoGoalChangeGoal>),
+                "9 demo goal changes: the ended goal on the Ended tab, the attempt line and the later settings row on goal pages, and an Abandoned outcome in the Goal history"),
+        ];
+
+        Assert.Equal(expected, SmokeCheckCoverage.Entries.Where(e => e.Port == typeof(IDemoGoalChangeStore)));
+        Assert.Equal(22, SmokeCheckCoverage.Entries.Count);
     }
 
     /// <summary>Every parameter of every method of each demo data port, except the <see cref="CancellationToken"/>.</summary>

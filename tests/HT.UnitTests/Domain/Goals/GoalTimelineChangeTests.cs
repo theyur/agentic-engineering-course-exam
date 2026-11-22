@@ -271,6 +271,30 @@ public class GoalTimelineChangeTests
     }
 
     [Fact]
+    public void Slice_8_an_ended_goal_gets_no_change()
+    {
+        // FR-021: attempt 1 from Monday 16 November, ended on Wednesday 18 November.
+        var ended = GoalOf(AttemptFrom(1, Monday, EndedOn(Wednesday), new GoalSettingsVersion(new GoalSettings(PerDay(), Kyiv), Monday)));
+
+        Assert.Equal(GoalVersionChange.None, GoalTimeline.ChangeOf(ended, SecondChange, NewYork));
+    }
+
+    [Fact]
+    public void Slice_8_a_waiting_attempt_2_after_a_begun_attempt_1_gets_ReplaceFirst()
+    {
+        // Attempt 1 has begun and ended, so the goal has a current date; attempt 2 starts on 1 December.
+        var goal = GoalOf(
+            AttemptFrom(1, Monday, EndedOn(Wednesday), new GoalSettingsVersion(new GoalSettings(OnDays(MonWedFri), Kyiv), Monday)),
+            AttemptFrom(2, FirstDecember, null, new GoalSettingsVersion(new GoalSettings(OnDays(MonWedFri), Kyiv), FirstDecember)));
+
+        Assert.NotNull(GoalTimeline.CurrentDate(goal, SecondChange));
+        Assert.Equal(GoalVersionChange.ReplaceFirst(NewYork), GoalTimeline.ChangeOf(goal, SecondChange, NewYork));
+        Assert.Equal([(FirstDecember, "America/New_York")], VersionsOf(Changed(goal, SecondChange, NewYork)));
+        Assert.Equal(goal.VersionsOf(1), Changed(goal, SecondChange, NewYork).VersionsOf(1));
+        Assert.Equal(GoalVersionChange.None, GoalTimeline.ChangeOf(goal, SecondChange, Kyiv));
+    }
+
+    [Fact]
     public void Never_more_than_one_version_after_the_current_date_and_no_begun_day_changes_its_version()
     {
         NamedTimeZone[] zones = [NewYork, Tokyo, Kyiv, PagoPago, Kiritimati, NamedTimeZone.Utc, Zone("America/Havana")];

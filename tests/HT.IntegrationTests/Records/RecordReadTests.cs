@@ -142,6 +142,53 @@ public sealed class RecordReadTests(DatabaseFixture database)
         Assert.Equal(Comparable(fake), Comparable(real));
     }
 
+    [Fact]
+    public async Task Slice_8_the_History_and_recent_notes_of_a_restarted_goal_cover_only_the_latest_attempt()
+    {
+        // "20 min daily" from Monday 16 November in UTC, with records and notes on 16 and 17; ended with the ending date
+        // Wednesday 18 (last date Tuesday 17), a note kept on 18; attempt 2 from Friday 20 with a note that day. The
+        // ending and the new attempt go straight through the store's conditional writes (the use cases come with US2
+        // and US3). Read at 10:00Z on Saturday 21.
+        var suffix = Suffix();
+        var owner = await OwnerAsync(database, "restarted", suffix);
+        var goal = await GoalAsync(database, owner, "Restarted", suffix, Reading20MinDaily(), Mon16);
+        var fri20 = new DateOnly(2026, 11, 20);
+        var sat21 = new DateOnly(2026, 11, 21);
+        await AddAsync(owner, goal, Day(Mon16), true, Mon16, Minutes(25), Note("Attempt 1, Monday."));
+        await AddAsync(owner, goal, Day(Tue17), true, Tue17, Minutes(20), Note("Attempt 1, Tuesday."));
+        await AddAsync(owner, goal, Day(Wed18), true, Wed18, Minutes(30), Note("Kept after the end."));
+
+        await using (var scope = database.CreateScope())
+        {
+            var goals = scope.ServiceProvider.GetRequiredService<IGoalStore>();
+            var read = (await goals.ReadOwnerGoalAsync(owner, goal, None))!;
+            var stored = read.Goal!.Goal;
+            var effect = GoalTimeline.EndingOf(stored, Wed18);
+            Assert.Equal(Tue17, effect.LastDate);
+            var ending = new GoalEndingWrite(goal, GoalAttempt.First, new GoalEnding(Wed18, Outcome.Abandoned, null), effect.LastDate, effect.KeptVersions);
+            Assert.Equal(GoalChangeWriteOutcome.Written, await goals.TryEndAsync(owner, read.StoredTimeZone, read.GoalsRevision, ending, None));
+
+            var again = (await goals.ReadOwnerGoalAsync(owner, goal, None))!;
+            var first = new GoalSettingsVersion(stored.Versions[0].Settings, fri20);
+            Assert.Equal(GoalChangeWriteOutcome.Written, await goals.TryStartAttemptAsync(owner, again.StoredTimeZone, again.GoalsRevision, new GoalAttemptWrite(goal, 2, first), None));
+        }
+
+        await AddAsync(owner, goal, Day(fri20), true, fri20, Minutes(20), Note("Attempt 2, Friday."));
+        var user = ActingUser.ForAccount(owner, Role.RegisteredUser);
+        await using var services = BuildServices(new FakeTimeProvider(new DateTimeOffset(2026, 11, 21, 10, 0, 0, TimeSpan.Zero)));
+        await using var readScope = services.CreateAsyncScope();
+        var recording = readScope.ServiceProvider.GetRequiredService<RecordingService>();
+
+        var history = await recording.GetHistoryAsync(user, goal, Mon16, sat21, None);
+        var notes = await recording.GetRecentNotesAsync(user, goal, None);
+
+        Assert.Equal(HistoryOutcome.Found, history.Outcome);
+        Assert.Equal([(fri20, 2), (sat21, 2)], history.History!.Entries.Select(e => (e.FirstDate, e.AttemptNumber)));
+        Assert.Equal("Attempt 2, Friday.", history.History.Entries[0].Note);
+        Assert.Equal(RecentNotesOutcome.Found, notes.Outcome);
+        Assert.Equal([(fri20, "Attempt 2, Friday.")], notes.Notes.Select(n => (n.FirstDate, n.Note)));
+    }
+
     /// <summary>
     /// Writes <paramref name="records"/> and <paramref name="notes"/> to the real store and seeds the same into a
     /// <see cref="FakeRecordStore"/>, then reads the history at <paramref name="now"/> through a

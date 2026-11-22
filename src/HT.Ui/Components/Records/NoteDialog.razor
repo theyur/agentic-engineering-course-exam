@@ -74,7 +74,10 @@
     [Parameter, EditorRequired]
     public string GoalName { get; set; } = string.Empty;
 
-    /// <summary>The history the row came from (GetHistoryAsync); its schedule kind and period word the row's state.</summary>
+    /// <summary>
+    /// The history the row came from (GetHistoryAsync); the schedule kind and period of the row's settings in it
+    /// (<see cref="GoalHistory.SettingsOf"/>) word the row's state.
+    /// </summary>
     [Parameter, EditorRequired]
     public GoalHistory History { get; set; } = default!;
 
@@ -90,9 +93,18 @@
     [Parameter]
     public EventCallback<HistoryEntry> OnSaved { get; set; }
 
-    /// <summary>The row's date and its state word: "Tue 27 Oct · Missed".</summary>
-    private string SubLine =>
-        RecordingText.EntryDate(Row) + Separator + RecordingText.State(Row.State, History.GoalScheduleKind, History.Period);
+    /// <summary>
+    /// The row's date and its state word: "Tue 27 Oct · Missed". Slice 8 (research R-07): the word follows the schedule
+    /// kind and period of the row's own settings, not the History's goal-level ones.
+    /// </summary>
+    private string SubLine
+    {
+        get
+        {
+            var settings = History.SettingsOf(Row);
+            return RecordingText.EntryDate(Row) + Separator + RecordingText.State(Row.State, settings.GoalScheduleKind, settings.Period);
+        }
+    }
 
     protected override void OnParametersSet()
     {

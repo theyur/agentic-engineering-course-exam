@@ -51,6 +51,32 @@ internal static partial class StartupTasks
         await RunStepAsync("Demo history loading", logger, () => LoadDemoHistoryAsync(services, logger));
         await RunStepAsync("Demo report loading", logger, () => LoadDemoReportAsync(services, logger));
         await RunStepAsync("Demo pause loading", logger, () => LoadDemoPausesAsync(services, logger));
+        await RunStepAsync("Demo goal-change loading", logger, () => LoadDemoGoalChangesAsync(services, logger));
+    }
+
+    // Slice 8 HP-011: at every start, right after demo pause loading (ADR 0026). The demo password, from the same key,
+    // is passed on and never logged.
+    private static async Task LoadDemoGoalChangesAsync(IServiceProvider services, ILogger logger)
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+
+        await using var scope = services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<DemoGoalChangeService>()
+            .LoadAsync(configuration[DemoPasswordKey], CancellationToken.None);
+
+        if (result.Outcome != DemoGoalChangeLoadingOutcome.Loaded)
+        {
+            LogDemoGoalChangeLoading(logger, result.Message);
+            return;
+        }
+
+        // Slice 8 contracts/host.md "Operator log": demo pause loading's templates, the account line, then for a created
+        // account its goal line and its record line. The results name the demo email and a result text only, never a
+        // goal, habit, note, outcome, unit or amount (FR-031, HP-010).
+        foreach (var account in result.Accounts)
+        {
+            LogHistoryAccountLines(logger, account.Email, account.Message, account.Goals, account.Records);
+        }
     }
 
     // Slice 7 HP-010: at every start, right after demo report loading (ADR 0023). The demo password, from the same key,
@@ -165,8 +191,8 @@ internal static partial class StartupTasks
         }
     }
 
-    // The lines of one account of demo history, demo report or demo pause loading: the account line, then for a created
-    // account its goal line and its record line. They name the demo email and a result text only.
+    // The lines of one account of demo history, demo report, demo pause or demo goal-change loading: the account line,
+    // then for a created account its goal line and its record line. They name the demo email and a result text only.
     private static void LogHistoryAccountLines(
         ILogger logger, string email, string message, DemoGoalsResult? goals, DemoRecordsResult? records)
     {
@@ -250,6 +276,9 @@ internal static partial class StartupTasks
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Demo pause loading: {Result}")]
     private static partial void LogDemoPauseLoading(ILogger logger, string? result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo goal-change loading: {Result}")]
+    private static partial void LogDemoGoalChangeLoading(ILogger logger, string? result);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Demo records {Email}: {Result}")]
     private static partial void LogDemoRecords(ILogger logger, string email, string result);

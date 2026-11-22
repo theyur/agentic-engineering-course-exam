@@ -4,6 +4,7 @@ using HT.Domain.Accounts;
 using HT.Domain.Evaluation;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.UnitTests.Application.Goals;
 using HT.Domain.Records;
 using static HT.UnitTests.Application.Exemptions.ExemptionWorld;
 using static HT.UnitTests.Domain.Goals.GoalSamples;
@@ -437,5 +438,65 @@ public sealed class ExcuseTests
         Assert.Equal(
             [nameof(IRecordStore.ReadExemptionsAsync), nameof(IRecordStore.ReadAsync), nameof(IRecordStore.ExcuseAsync)],
             _world.Records.Calls);
+    }
+
+    // ---- Slice 8: the schedule kind of the date's attempt (plan "Spec discrepancies" 2; T056) ----
+
+    [Fact]
+    public async Task Slice_8_an_earlier_commitment_based_attempts_date_of_a_goal_now_per_week_can_be_excused()
+    {
+        // Attempt 1 "10 min daily" from Monday 2 November in UTC, ended on Monday 16 (last date Sunday 15); attempt 2
+        // "3 times a week" from Wednesday 18. At 2026-11-17T10:00:00Z, 15 November is Pending.
+        var world = new AttemptWorld();
+        var goal = await world.CreateGoalAsync(DurationDays(10, DurationUnit.Minutes, BuildOrReduce.Build, AllDays), Date(2026, 11, 2), Utc("2026-11-01T10:00:00Z"));
+        world.At(Utc("2026-11-16T10:00:00Z"));
+        await world.EndAsync(goal);
+        world.At(Utc("2026-11-16T10:01:00Z"));
+        await world.StartAttemptAsync(goal, YesNoTimes(3, SchedulePeriod.Week), Date(2026, 11, 18));
+        world.At(Utc("2026-11-17T10:00:00Z"));
+
+        var between = await world.Excusals.ExcuseAsync(world.User, goal, Date(2026, 11, 16), null, CancellationToken.None);
+        var excused = await world.Excusals.ExcuseAsync(world.User, goal, Date(2026, 11, 15), "Travelling.", CancellationToken.None);
+
+        Assert.Equal((ExcuseOutcome.NothingScheduled, "Nothing is scheduled on this date."), (between.Outcome, between.Message));
+        Assert.Equal((ExcuseOutcome.Excused, (DateOnly?)Date(2026, 11, 15)), (excused.Outcome, excused.Date));
+        Assert.True(world.Records.ExemptionsOfGoal(goal).IsExcused(Date(2026, 11, 15)));
+
+        world.At(Utc("2026-11-23T10:00:00Z"));
+        var week = await world.Excusals.ExcuseAsync(world.User, goal, Date(2026, 11, 23), null, CancellationToken.None);
+        Assert.Equal((ExcuseOutcome.NotACommitment, "Only commitments can be excused. This goal is evaluated by period."), (week.Outcome, week.Message));
+    }
+
+    [Fact]
+    public async Task Slice_8_an_ending_on_the_date_between_the_check_and_the_write_gives_Nothing_is_scheduled_and_writes_nothing()
+    {
+        // "10 min daily" from Monday 2 November in UTC. At 2026-11-17T10:00:00Z Tuesday 17 is Due; the goal is ended on
+        // Tuesday 17 (last date Monday 16) between the use case's checks and the store's write (FR-009).
+        var world = new AttemptWorld();
+        var goal = await world.CreateGoalAsync(DurationDays(10, DurationUnit.Minutes, BuildOrReduce.Build, AllDays), Date(2026, 11, 2), Utc("2026-11-01T10:00:00Z"));
+        world.At(Utc("2026-11-17T10:00:00Z"));
+        world.Records.BeforeNextWrite = () => world.EndNow(goal);
+
+        var result = await world.Excusals.ExcuseAsync(world.User, goal, Date(2026, 11, 17), null, CancellationToken.None);
+
+        Assert.Equal((ExcuseOutcome.NothingScheduled, "Nothing is scheduled on this date.", (DateOnly?)null), (result.Outcome, result.Message, result.Date));
+        Assert.True(world.GoalOf(goal).IsEnded);
+        Assert.False(world.Records.ExemptionsOfGoal(goal).IsExcused(Date(2026, 11, 17)));
+    }
+
+    [Fact]
+    public async Task Slice_8_an_ending_between_the_check_and_the_write_keeps_the_ended_attempts_Pending_date_excusable()
+    {
+        // As above, but the excused date is Monday 16, Pending and the ended attempt's last date (FR-010).
+        var world = new AttemptWorld();
+        var goal = await world.CreateGoalAsync(DurationDays(10, DurationUnit.Minutes, BuildOrReduce.Build, AllDays), Date(2026, 11, 2), Utc("2026-11-01T10:00:00Z"));
+        world.At(Utc("2026-11-17T10:00:00Z"));
+        world.Records.BeforeNextWrite = () => world.EndNow(goal);
+
+        var result = await world.Excusals.ExcuseAsync(world.User, goal, Date(2026, 11, 16), null, CancellationToken.None);
+
+        Assert.Equal((ExcuseOutcome.Excused, (DateOnly?)Date(2026, 11, 16)), (result.Outcome, result.Date));
+        Assert.True(world.GoalOf(goal).IsEnded);
+        Assert.True(world.Records.ExemptionsOfGoal(goal).IsExcused(Date(2026, 11, 16)));
     }
 }

@@ -452,4 +452,106 @@ public sealed class RecordingTextTests
             Assert.Equal(expected, Texts());
         }
     }
+
+    // ---- Slice 8: each entry's own settings (research R-07, HP-008; T052) ----
+
+    private static EntrySettings Settings(GoalTarget target) => new()
+    {
+        GoalScheduleKind = target.ScheduleKindOf,
+        Period = target.PeriodLength,
+        BuildOrReduce = target.BuildOrReduce,
+        Measurement = target.Measurement,
+        Amount = target.Amount,
+        CountUnit = target.CountUnit,
+        DurationUnit = target.DurationUnit,
+        Times = target.ScheduleKindOf == GoalScheduleKind.PeriodBased ? target.Schedule.Times : null,
+        Target = target,
+    };
+
+    private static GoalTarget Pages12Daily(BuildOrReduce side = BuildOrReduce.Build) => Target(CountDays(12, "pages", side, AllDays));
+
+    private static GoalTarget Minutes12Daily(BuildOrReduce side = BuildOrReduce.Build) => Target(DurationDays(12, DurationUnit.Minutes, side, AllDays));
+
+    public static TheoryData<string> SettingsTargets => new() { "reading", "coffee", "sugar", "pages per week", "yes/no days", "yes/no reduce" };
+
+    private static GoalTarget TargetNamed(string name) => name switch
+    {
+        "reading" => Reading20MinDaily(),
+        "coffee" => CoffeeAtMost2Cups(),
+        "sugar" => SugarAtMost1Sweet(),
+        "pages per week" => Pages20ThreeTimesAWeek(),
+        "yes/no days" => Target(YesNoDays(BuildOrReduce.Build, MonWedFri)),
+        _ => Target(YesNoTimes(1, SchedulePeriod.Day, BuildOrReduce.Reduce)),
+    };
+
+    [Theory]
+    [MemberData(nameof(SettingsTargets))]
+    public void Each_EntrySettings_overload_gives_what_its_GoalHistory_member_gives_for_the_same_settings(string name)
+    {
+        var target = TargetNamed(name);
+        var history = History(target);
+        var settings = Settings(target);
+        var record = new RecordView(new RecordId(Guid.NewGuid()), Wednesday, target.Measurement == Measurement.YesNo ? YesNoAnswer.Yes : null, target.Measurement == Measurement.YesNo ? null : 12);
+        var progress = new Progress(ProgressKind.RecordedValue, 12, 20);
+
+        Assert.Equal(RecordingText.Recorded(history, record), RecordingText.Recorded(settings, record));
+        Assert.Equal(RecordingText.TargetLine(history), RecordingText.TargetLine(settings));
+        Assert.Equal(RecordingText.Progress(history, progress), RecordingText.Progress(settings, progress));
+        Assert.Equal(RecordingText.FieldLabel(history), RecordingText.FieldLabel(settings));
+        Assert.Equal(RecordingText.PartialNote(history), RecordingText.PartialNote(settings));
+        Assert.Equal(RecordingText.ReduceHelp(history), RecordingText.ReduceHelp(settings));
+        Assert.Equal(RecordingText.NoteHelp(history), RecordingText.NoteHelp(settings));
+    }
+
+    [Fact]
+    public void AC_020_a_duration_entry_under_a_count_history_reads_minutes_and_a_count_entry_pages()
+    {
+        var history = History(Pages12Daily());
+        var durationEntry = Entry(Wednesday, Wednesday, EvaluationState.Met) with { Settings = Settings(Minutes12Daily()) };
+        var countEntry = Entry(Friday, Friday, EvaluationState.Met) with { Settings = Settings(Pages12Daily()) };
+        var minutes = new RecordView(new RecordId(Guid.NewGuid()), Wednesday, null, 12);
+        var pages = new RecordView(new RecordId(Guid.NewGuid()), Friday, null, 12);
+
+        Assert.Equal("12 min", RecordingText.Recorded(history.SettingsOf(durationEntry), minutes));
+        Assert.Equal("12 pages", RecordingText.Recorded(history.SettingsOf(countEntry), pages));
+        Assert.Equal("Time spent", RecordingText.FieldLabel(history.SettingsOf(durationEntry)));
+        Assert.Equal("Amount", RecordingText.FieldLabel(history.SettingsOf(countEntry)));
+    }
+
+    [Fact]
+    public void A_Build_entry_under_a_Reduce_history_gets_the_Build_help_and_sub_line()
+    {
+        var history = History(Minutes12Daily(BuildOrReduce.Reduce));
+        var buildEntry = Entry(Wednesday, Wednesday, EvaluationState.Pending) with { Settings = Settings(Minutes12Daily()) };
+        var settings = history.SettingsOf(buildEntry);
+
+        Assert.NotNull(RecordingText.ReduceHelp(history));
+        Assert.Null(RecordingText.ReduceHelp(settings));
+        Assert.Equal(RecordingText.TargetLine(History(Minutes12Daily())), RecordingText.TargetLine(settings));
+        Assert.NotEqual(RecordingText.TargetLine(history), RecordingText.TargetLine(settings));
+        Assert.Equal(RecordingText.PartialNote(History(Minutes12Daily())), RecordingText.PartialNote(settings));
+    }
+
+    [Fact]
+    public void An_earlier_commitment_based_entry_under_a_per_day_history_gets_the_commitment_note_help()
+    {
+        var history = History(Target(YesNoTimes(1, SchedulePeriod.Day, BuildOrReduce.Reduce)));
+        var commitment = Entry(Wednesday, Wednesday, EvaluationState.Pending) with { Settings = Settings(Reading20MinDaily()) };
+
+        Assert.Equal("This note is for the whole day. Clear the field to remove it.", RecordingText.NoteHelp(history));
+        Assert.Equal("Clear the field to remove the note.", RecordingText.NoteHelp(history.SettingsOf(commitment)));
+    }
+
+    [Fact]
+    public void SettingsOf_falls_back_to_the_goal_level_settings_for_an_entry_without_settings()
+    {
+        var target = Pages20ThreeTimesAWeek();
+        var history = History(target);
+        var entry = Entry(WeekMonday, WeekSunday, EvaluationState.Due);
+
+        Assert.Null(entry.Settings);
+        Assert.Equal(Settings(target) with { Times = history.Times }, history.SettingsOf(entry));
+        var own = Settings(Reading20MinDaily());
+        Assert.Same(own, history.SettingsOf(entry with { Settings = own }));
+    }
 }

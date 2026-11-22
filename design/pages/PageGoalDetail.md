@@ -133,3 +133,46 @@ Changed 2026-11-21 in the full preview, whose texts disagreed with the spec: the
 - After any write in a dialog or card (pause, resume, cancel a pause, excuse, remove an excusal, record, note), the page reads everything again, so the Notice, the head's "Pause", the cards and the figures agree.
 - Still no Edit settings, End goal or earlier attempts (slice 8). A goal with no begun entry keeps the slice 5 page, now with "Pause" in its head (a goal that has not started can be paused from the account's today, FR-006) and the Pauses card when it has a pause (settled here, T003).
 - Every text comes from `ReportText`, `ExcusalTexts` and `PauseTexts` (HP-008); the page builds none.
+
+## Slice 8 state
+
+The last part of the preview shows the page as slice 8 builds it (HP-001, US1-AS15, US2-AS13, US3-AS14, US3-AS15, US4-AS8, contracts/host.md "Goal page", ADR 0008). Six examples: "Reading, 15 min daily" (spec US1) on Wed 11 Nov 2026, 10:00, right after its change to 20 minutes; "Meditation, 10 min daily" (spec US2) on Mon 16 Nov 2026, 10:01, just ended with "Abandoned"; "Sugar, at most 1 sweet a day" (spec US4) on Mon 16 Nov 2026, 12:00, restarted that day; "Meditation, 5 min daily" (spec US3-AS4) on Thu 19 Nov 2026, whose attempt 2 starts on Mon 23 Nov; the goal of spec US2-AS12, ended before it began, on Tue 17 Nov 2026; and its Earlier attempts card after a restart.
+
+Changed 2026-11-22 in the full preview, whose texts disagreed with the spec: the Earlier attempts card showed "Attempt 1" with the meta "2 Mar – 30 Jun 2026 · Abandoned"; it now shows "Attempt 1 · 2 Mar – 30 Jun" as a link, the outcome Tag "Abandoned" and the consistency (HP-001).
+
+- Everything of slice 7 stays: the page head with "Pause" and "Record", the paused Notice, the GoalStats, TrendChart, History, Settings, Pauses and Recent notes cards (the "Slice 7 state" above). The additions:
+- **Page head of a goal that is not ended**, the actions in one `ht-inline` group after `ht-spacer`, in this order:
+  1. the ghost "Edit settings" (`a.ht-btn.ht-btn--ghost`, a link to `/goals/{id}/edit`, `pages/PageEditGoalSettings.md`);
+  2. slice 7's secondary "Pause" (absent while the goal is paused);
+  3. the ghost "End goal" (`button.ht-btn.ht-btn--ghost`, `aria-haspopup="dialog"`), which opens the EndGoalDialog (`components/EndGoalDialog.md`, "Slice 8 state");
+  4. slice 5's primary "Record" (absent when nothing can be recorded now).
+
+  "Edit settings" and "End goal" are there whatever the goal's state, paused or not started included (HP-001 names no condition but "not ended"; settled here, T003).
+- **Attempt line** (`span.ht-attempt`, after the tags), for the latest attempt (`GoalDetails.AttemptHasBegun` and `AttemptStartDate`, never `HasStarted` or a clock):
+  - "Attempt 2 · started 16 Nov" once the latest attempt has begun;
+  - "Attempt 2 · starts 23 Nov" while it has not;
+  - "Attempt 1 · ended before it began" for an ended latest attempt that never began (it has no date; plan "Spec discrepancies" 5).
+- **Settings card**, slice 4's rows with two changes:
+  - when a later settings version exists (`GoalDetails.Later`), the row "From Thu 12 Nov" (`dt`, `ReportText`) with that version's target text ("20 min daily", `dd`), placed directly after the Target row, so the two targets read together (settled here, T003). The other rows show the settings in effect;
+  - the start row shows the latest attempt's date: "Started" ("16 Nov 2026") once it has begun, "Starts" ("23 Nov 2026") while it has not. An ended goal whose latest attempt never began has no start row, so the card never announces a start under the Ended Notice.
+
+  Slice 4's sentence under the list, "Changes apply from the next commitment. Past results keep their rules.", stays as it is on a goal that is not ended. An ended goal cannot be changed, so its card has no sentence (owner decision on PR 45).
+- **Ended goal** (`GoalDetails` with an ending):
+  - no actions in the head: no "Record", "Edit settings", "Pause" or "End goal", and no `ht-spacer`;
+  - directly under the head, the Notice (`ht-notice`, the invitation style, which may hold one button) with "Ended Mon 16 Nov · Abandoned" (`ReportText`), a separator "·" (`aria-hidden="true"`) and the action "Start new attempt" (`a.ht-btn.ht-btn--primary.ht-btn--sm`, a link to `/goals/{id}/new-attempt`, `pages/PageNewAttempt.md`), as slice 7's paused Notice holds "Resume now";
+  - the GoalStats, TrendChart, History, Settings and Recent notes cards of the ended attempt stay. The History card keeps its record and note actions for the ended attempt's dates (FR-010): its Pending rows can still be recorded, and every row can be corrected. Excused rows keep "Remove excusal" while their grace period is open;
+  - an ended goal is never paused, so it has no paused Notice and no "Resume now" (its past pauses stay in the Pauses card, with no action);
+  - after a successful ending in the EndGoalDialog, the page reads everything again and the focus goes to the Notice's "Start new attempt" (HP-009).
+- **Earlier attempts card** (`EarlierAttemptsCard`), in the right column after Recent notes (after Settings and Pauses when there are no notes). Absent when the goal has only one attempt:
+  - the title "Earlier attempts" (`h2.ht-card__title`);
+  - one `ht-goal` item per ended attempt that is not the latest, latest first (`AttemptService.GetAttemptsAsync`):
+    - on its top line (`ht-goal__top`): "Attempt 1 · 2 Nov – 13 Nov" (start date to last date), or "Attempt 1 · ended before it began" for an attempt with no date, as a link to `/goals/{id}/attempts/{n}` (`a.ht-goal__name`, `pages/PageAttemptDetail.md`); then the outcome Tag (`ht-chip`, "Achieved", always with its word); then the consistency as one whole text (`ht-goal__pct`, "100% (12 of 12)", or "N/A");
+    - under it (`ht-goal__meta`), the attempt's name (FR-004, "Meditation, 10 min daily"), only when it differs from the goal's current name;
+    - then the ending note in `ht-goal__meta ht-muted`, only when it has one.
+
+    The order of the parts is settled here (T003): the link, the Tag and the figure on one line, as the Home's Active goals card puts a goal's name and figure, and the texts under it.
+- **History card and dialogs**: each row's Recorded cell, state words and record actions use that row's own settings (`History.SettingsOf(entry)`), and so do the RecordDialog and the NoteDialog fixed to a row: after a change of measurement, 11 Nov shows "12 min" and 12 Nov "12 pages" (AC-020). The layout is slice 5's; only the texts follow each row.
+- A restarted goal whose latest attempt has not begun has no begun entry of that attempt: no "Record", GoalStats, TrendChart, History or Recent notes card (slice 5's rule; the goal page covers only the latest attempt's dates, FR-016), only the head with "Edit settings", "Pause" and "End goal", the Settings card with "Starts", and the Earlier attempts card. The earlier attempt's dates are recorded from its attempt view (the fourth example).
+- An ended goal that never began: the attempt line "Attempt 1 · ended before it began", the Ended Notice with "Start new attempt", and the Settings card without its start row (the fifth example). It has no begun entry, so no other card.
+- After any write (a change on the Edit settings page, an ending, a new attempt, and slice 7's writes), the page reads everything again, so the head, the Notice, the cards and the figures agree.
+- Every text comes from `ReportText`, `GoalChangeTexts`, `ExcusalTexts` and `PauseTexts` (HP-008); the page builds none.

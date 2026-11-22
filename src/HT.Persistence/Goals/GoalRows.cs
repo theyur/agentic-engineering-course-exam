@@ -1,3 +1,4 @@
+using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Persistence.Habits;
 
@@ -35,10 +36,16 @@ internal sealed class GoalRow
     public List<GoalAttemptRow> Attempts { get; set; } = [];
 }
 
-/// <summary>A row of <c>GoalSettingsVersions</c>; key (goal, applies-from). The target's values and the version's zone.</summary>
+/// <summary>
+/// A row of <c>GoalSettingsVersions</c>; key (goal, attempt number, applies-from) since slice 8 (research R-05), with a
+/// foreign key (goal, attempt number) to <c>GoalAttempts</c>. The target's values and the version's zone.
+/// </summary>
 internal sealed class GoalSettingsVersionRow
 {
     public Guid GoalId { get; set; }
+
+    /// <summary>The number of the attempt the version belongs to (slice 8); 1 for every version written before slice 8.</summary>
+    public int AttemptNumber { get; set; }
 
     public DateOnly AppliesFrom { get; set; }
 
@@ -65,7 +72,12 @@ internal sealed class GoalSettingsVersionRow
     public string TimeZone { get; set; } = string.Empty;
 }
 
-/// <summary>A row of <c>GoalAttempts</c>; key (goal, number).</summary>
+/// <summary>
+/// A row of <c>GoalAttempts</c>; key (goal, number). Slice 8 (data-model.md "Tables"): the ending's columns, all null
+/// while the attempt is not ended; <see cref="EndingDate"/> and <see cref="Outcome"/> are both set or both null, and
+/// <see cref="EndingNote"/> is null without them. The mapping checks it, not a check constraint. The last date is never
+/// stored (FR-026).
+/// </summary>
 internal sealed class GoalAttemptRow
 {
     public Guid GoalId { get; set; }
@@ -73,6 +85,14 @@ internal sealed class GoalAttemptRow
     public int Number { get; set; }
 
     public DateOnly StartDate { get; set; }
+
+    /// <summary>The ending date E; null while the attempt is not ended.</summary>
+    public DateOnly? EndingDate { get; set; }
+
+    public Outcome? Outcome { get; set; }
+
+    /// <summary>The trimmed ending note; null when there is none. Private (HP-010).</summary>
+    public string? EndingNote { get; set; }
 }
 
 /// <summary>
@@ -84,4 +104,15 @@ internal sealed class AccountRevisionRow
     public string? TimeZone { get; set; }
 
     public int GoalsRevision { get; set; }
+}
+
+/// <summary>
+/// What a goal-change write reads of the locked goal's latest attempt (slice 8, research R-05): its number and its
+/// ending date, null while it is not ended. A projection, never tracked.
+/// </summary>
+internal sealed class LatestAttemptRow
+{
+    public int Number { get; init; }
+
+    public DateOnly? EndingDate { get; init; }
 }

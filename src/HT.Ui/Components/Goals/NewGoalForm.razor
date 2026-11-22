@@ -1,4 +1,5 @@
 @using System.Globalization
+@using HT.Application.Reports
 @using HT.Domain.Accounts
 @using HT.Domain.Goals
 @using HT.Domain.Habits
@@ -9,48 +10,65 @@
    "When?"; Start date and "Name (optional)"; "Create goal" and Cancel) beside the summary card. Only the controls of
    the chosen measurement and schedule are shown. "At least" becomes "At most" for Reduce, and the amount's lowest
    value follows (Build 1, Reduce 0). One refusal at a time sits under its field. The page decides what the actions
-   and a chosen habit do. *@
+   and a chosen habit do.
+   Slice 8 edit mode (design/pages/PageEditGoalSettings, HP-002, HP-009): no Habit section, no habit chooser and no
+   start date; "When?" offers only the goal's schedule kind (the DayPicker, or the times Stepper with the note of the
+   goal's period, without the kind's ChoiceCards or the period control); "Name (optional)" alone in its field pair; a
+   refusal about no field as a role="alert" paragraph above the first section; above the actions the neutral Notice
+   "Changes apply from …" (ReportText); "Save changes" and Cancel. The first field ("Build or reduce") gets the focus
+   when the form first renders interactively.
+   Slice 8 attempt mode (design/pages/PageNewAttempt, HP-004, HP-009): no Habit section, no habit chooser and no name;
+   "When?" offers every schedule kind, as in creation; "Start date" alone in its field pair (the name's place stays
+   empty); a refusal about no field as a role="alert" paragraph above the first section, as in edit mode; "Start
+   attempt" and Cancel. The first field ("Build or reduce") gets the focus when the form first renders interactively. *@
 <div class="ht-grid-2">
-    <EditForm Model="Model" OnSubmit="OnSubmit" class="ht-card" FormName="new-goal" novalidate>
-        <div class="ht-form-section">
-            <h2 class="ht-form-section__title">Habit</h2>
-            @if (Model.Habit is { } habit)
-            {
-                <div class="ht-inline">
-                    @if (habit.Icon is { } icon)
-                    {
-                        <span class="ht-habit__glyph ht-habit__glyph--row"><HtIcon Name="@icon" Size="HtIcon.IconSize.Large" /></span>
-                    }
-                    <b>@habit.Name</b>
-                    <Tag Text="@habit.Category.ToString()" />
-                    @if (habit.Kind == HabitKind.Custom)
-                    {
-                        <Tag Text="Private" Strong="true" />
-                    }
-                    <span class="ht-spacer"></span>
-                    <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog" aria-label="Change habit"
-                            aria-describedby="@ErrorId(GoalField.Habit)" @ref="_habitButton" @onclick="OpenChooser">Change</button>
-                </div>
-            }
-            else
-            {
-                <p class="ht-form-section__help">Choose the habit this goal is for.</p>
-                <button type="button" class="ht-btn ht-btn--secondary" aria-haspopup="dialog"
-                        aria-describedby="@ErrorId(GoalField.Habit)" @ref="_habitButton" @onclick="OpenChooser">Choose a habit</button>
-            }
-            @ErrorText(GoalField.Habit)
-        </div>
+    <EditForm Model="Model" OnSubmit="OnSubmit" class="ht-card" FormName="@Prefix" novalidate>
+        @if (!IsCreation && Refusal is { } refusal)
+        {
+            <p class="ht-field__error" role="alert">@refusal</p>
+        }
+        @if (IsCreation)
+        {
+            <div class="ht-form-section">
+                <h2 class="ht-form-section__title">Habit</h2>
+                @if (Model.Habit is { } habit)
+                {
+                    <div class="ht-inline">
+                        @if (habit.Icon is { } icon)
+                        {
+                            <span class="ht-habit__glyph ht-habit__glyph--row"><HtIcon Name="@icon" Size="HtIcon.IconSize.Large" /></span>
+                        }
+                        <b>@habit.Name</b>
+                        <Tag Text="@habit.Category.ToString()" />
+                        @if (habit.Kind == HabitKind.Custom)
+                        {
+                            <Tag Text="Private" Strong="true" />
+                        }
+                        <span class="ht-spacer"></span>
+                        <button type="button" class="ht-btn ht-btn--ghost ht-btn--sm" aria-haspopup="dialog" aria-label="Change habit"
+                                aria-describedby="@ErrorId(GoalField.Habit)" @ref="_habitButton" @onclick="OpenChooser">Change</button>
+                    </div>
+                }
+                else
+                {
+                    <p class="ht-form-section__help">Choose the habit this goal is for.</p>
+                    <button type="button" class="ht-btn ht-btn--secondary" aria-haspopup="dialog"
+                            aria-describedby="@ErrorId(GoalField.Habit)" @ref="_habitButton" @onclick="OpenChooser">Choose a habit</button>
+                }
+                @ErrorText(GoalField.Habit)
+            </div>
+        }
         <div class="ht-form-section">
             <h2 class="ht-form-section__title">Do you want to build or reduce it?</h2>
             <p class="ht-form-section__help">Build: do it at least the target. Reduce: stay at or below a limit.</p>
-            <SegmentedControl TValue="BuildOrReduce" Label="Build or reduce" Options="Sides" Value="Model.BuildOrReduce"
+            <SegmentedControl @ref="_side" TValue="BuildOrReduce" Label="Build or reduce" Options="Sides" Value="Model.BuildOrReduce"
                               ValueChanged="v => Model.BuildOrReduce = v" DescribedBy="@ErrorId(GoalField.BuildOrReduce)" />
             @ErrorText(GoalField.BuildOrReduce)
         </div>
         <div class="ht-form-section">
-            <h2 class="ht-form-section__title" id="new-goal-measure">How do you measure it?</h2>
+            <h2 class="ht-form-section__title" id="@(Prefix + "-measure")">How do you measure it?</h2>
             <p class="ht-form-section__help">You can record partial amounts; the target decides the result.</p>
-            <ChoiceCard TValue="Measurement" Name="new-goal-measure" LabelledBy="new-goal-measure" Options="Measurements"
+            <ChoiceCard TValue="Measurement" Name="@(Prefix + "-measure")" LabelledBy="@(Prefix + "-measure")" Options="Measurements"
                         Value="Model.Measurement" ValueChanged="v => Model.Measurement = v" DescribedBy="@ErrorId(GoalField.Measurement)" />
             @ErrorText(GoalField.Measurement)
         </div>
@@ -60,13 +78,13 @@
                 <h2 class="ht-form-section__title">Target</h2>
                 <div class="ht-inline">
                     <span>@(Model.BuildOrReduce == BuildOrReduce.Reduce ? "At most" : "At least")</span>
-                    <Stepper Id="new-goal-amount" Label="Amount" Value="Model.Amount" ValueChanged="v => Model.Amount = v"
+                    <Stepper Id="@(Prefix + "-amount")" Label="Amount" Value="Model.Amount" ValueChanged="v => Model.Amount = v"
                              Min="@(Model.BuildOrReduce == BuildOrReduce.Reduce ? 0 : 1)" Max="999"
                              Step="@(Model.Measurement == Measurement.Duration && Model.DurationUnit != DurationUnit.Hours ? 5 : 1)"
                              DescribedBy="@ErrorId(GoalField.Amount)" Invalid="@(Error?.For(GoalField.Amount) is not null)" />
                     @if (Model.Measurement == Measurement.Count)
                     {
-                        <input class="ht-input ht-unit-input" id="new-goal-unit" value="@Model.CountUnit" placeholder="pages" aria-label="Unit"
+                        <input class="ht-input ht-unit-input" id="@(Prefix + "-unit")" value="@Model.CountUnit" placeholder="pages" aria-label="Unit"
                                aria-describedby="@ErrorId(GoalField.Unit)" aria-invalid="@(Error?.For(GoalField.Unit) is null ? null : "true")"
                                @onchange="e => Model.CountUnit = e.Value?.ToString()" />
                     }
@@ -80,60 +98,99 @@
                 @ErrorText(GoalField.Unit)
             </div>
         }
-        <div class="ht-form-section">
-            <h2 class="ht-form-section__title" id="new-goal-when">When?</h2>
-            <ChoiceCard TValue="ScheduleKind" Name="new-goal-when" LabelledBy="new-goal-when" Options="Schedules"
-                        Value="Model.ScheduleKind" ValueChanged="v => Model.ScheduleKind = v" DescribedBy="@ErrorId(GoalField.Schedule)" />
-            @ErrorText(GoalField.Schedule)
-            @if (Model.ScheduleKind == ScheduleKind.FixedDays)
-            {
-                <DayPicker Days="Model.Days" DaysChanged="d => Model.Days = d" DescribedBy="@ErrorId(GoalField.Days)" />
-                @ErrorText(GoalField.Days)
-                <p class="ht-form-section__note">Each selected day is one commitment.</p>
-            }
-            else if (Model.ScheduleKind == ScheduleKind.Times)
-            {
-                <div class="ht-inline">
-                    <Stepper Id="new-goal-times" Label="Times" Value="Model.Times" ValueChanged="v => Model.Times = v" Min="1" Max="20"
-                             Unit="@(Model.Times == 1 ? "time" : "times")"
-                             DescribedBy="@ErrorId(GoalField.Times)" Invalid="@(Error?.For(GoalField.Times) is not null)" />
-                    <SegmentedControl TValue="SchedulePeriod" Label="Period" Options="Periods" Value="Model.Period"
-                                      ValueChanged="v => Model.Period = v" DescribedBy="@ErrorId(GoalField.Period)" />
-                </div>
-                @ErrorText(GoalField.Times)
-                @ErrorText(GoalField.Period)
-                @if (Model.Period is { } period)
+        @if (EditMode)
+        {
+            <div class="ht-form-section">
+                <h2 class="ht-form-section__title">When?</h2>
+                @if (Model.ScheduleKind == ScheduleKind.FixedDays)
                 {
-                    <p class="ht-form-section__note">@(period == SchedulePeriod.Day ? "Each day is evaluated as a whole." : "Each week, Monday to Sunday, is evaluated as a whole.")</p>
+                    <DayPicker Days="Model.Days" DaysChanged="d => Model.Days = d" DescribedBy="@(ErrorId(GoalField.Days) ?? ErrorId(GoalField.Schedule))" />
+                    @ErrorText(GoalField.Days)
+                    <p class="ht-form-section__note">Each selected day is one commitment.</p>
                 }
-            }
-        </div>
-        <div class="ht-form-section">
-            <div class="ht-field-pair">
-                <label class="ht-field">
-                    <span class="ht-field__label">Start date</span>
-                    <input class="ht-input" type="date" id="new-goal-start" value="@StartDateValue"
-                           aria-describedby="@ErrorId(GoalField.StartDate)" aria-invalid="@(Error?.For(GoalField.StartDate) is null ? null : "true")"
-                           @onchange="OnStartDateChanged" />
-                    @ErrorText(GoalField.StartDate)
-                </label>
-                <label class="ht-field">
-                    <span class="ht-field__label">Name <span class="ht-muted">(optional)</span></span>
-                    <input class="ht-input" id="new-goal-name" value="@Model.Name"
-                           aria-describedby="@ErrorId(GoalField.Name)" aria-invalid="@(Error?.For(GoalField.Name) is null ? null : "true")"
-                           @onchange="e => Model.Name = e.Value?.ToString()" />
-                    @ErrorText(GoalField.Name)
-                </label>
+                else
+                {
+                    <div class="ht-inline">
+                        <Stepper Id="@(Prefix + "-times")" Label="Times" Value="Model.Times" ValueChanged="v => Model.Times = v" Min="1" Max="20"
+                                 Unit="@(Model.Times == 1 ? "time" : "times")"
+                                 DescribedBy="@(ErrorId(GoalField.Times) ?? ErrorId(GoalField.Period) ?? ErrorId(GoalField.Schedule))"
+                                 Invalid="@(Error?.For(GoalField.Times) is not null)" />
+                    </div>
+                    <p class="ht-form-section__note">@(Model.Period == SchedulePeriod.Day ? "Each day is evaluated as a whole." : "Each week, Monday to Sunday, is evaluated as a whole.")</p>
+                    @ErrorText(GoalField.Times)
+                    @ErrorText(GoalField.Period)
+                }
+                @ErrorText(GoalField.Schedule)
             </div>
-        </div>
+            <div class="ht-form-section">
+                <div class="ht-field-pair">
+                    @NameField
+                </div>
+            </div>
+            @if (ChangesApplyFrom is { } appliesFrom)
+            {
+                <div class="ht-form-section">
+                    <Notice Neutral="true">@ReportText.ChangesApplyFrom(appliesFrom)</Notice>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="ht-form-section">
+                <h2 class="ht-form-section__title" id="@(Prefix + "-when")">When?</h2>
+                <ChoiceCard TValue="ScheduleKind" Name="@(Prefix + "-when")" LabelledBy="@(Prefix + "-when")" Options="Schedules"
+                            Value="Model.ScheduleKind" ValueChanged="v => Model.ScheduleKind = v" DescribedBy="@ErrorId(GoalField.Schedule)" />
+                @ErrorText(GoalField.Schedule)
+                @if (Model.ScheduleKind == ScheduleKind.FixedDays)
+                {
+                    <DayPicker Days="Model.Days" DaysChanged="d => Model.Days = d" DescribedBy="@ErrorId(GoalField.Days)" />
+                    @ErrorText(GoalField.Days)
+                    <p class="ht-form-section__note">Each selected day is one commitment.</p>
+                }
+                else if (Model.ScheduleKind == ScheduleKind.Times)
+                {
+                    <div class="ht-inline">
+                        <Stepper Id="@(Prefix + "-times")" Label="Times" Value="Model.Times" ValueChanged="v => Model.Times = v" Min="1" Max="20"
+                                 Unit="@(Model.Times == 1 ? "time" : "times")"
+                                 DescribedBy="@ErrorId(GoalField.Times)" Invalid="@(Error?.For(GoalField.Times) is not null)" />
+                        <SegmentedControl TValue="SchedulePeriod" Label="Period" Options="Periods" Value="Model.Period"
+                                          ValueChanged="v => Model.Period = v" DescribedBy="@ErrorId(GoalField.Period)" />
+                    </div>
+                    @ErrorText(GoalField.Times)
+                    @ErrorText(GoalField.Period)
+                    @if (Model.Period is { } period)
+                    {
+                        <p class="ht-form-section__note">@(period == SchedulePeriod.Day ? "Each day is evaluated as a whole." : "Each week, Monday to Sunday, is evaluated as a whole.")</p>
+                    }
+                }
+            </div>
+            <div class="ht-form-section">
+                <div class="ht-field-pair">
+                    <label class="ht-field">
+                        <span class="ht-field__label">Start date</span>
+                        <input class="ht-input" type="date" id="@(Prefix + "-start")" value="@StartDateValue"
+                               aria-describedby="@ErrorId(GoalField.StartDate)" aria-invalid="@(Error?.For(GoalField.StartDate) is null ? null : "true")"
+                               @onchange="OnStartDateChanged" />
+                        @ErrorText(GoalField.StartDate)
+                    </label>
+                    @if (!AttemptMode)
+                    {
+                        @NameField
+                    }
+                </div>
+            </div>
+        }
         <div class="ht-form-actions">
-            <HtButton Type="submit">Create goal</HtButton>
+            <HtButton Type="submit">@(EditMode ? "Save changes" : AttemptMode ? "Start attempt" : "Create goal")</HtButton>
             <HtButton Variant="HtButton.ButtonVariant.Secondary" Href="@CancelHref">Cancel</HtButton>
         </div>
     </EditForm>
     <GoalSummaryCard Model="Model" />
 </div>
-<HabitChooser Open="_chooserOpen" ActingUser="ActingUser" OnChoose="ChooseAsync" OnClose="CloseChooser" FocusOnClose="FocusHabitButtonAsync" />
+@if (IsCreation)
+{
+    <HabitChooser Open="_chooserOpen" ActingUser="ActingUser" OnChoose="ChooseAsync" OnClose="CloseChooser" FocusOnClose="FocusHabitButtonAsync" />
+}
 
 @code {
     private static readonly IReadOnlyList<(BuildOrReduce, string)> Sides = [(BuildOrReduce.Build, "Build"), (BuildOrReduce.Reduce, "Reduce")];
@@ -156,6 +213,7 @@
     private static readonly IReadOnlyList<(SchedulePeriod, string)> Periods = [(SchedulePeriod.Day, "Per day"), (SchedulePeriod.Week, "Per week")];
 
     private ElementReference _habitButton;
+    private SegmentedControl<BuildOrReduce>? _side;
     private bool _chooserOpen;
 
     [Parameter, EditorRequired]
@@ -180,7 +238,51 @@
     [Parameter]
     public EventCallback<GoalHabit> OnHabitChosen { get; set; }
 
+    /// <summary>Slice 8 (HP-002): the Edit settings form of an existing goal instead of the New goal form.</summary>
+    [Parameter]
+    public bool EditMode { get; set; }
+
+    /// <summary>Slice 8 edit mode: the date a change applies from, for the Notice above the actions; none without it.</summary>
+    [Parameter]
+    public DateOnly? ChangesApplyFrom { get; set; }
+
+    /// <summary>
+    /// Slice 8 edit and attempt modes: the text of a refusal about no field (the goal ended elsewhere, or was restarted
+    /// elsewhere, for example).
+    /// </summary>
+    [Parameter]
+    public string? Refusal { get; set; }
+
+    /// <summary>
+    /// Slice 8 (HP-004): the Start new attempt form of an ended goal instead of the New goal form: every schedule kind and
+    /// the start date, without the habit and the name.
+    /// </summary>
+    [Parameter]
+    public bool AttemptMode { get; set; }
+
+    /// <summary>The New goal form itself: neither the edit mode nor the attempt mode.</summary>
+    private bool IsCreation => !EditMode && !AttemptMode;
+
+    private string Prefix => EditMode ? "edit-goal" : AttemptMode ? "new-attempt" : "new-goal";
+
     private string? StartDateValue => Model.StartDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private RenderFragment NameField => @<label class="ht-field">
+        <span class="ht-field__label">Name <span class="ht-muted">(optional)</span></span>
+        <input class="ht-input" id="@(Prefix + "-name")" value="@Model.Name"
+               aria-describedby="@ErrorId(GoalField.Name)" aria-invalid="@(Error?.For(GoalField.Name) is null ? null : "true")"
+               @onchange="e => Model.Name = e.Value?.ToString()" />
+        @ErrorText(GoalField.Name)
+    </label>;
+
+    // HP-009: the edit and attempt forms move the focus to their first field when they first render interactively.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !IsCreation && _side is not null)
+        {
+            await _side.FocusAsync();
+        }
+    }
 
     private void OnStartDateChanged(ChangeEventArgs e) =>
         Model.StartDate = DateOnly.TryParseExact(e.Value?.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
@@ -201,7 +303,7 @@
 
     private ValueTask FocusHabitButtonAsync() => _habitButton.FocusAsync();
 
-    private static string ErrorIdOf(GoalField field) => "new-goal-" + field + "-error";
+    private string ErrorIdOf(GoalField field) => Prefix + "-" + field + "-error";
 
     private string? ErrorId(GoalField field) => Error?.For(field) is null ? null : ErrorIdOf(field);
 
