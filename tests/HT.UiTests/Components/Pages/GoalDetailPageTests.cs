@@ -114,10 +114,11 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Empty(cut.FindAll(".ht-notice"));
         // Tuesday 17 November is not scheduled, but Monday 16 is Pending: "Record" is the page head's primary action
         // (HP-001), after slice 7's "Pause" for a goal that is not paused (T064). Slice 8 (T069, on purpose): the ghost
-        // link "Edit settings" comes first in the head, so it leaves the absent list.
-        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
-        Assert.Equal(["Edit settings", "Pause", "Record"], cut.FindAll(".ht-page-head .ht-btn").Select(b => b.TextContent));
-        foreach (var absent in new[] { "End goal", "Earlier attempts" })
+        // link "Edit settings" comes first in the head, so it leaves the absent list. Slice 8 (T077, on purpose): the ghost
+        // "End goal" follows "Pause", so it leaves the absent list too.
+        Assert.Equal(["Pause", "End goal", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Edit settings", "Pause", "End goal", "Record"], cut.FindAll(".ht-page-head .ht-btn").Select(b => b.TextContent));
+        foreach (var absent in new[] { "Earlier attempts" })
         {
             Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
         }
@@ -155,7 +156,7 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Equal(Sentence, cut.Find(".ht-card__sub").TextContent);
         Assert.Empty(cut.FindAll(".ht-notice"));
         // Slice 7 (T064): a goal that has not started can be paused from the account's today, so "Pause" is its one action.
-        Assert.Equal(["Pause"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Pause", "End goal"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         Assert.DoesNotContain(">Record<", cut.Markup, StringComparison.Ordinal);
         // Slice 5 (T055): no current date, so no History card; the Settings card stands alone in ht-grid-2.
         Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
@@ -174,8 +175,8 @@ public sealed class GoalDetailPageTests : BunitContext
 
         // Slice 7 (T064): "Pause" comes before "Record", both in an ht-inline group after ht-spacer.
         var actions = cut.FindAll(".ht-page-head button");
-        Assert.Equal(["Pause", "Record"], actions.Select(b => b.TextContent));
-        var record = actions[1];
+        Assert.Equal(["Pause", "End goal", "Record"], actions.Select(b => b.TextContent));
+        var record = actions[2];
         Assert.Equal(["ht-btn", "ht-btn--primary"], record.ClassList.ToArray());
         Assert.Equal("dialog", record.GetAttribute("aria-haspopup"));
         Assert.Equal(["ht-btn", "ht-btn--secondary"], actions[0].ClassList.ToArray());
@@ -200,7 +201,7 @@ public sealed class GoalDetailPageTests : BunitContext
 
         Assert.Equal("Attempt 1 · started 17 Nov", cut.Find(".ht-attempt").TextContent);
         // Slice 7 (T064): no "Record", but the goal can be paused.
-        Assert.Equal(["Pause"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Pause", "End goal"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         // T055: a current date but no begun entry, so no History card; the Settings card stands alone in ht-grid-2.
         Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
         Assert.Empty(cut.FindAll(".ht-grid-2 > .ht-stack"));
@@ -323,7 +324,7 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Empty(cut.FindAll("[role=dialog]"));
         var record = Assert.Single(_records.RecordsOfGoal(id));
         Assert.Equal((Today, 12), (record.Date, record.Value.Amount!.Value));
-        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Pause", "End goal", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         // T055: after a save the history is read again.
         var row = Assert.Single(cut.FindAll("table[aria-label=History] tbody tr"));
         Assert.Equal(["Tue 17 Nov", "12 min", "Due today"], row.QuerySelectorAll("td").Take(3).Select(Text));
@@ -871,7 +872,7 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Equal(["ht-btn", "ht-btn--primary", "ht-btn--sm"], resume.ClassList.ToArray());
         Assert.Equal("ht-page-head", cut.Find(".ht-notice").PreviousElementSibling!.ClassName?.Split(' ')[0]);
         // "Pause" leaves the head while the pause is current; "Record" stays for the Pending days before it.
-        Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["End goal", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         var right = cut.FindAll(".ht-grid-2 > .ht-stack")[1];
         Assert.Equal(["Settings", "Pauses"], right.QuerySelectorAll(".ht-card__title").Select(Text));
         Assert.Equal(["Tue 17 Nov – Sun 22 Nov"], PauseRanges(cut));
@@ -906,14 +907,14 @@ public sealed class GoalDetailPageTests : BunitContext
         var goal = ReadingFromTue10(g => _records.SeedPause(g, Today, Sun22, Reason("Family visit")));
         var cut = RenderGoal(goal);
         Assert.Equal("Paused until Sun 22 Nov", NoticeOf(cut));
-        Assert.Equal(["Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["End goal", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
 
         await cut.Find(".ht-notice button").ClickAsync(new MouseEventArgs());
 
         Assert.Empty(_records.ExemptionsOfGoal(goal).Pauses);
         Assert.Empty(cut.FindAll(".ht-notice"));
         Assert.Empty(cut.FindAll("[role=alert]"));
-        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Pause", "End goal", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         Assert.DoesNotContain(cut.FindAll(".ht-card__title"), title => title.TextContent == "Pauses");
         Assert.Equal(["Tue 17 Nov", "—", "Due today"], HistoryRow(cut, "Tue 17 Nov").QuerySelectorAll("td").Take(3).Select(Text));
         Assert.Equal(cut.Find(".ht-page-head .ht-btn--secondary").GetAttribute("blazor:elementReference"), FocusedIds(1)[^1]);
@@ -935,7 +936,7 @@ public sealed class GoalDetailPageTests : BunitContext
         var alert = cut.Find("p.ht-field__error[role=alert]");
         Assert.Equal("This goal is not paused.", alert.TextContent);
         Assert.Equal("ht-page-head", alert.PreviousElementSibling!.ClassName?.Split(' ')[0]);
-        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Pause", "End goal", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
     }
 
     [Fact]
@@ -948,7 +949,7 @@ public sealed class GoalDetailPageTests : BunitContext
         });
         var cut = RenderGoal(goal);
         Assert.Empty(cut.FindAll(".ht-notice"));
-        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Pause", "End goal", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         Assert.Equal(["Settings", "Pauses"], cut.FindAll(".ht-grid-2 > .ht-stack")[1].QuerySelectorAll(".ht-card__title").Select(Text));
         Assert.Equal(["Mon 23 Nov – Fri 27 Nov", "Tue 10 Nov – Wed 11 Nov"], PauseRanges(cut));
         var cancel = Assert.Single(PausesCard(cut).QuerySelectorAll("button"));
@@ -979,7 +980,7 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Empty(cut.FindAll(".ht-notice"));
         Assert.Equal(["Mon 16 Nov – Mon 16 Nov"], PauseRanges(cut));
         Assert.Empty(PausesCard(cut).QuerySelectorAll("button"));
-        Assert.Equal(["Pause", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Pause", "End goal", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         Assert.Equal("Paused", Text(HistoryRow(cut, "Mon 16 Nov").QuerySelectorAll("td")[2]));
         Assert.Equal("Due today", Text(HistoryRow(cut, "Tue 17 Nov").QuerySelectorAll("td")[2]));
     }
@@ -1012,7 +1013,7 @@ public sealed class GoalDetailPageTests : BunitContext
         var reading = _catalog.Add(HabitSamples.Reading());
         var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, new DateOnly(2026, 11, 25));
         var cut = RenderGoal(id);
-        Assert.Equal(["Pause"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
+        Assert.Equal(["Pause", "End goal"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
 
         await cut.Find(".ht-page-head button").ClickAsync(new MouseEventArgs());
         Assert.Equal("2026-11-17", cut.Find("[role=dialog] input[type=date]").GetAttribute("min"));
@@ -1020,7 +1021,7 @@ public sealed class GoalDetailPageTests : BunitContext
         await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
 
         Assert.Equal("Paused until Sun 22 Nov", NoticeOf(cut));
-        Assert.Empty(cut.FindAll(".ht-page-head button"));
+        Assert.Equal(["End goal"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         var column = Assert.Single(cut.FindAll(".ht-grid-2 > .ht-stack"));
         Assert.Equal(["Settings", "Pauses"], column.QuerySelectorAll(".ht-card__title").Select(Text));
     }
@@ -1116,7 +1117,7 @@ public sealed class GoalDetailPageTests : BunitContext
         var edit = group.FirstElementChild!;
         Assert.Equal(("A", "Edit settings", $"/goals/{id.Value}/edit"), (edit.TagName, edit.TextContent, edit.GetAttribute("href")));
         Assert.Equal(["ht-btn", "ht-btn--ghost"], edit.ClassList.ToArray());
-        Assert.Equal(["Edit settings", "Pause", "Record"], group.QuerySelectorAll(".ht-btn").Select(b => b.TextContent));
+        Assert.Equal(["Edit settings", "Pause", "End goal", "Record"], group.QuerySelectorAll(".ht-btn").Select(b => b.TextContent));
     }
 
     [Fact]
@@ -1128,7 +1129,7 @@ public sealed class GoalDetailPageTests : BunitContext
 
         var cut = RenderGoal(id);
 
-        Assert.Equal(["Edit settings", "Pause"], cut.FindAll(".ht-page-head .ht-btn").Select(b => b.TextContent));
+        Assert.Equal(["Edit settings", "Pause", "End goal"], cut.FindAll(".ht-page-head .ht-btn").Select(b => b.TextContent));
         Assert.Equal(("Starts", "25 Nov 2026"), Rows(cut)[^1]);
     }
 
@@ -1173,5 +1174,147 @@ public sealed class GoalDetailPageTests : BunitContext
 
         Assert.DoesNotContain(Rows(cut), row => row.Label is "Started" or "Starts");
         Assert.DoesNotContain("Edit settings", cut.Markup, StringComparison.Ordinal);
+    }
+
+    // ---- slice 8: ending a goal from its goal page (HP-001, HP-003, HP-009, US2-AS13; T078) ----
+
+    private async Task<GoalEndResult> EndThroughServiceAsync(AccountId owner, GoalId goal)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<GoalChangeService>().EndAsync(
+            ActingUser.ForAccount(owner, Role.RegisteredUser), goal, Outcome.Abandoned, "Too busy this month.", CancellationToken.None);
+    }
+
+    private static AngleSharp.Dom.IElement EndGoalButton(IRenderedComponent<GoalDetail> cut) =>
+        cut.FindAll(".ht-page-head button").Single(b => b.TextContent == "End goal");
+
+    /// <summary>The goal's History rows by their date text.</summary>
+    private static List<string> HistoryDates(IRenderedComponent<GoalDetail> cut) =>
+        cut.FindAll("table[aria-label=History] tbody tr").Select(r => Text(r.QuerySelector("td")!)).ToList();
+
+    /// <summary>The ended goal's head, Notice and History card: no head actions, the Notice with "Start new attempt", the History actions kept.</summary>
+    private static void AssertEndedPage(IRenderedComponent<GoalDetail> cut, GoalId goal)
+    {
+        Assert.Empty(cut.FindAll(".ht-page-head .ht-btn"));
+        Assert.Empty(cut.FindAll(".ht-page-head .ht-spacer"));
+        foreach (var absent in new[] { "Edit settings", "End goal", "Paused until" })
+        {
+            Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
+        }
+
+        var notice = Assert.Single(cut.FindAll(".ht-notice"));
+        Assert.Equal("ht-page-head", notice.PreviousElementSibling!.ClassName?.Split(' ')[0]);
+        Assert.Equal("Ended Tue 17 Nov · Abandoned", NoticeOf(cut));
+        var start = notice.QuerySelector("a")!;
+        Assert.Equal(("Start new attempt", $"/goals/{goal.Value}/new-attempt"), (start.TextContent, start.GetAttribute("href")));
+        Assert.Equal(["ht-btn", "ht-btn--primary", "ht-btn--sm"], start.ClassList.ToArray());
+        Assert.Equal("true", notice.QuerySelectorAll("span")[1].GetAttribute("aria-hidden"));
+        // The ending date Tuesday 17 is not in the attempt; Sunday 15 and Monday 16, Pending, can still be recorded (FR-010).
+        Assert.DoesNotContain("Tue 17 Nov", HistoryDates(cut));
+        Assert.Contains("Add record", HistoryActions(cut, "Mon 16 Nov"));
+        Assert.Contains("Add record", HistoryActions(cut, "Sun 15 Nov"));
+        Assert.NotEmpty(cut.FindAll(".ht-stats"));
+    }
+
+    [Fact]
+    public void Slice_8_HP_001_End_goal_is_a_ghost_dialog_button_after_Pause_and_before_Record()
+    {
+        var goal = ReadingFromTue10();
+
+        var cut = RenderGoal(goal);
+
+        var group = cut.Find(".ht-page-head > .ht-inline");
+        Assert.Equal(["Edit settings", "Pause", "End goal", "Record"], group.QuerySelectorAll(".ht-btn").Select(b => b.TextContent));
+        var end = EndGoalButton(cut);
+        Assert.Equal(["ht-btn", "ht-btn--ghost"], end.ClassList.ToArray());
+        Assert.Equal(("button", "dialog"), (end.GetAttribute("type"), end.GetAttribute("aria-haspopup")));
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+    }
+
+    [Fact]
+    public async Task Slice_8_US2_AS13_End_goal_the_outcome_and_End_goal_show_the_ended_Notice_and_the_focus_goes_to_Start_new_attempt()
+    {
+        var goal = ReadingFromTue10();
+        var cut = RenderGoal(goal);
+
+        // The three actions: "End goal", the outcome, "End goal" (SC-001); the note is optional.
+        await EndGoalButton(cut).ClickAsync(new MouseEventArgs());
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Equal("End goal · Reading, 20 min daily", dialog.QuerySelector("h2")!.TextContent);
+        Assert.Equal("Attempt 1 · started 10 Nov", dialog.QuerySelector(".ht-dialog__sub")!.TextContent);
+        await cut.FindAll("[role=dialog] input[type=radio]")[1].ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = true });
+        await cut.Find("[role=dialog] textarea").InputAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "Too busy this month." });
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        var ending = _goals.Goals.Single(g => g.Id == goal).Attempt.Ending!;
+        Assert.Equal((Today, Outcome.Abandoned, "Too busy this month."), (ending.Date, ending.Outcome, ending.Note!.Value.Value));
+        AssertEndedPage(cut, goal);
+        // The re-read removed "End goal", the opener, so the focus goes to the Notice's "Start new attempt" (HP-009).
+        Assert.Equal(cut.Find(".ht-notice a").GetAttribute("blazor:elementReference"), FocusedIds(2)[^1]);
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_009_Cancel_closes_the_EndGoalDialog_ends_nothing_and_gives_the_focus_back_to_End_goal()
+    {
+        var goal = ReadingFromTue10();
+        var cut = RenderGoal(goal);
+        var endId = EndGoalButton(cut).GetAttribute("blazor:elementReference");
+        Assert.False(string.IsNullOrEmpty(endId));
+
+        await EndGoalButton(cut).ClickAsync(new MouseEventArgs());
+        await cut.FindAll(".ht-dialog__foot .ht-btn")[1].ClickAsync(new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.False(_goals.Goals.Single(g => g.Id == goal).IsEnded);
+        Assert.Equal(endId, FocusedIds(2)[^1]);
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_001_an_ended_goal_has_the_Notice_no_head_actions_and_keeps_its_History_actions()
+    {
+        var (goal, owner) = OwnedReadingFromTue10();
+        Assert.Equal(GoalEndOutcome.Ended, (await EndThroughServiceAsync(owner, goal)).Outcome);
+
+        var cut = RenderGoal(goal);
+
+        Assert.Equal("Attempt 1 · started 10 Nov", cut.Find(".ht-attempt").TextContent);
+        AssertEndedPage(cut, goal);
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_001_the_attempt_line_of_a_waiting_attempt_2_says_starts_though_the_goal_has_started()
+    {
+        var (goal, owner) = OwnedReadingFromTue10();
+        Assert.Equal(GoalEndOutcome.Ended, (await EndThroughServiceAsync(owner, goal)).Outcome);
+        var read = (await _goals.ReadOwnerGoalAsync(owner, goal, CancellationToken.None))!;
+        Assert.True(GoalTarget.TryCreate(Reading20MinDaily, out var target, out _));
+        var first = new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), new DateOnly(2026, 11, 23));
+        Assert.Equal(GoalChangeWriteOutcome.Written, await _goals.TryStartAttemptAsync(
+            owner, read.StoredTimeZone, read.GoalsRevision, new GoalAttemptWrite(goal, 2, first), CancellationToken.None));
+
+        var cut = RenderGoal(goal);
+
+        Assert.Equal("Attempt 2 · starts 23 Nov", cut.Find(".ht-attempt").TextContent);
+        Assert.Empty(cut.FindAll(".ht-notice"));
+        // Attempt 1's Pending 15 and 16 November can still be recorded now (FR-016), so "Record" stays.
+        Assert.Equal(["Edit settings", "Pause", "End goal", "Record"], cut.FindAll(".ht-page-head .ht-btn").Select(b => b.TextContent));
+    }
+
+    [Fact]
+    public async Task Slice_8_HP_001_an_ended_goal_that_never_began_says_ended_before_it_began_and_has_the_Notice()
+    {
+        var user = SignInUser();
+        var reading = _catalog.Add(HabitSamples.Reading());
+        var id = await CreateAsync(user, new GoalHabit(reading.Id, HabitKind.Catalog), Reading20MinDaily, new DateOnly(2026, 11, 25));
+        Assert.Equal(GoalEndOutcome.Ended, (await EndThroughServiceAsync(user.AccountId!.Value, id)).Outcome);
+
+        var cut = RenderGoal(id);
+
+        Assert.Equal("Attempt 1 · ended before it began", cut.Find(".ht-attempt").TextContent);
+        Assert.Equal("Ended Tue 17 Nov · Abandoned", NoticeOf(cut));
+        Assert.Equal("Start new attempt", cut.Find(".ht-notice a").TextContent);
+        Assert.Empty(cut.FindAll(".ht-page-head .ht-btn"));
+        Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
     }
 }

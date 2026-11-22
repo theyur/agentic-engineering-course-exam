@@ -51,6 +51,16 @@ public sealed class UseCaseParameterTests
         Assert.Empty(offenders);
     }
 
+    [Theory]
+    [InlineData(nameof(GoalChangeService.ChangeSettingsAsync))]
+    [InlineData(nameof(GoalChangeService.EndAsync))]
+    public void GoalChangeService_has_the_use_case(string name)
+    {
+        // Slice 8 (T061, T071): each use case of contracts/application-api.md "GoalChangeService" is a public method, so
+        // the rule above covers it.
+        Assert.Single(PublicMethods(typeof(GoalChangeService)), m => m.Name == name);
+    }
+
     [Fact]
     public void Every_method_of_the_custom_habit_port_takes_the_owner_first()
     {

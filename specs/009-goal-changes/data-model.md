@@ -232,6 +232,12 @@ refusal's text, or "settings changed" / "settings unchanged". `Field` is set onl
 (`GoalDraft.FieldOf`), `ScheduleKindChanged` (`Schedule`) and `NameTooLong` (`Name`). `GoalSettingsInput` is a sealed
 record with init-only `Target` (default empty) and `Name`, as `GoalInput`.
 
+Settled in T071: `GoalEndResult`'s outcome enum is `GoalEndOutcome` (in `GoalChangeResults.cs`), with the members in
+FR-007's check order and the success last: `NotSignedIn`, `NotForAdministrators`, `NotFound`, `AlreadyEnded`,
+`OutcomeMissing`, `NoteTooLong`, `Ended`. `Message` is never null: the refusal's text, or "goal ended". `EndingDate` and
+`LastDate` (`DateOnly?`) are set only for `Ended`. An `outcome` that is not a defined `Outcome` value gives
+`OutcomeMissing`, as a null one does. Neither the result nor a refusal carries the note.
+
 `NewAttemptValues` has:
 
 - the target fields of the ended attempt's last version, as `GoalStartingValues` gives them: `BuildOrReduce`,

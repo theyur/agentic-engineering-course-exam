@@ -165,4 +165,40 @@ public sealed class GoalChangeHostTests(HostFixture host)
                 rows, StringComparison.Ordinal);
         }
     }
+
+    [Fact]
+    public async Task SC_001_an_ending_in_three_actions_from_the_goal_page_shows_the_ended_Notice()
+    {
+        // Slice 8 (T078; HP-001, HP-003, US2-AS13).
+        var (browser, user, goal, _, today) = await OwnerWithGoalAsync("sc001-end");
+        using (browser)
+        {
+            // 1. "End goal" in the goal page's head, after "Edit settings".
+            var (pageStatus, page) = await browser.GetPageAsync($"/goals/{goal.Value}");
+            Assert.Equal(HttpStatusCode.OK, pageStatus);
+            var head = WebUtility.HtmlDecode(page);
+            Assert.Contains("<button type=\"button\" class=\"ht-btn ht-btn--ghost\" aria-haspopup=\"dialog\">End goal</button>", head, StringComparison.Ordinal);
+            Assert.True(head.IndexOf(">Edit settings</a>", StringComparison.Ordinal) < head.IndexOf(">End goal</button>", StringComparison.Ordinal));
+
+            // 2. The outcome, and 3. "End goal", in the EndGoalDialog: the interactive dialog sends them to GoalChangeService,
+            // which this test calls as it does.
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var ended = await scope.ServiceProvider.GetRequiredService<GoalChangeService>().EndAsync(
+                    user, goal, Outcome.Abandoned, null, CancellationToken.None);
+                Assert.Equal((GoalEndOutcome.Ended, (DateOnly?)today), (ended.Outcome, ended.EndingDate));
+            }
+
+            // The goal page now shows the ended Notice with "Start new attempt", and no head actions.
+            var (afterStatus, after) = await browser.GetPageAsync($"/goals/{goal.Value}");
+            Assert.Equal(HttpStatusCode.OK, afterStatus);
+            var text = WebUtility.HtmlDecode(after);
+            Assert.Contains($"<span>Ended {DateTexts.ShortDate(today)} · Abandoned</span>", text, StringComparison.Ordinal);
+            Assert.Contains($"<a class=\"ht-btn ht-btn--primary ht-btn--sm\" href=\"/goals/{goal.Value}/new-attempt\">Start new attempt</a>", text, StringComparison.Ordinal);
+            foreach (var absent in new[] { ">Edit settings<", ">End goal<", ">Pause<", ">Record<" })
+            {
+                Assert.DoesNotContain(absent, text, StringComparison.Ordinal);
+            }
+        }
+    }
 }

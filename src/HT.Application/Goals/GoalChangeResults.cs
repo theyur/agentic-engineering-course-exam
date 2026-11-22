@@ -78,3 +78,55 @@ public sealed class SettingsChangeResult
     internal static SettingsChangeResult Unchanged() =>
         new(SettingsChangeOutcome.Unchanged, GoalChangeTexts.SettingsUnchanged, null, null);
 }
+
+/// <summary>
+/// The outcomes of <see cref="GoalChangeService.EndAsync"/>, in FR-007's check order (data-model.md "Results and views"):
+/// the acting user, the goal, an ended goal, no outcome and the note; then the success.
+/// </summary>
+public enum GoalEndOutcome
+{
+    NotSignedIn,
+    NotForAdministrators,
+    NotFound,
+    AlreadyEnded,
+    OutcomeMissing,
+    NoteTooLong,
+    Ended,
+}
+
+/// <summary>
+/// The result of an ending (slice 8 FR-007, FR-008): "goal ended" with the ending date and the ended attempt's last date,
+/// or one refusal with its text. A refusal carries no input value, and neither result carries the note (HP-010).
+/// </summary>
+public sealed class GoalEndResult
+{
+    private GoalEndResult(GoalEndOutcome outcome, string message, DateOnly? endingDate, DateOnly? lastDate)
+    {
+        Outcome = outcome;
+        Message = message;
+        EndingDate = endingDate;
+        LastDate = lastDate;
+    }
+
+    public GoalEndOutcome Outcome { get; }
+
+    /// <summary>The refusal's text, or the success words "goal ended" (<see cref="GoalChangeTexts.Ended"/>).</summary>
+    public string Message { get; }
+
+    /// <summary>
+    /// The ending date E (FR-007): the goal's current date, or the account's today for a goal that has not started; set
+    /// only for <see cref="GoalEndOutcome.Ended"/>.
+    /// </summary>
+    public DateOnly? EndingDate { get; }
+
+    /// <summary>
+    /// The ended attempt's last date L (FR-008), before its start date when the attempt has no commitment or period; set
+    /// only for <see cref="GoalEndOutcome.Ended"/>.
+    /// </summary>
+    public DateOnly? LastDate { get; }
+
+    internal static GoalEndResult Refused(GoalEndOutcome outcome, string message) => new(outcome, message, null, null);
+
+    internal static GoalEndResult Ended(DateOnly endingDate, DateOnly lastDate) =>
+        new(GoalEndOutcome.Ended, GoalChangeTexts.Ended, endingDate, lastDate);
+}

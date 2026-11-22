@@ -1,4 +1,5 @@
 using HT.Application.Accounts;
+using HT.Application.Records;
 using HT.Domain.Accounts;
 using HT.Domain.Goals;
 using HT.Domain.Time;
@@ -119,6 +120,66 @@ public sealed class GoalChangeService
         return new Decision<SettingsChangeResult>(
             SettingsChangeResult.Changed(change.AppliesFrom),
             token => _goals.TryChangeSettingsAsync(owner, read.StoredTimeZone, read.GoalsRevision, write, token));
+    }
+
+    /// <summary>
+    /// Ends one of the acting user's goals that is not ended (FR-007 to FR-009), checking in FR-007's order after access:
+    /// an ended goal, no outcome (null or not defined), then a note longer than 500 characters after trimming. The ending
+    /// date E is the goal's current date at the supplied time, or the account's today for a goal that has not started;
+    /// <see cref="GoalTimeline.EndingOf"/> gives the last date and the versions the attempt keeps, and
+    /// <see cref="IGoalStore.TryEndAsync"/> writes them with the ending and cuts the pauses and excusals after the last
+    /// date. "goal ended" carries E and the last date. A goal that has not started, or whose attempt has not begun, can be
+    /// ended; its attempt then has no commitment or period.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The goal or the account kept changing during every write. The message names no value.</exception>
+    public async Task<GoalEndResult> EndAsync(
+        ActingUser actingUser, GoalId goal, Outcome? outcome, string? note, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await AccessAsync(actingUser, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return GoalEndResult.Refused(
+                refusal == AccessRefusal.NotSignedIn ? GoalEndOutcome.NotSignedIn : GoalEndOutcome.NotForAdministrators,
+                access.Message!);
+        }
+
+        var now = _clock.GetUtcNow();
+        return await DecideAndWriteAsync(
+            access.Owner,
+            goal,
+            static () => GoalEndResult.Refused(GoalEndOutcome.NotSignedIn, AccountTexts.NotSignedIn),
+            static () => GoalEndResult.Refused(GoalEndOutcome.NotFound, GoalTexts.NotFound),
+            (read, stored) => DecideEnding(access.Owner, read, stored, outcome, note, now),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Steps 4 to 6 of FR-007 and the ending, on one read of the goal.</summary>
+    private Decision<GoalEndResult> DecideEnding(
+        AccountId owner, OwnerGoal read, Goal goal, Outcome? outcome, string? note, DateTimeOffset now)
+    {
+        if (goal.IsEnded)
+        {
+            return Decision<GoalEndResult>.Done(GoalEndResult.Refused(GoalEndOutcome.AlreadyEnded, GoalChangeTexts.AlreadyEnded));
+        }
+
+        if (outcome is not { } chosen || !Enum.IsDefined(chosen))
+        {
+            return Decision<GoalEndResult>.Done(GoalEndResult.Refused(GoalEndOutcome.OutcomeMissing, GoalChangeTexts.OutcomeMissing));
+        }
+
+        if (!EndingNote.TryCreate(note, out var endingNote, out _))
+        {
+            return Decision<GoalEndResult>.Done(GoalEndResult.Refused(GoalEndOutcome.NoteTooLong, RecordTexts.NoteTooLong));
+        }
+
+        var endingDate = GoalTimeline.CurrentDate(goal, now) ?? ZoneOf(read.StoredTimeZone).DateAt(now);
+        var effect = GoalTimeline.EndingOf(goal, endingDate);
+        var write = new GoalEndingWrite(
+            goal.Id, goal.Attempt.Number, new GoalEnding(endingDate, chosen, endingNote), effect.LastDate, effect.KeptVersions);
+        return new Decision<GoalEndResult>(
+            GoalEndResult.Ended(endingDate, effect.LastDate),
+            token => _goals.TryEndAsync(owner, read.StoredTimeZone, read.GoalsRevision, write, token));
     }
 
     /// <summary>
