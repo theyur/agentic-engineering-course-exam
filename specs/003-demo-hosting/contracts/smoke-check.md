@@ -21,6 +21,11 @@ Research R-06. Decides whether a deployment or refresh succeeded (HP-017, SC-005
 > `IDemoPauseStore` in the coverage rule, and the `PageReader` reader `ReadGoalMetas` with its `GoalMeta` records
 > (slice 7 HP-011, `specs/008-excusals-and-pauses/contracts/host.md` "Smoke check"). Checks 1 to 7 are unchanged.
 
+> **Slice 8 (ADR 0026).** [ADR 0026](../../../docs/adr/0026-demo-goal-change-loading.md) adds demo goal-change loading
+> (`demo7@example.com`). This contract gains a check 9 `demo goal changes demo7@example.com`, the fifth demo data port
+> `IDemoGoalChangeStore` in the coverage rule, and the `PageReader` readers `ReadAttemptLines` and `ReadTableText`
+> (slice 8 HP-012, `specs/009-goal-changes/contracts/host.md` "Smoke check"). Checks 1 to 8 are unchanged.
+
 ## Invocation
 
 ```text
@@ -54,6 +59,7 @@ with its own cookies on every call.
 | 6 | `demo history demo4@example.com` (slice 5) | `DemoHistoryService.DemoEmail` signs in with the demo password, `GET /goals` shows the 3 names of `DemoHistory.GoalNames`, the History card of "Reading, 20 min daily" contains "Met", "Failed", "Pending", "Due today", "12 min" and "Fell asleep early.", and the History card of "Yoga, 3 times a week" contains "Failed" and "Missed": 11 expected texts. Slice 6 adds 3: the stat labels "Consistency" and "Streak, commitments" among the stat labels of "Reading, 20 min daily"'s page, and "Due now" among the tile labels of `GET /`: 14 expected texts |
 | 7 | `demo report demo5@example.com` (slice 6) | `DemoReportService.DemoEmail` signs in with the demo password, `GET /goals` shows the 3 names of `DemoReport.GoalNames`, the page of "Strength training, 2 times a week" has the stat label "Streak, weeks", and `GET /` has "Missed this week" among its tile labels and "Missed" among its status chips: 6 expected texts |
 | 8 | `demo pause demo6@example.com` (slice 7) | `DemoPauseService.DemoEmail` signs in with the demo password, the page of "Meditation, 10 min daily", reached through its link on `GET /goals`, has "Excused" among its status chips, and `GET /goals?tab=paused` shows the goal "Drinking water, 8 glasses a day" with a meta text that starts "Paused until" in the same goal item: 3 expected texts |
+| 9 | `demo goal changes demo7@example.com` (slice 8) | `DemoGoalChangeService.DemoEmail` signs in with the demo password, `GET /goals?tab=ended` shows the goal "Sugar, at most 1 sweet a day", the page of "Meditation, 5 min daily", reached through its link on `GET /goals`, has an attempt line that starts "Attempt 2 · started", the page of "Reading, 20 min daily" has in its Settings card the row "From …" with "25 min daily", and `GET /profile?tab=history` has the table "Goal history" with "Abandoned" in it: 4 expected texts |
 
 - Sign-in: `GET /sign-in`, read the antiforgery token and the `sign-in` handler, `POST /sign-in` with
   `Input.Email` and `Input.Password`, and expect a redirect that is not back to `/sign-in`.
@@ -104,6 +110,26 @@ with its own cookies on every call.
     `div.ht-goalitem__meta` after it and before the next goal item, without its chips (the Build or Reduce Tag and a
     Pending StatusChip). "Drinking water, 8 glasses a day" must equal one of those names, and its own meta text must
     start with "Paused until" (ordinal), so "Paused until" on another item does not count.
+- Check 9 (slice 8 HP-012):
+  - The goal names come from `DemoGoalChanges.GoalNames`, "25 min daily" from `DemoGoalChanges.WaitingTargetText`,
+    "Abandoned" from `ReportText.OutcomeText`, "Attempt 2 · started" from `ReportText.AttemptStarted` for the number of
+    "Meditation"'s latest attempt in `DemoGoalChanges.For` without its date (`DateTexts.DayMonth`), and "From" from
+    `ReportText.From` without its date (`DateTexts.ShortDate`), so no text is typed in the tool and the check holds
+    whatever the hosted run date is. "Goal history" is the label of the Profile's DataTable, named once in the tool.
+  - On the Ended tab `GET /goals?tab=ended`, "Sugar, at most 1 sweet a day" (position 3) must equal one of the
+    `a.ht-goalitem__name` names (`PageReader.ReadGoalNames`).
+  - The pages of "Meditation, 5 min daily" (position 2) and "Reading, 20 min daily" (position 1) are reached as checks 6
+    to 8 reach their goal pages, from `GET /goals` (the Active tab, where both are listed).
+  - On "Meditation"'s page an attempt line (`PageReader.ReadAttemptLines`: the text of every element with the class
+    `ht-attempt`, the line under the title) must start with "Attempt 2 · started " (ordinal); the Earlier attempts card
+    and the History card cannot satisfy it.
+  - On "Reading"'s page the Settings card's text (`PageReader.ReadCardText(html, "Settings")`) must hold "From " with
+    "25 min daily" after it (ordinal). The card shows the later target only in its "From …" row, after the Target row
+    ("20 min daily"), so the History card, another card or a later target before "From" does not count.
+  - On the Profile's Goal history tab `GET /profile?tab=history`, the text of the table "Goal history"
+    (`PageReader.ReadTableText`: the first `table.ht-table` whose `aria-label` is the label, up to its `</table>`, each tag
+    made one space, entities decoded and white space runs made one space) must hold "Abandoned" (ordinal), the outcome
+    of "Meditation"'s ended attempt 1. Another table's words or a chip outside the table do not count.
 - Timings, reported for SC-001 and never failing a check (one sample is not SC-001's 9 of 10):
   - `first`: the duration of the first request of check 1, from sending to the full response, whether it
     succeeded or not; when it did not succeed and a retry was needed, the line says `first <ms> ms (retried)`
@@ -113,12 +139,12 @@ with its own cookies on every call.
     every stylesheet and script the page links (`<link rel="stylesheet" href>`, `<script src>`), fetched one
     after another with that account's cookie, as a signed-in browser without a cache does (slice 1 research
     R-09: no-store, one security-stamp lookup per request). It does not include opening the interactive
-    circuit. Checks 6, 7 and 8 do not measure it.
+    circuit. Checks 6, 7, 8 and 9 do not measure it.
 
 ## Coverage rule
 
 All demo data is written through the demo data ports `IDemoDataStore` (ADR 0013, slice 2 research R-09),
-`IDemoHistoryStore` (slice 5, ADR 0018), `IDemoReportStore` (slice 6, ADR 0021) and `IDemoPauseStore` (slice 7, ADR 0023). Every data parameter of every method of each port (all parameters but
+`IDemoHistoryStore` (slice 5, ADR 0018), `IDemoReportStore` (slice 6, ADR 0021), `IDemoPauseStore` (slice 7, ADR 0023) and `IDemoGoalChangeStore` (slice 8, ADR 0026). Every data parameter of every method of each port (all parameters but
 the `CancellationToken`) has an entry in the smoke check's public coverage map `SmokeCheckCoverage`, keyed by
 port, method name, parameter name and parameter type, with the check that verifies it:
 
@@ -142,8 +168,12 @@ port, method name, parameter name and parameter type, with the check that verifi
 | `IDemoPauseStore` | `CreateDemoPauseAccountAsync` | `password` | `string` | 8 demo pause: the sign-in |
 | `IDemoPauseStore` | `CreateDemoPauseAccountAsync` | `profile` | `DemoAccountProfile` | 8 demo pause: the sign-in |
 | `IDemoPauseStore` | `CreateDemoPauseAccountAsync` | `goals` | `IReadOnlyList<DemoPauseGoal>` | 8 demo pause: an Excused result on a goal page, and the paused goal with its Paused until meta on the Paused tab |
+| `IDemoGoalChangeStore` | `CreateDemoGoalChangeAccountAsync` | `email` | `Email` | 9 demo goal changes: the sign-in |
+| `IDemoGoalChangeStore` | `CreateDemoGoalChangeAccountAsync` | `password` | `string` | 9 demo goal changes: the sign-in |
+| `IDemoGoalChangeStore` | `CreateDemoGoalChangeAccountAsync` | `profile` | `DemoAccountProfile` | 9 demo goal changes: the sign-in |
+| `IDemoGoalChangeStore` | `CreateDemoGoalChangeAccountAsync` | `goals` | `IReadOnlyList<DemoGoalChangeGoal>` | 9 demo goal changes: the ended goal on the Ended tab, the attempt line and the later settings row on goal pages, and an Abandoned outcome in the Goal history |
 
-That is 18 entries (10 until slice 5, 14 until slice 6). A test (research R-11) reflects over every port and fails when a method or a data parameter has no entry, or an
+That is 22 entries (10 until slice 5, 14 until slice 6, 18 until slice 7). A test (research R-11) reflects over every port and fails when a method or a data parameter has no entry, or an
 entry no longer matches a parameter of its port. A slice that adds demo data adds a method or a parameter to a
 port, adds a port, or changes a parameter's type, so its build of this test fails until it extends the check (a
 new port is also added to the test's list of ports). A slice that ships before this slice is implemented is
@@ -152,7 +182,7 @@ covered by the tasks gate instead (plan, Gates): the test does not exist yet the
 ## Output
 
 One line per check, in order. Every check runs, also after an earlier one failed (a failed `home` does not stop
-checks 2–8):
+checks 2–9):
 
 - a check with a list of expected names (`catalog`, `demo <email>`): `PASS <name> (<found> of <expected>)` or
   `FAIL <name>: <reason>`, where `<found>` counts the expected names present on the page, not the cards shown;
@@ -196,6 +226,19 @@ checks 2–8):
 
   No goal name, reason, note, figure, date, goal path, chip or meta text read from a page or other page content is
   printed;
+- `demo goal changes demo7@example.com` (slice 8), in check 8's form: `PASS demo goal changes demo7@example.com (4 of 4)`
+  when every expected text is found, otherwise `FAIL demo goal changes demo7@example.com: <reason>`. Every page that can
+  be reached is still read; the reason is the first failing part's, in this order:
+  - `the sign-in was refused`;
+  - `GET /goals?tab=ended gave status <code>`, or `0 of 1 goal names on the Ended tab shown`;
+  - `GET /goals gave status <code>`, `no link for goal page 2`, `GET goal page 2 gave status <code>`, or
+    `0 of 1 attempt lines on goal page 2 shown`;
+  - `GET /goals gave status <code>`, `no link for goal page 1`, `GET goal page 1 gave status <code>`, or
+    `0 of 1 later settings rows on goal page 1 shown`;
+  - `GET /profile?tab=history gave status <code>`, or `0 of 1 outcomes in the Goal history shown`.
+
+  No goal name, note, ending note, outcome, figure, date, goal path, attempt line, row or table text read from a page or
+  other page content is printed;
 - a check without a list (`home`, `https-redirect`, `administrator`): `PASS <name>` or `FAIL <name>: <reason>`;
 - check 2 with `--skip-http-redirect`: `SKIP https-redirect`;
 - a check that signs in and gets no response fails with `no response (<error>)` or `no response in time`.
@@ -232,7 +275,9 @@ starting a process:
 - `PageReader`, with `ReadGoalLinks(html)`, which returns `GoalLink` records (name, `href` or null), and
   `ReadCardText(html, title)` (slice 5); `ReadStatLabels(html)`, `ReadTileLabels(html)` and `ReadStatusChips(html)`
   (slice 6), each the decoded texts of its leaf elements in document order; `ReadGoalMetas(html)` (slice 7), which
-  returns `GoalMeta` records (the goal item's name, and its meta text without chips or null);
+  returns `GoalMeta` records (the goal item's name, and its meta text without chips or null); `ReadAttemptLines(html)`,
+  the decoded texts of the attempt lines in document order, and `ReadTableText(html, label)`, the text of the labelled
+  table or null (slice 8);
 - `SmokeCheckCoverage`, whose `Entries` are `CoverageEntry` records (port type, method, parameter, parameter
   type, check).
 

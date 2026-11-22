@@ -14,7 +14,7 @@ namespace HT.UiTests.Host;
 /// contracts/host.md "Operator log"): the default time zone's warning, only for a value that is not a named time zone.
 /// Slice 5 (HP-007, research R-09): demo history loading's lines for demo4 follow demo loading's. Slice 6 (HP-011, research
 /// R-10): demo report loading's lines for demo5 follow demo4's, which stay as they are. Slice 7 (HP-010): demo pause
-/// loading's lines for demo6 follow demo5's.
+/// loading's lines for demo6 follow demo5's. Slice 8 (HP-011): demo goal-change loading's lines for demo7 follow demo6's.
 /// </summary>
 [Collection(HostCollection.Name)]
 public sealed class StartupLogTests(HostFixture host)
@@ -34,29 +34,30 @@ public sealed class StartupLogTests(HostFixture host)
     }
 
     [Fact]
-    public void The_started_host_has_logged_the_three_demo_accounts_and_then_demo4_demo5_and_demo6_after_administrator_creation()
+    public void The_started_host_has_logged_the_three_demo_accounts_and_then_demo4_demo5_demo6_and_demo7_after_administrator_creation()
     {
         using var browser = host.CreateBrowser();
 
         var log = host.Logs.EntriesOf(StartupTasks.LoggerCategory).Select(e => e.Message).ToList();
 
         // Slice 5 HP-007: demo history loading's account line, for demo4, comes after demo loading's three; slice 6 HP-011:
-        // demo report loading's, for demo5, comes after it; slice 7 HP-010: demo pause loading's, for demo6, comes last.
+        // demo report loading's, for demo5, comes after it; slice 7 HP-010: demo pause loading's, for demo6, after that;
+        // slice 8 HP-011: demo goal-change loading's, for demo7, comes last.
         var administrator = log.FindIndex(m => m.StartsWith("Administrator creation: ", StringComparison.Ordinal));
         Assert.True(administrator >= 0, "No administrator creation line.");
         var demoLines = log.Skip(administrator + 1).Where(m => m.StartsWith("Demo account ", StringComparison.Ordinal)).ToList();
-        Assert.Equal(6, demoLines.Count);
+        Assert.Equal(7, demoLines.Count);
         Assert.Equal(
             [
                 "demo1@example.com", "demo2@example.com", "demo3@example.com", DemoHistoryService.DemoEmail, DemoReportService.DemoEmail,
-                DemoPauseService.DemoEmail,
+                DemoPauseService.DemoEmail, DemoGoalChangeService.DemoEmail,
             ],
             demoLines.Select(m => m["Demo account ".Length..m.IndexOf(':', StringComparison.Ordinal)]));
         Assert.All(log, m => Assert.DoesNotContain(HostFixture.DemoPassword, m, StringComparison.Ordinal));
     }
 
     [Fact]
-    public void The_started_host_has_logged_demo_history_loading_after_demo_loading_then_demo_report_and_demo_pause_loading_with_no_fault()
+    public void The_started_host_has_logged_demo_history_loading_after_demo_loading_then_demo_report_pause_and_goal_change_loading_with_no_fault()
     {
         using var browser = host.CreateBrowser();
 
@@ -76,6 +77,9 @@ public sealed class StartupLogTests(HostFixture host)
                 $"Demo account {DemoPauseService.DemoEmail}: created",
                 $"Demo goals {DemoPauseService.DemoEmail}: demo goals added",
                 $"Demo records {DemoPauseService.DemoEmail}: demo records added",
+                $"Demo account {DemoGoalChangeService.DemoEmail}: created",
+                $"Demo goals {DemoGoalChangeService.DemoEmail}: demo goals added",
+                $"Demo records {DemoGoalChangeService.DemoEmail}: demo records added",
             ],
             log.Skip(lastDemoLoading + 1).Where(m => m.StartsWith("Demo ", StringComparison.Ordinal)));
         Assert.DoesNotContain(log, m => m.EndsWith("failed; the app starts without it", StringComparison.Ordinal));

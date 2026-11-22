@@ -59,6 +59,27 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     /// <summary>The position of "Drinking water, 8 glasses a day" in <see cref="DemoPauses.GoalNames"/>, which check 8 finds on the Paused tab.</summary>
     private const int DrinkingWaterIndex = 1;
 
+    /// <summary>The Goals page's Ended tab (slice 8 HP-005), which check 9 reads.</summary>
+    private const string EndedTabPath = "/goals?tab=ended";
+
+    /// <summary>The Profile's Goal history tab (slice 8 HP-006), which check 9 reads.</summary>
+    private const string GoalHistoryTabPath = "/profile?tab=history";
+
+    /// <summary>The label of the Profile's Goal history DataTable (<c>Profile.razor</c>), which check 9 reads (slice 8 HP-006).</summary>
+    private const string GoalHistoryLabel = "Goal history";
+
+    /// <summary>The title of the goal page's Settings card (<c>GoalSettingsCard.razor</c>), whose text check 9 reads.</summary>
+    private const string SettingsTitle = "Settings";
+
+    /// <summary>The position of "Reading, 20 min daily" in <see cref="DemoGoalChanges.GoalNames"/>, whose page check 9 reads.</summary>
+    private const int ChangedReadingIndex = 0;
+
+    /// <summary>The position of "Meditation, 5 min daily" in <see cref="DemoGoalChanges.GoalNames"/>, whose page check 9 reads.</summary>
+    private const int RestartedMeditationIndex = 1;
+
+    /// <summary>The position of "Sugar, at most 1 sweet a day" in <see cref="DemoGoalChanges.GoalNames"/>, which check 9 finds on the Ended tab.</summary>
+    private const int EndedSugarIndex = 2;
+
     /// <summary>
     /// The goal pages of check 6 and their expected texts, all from <c>HT.Application</c> (slice 5 research R-10): the
     /// History card of "Reading" (<see cref="DemoHistory.GoalNames"/>[0], a daily commitment) holds Met, Failed, Pending,
@@ -101,6 +122,22 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     /// </summary>
     private static readonly string PausedUntilPrefix = PausedUntilWithoutDate(new DateOnly(2026, 11, 22));
 
+    /// <summary>
+    /// How the attempt line of "Meditation, 5 min daily" starts, "Attempt 2 · started " (slice 8 HP-001, HP-012):
+    /// <see cref="ReportText.AttemptStarted"/> for the number of its latest attempt in <see cref="DemoGoalChanges.For"/>,
+    /// without its date, so no text is typed in the tool and the check holds whatever the hosted run date is.
+    /// </summary>
+    private static readonly string RestartedAttemptPrefix = AttemptStartedWithoutDate(new DateOnly(2026, 11, 22));
+
+    /// <summary>
+    /// How the Settings card's row of the later settings starts, "From " (slice 8 HP-001, HP-012): <see cref="ReportText.From"/>
+    /// without its date.
+    /// </summary>
+    private static readonly string FromPrefix = FromWithoutDate(new DateOnly(2026, 11, 22));
+
+    /// <summary>The outcome check 9 finds in the Goal history: "Abandoned", that of "Meditation"'s ended attempt 1 (slice 8 FR-031).</summary>
+    private static readonly string AbandonedOutcome = ReportText.OutcomeText(Outcome.Abandoned);
+
     /// <summary>The pause between two tries of check 1, shortened to the warm-up time that is left.</summary>
     private static readonly TimeSpan RetryPause = TimeSpan.FromSeconds(5);
 
@@ -140,6 +177,7 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
         await WriteCheckAsync(lines, await CheckDemoHistoryAsync().ConfigureAwait(false)).ConfigureAwait(false);
         await WriteCheckAsync(lines, await CheckDemoReportAsync().ConfigureAwait(false)).ConfigureAwait(false);
         await WriteCheckAsync(lines, await CheckDemoPauseAsync().ConfigureAwait(false)).ConfigureAwait(false);
+        await WriteCheckAsync(lines, await CheckDemoGoalChangesAsync().ConfigureAwait(false)).ConfigureAwait(false);
 
         var laterMilliseconds = later?.Milliseconds;
         var laterRequests = later?.Requests ?? 0;
@@ -548,6 +586,101 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     }
 
     /// <summary>
+    /// Check 9 <c>demo goal changes &lt;email&gt;</c> (slice 8 HP-012): <see cref="DemoGoalChangeService.DemoEmail"/> signs in
+    /// on a new client with the demo password; the Ended tab <c>GET /goals?tab=ended</c> shows the goal "Sugar, at most 1
+    /// sweet a day" (<see cref="DemoGoalChanges.GoalNames"/>[2]); the page of "Meditation, 5 min daily" ([1]), reached
+    /// through its link on <c>GET /goals</c>, has an attempt line that starts "Attempt 2 · started"; the page of "Reading,
+    /// 20 min daily" ([0]) has, in its Settings card, the row "From …" with the later target "25 min daily" after it; and
+    /// the Profile's Goal history tab <c>GET /profile?tab=history</c> has the table "Goal history" with "Abandoned" in it:
+    /// 4 expected texts, the goal name matched whole. Every page is read; a <c>FAIL</c> names the first part that misses,
+    /// in that order. No goal name, note, outcome, figure, date or goal path is printed.
+    /// </summary>
+    private async Task<string> CheckDemoGoalChangesAsync()
+    {
+        var name = $"demo goal changes {DemoGoalChangeService.DemoEmail}";
+        return await GuardAsync(name, async () =>
+        {
+            using var client = _createClient();
+            if (!await SignInAsync(client, DemoGoalChangeService.DemoEmail, _options.DemoPassword).ConfigureAwait(false))
+            {
+                return $"{FailPrefix}{name}: the sign-in was refused";
+            }
+
+            var (endedStatus, endedHtml) = await GetPageAsync(client, EndedTabPath).ConfigureAwait(false);
+            List<NamesPart> parts =
+            [
+                NamesPart.Of(EndedTabPath, endedStatus, PageReader.ReadGoalNames(endedHtml), [DemoGoalChanges.GoalNames[EndedSugarIndex]], "goal names on the Ended tab"),
+            ];
+
+            var (goalsStatus, goalsHtml) = await GetPageAsync(client, GoalsPath).ConfigureAwait(false);
+            IReadOnlyList<GoalLink> links = goalsStatus == HttpStatusCode.OK ? PageReader.ReadGoalLinks(goalsHtml) : [];
+            parts.Add(await GoalChangePagePartAsync(client, goalsStatus, links, RestartedMeditationIndex, ShowsRestartedAttempt, "attempt lines").ConfigureAwait(false));
+            parts.Add(await GoalChangePagePartAsync(client, goalsStatus, links, ChangedReadingIndex, ShowsLaterSettingsRow, "later settings rows").ConfigureAwait(false));
+
+            var (historyStatus, historyHtml) = await GetPageAsync(client, GoalHistoryTabPath).ConfigureAwait(false);
+            parts.Add(historyStatus != HttpStatusCode.OK
+                ? new NamesPart(0, 1, $"GET {GoalHistoryTabPath} gave {StatusText(historyStatus)}")
+                : PageReader.ReadTableText(historyHtml, GoalHistoryLabel) is { } table && table.Contains(AbandonedOutcome, StringComparison.Ordinal)
+                    ? new NamesPart(1, 1, null)
+                    : new NamesPart(0, 1, "0 of 1 outcomes in the Goal history shown"));
+            return PartsLine(name, parts);
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// One goal page of check 9: the status of <c>GET /goals</c>, then the page through its link there, then whether it
+    /// <paramref name="shows"/> its expected text. The page is named by its position in <see cref="DemoGoalChanges.GoalNames"/> only.
+    /// </summary>
+    private static async Task<NamesPart> GoalChangePagePartAsync(
+        HttpClient client, HttpStatusCode goalsStatus, IReadOnlyList<GoalLink> links, int index, Func<string, bool> shows, string what)
+    {
+        if (goalsStatus != HttpStatusCode.OK)
+        {
+            return new NamesPart(0, 1, $"GET {GoalsPath} gave {StatusText(goalsStatus)}");
+        }
+
+        var position = (index + 1).ToString(CultureInfo.InvariantCulture);
+        var (problem, html) = await GetGoalPageAsync(client, links, DemoGoalChanges.GoalNames[index], position).ConfigureAwait(false);
+        if (problem is not null)
+        {
+            return new NamesPart(0, 1, problem);
+        }
+
+        return shows(html) ? new NamesPart(1, 1, null) : new NamesPart(0, 1, $"0 of 1 {what} on goal page {position} shown");
+    }
+
+    /// <summary>True when an attempt line of the page (<see cref="PageReader.ReadAttemptLines"/>) starts with <see cref="RestartedAttemptPrefix"/>.</summary>
+    private static bool ShowsRestartedAttempt(string html) =>
+        PageReader.ReadAttemptLines(html).Any(line => line.StartsWith(RestartedAttemptPrefix, StringComparison.Ordinal));
+
+    /// <summary>
+    /// True when the page's Settings card (<see cref="PageReader.ReadCardText"/>) holds "From " with the later target text
+    /// <see cref="DemoGoalChanges.WaitingTargetText"/> after it. The card shows that target only in its "From …" row, so
+    /// the History card or the Target row cannot satisfy it.
+    /// </summary>
+    private static bool ShowsLaterSettingsRow(string html)
+    {
+        var card = PageReader.ReadCardText(html, SettingsTitle);
+        var from = card?.IndexOf(FromPrefix, StringComparison.Ordinal) ?? -1;
+        return from >= 0 && card!.IndexOf(DemoGoalChanges.WaitingTargetText, from + FromPrefix.Length, StringComparison.Ordinal) >= 0;
+    }
+
+    /// <summary>"Attempt 2 · started 18 Nov" without "18 Nov", for the number of "Meditation"'s latest demo attempt.</summary>
+    private static string AttemptStartedWithoutDate(DateOnly runDate)
+    {
+        var number = DemoGoalChanges.For(runDate)[RestartedMeditationIndex].Attempts[^1].Number;
+        var text = ReportText.AttemptStarted(number, runDate);
+        return text[..^DateTexts.DayMonth(runDate).Length];
+    }
+
+    /// <summary>"From Thu 12 Nov" without "Thu 12 Nov": the text before the date, whatever the date is.</summary>
+    private static string FromWithoutDate(DateOnly appliesFrom)
+    {
+        var text = ReportText.From(appliesFrom);
+        return text[..^DateTexts.ShortDate(appliesFrom).Length];
+    }
+
+    /// <summary>
     /// A goal page reached through its link on Goals: the first goal item with <paramref name="goalName"/> whose
     /// <c>href</c> is a path on this site. Gives a reason that names the page by its <paramref name="position"/> only, or
     /// null and the page's HTML.
@@ -681,7 +814,7 @@ public sealed class SmokeCheckRunner(Func<HttpClient> createClient, SmokeCheckOp
     /// <summary>
     /// Signs in through the sign-in page as a browser does: <c>GET /sign-in</c>, its antiforgery token and the
     /// <c>sign-in</c> form handler, then <c>POST /sign-in</c>. True when the answer is a redirect that does not go back
-    /// to <c>/sign-in</c>; the client then holds the session cookie. Used by checks 4, 5, 6, 7 and 8.
+    /// to <c>/sign-in</c>; the client then holds the session cookie. Used by checks 4, 5, 6, 7, 8 and 9.
     /// </summary>
     private static async Task<bool> SignInAsync(HttpClient client, string email, string password)
     {

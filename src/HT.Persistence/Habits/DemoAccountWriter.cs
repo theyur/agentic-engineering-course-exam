@@ -15,8 +15,10 @@ namespace HT.Persistence.Habits;
 /// <summary>
 /// The writer of a demo account with history, shared by <see cref="DemoHistoryStore"/> (slice 5 FR-030, research R-08)
 /// and <see cref="DemoReportStore"/> (slice 6 FR-032, research R-09), and by <see cref="DemoPauseStore"/> (slice 7
-/// FR-031, research R-08), which also writes each goal's excusals and pauses after its records and notes, so the ports
-/// write in exactly the same way (ADR 0013, ADR 0021, ADR 0023). Each of its members is one transaction on the scoped context,
+/// FR-031, research R-08), which also writes each goal's excusals and pauses after its records and notes, and by
+/// <see cref="DemoGoalChangeStore"/> (slice 8 FR-031, research R-09), which writes each goal's attempts with their endings
+/// and per-attempt versions in place of version 1 and attempt 1, so the ports write in exactly the same way (ADR 0013,
+/// ADR 0021, ADR 0023, ADR 0026). Each of its members is one transaction on the scoped context,
 /// which Identity's user manager uses too: the demo account is inserted with its profile, then each goal whose catalog
 /// habit, looked up by name key under the key-range locks of goal creation, is in one of the goal's accepted states,
 /// with settings version 1 in the profile's zone and attempt 1 from its start date, its records in list order (one
@@ -51,7 +53,14 @@ internal sealed class DemoAccountWriter
         DemoAccountProfile profile,
         IReadOnlyList<DemoHistoryGoal> goals,
         CancellationToken cancellationToken) =>
-        CreateAsync(email, password, profile, goals, static goal => goal, static (_, _, _) => Task.CompletedTask, cancellationToken);
+        CreateAsync(
+            email,
+            password,
+            profile,
+            goals,
+            static goal => (goal.Goal.CatalogHabitName, goal.Goal.AcceptedStates),
+            (owner, habit, goal, ct) => WriteGoalAsync(owner, habit, goal, profile, ct),
+            cancellationToken);
 
     /// <summary>
     /// The demo account with these goals, their records and their notes, then each written goal's excusals and pauses
@@ -64,20 +73,52 @@ internal sealed class DemoAccountWriter
         DemoAccountProfile profile,
         IReadOnlyList<DemoPauseGoal> goals,
         CancellationToken cancellationToken) =>
-        CreateAsync(email, password, profile, goals, static goal => goal.History, WriteExemptionsAsync, cancellationToken);
+        CreateAsync(
+            email,
+            password,
+            profile,
+            goals,
+            static goal => (goal.History.Goal.CatalogHabitName, goal.History.Goal.AcceptedStates),
+            async (owner, habit, goal, ct) =>
+            {
+                var goalId = await WriteGoalAsync(owner, habit, goal.History, profile, ct).ConfigureAwait(false);
+                await WriteExemptionsAsync(goalId, goal, ct).ConfigureAwait(false);
+            },
+            cancellationToken);
 
     /// <summary>
-    /// The one transaction: the account, then each goal of <paramref name="goals"/> whose habit qualifies, as
-    /// <paramref name="historyOf"/> gives it with its records and notes, then what <paramref name="writeAfter"/> writes
-    /// for it under the new goal's identifier.
+    /// Slice 8 (FR-031, research R-09): the demo account with these goals, each with its attempts (rows with their
+    /// endings) and each attempt's settings versions in the profile's zone, then its records and notes, in the same
+    /// transaction: a goal left out is left out with all of them, and one that cannot be written is a fault that rolls
+    /// everything back.
+    /// </summary>
+    public Task<CreateDemoAccountOutcome> CreateWithAttemptsAsync(
+        Email email,
+        string password,
+        DemoAccountProfile profile,
+        IReadOnlyList<DemoGoalChangeGoal> goals,
+        CancellationToken cancellationToken) =>
+        CreateAsync(
+            email,
+            password,
+            profile,
+            goals,
+            static goal => (goal.CatalogHabitName, goal.AcceptedStates),
+            (owner, habit, goal, ct) => WriteGoalWithAttemptsAsync(owner, habit, goal, profile, ct),
+            cancellationToken);
+
+    /// <summary>
+    /// The one transaction: the account, then each goal of <paramref name="goals"/> whose catalog habit, as
+    /// <paramref name="habitOf"/> names it with the goal's accepted states, qualifies, written by
+    /// <paramref name="writeGoal"/> for the new owner and that habit.
     /// </summary>
     private async Task<CreateDemoAccountOutcome> CreateAsync<TGoal>(
         Email email,
         string password,
         DemoAccountProfile profile,
         IReadOnlyList<TGoal> goals,
-        Func<TGoal, DemoHistoryGoal> historyOf,
-        Func<Guid, TGoal, CancellationToken, Task> writeAfter,
+        Func<TGoal, (string? HabitName, IReadOnlySet<CatalogHabitState> AcceptedStates)> habitOf,
+        Func<AccountId, Guid, TGoal, CancellationToken, Task> writeGoal,
         CancellationToken cancellationToken)
         where TGoal : class
     {
@@ -100,11 +141,10 @@ internal sealed class DemoAccountWriter
             foreach (var goal in goals)
             {
                 ArgumentNullException.ThrowIfNull(goal);
-                var history = historyOf(goal);
-                if (await PublishedHabitOfAsync(history.Goal, cancellationToken).ConfigureAwait(false) is { } habit)
+                var (habitName, acceptedStates) = habitOf(goal);
+                if (await PublishedHabitOfAsync(habitName, acceptedStates, cancellationToken).ConfigureAwait(false) is { } habit)
                 {
-                    var goalId = await WriteGoalAsync(owner, habit, history, profile, cancellationToken).ConfigureAwait(false);
-                    await writeAfter(goalId, goal, cancellationToken).ConfigureAwait(false);
+                    await writeGoal(owner, habit, goal, cancellationToken).ConfigureAwait(false);
                 }
             }
 
@@ -157,9 +197,10 @@ internal sealed class DemoAccountWriter
     /// key with its state under UPDLOCK, HOLDLOCK until the commit, so it cannot change state in between; that state is
     /// the only data this store reads.
     /// </summary>
-    private async Task<Guid?> PublishedHabitOfAsync(DemoGoal goal, CancellationToken cancellationToken)
+    private async Task<Guid?> PublishedHabitOfAsync(
+        string? catalogHabitName, IReadOnlySet<CatalogHabitState> acceptedStates, CancellationToken cancellationToken)
     {
-        var key = HabitName.KeyOf(goal.CatalogHabitName
+        var key = HabitName.KeyOf(catalogHabitName
             ?? throw new InvalidOperationException(_failure + ": a demo goal names no catalog habit."));
         var found = await WriteAsync(() => _db.Database.SqlQuery<CatalogHabitStateRow>(
                     $"SELECT [Id], [State] FROM [CatalogHabits] WITH (UPDLOCK, HOLDLOCK) WHERE [NameKey] = {key}")
@@ -167,7 +208,7 @@ internal sealed class DemoAccountWriter
             .ConfigureAwait(false);
         return found is [var row]
                && Enum.TryParse<CatalogHabitState>(row.State, ignoreCase: false, out var state)
-               && goal.AcceptedStates.Contains(state)
+               && acceptedStates.Contains(state)
             ? row.Id
             : null;
     }
@@ -194,17 +235,68 @@ internal sealed class DemoAccountWriter
             Attempts = [new GoalAttemptRow { GoalId = id, Number = GoalAttempt.First, StartDate = demoGoal.StartDate }],
         }, cancellationToken).ConfigureAwait(false);
 
-        foreach (var record in goal.Records)
-        {
-            await SaveAsync(RecordMapping.ToRow(id, record.Date, record.Value), cancellationToken).ConfigureAwait(false);
-        }
-
-        foreach (var note in goal.Notes)
-        {
-            await SaveAsync(RecordMapping.ToRow(id, note.EntryDate, note.Text), cancellationToken).ConfigureAwait(false);
-        }
-
+        await WriteRecordsAndNotesAsync(id, goal.Records, goal.Notes, cancellationToken).ConfigureAwait(false);
         return id;
+    }
+
+    /// <summary>
+    /// Slice 8 (research R-09): the goal row from attempt 1's start date, with no own name, with its attempt rows, each
+    /// with its ending (<see cref="AttemptRowOf"/>), and every attempt's settings versions in the profile's zone
+    /// (<see cref="VersionRowsOf"/>), in one save; then its records and notes as <see cref="WriteGoalAsync"/> writes
+    /// them. The rows pass <see cref="GoalMapping"/>'s checks on read, because <see cref="DemoGoalChangeGoal"/> has
+    /// checked the attempts against the goal invariants.
+    /// </summary>
+    private async Task WriteGoalWithAttemptsAsync(
+        AccountId owner, Guid habitId, DemoGoalChangeGoal goal, DemoAccountProfile profile, CancellationToken cancellationToken)
+    {
+        var id = Guid.NewGuid();
+        await SaveAsync(new GoalRow
+        {
+            Id = id,
+            OwnerId = owner.Value,
+            CatalogHabitId = habitId,
+            StartDate = goal.StartDate,
+            Versions = VersionRowsOf(id, goal, profile),
+            Attempts = [.. goal.Attempts.Select(a => AttemptRowOf(id, a))],
+        }, cancellationToken).ConfigureAwait(false);
+
+        await WriteRecordsAndNotesAsync(id, goal.Records, goal.Notes, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The attempt row of <paramref name="attempt"/>, with its ending's date, outcome and trimmed note; all three null while it is not ended.</summary>
+    private static GoalAttemptRow AttemptRowOf(Guid goalId, DemoAttempt attempt) => new()
+    {
+        GoalId = goalId,
+        Number = attempt.Number,
+        StartDate = attempt.StartDate,
+        EndingDate = attempt.Ending?.Date,
+        Outcome = attempt.Ending?.Outcome,
+        EndingNote = attempt.Ending?.Note?.Value,
+    };
+
+    /// <summary>The version rows of every attempt of <paramref name="goal"/>, each under its attempt's number, in the profile's zone.</summary>
+    private static List<GoalSettingsVersionRow> VersionRowsOf(Guid goalId, DemoGoalChangeGoal goal, DemoAccountProfile profile) =>
+    [
+        .. goal.AttemptsIn(profile.TimeZone)
+            .SelectMany(a => a.Versions.Select(v => GoalMapping.ToRow(goalId, a.Attempt.Number, v))),
+    ];
+
+    /// <summary>
+    /// The goal's records, one save each in list order, so the identity column keeps that order; then its notes, one
+    /// save each, so a second note under the same entry key is a primary-key fault of the database.
+    /// </summary>
+    private async Task WriteRecordsAndNotesAsync(
+        Guid goalId, IReadOnlyList<DemoRecord> records, IReadOnlyList<DemoNote> notes, CancellationToken cancellationToken)
+    {
+        foreach (var record in records)
+        {
+            await SaveAsync(RecordMapping.ToRow(goalId, record.Date, record.Value), cancellationToken).ConfigureAwait(false);
+        }
+
+        foreach (var note in notes)
+        {
+            await SaveAsync(RecordMapping.ToRow(goalId, note.EntryDate, note.Text), cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

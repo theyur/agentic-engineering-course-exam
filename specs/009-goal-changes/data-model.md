@@ -466,15 +466,31 @@ Settled in T044 to T047 (all internal, so no public surface changes):
   the default zone.
 - `DemoGoalChangeLoadingResult` and `DemoGoalChangeAccountResult` mirror slice 7's results: "no demo password
   configured", "demo password does not meet the password rule", "created" or "already exists", "demo goals added",
-  "demo records added".
-- `DemoGoalChanges.For(DateOnly runDate)` → the three `DemoGoalChangeGoal`s of FR-031.
-- `DemoGoalChangeGoal` has:
+  "demo records added". `DemoGoalChangeLoadingResult.Outcome` is the enum `DemoGoalChangeLoadingOutcome`
+  (`NoPassword`, `PasswordRuleNotMet`, `Loaded`, in FR-031's check order), as `DemoPauseLoadingResult` has
+  `DemoPauseLoadingOutcome` (T105).
+- `DemoGoalChanges.For(DateOnly runDate)` → the three `DemoGoalChangeGoal`s of FR-031, in creation order: Reading,
+  Meditation, Sugar. Its constants `ShortOnTimeNote` ("Short on time."), `TooBusyEndingNote` ("Too busy.") and
+  `SugarEndingNote` ("Three weeks without extra sweets."), and, for the smoke check, `GoalNames` (the three names at
+  the run time, in creation order), `EarlierAttemptName` ("Meditation, 10 min daily") and `WaitingTargetText`
+  ("25 min daily") (T104).
+- `DemoGoalChangeGoal(string catalogHabitName, IEnumerable<CatalogHabitState> acceptedStates,
+  IEnumerable<DemoAttempt> attempts, IEnumerable<DemoRecord> records, IEnumerable<DemoNote> notes)` has:
   - the catalog habit name;
   - the accepted habit states (Published);
   - its `DemoAttempt`s;
-  - its records and notes (slice 6's `DemoRecord` and `DemoNote`).
-- `DemoAttempt` has its number, its versions (`DemoVersion`: applies-from date and target fields), and an optional
-  ending (date, outcome, note).
+  - its records and notes (slice 6's `DemoRecord` and `DemoNote`);
+  - no own name, so its name follows FR-004; `StartDate` is attempt 1's start date.
+
+  Its constructor refuses a null part and attempts that fail the `Goal` invariants (checked by building a `Goal` in
+  UTC; the zone takes part in no invariant), so the store never writes rows that `GoalMapping` would refuse on read.
+  `AttemptsIn(NamedTimeZone zone)` gives the attempts as `GoalAttemptVersions` with every version in that zone; the
+  store maps them with `GoalMapping.ToRow(goalId, attemptNumber, version)` in the profile's zone, and the unit tests
+  build the `Goal` from them (T104).
+- `DemoAttempt(int number, IEnumerable<DemoVersion> versions, GoalEnding? ending)` has its number, its versions
+  (`DemoVersion(DateOnly appliesFrom, GoalTarget target)`: applies-from date and the checked target; the zone is the
+  profile's), and an optional ending, the Domain's `GoalEnding` (date, outcome, note). Its `StartDate` is its first
+  version's date (T104).
 - `IDemoGoalChangeStore.CreateDemoGoalChangeAccountAsync(Email email, string password, DemoAccountProfile profile,
   IReadOnlyList<DemoGoalChangeGoal> goals, CancellationToken)` → `CreateDemoAccountOutcome`. It writes everything in
   one transaction, as `IDemoPauseStore` does.

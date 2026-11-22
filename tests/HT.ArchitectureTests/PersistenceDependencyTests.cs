@@ -40,16 +40,18 @@ public sealed class PersistenceDependencyTests
     }
 
     /// <summary>
-    /// Slice 6 (research R-09, R-14) and slice 7 (research R-08): the shared demo account writer, the demo report store and
-    /// the demo pause store are internal, so the demo report data is written only through <c>IDemoReportStore</c> and the
-    /// demo pause data only through <c>IDemoPauseStore</c> (ADR 0010, ADR 0013, ADR 0023). The named types must exist,
-    /// so a rename cannot make the rule pass on nothing.
+    /// Slice 6 (research R-09, R-14), slice 7 (research R-08) and slice 8 (research R-09): the shared demo account writer,
+    /// the demo report store, the demo pause store and the demo goal-change store are internal, so the demo report data
+    /// is written only through <c>IDemoReportStore</c>, the demo pause data only through <c>IDemoPauseStore</c> and the
+    /// demo goal-change data only through <c>IDemoGoalChangeStore</c> (ADR 0010, ADR 0013, ADR 0023, ADR 0026). The named
+    /// types must exist, so a rename cannot make the rule pass on nothing.
     /// </summary>
     [Theory]
     [InlineData("HT.Persistence.Habits.DemoAccountWriter")]
     [InlineData("HT.Persistence.Habits.DemoReportStore")]
     [InlineData("HT.Persistence.Habits.DemoPauseStore")]
-    public void TheDemoAccountWriterTheDemoReportStoreAndTheDemoPauseStoreAreInternal(string name)
+    [InlineData("HT.Persistence.Habits.DemoGoalChangeStore")]
+    public void TheDemoAccountWriterTheDemoReportStoreTheDemoPauseStoreAndTheDemoGoalChangeStoreAreInternal(string name)
     {
         var type = ArchitectureModel.Persistence.GetType(name);
 
