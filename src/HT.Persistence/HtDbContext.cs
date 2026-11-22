@@ -142,7 +142,16 @@ internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
         builder.Entity<GoalSettingsVersionRow>(version =>
         {
             version.ToTable("GoalSettingsVersions");
-            version.HasKey(v => new { v.GoalId, v.AppliesFrom });
+
+            // Slice 8 (data-model.md "Tables", research R-05): two attempts can have versions from the same date. The
+            // foreign key to the attempt takes no action on delete: the cascades from Goals delete both tables' rows in
+            // the one statement, and a second cascade path to this table is one that SQL Server refuses. Existing rows
+            // get attempt 1 from the migration only, so the model has no default value.
+            version.HasKey(v => new { v.GoalId, v.AttemptNumber, v.AppliesFrom });
+            version.HasOne<GoalAttemptRow>()
+                .WithMany()
+                .HasForeignKey(v => new { v.GoalId, v.AttemptNumber })
+                .OnDelete(DeleteBehavior.NoAction);
             version.Property(v => v.BuildOrReduce).HasConversion<string>().HasMaxLength(16).IsUnicode(false).IsRequired();
             version.Property(v => v.Measurement).HasConversion<string>().HasMaxLength(16).IsUnicode(false).IsRequired();
             version.Property(v => v.CountUnit).HasMaxLength(SuggestedStartingGoal.CountUnitMaxLength);
@@ -157,6 +166,11 @@ internal sealed class HtDbContext(DbContextOptions<HtDbContext> options)
             attempt.ToTable("GoalAttempts");
             attempt.HasKey(a => new { a.GoalId, a.Number });
             attempt.Property(a => a.Number).ValueGeneratedNever();
+
+            // Slice 8 (data-model.md "Tables"): the ending, null while the attempt is not ended; no check constraint.
+            attempt.Property(a => a.EndingDate).HasColumnType("date");
+            attempt.Property(a => a.Outcome).HasConversion<string>().HasMaxLength(16).IsUnicode(false);
+            attempt.Property(a => a.EndingNote).HasMaxLength(RecordLimits.MaxNoteLength);
         });
 
         // Slice 5 (data-model.md "Tables"): no check constraints; the mapping keeps the value rule (research R-06).

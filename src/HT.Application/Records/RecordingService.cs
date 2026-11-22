@@ -72,7 +72,8 @@ public sealed class RecordingService
         }
 
         var now = _clock.GetUtcNow();
-        var found = access.Goal!;
+        var stored = access.Goal!;
+        var found = stored.Goal;
         if (GoalTimeline.EntryOf(found, date) is not { } entry)
         {
             return RecordWriteResult.Refused(RecordWriteOutcome.NothingScheduled, RecordTexts.NothingScheduled);
@@ -113,7 +114,7 @@ public sealed class RecordingService
         switch (write.Outcome)
         {
             case RecordStoreWriteOutcome.Written:
-                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, exemptions, now);
+                var view = EntryViews.Of(stored, entry, write.Entry!.Records, write.Entry.Note, exemptions, now);
                 return RecordWriteResult.Recorded(write.RecordId!.Value, view, view.IsCorrection);
             case RecordStoreWriteOutcome.LimitReached:
                 return RecordWriteResult.Refused(RecordWriteOutcome.RecordLimitReached, RecordTexts.RecordLimitReached);
@@ -133,9 +134,10 @@ public sealed class RecordingService
     /// Changes the value of one record of one of the acting user's goals (FR-003 to FR-007), at any time, also after the
     /// entry is final (US3), checking in contracts/application-api.md's order: access; the record among that goal's
     /// records (<see cref="RecordWriteOutcome.RecordNotFound"/> for a record of another goal, of another account or of
-    /// nothing); the value for the measurement of the version in effect for the record's entry (FR-004, FR-015); then
-    /// the note (FR-007). There is no date step: the record's date never changes (FR-003), and while versions differ
-    /// only in their time zone it always passes FR-002 again (plan "Resolved in the spec" 1). The record keeps its
+    /// nothing); the record's date in an entry of one of the goal's attempts (slice 8 FR-009, FR-014, plan "Spec
+    /// discrepancies" 4: a record kept outside every attempt gives <see cref="RecordWriteOutcome.NothingScheduled"/> and
+    /// nothing changes); the value for the measurement of the version in effect for the record's entry (FR-004, FR-015);
+    /// then the note (FR-007). The record's date never changes (FR-003). The record keeps its
     /// identifier, date and place in the stored order. In the record's transaction, a note with text adds or replaces
     /// the entry's note, an empty one removes it, and none leaves it unchanged (specs/006-note-editing FR-001); a
     /// refusal writes neither. <see cref="RecordWriteOutcome.Changed"/> carries the record's identifier, the entry after the write
@@ -153,13 +155,18 @@ public sealed class RecordingService
         }
 
         var now = _clock.GetUtcNow();
-        var found = access.Goal!;
+        var stored = access.Goal!;
+        var found = stored.Goal;
         if (await _records.FindRecordDateAsync(access.Owner, goal, record, cancellationToken).ConfigureAwait(false) is not { } date)
         {
             return RecordWriteResult.Refused(RecordWriteOutcome.RecordNotFound, RecordTexts.RecordNotFound);
         }
 
-        var entry = StoredEntryOf(found, date);
+        if (GoalTimeline.EntryOf(found, date) is not { } entry)
+        {
+            return RecordWriteResult.Refused(RecordWriteOutcome.NothingScheduled, RecordTexts.NothingScheduled);
+        }
+
         var target = EntryViews.TargetOf(found, entry);
         if (!RecordValue.TryCreate(target.Measurement, input.Answer, input.Amount, out var value, out var problem))
         {
@@ -177,7 +184,7 @@ public sealed class RecordingService
         {
             case RecordStoreWriteOutcome.Written:
                 var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
-                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, exemptions, now);
+                var view = EntryViews.Of(stored, entry, write.Entry!.Records, write.Entry.Note, exemptions, now);
                 return RecordWriteResult.Changed(write.RecordId!.Value, view, view.IsCorrection);
             case RecordStoreWriteOutcome.RecordNotFound:
                 // The record was deleted between the lookup and the write.
@@ -193,7 +200,9 @@ public sealed class RecordingService
     /// <summary>
     /// Deletes one record of one of the acting user's goals (FR-003, FR-006), at any time, also after the entry is final
     /// (US3-AS3), checking in contracts/application-api.md's order: access, then the record among that goal's records
-    /// (<see cref="RecordWriteOutcome.RecordNotFound"/>); nothing after the record. Deleting the only record of a final
+    /// (<see cref="RecordWriteOutcome.RecordNotFound"/>), then (slice 8 FR-009, FR-014) the record's date in an entry of
+    /// one of the goal's attempts (<see cref="RecordWriteOutcome.NothingScheduled"/> for a record kept outside every
+    /// attempt, which stays stored); nothing after that. Deleting the only record of a final
     /// entry makes it Missed. <see cref="RecordWriteOutcome.Deleted"/> carries the entry after the write and whether the
     /// deletion was a correction (FR-006): deleting the only record of a Due or Pending entry is not one.
     /// </summary>
@@ -207,19 +216,23 @@ public sealed class RecordingService
         }
 
         var now = _clock.GetUtcNow();
-        var found = access.Goal!;
+        var stored = access.Goal!;
         if (await _records.FindRecordDateAsync(access.Owner, goal, record, cancellationToken).ConfigureAwait(false) is not { } date)
         {
             return RecordWriteResult.Refused(RecordWriteOutcome.RecordNotFound, RecordTexts.RecordNotFound);
         }
 
-        var entry = StoredEntryOf(found, date);
+        if (GoalTimeline.EntryOf(stored.Goal, date) is not { } entry)
+        {
+            return RecordWriteResult.Refused(RecordWriteOutcome.NothingScheduled, RecordTexts.NothingScheduled);
+        }
+
         var write = await _records.DeleteAsync(access.Owner, goal, record, SpanOf(entry), cancellationToken).ConfigureAwait(false);
         switch (write.Outcome)
         {
             case RecordStoreWriteOutcome.Written:
                 var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
-                var view = EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, exemptions, now);
+                var view = EntryViews.Of(stored, entry, write.Entry!.Records, write.Entry.Note, exemptions, now);
                 return RecordWriteResult.Deleted(view, view.IsCorrection);
             case RecordStoreWriteOutcome.RecordNotFound:
                 // The record was deleted between the lookup and the write.
@@ -252,7 +265,8 @@ public sealed class RecordingService
         }
 
         var now = _clock.GetUtcNow();
-        var found = access.Goal!;
+        var stored = access.Goal!;
+        var found = stored.Goal;
         if (GoalTimeline.EntryOf(found, date) is not { } entry)
         {
             return NoteSaveResult.Refused(NoteSaveOutcome.NothingScheduled, RecordTexts.NothingScheduled);
@@ -273,7 +287,7 @@ public sealed class RecordingService
         {
             case RecordStoreWriteOutcome.Written:
                 var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
-                return NoteSaveResult.Saved(EntryViews.Of(found, entry, write.Entry!.Records, write.Entry.Note, exemptions, now));
+                return NoteSaveResult.Saved(EntryViews.Of(stored, entry, write.Entry!.Records, write.Entry.Note, exemptions, now));
             case RecordStoreWriteOutcome.GoalNotFound:
                 // The goal was removed between the lookup and the write.
                 return NoteSaveResult.Refused(NoteSaveOutcome.NotFound, GoalTexts.NotFound);
@@ -289,6 +303,12 @@ public sealed class RecordingService
     /// latest note keys; then one read per key, over that entry's dates only, gives its records and note, so the call
     /// makes at most 6 store reads and none spans the dates between two notes. A note removed between the two reads is
     /// left out.
+    /// <para>
+    /// Slice 8 (FR-016, FR-027, research R-07): only the notes inside the latest attempt's entries, read through the
+    /// bounded <see cref="IRecordStore.ReadRecentNoteKeysAsync(AccountId, GoalId, DateOnly, DateOnly?, int, CancellationToken)"/>
+    /// from its first entry's first date and, once it is ended, through its last entry's last date. A latest attempt
+    /// with no date gives no note and reads nothing. A key with no entry is skipped. An ending note is never a note.
+    /// </para>
     /// </summary>
     public async Task<RecentNotesResult> GetRecentNotesAsync(ActingUser actingUser, GoalId goal, CancellationToken cancellationToken)
     {
@@ -301,14 +321,26 @@ public sealed class RecordingService
 
         var now = _clock.GetUtcNow();
         var found = access.Goal!;
-        var keys = await _records.ReadRecentNoteKeysAsync(access.Owner, goal, RecentNotesCount, cancellationToken).ConfigureAwait(false);
+        var bounds = AttemptEntries.BoundsOf(found.Goal, found.Goal.Attempt.Number);
+        if (bounds.Count == 0)
+        {
+            return RecentNotesResult.Found([]);
+        }
+
+        DateOnly? through = found.Goal.IsEnded ? bounds[^1].LastDate : null;
+        var keys = await _records.ReadRecentNoteKeysAsync(access.Owner, goal, bounds[0].FirstDate, through, RecentNotesCount, cancellationToken)
+            .ConfigureAwait(false);
         var notes = new List<RecentNote>(keys.Count);
         var exemptions = keys.Count == 0
             ? GoalExemptions.None
             : await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
         foreach (var key in keys)
         {
-            var entry = NoteEntryOf(found, key);
+            if (GoalTimeline.EntryOf(found.Goal, key) is not { } entry)
+            {
+                continue;
+            }
+
             var stored = await _records.ReadAsync(access.Owner, goal, entry.FirstDate, entry.LastDate, cancellationToken)
                 .ConfigureAwait(false);
             if (stored.Notes.GetValueOrDefault(entry.Key) is not { } note)
@@ -332,6 +364,11 @@ public sealed class RecordingService
     /// covers the first entry's first date to the last entry's last date. A range with no entry (unscheduled days only,
     /// days before the start date, or a per-week goal's days before its first week) gives no entries, and then no
     /// record is read. <see cref="GoalHistory.CurrentDate"/> is the goal's current date at the supplied time.
+    /// <para>
+    /// Slice 8 (FR-016, research R-07): only the latest attempt's entries within the range, each with its own settings;
+    /// the goal-level settings are the latest attempt's settings in effect
+    /// (<see cref="GoalTimeline.VersionInEffect(Goal, DateTimeOffset)"/>).
+    /// </para>
     /// </summary>
     public async Task<HistoryResult> GetHistoryAsync(
         ActingUser actingUser, GoalId goal, DateOnly first, DateOnly last, CancellationToken cancellationToken)
@@ -344,16 +381,18 @@ public sealed class RecordingService
         }
 
         var found = access.Goal!;
-        if (!GoalTimeline.TryEntries(found, first, last, out var entries))
+        if (!GoalTimeline.TryEntries(found.Goal, first, last, out var inRange))
         {
             return HistoryResult.Refused(HistoryOutcome.RangeOutOfBounds, GoalTexts.RangeOutOfBounds);
         }
 
         var now = _clock.GetUtcNow();
-        var current = GoalTimeline.CurrentDate(found, now);
+        var current = GoalTimeline.CurrentDate(found.Goal, now);
+        var version = GoalTimeline.VersionInEffect(found.Goal, now);
+        var entries = LatestAttemptOnly(found.Goal, inRange);
         if (entries.Count == 0)
         {
-            return HistoryResult.Found(EntryViews.HistoryOf(found, current, [], now));
+            return HistoryResult.Found(EntryViews.HistoryOf(found.Goal, version, current, [], now));
         }
 
         var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
@@ -362,7 +401,7 @@ public sealed class RecordingService
         var views = entries
             .Select(entry => EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), exemptions, now))
             .ToList();
-        return HistoryResult.Found(EntryViews.HistoryOf(found, current, views, now));
+        return HistoryResult.Found(EntryViews.HistoryOf(found.Goal, version, current, views, now));
     }
 
     /// <summary>
@@ -371,6 +410,12 @@ public sealed class RecordingService
     /// newest first by first date, each as the history gives it. A goal with no current date, or with no entry in that
     /// window (a per-week goal before its first week), has none, and then no record is read.
     /// <see cref="GoalHistory.CurrentDate"/> is the goal's current date at the supplied time.
+    /// <para>
+    /// Slice 8 (FR-016, research R-07): the window's entries of the latest attempt that are Due or Pending, plus the
+    /// Pending entries of earlier ended attempts whose grace period is open (the overview's <c>EarlierPending</c>), each
+    /// with its attempt's number, name and settings, from one record read over the range they span. The goal-level
+    /// settings are the latest attempt's settings in effect.
+    /// </para>
     /// </summary>
     public async Task<RecordableResult> GetRecordableAsync(ActingUser actingUser, GoalId goal, CancellationToken cancellationToken)
     {
@@ -383,25 +428,39 @@ public sealed class RecordingService
 
         var now = _clock.GetUtcNow();
         var found = access.Goal!;
-        if (GoalTimeline.CurrentDate(found, now) is not { } current)
+        var version = GoalTimeline.VersionInEffect(found.Goal, now);
+        if (GoalTimeline.CurrentDate(found.Goal, now) is not { } current)
         {
-            return RecordableResult.Found(EntryViews.HistoryOf(found, null, [], now));
+            return RecordableResult.Found(EntryViews.HistoryOf(found.Goal, version, null, [], now));
         }
 
-        if (!GoalTimeline.TryEntries(found, current.AddDays(-RecordableWindowDays), current, out var entries) || entries.Count == 0)
+        var entries = GoalTimeline.TryEntries(found.Goal, current.AddDays(-RecordableWindowDays), current, out var window)
+            ? LatestAttemptOnly(found.Goal, window)
+            : [];
+        var earlier = AttemptEntries.EarlierOpenOf(found.Goal, now);
+        if (entries.Count == 0 && earlier.Count == 0)
         {
-            return RecordableResult.Found(EntryViews.HistoryOf(found, current, [], now));
+            return RecordableResult.Found(EntryViews.HistoryOf(found.Goal, version, current, [], now));
         }
 
         var exemptions = await _records.ReadExemptionsAsync(access.Owner, goal, cancellationToken).ConfigureAwait(false);
-        var stored = await _records.ReadAsync(access.Owner, goal, entries[0].FirstDate, entries[^1].LastDate, cancellationToken)
+        var stored = await _records.ReadAsync(
+                access.Owner,
+                goal,
+                earlier.Count > 0 ? earlier[0].Entry.FirstDate : entries[0].FirstDate,
+                entries.Count > 0 ? entries[^1].LastDate : earlier[^1].Entry.LastDate,
+                cancellationToken)
             .ConfigureAwait(false);
+        var earlierPending = earlier
+            .Select(open => EntryViews.Of(found, open.Entry, EntryViews.RecordsIn(stored, open.Entry), stored.Notes.GetValueOrDefault(open.Entry.Key), exemptions, now))
+            .Where(view => view.State == EvaluationState.Pending);
         var recordable = entries
             .Select(entry => EntryViews.Of(found, entry, EntryViews.RecordsIn(stored, entry), stored.Notes.GetValueOrDefault(entry.Key), exemptions, now))
             .Where(view => view.State is EvaluationState.Due or EvaluationState.Pending)
+            .Concat(earlierPending)
             .OrderByDescending(view => view.FirstDate)
             .ToList();
-        return RecordableResult.Found(EntryViews.HistoryOf(found, current, recordable, now));
+        return RecordableResult.Found(EntryViews.HistoryOf(found.Goal, version, current, recordable, now));
     }
 
     /// <summary>
@@ -427,26 +486,19 @@ public sealed class RecordingService
         }
 
         return await _goals.FindAsync(owner, goal, cancellationToken).ConfigureAwait(false) is { } stored
-            ? new Access(owner, stored.Goal, null, null)
+            ? new Access(owner, stored, null, null)
             : Access.Refused(AccessRefusal.NotFound, GoalTexts.NotFound);
     }
 
     /// <summary>
-    /// The entry of a stored record's date. A record is stored only for a date of an entry, and while versions differ
-    /// only in their time zone that date stays one (FR-015, plan "Resolved in the spec" 1); the message names no date.
+    /// The entries of <paramref name="entries"/> that belong to the goal's latest attempt (slice 8 FR-016): those from its
+    /// timing date on, since every earlier attempt ends before the latest one starts.
     /// </summary>
-    private static CalendarEntry StoredEntryOf(Goal goal, DateOnly date) =>
-        GoalTimeline.EntryOf(goal, date)
-        ?? throw new InvalidOperationException("A stored record's date belongs to no commitment or period of its goal.");
-
-    /// <summary>
-    /// The entry of a stored note's key (the commitment's date, the day, or the week's Monday). A note is stored only under
-    /// an entry's key, and while versions differ only in their time zone that key stays one (FR-015); the message names no
-    /// date.
-    /// </summary>
-    private static CalendarEntry NoteEntryOf(Goal goal, DateOnly key) =>
-        GoalTimeline.EntryOf(goal, key)
-        ?? throw new InvalidOperationException("A stored note's key belongs to no commitment or period of its goal.");
+    private static List<CalendarEntry> LatestAttemptOnly(Goal goal, IReadOnlyList<CalendarEntry> entries)
+    {
+        var timing = AttemptEntries.TimingDateOf(goal, goal.Attempt.Number);
+        return entries.Where(entry => entry.FirstDate >= timing).ToList();
+    }
 
     /// <summary>
     /// What a record's write does to its entry's note (specs/006-note-editing FR-001, D-1; research R-02): null keeps
@@ -550,7 +602,7 @@ public sealed class RecordingService
     }
 
     /// <summary>The acting user's account and goal, or why the use case refuses before anything else is looked at.</summary>
-    private sealed record Access(AccountId Owner, Goal? Goal, AccessRefusal? Refusal, string? Message)
+    private sealed record Access(AccountId Owner, StoredGoal? Goal, AccessRefusal? Refusal, string? Message)
     {
         public static Access Refused(AccessRefusal refusal, string message) => new(default, null, refusal, message);
     }

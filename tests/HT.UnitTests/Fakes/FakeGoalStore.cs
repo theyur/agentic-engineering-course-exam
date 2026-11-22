@@ -12,6 +12,14 @@ namespace HT.UnitTests.Fakes;
 /// <see cref="FakeCatalogHabitStore"/> and a <see cref="FakeCustomHabitStore"/>, so a read gives each habit's current
 /// name, category and state. Shared with HT.UiTests by a link. Safe to call from parallel tasks; its lock is taken
 /// before the other fakes' locks, so they never call into it while holding their own.
+/// <para>
+/// Slice 8 (research R-05): the conditional goal-change writes re-check the zone, the revision and their precondition
+/// as the real store does, and <see cref="TryEndAsync"/> applies its pause and excusal cuts to the
+/// <see cref="FakeRecordStore"/> attached as <see cref="Records"/> (a record store over this goal store attaches itself),
+/// under this store's lock and then the record store's, the usual lock order. Goals with any attempts and endings are
+/// arranged through <see cref="Add"/>; <see cref="BeforeNextWrite"/> and <see cref="IncrementRevision"/> simulate a
+/// concurrent write or a stale revision.
+/// </para>
 /// </summary>
 public sealed class FakeGoalStore : IGoalStore
 {
@@ -24,6 +32,10 @@ public sealed class FakeGoalStore : IGoalStore
     private int _timeZoneChangesToReport;
     private int _timeZoneConflictsToReport;
     private int _lookups;
+    private int _ownerGoalReads;
+    private int _changeWriteCount;
+    private Action? _beforeNextWrite;
+    private FakeRecordStore? _records;
 
     /// <summary>Takes the fakes it reads, and sets <see cref="FakeCustomHabitStore.Goals"/> to itself.</summary>
     public FakeGoalStore(FakeAccountStore accounts, FakeCatalogHabitStore catalogHabits, FakeCustomHabitStore customHabits)
@@ -66,8 +78,8 @@ public sealed class FakeGoalStore : IGoalStore
     public int TimeZoneChangeCount { get; private set; }
 
     /// <summary>
-    /// Calls of <see cref="FindAsync"/> and <see cref="ListAsync"/>, so a test can prove that a refusal looked up no goal
-    /// (FR-015's check order).
+    /// Calls of <see cref="FindAsync"/>, <see cref="ListAsync"/> and (slice 8) <see cref="ReadOwnerGoalAsync"/>, so a test
+    /// can prove that a refusal looked up no goal (FR-015's check order).
     /// </summary>
     public int Lookups
     {
@@ -77,6 +89,63 @@ public sealed class FakeGoalStore : IGoalStore
             {
                 return _lookups;
             }
+        }
+    }
+
+    /// <summary>Slice 8: calls of <see cref="ReadOwnerGoalAsync"/>.</summary>
+    public int OwnerGoalReads
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _ownerGoalReads;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Slice 8: calls of the three conditional goal-change writes (<see cref="TryChangeSettingsAsync"/>,
+    /// <see cref="TryEndAsync"/> and <see cref="TryStartAttemptAsync"/>), refused ones included.
+    /// </summary>
+    public int ChangeWriteCount
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _changeWriteCount;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Slice 8: an action run once, at the start of the next conditional goal-change write, before its re-checks and
+    /// outside this store's lock, and then cleared. A unit test sets it to simulate a concurrent write between a use
+    /// case's read and its write, for example a call of one of the writes or <see cref="IncrementRevision"/>.
+    /// </summary>
+    public Action? BeforeNextWrite
+    {
+        get => Volatile.Read(ref _beforeNextWrite);
+        set => Volatile.Write(ref _beforeNextWrite, value);
+    }
+
+    /// <summary>
+    /// Slice 8: the record store whose pauses and excusals <see cref="TryEndAsync"/> cuts; a <see cref="FakeRecordStore"/>
+    /// over this store sets it to itself. Null when none is attached, and then an ending cuts nothing.
+    /// </summary>
+    public FakeRecordStore? Records
+    {
+        get => Volatile.Read(ref _records);
+        set => Volatile.Write(ref _records, value);
+    }
+
+    /// <summary>Slice 8: increments the owner's goal revision, as a write committed in another session would.</summary>
+    public void IncrementRevision(AccountId owner)
+    {
+        lock (_gate)
+        {
+            _revisions[owner] = _revisions.GetValueOrDefault(owner) + 1;
         }
     }
 
@@ -119,7 +188,8 @@ public sealed class FakeGoalStore : IGoalStore
     /// <summary>
     /// Stores a goal directly, for arranging a test that needs goals to exist without <c>GoalService</c> and without an
     /// account: neither the account's time zone nor the revision changes. <paramref name="habit"/> is the view that a
-    /// read gives when the habit stores no longer have the habit.
+    /// read gives when the habit stores no longer have the habit. Slice 8: the goal may be built through either
+    /// constructor, with any attempts and endings, also past ones that the use cases would refuse.
     /// </summary>
     public Goal Add(AccountId owner, Goal goal, GoalHabitView habit)
     {
@@ -265,6 +335,99 @@ public sealed class FakeGoalStore : IGoalStore
         }
     }
 
+    /// <summary>Slice 8: the account's stored zone and revision, then the goal, read together under this store's lock; null without an account.</summary>
+    public Task<OwnerGoal?> ReadOwnerGoalAsync(AccountId owner, GoalId goal, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            _lookups++;
+            _ownerGoalReads++;
+            if (_accounts.FindById(owner) is not { } account)
+            {
+                return Task.FromResult<OwnerGoal?>(null);
+            }
+
+            var stored = _goals.FirstOrDefault(g => g.Goal.Owner == owner && g.Goal.Id == goal);
+            return Task.FromResult<OwnerGoal?>(
+                new OwnerGoal(account.StoredTimeZone, _revisions.GetValueOrDefault(owner), stored is null ? null : Current(stored)));
+        }
+    }
+
+    /// <summary>
+    /// Slice 8 (research R-05): <see cref="GoalChangeWriteOutcome.Stale"/> unless the latest attempt is
+    /// <see cref="GoalSettingsWrite.Attempt"/> and not ended; then the own name and, when given, that attempt's versions
+    /// are replaced.
+    /// </summary>
+    public Task<GoalChangeWriteOutcome> TryChangeSettingsAsync(
+        AccountId owner, string? expectedStoredZone, int expectedRevision, GoalSettingsWrite write, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+        return ConditionalWrite(owner, expectedStoredZone, expectedRevision, write.Goal, goal =>
+        {
+            if (goal.IsEnded || goal.Attempt.Number != write.Attempt)
+            {
+                return null;
+            }
+
+            var attempts = goal.Attempts.ToList();
+            if (write.Versions is { } versions)
+            {
+                attempts[^1] = attempts[^1] with { Versions = versions };
+            }
+
+            return new Goal(goal.Id, goal.Owner, goal.Habit, write.Name, attempts);
+        });
+    }
+
+    /// <summary>
+    /// Slice 8 (research R-04, R-05): <see cref="GoalChangeWriteOutcome.Stale"/> unless the latest attempt is
+    /// <see cref="GoalEndingWrite.Attempt"/> and not ended; then the ending and the kept versions are written, and the
+    /// pauses and excusals after the last date are cut in the attached <see cref="Records"/>.
+    /// </summary>
+    public Task<GoalChangeWriteOutcome> TryEndAsync(
+        AccountId owner, string? expectedStoredZone, int expectedRevision, GoalEndingWrite write, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+        return ConditionalWrite(
+            owner,
+            expectedStoredZone,
+            expectedRevision,
+            write.Goal,
+            goal =>
+            {
+                if (goal.IsEnded || goal.Attempt.Number != write.Attempt)
+                {
+                    return null;
+                }
+
+                var attempts = goal.Attempts.ToList();
+                attempts[^1] = new GoalAttemptVersions(attempts[^1].Attempt with { Ending = write.Ending }, write.KeptVersions);
+                return new Goal(goal.Id, goal.Owner, goal.Habit, goal.OwnName, attempts);
+            },
+            () => Records?.CutAfter(write.Goal, write.LastDate));
+    }
+
+    /// <summary>
+    /// Slice 8 (research R-05): <see cref="GoalChangeWriteOutcome.Stale"/> unless the latest attempt is ended and
+    /// numbered <see cref="GoalAttemptWrite.Number"/> − 1; then the attempt, beginning on its first version's date, is
+    /// added with that version.
+    /// </summary>
+    public Task<GoalChangeWriteOutcome> TryStartAttemptAsync(
+        AccountId owner, string? expectedStoredZone, int expectedRevision, GoalAttemptWrite write, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+        return ConditionalWrite(owner, expectedStoredZone, expectedRevision, write.Goal, goal =>
+        {
+            if (!goal.IsEnded || goal.Attempt.Number != write.Number - 1)
+            {
+                return null;
+            }
+
+            var attempt = new GoalAttemptVersions(new GoalAttempt(write.Number, write.First.AppliesFrom), [write.First]);
+            return new Goal(goal.Id, goal.Owner, goal.Habit, goal.OwnName, [.. goal.Attempts, attempt]);
+        });
+    }
+
     public Task<IReadOnlyList<StoredGoal>> ListAsync(AccountId owner, CancellationToken cancellationToken)
     {
         lock (_gate)
@@ -298,7 +461,7 @@ public sealed class FakeGoalStore : IGoalStore
         lock (_gate)
         {
             IReadOnlyDictionary<HabitId, int> counts = _goals
-                .Where(g => g.Goal.Owner == owner && g.Goal.Habit.Kind == HabitKind.Catalog)
+                .Where(g => g.Goal.Owner == owner && g.Goal.Habit.Kind == HabitKind.Catalog && !g.Goal.IsEnded)
                 .GroupBy(g => g.Goal.Habit.Id)
                 .ToDictionary(group => group.Key, group => group.Count());
             return Task.FromResult(counts);
@@ -311,7 +474,7 @@ public sealed class FakeGoalStore : IGoalStore
         lock (_gate)
         {
             return Task.FromResult<IReadOnlyList<StoredGoal>>(
-                _goals.Where(g => g.Goal.Owner == owner && g.Goal.Habit == onHabit).Select(Current).ToList());
+                _goals.Where(g => g.Goal.Owner == owner && g.Goal.Habit == onHabit && !g.Goal.IsEnded).Select(Current).ToList());
         }
     }
 
@@ -338,6 +501,46 @@ public sealed class FakeGoalStore : IGoalStore
         lock (_gate)
         {
             return action(_goals.Any(g => g.Goal.Habit == onHabit));
+        }
+    }
+
+    /// <summary>
+    /// The one path of the three conditional goal-change writes, all or nothing: <see cref="BeforeNextWrite"/> runs
+    /// first; then, under this store's lock, a stored zone or revision other than the expected ones gives
+    /// <see cref="GoalChangeWriteOutcome.Stale"/>, a goal that is not one of the owner's
+    /// <see cref="GoalChangeWriteOutcome.GoalNotFound"/>, and a null from <paramref name="change"/> (its precondition
+    /// failed) <see cref="GoalChangeWriteOutcome.Stale"/>. Otherwise the changed goal replaces the stored one,
+    /// <paramref name="after"/> runs, and the owner's revision is incremented.
+    /// </summary>
+    private Task<GoalChangeWriteOutcome> ConditionalWrite(
+        AccountId owner, string? expectedStoredZone, int expectedRevision, GoalId goal, Func<Goal, Goal?> change, Action? after = null)
+    {
+        Interlocked.Exchange(ref _beforeNextWrite, null)?.Invoke();
+        lock (_gate)
+        {
+            _changeWriteCount++;
+            if (_accounts.FindById(owner) is not { } account
+                || !string.Equals(account.StoredTimeZone, expectedStoredZone, StringComparison.Ordinal)
+                || _revisions.GetValueOrDefault(owner) != expectedRevision)
+            {
+                return Task.FromResult(GoalChangeWriteOutcome.Stale);
+            }
+
+            var position = _goals.FindIndex(g => g.Goal.Owner == owner && g.Goal.Id == goal);
+            if (position < 0)
+            {
+                return Task.FromResult(GoalChangeWriteOutcome.GoalNotFound);
+            }
+
+            if (change(_goals[position].Goal) is not { } changed)
+            {
+                return Task.FromResult(GoalChangeWriteOutcome.Stale);
+            }
+
+            _goals[position] = _goals[position] with { Goal = changed };
+            after?.Invoke();
+            _revisions[owner] = _revisions.GetValueOrDefault(owner) + 1;
+            return Task.FromResult(GoalChangeWriteOutcome.Written);
         }
     }
 

@@ -174,6 +174,29 @@ internal sealed class RecordStore : IRecordStore
             .ConfigureAwait(false));
     }
 
+    /// <summary>Slice 8 (research R-05): the same read with both bounds in the owner-scoped statement; no upper bound when <paramref name="through"/> is null.</summary>
+    public Task<IReadOnlyList<DateOnly>> ReadRecentNoteKeysAsync(
+        AccountId owner, GoalId goal, DateOnly from, DateOnly? through, int count, CancellationToken cancellationToken)
+    {
+        if (count <= 0)
+        {
+            return Task.FromResult<IReadOnlyList<DateOnly>>([]);
+        }
+
+        var notes = OwnedNotes(owner, goal).Where(n => n.EntryDate >= from);
+        if (through is { } last)
+        {
+            notes = notes.Where(n => n.EntryDate <= last);
+        }
+
+        return RunReadAsync<IReadOnlyList<DateOnly>>(async () => await notes
+            .OrderByDescending(n => n.EntryDate)
+            .Select(n => n.EntryDate)
+            .Take(count)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false));
+    }
+
     /// <summary>
     /// Slice 7 (research R-04): every excusal and pause of the owner's goal in one statement, the two tables joined to
     /// <c>Goals</c> on the owner and combined with UNION ALL; an excusal's row has no pause identifier. None when the
@@ -251,13 +274,27 @@ internal sealed class RecordStore : IRecordStore
             return deleted == 0 ? ExemptionStoreWrite.NotExcused : ExemptionStoreWrite.Written();
         }, cancellationToken);
 
-    /// <summary>Adds the pause with a new identifier, re-checking under the goal lock that it shares no date with another.</summary>
+    /// <summary>
+    /// Adds the pause with a new identifier, re-checking under the goal lock that the goal's latest attempt has no
+    /// ending date (slice 8, research R-05) and that the pause shares no date with another.
+    /// </summary>
     public Task<ExemptionStoreWrite> AddPauseAsync(
         AccountId owner, GoalId goal, DateOnly firstDay, DateOnly lastDay, ExemptionReason? reason, CancellationToken cancellationToken)
     {
         var row = ExemptionMapping.ToRow(goal.Value, firstDay, lastDay, reason);
         return InGoalExemptionTransactionAsync(owner, goal, async () =>
         {
+            var latestEnding = await _db.GoalAttempts.AsNoTracking()
+                .Where(a => a.GoalId == goal.Value)
+                .OrderByDescending(a => a.Number)
+                .Select(a => a.EndingDate)
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (latestEnding is not null)
+            {
+                return ExemptionStoreWrite.GoalEnded;
+            }
+
             if (await PausesOf(goal.Value, firstDay, lastDay).AnyAsync(cancellationToken).ConfigureAwait(false))
             {
                 return ExemptionStoreWrite.Overlaps;

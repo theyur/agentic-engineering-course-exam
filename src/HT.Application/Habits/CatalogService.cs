@@ -21,13 +21,30 @@ public sealed class CatalogService
 {
     private readonly ICatalogHabitStore _store;
     private readonly IGoalStore _goals;
+    private readonly TimeProvider? _clock;
 
+    /// <summary>
+    /// The slice 2 and slice 4 constructor, kept (slice 8 FR-024). A service built with it reads no clock and names each
+    /// goal on a habit with <see cref="GoalText.Name(Goal, string)"/>, as slice 4 does. The host uses the
+    /// <see cref="CatalogService(ICatalogHabitStore, IGoalStore, TimeProvider)"/> constructor.
+    /// </summary>
     public CatalogService(ICatalogHabitStore store, IGoalStore goals)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(goals);
         _store = store;
         _goals = goals;
+    }
+
+    /// <summary>
+    /// Slice 8 (FR-004, FR-020, research R-08): the constructor the host registers. <see cref="GetDetailsAsync(ActingUser, HabitId, CancellationToken)"/>
+    /// reads the time once per call and names each goal on the habit at it (<see cref="GoalText.Name(Goal, string, DateTimeOffset)"/>).
+    /// </summary>
+    public CatalogService(ICatalogHabitStore store, IGoalStore goals, TimeProvider clock)
+        : this(store, goals)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        _clock = clock;
     }
 
     /// <summary>
@@ -103,7 +120,8 @@ public sealed class CatalogService
     /// <see cref="GetDetailsAsync(HabitId, CancellationToken)"/>, and for a registered user also their own goal count
     /// and their goals on the habit, each with its identifier and its derived name (FR-010), in name order (the keys of
     /// <see cref="HabitName.KeyOf"/> compared ordinally), then creation order. Every other audience gets no goal
-    /// information.
+    /// information. Slice 8 (FR-020, research R-08): an ended goal is not on the list (the store leaves it out), and
+    /// with the clock each goal is named at one time read of the call.
     /// </summary>
     public async Task<CatalogHabitDetailsResult> GetDetailsAsync(ActingUser actingUser, HabitId id, CancellationToken cancellationToken)
     {
@@ -115,8 +133,11 @@ public sealed class CatalogService
         }
 
         var stored = await _goals.ListOnCatalogHabitAsync(owner, id, cancellationToken).ConfigureAwait(false);
+        var now = _clock?.GetUtcNow();
         var goals = stored
-            .Select(goal => new GoalOnHabit(goal.Goal.Id, GoalText.Name(goal.Goal, goal.Habit.Name)))
+            .Select(goal => new GoalOnHabit(
+                goal.Goal.Id,
+                now is { } instant ? GoalText.Name(goal.Goal, goal.Habit.Name, instant) : GoalText.Name(goal.Goal, goal.Habit.Name)))
             .OrderBy(goal => HabitName.KeyOf(goal.Name), StringComparer.Ordinal)
             .ToList();
         return CatalogHabitDetailsResult.Found(details with { GoalCount = goals.Count, Goals = goals });

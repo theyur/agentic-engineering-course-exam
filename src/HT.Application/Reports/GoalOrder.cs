@@ -24,7 +24,10 @@ internal static class GoalOrder
             .ToList();
     }
 
-    /// <summary>0 with a Pending result, 1 with a Due result (and none Pending), 2 otherwise.</summary>
+    /// <summary>
+    /// 0 with a Pending result, 1 with a Due result (and none Pending), 2 otherwise. Slice 8 (FR-018, research R-07): an
+    /// earlier attempt's open Pending entry is still the goal's, so it counts (<see cref="GoalEvaluation.HasPending"/>).
+    /// </summary>
     private static int GroupOf(GoalEvaluation evaluation) =>
-        evaluation.Pending.Count > 0 ? 0 : evaluation.Due.Count > 0 ? 1 : 2;
+        evaluation.HasPending ? 0 : evaluation.Due.Count > 0 ? 1 : 2;
 }

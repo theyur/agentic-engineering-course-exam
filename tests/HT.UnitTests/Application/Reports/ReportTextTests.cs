@@ -1,3 +1,4 @@
+using HT.Application.Goals;
 using HT.Application.Records;
 using HT.Application.Reports;
 using HT.Domain.Evaluation;
@@ -569,5 +570,135 @@ public sealed class ReportTextTests
                 Assert.Equal(expected, Texts());
             }
         }
+    }
+
+    // ---- Slice 8: goal changes (HP-001, HP-002, HP-004, HP-005, HP-007, HP-008, HP-014, R-07; T052) ----
+
+    [Theory]
+    [InlineData(Outcome.Achieved, "Achieved")]
+    [InlineData(Outcome.Abandoned, "Abandoned")]
+    [InlineData(Outcome.NoLongerRelevant, "No longer relevant")]
+    public void OutcomeText_is_the_outcomes_word(Outcome outcome, string expected) =>
+        Assert.Equal(expected, ReportText.OutcomeText(outcome));
+
+    [Fact]
+    public void An_undefined_outcome_has_no_word() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReportText.OutcomeText((Outcome)99));
+
+    [Fact]
+    public void The_goal_change_texts_word_for_word_under_any_culture()
+    {
+        var mon16 = new DateOnly(2026, 11, 16);
+        var thu12 = new DateOnly(2026, 11, 12);
+        var nov2 = new DateOnly(2026, 11, 2);
+        var nov15 = new DateOnly(2026, 11, 15);
+        var nov18 = new DateOnly(2026, 11, 18);
+        var nov23 = new DateOnly(2026, 11, 23);
+
+        string[] Texts() =>
+        [
+            ReportText.Ended(mon16, Outcome.Abandoned),
+            ReportText.Ended(mon16),
+            ReportText.Attempt(2),
+            ReportText.AttemptStarted(2, nov18),
+            ReportText.AttemptStarts(2, nov23),
+            ReportText.AttemptSpan(1, nov2, nov15),
+            ReportText.AttemptWithoutDate(1),
+            ReportText.From(thu12),
+            ReportText.ChangesApplyFrom(thu12),
+            ReportText.NewAttemptLine(2),
+            ReportText.Attempt(1234),
+            ReportText.NoEndedGoals,
+            ReportText.NoEndedGoalsYet,
+            ReportText.EndedTag,
+        ];
+
+        string[] expected =
+        [
+            "Ended Mon 16 Nov · Abandoned",
+            "Ended Mon 16 Nov",
+            "Attempt 2",
+            "Attempt 2 · started 18 Nov",
+            "Attempt 2 · starts 23 Nov",
+            "Attempt 1 · 2 Nov – 15 Nov",
+            "Attempt 1 · ended before it began",
+            "From Thu 12 Nov",
+            "Changes apply from Thu 12 Nov. Past results keep their rules.",
+            "Attempt 2 starts with its own history and a streak from zero.",
+            "Attempt 1234",
+            "No ended goals.",
+            "No ended goals yet.",
+            "Ended",
+        ];
+
+        Assert.Equal(expected, Texts());
+        foreach (var culture in new[] { "ar-SA", "de-DE", "uk-UA" })
+        {
+            using (new CultureScope(culture))
+            {
+                Assert.Equal(expected, Texts());
+            }
+        }
+    }
+
+    [Fact]
+    public void The_GoalChangeTexts_word_for_word()
+    {
+        string[] texts =
+        [
+            GoalChangeTexts.SettingsChanged,
+            GoalChangeTexts.SettingsUnchanged,
+            GoalChangeTexts.Ended,
+            GoalChangeTexts.AttemptStarted,
+            GoalChangeTexts.GoalEnded,
+            GoalChangeTexts.AlreadyEnded,
+            GoalChangeTexts.ScheduleKindChanged,
+            GoalChangeTexts.OutcomeMissing,
+            GoalChangeTexts.NotEnded,
+            GoalChangeTexts.StartDateNotAfterEnding,
+            GoalChangeTexts.AttemptNotFound,
+            GoalChangeTexts.Achieved,
+            GoalChangeTexts.Abandoned,
+            GoalChangeTexts.NoLongerRelevant,
+        ];
+
+        Assert.Equal(
+            [
+                "settings changed",
+                "settings unchanged",
+                "goal ended",
+                "attempt started",
+                "This goal has ended.",
+                "This goal has already ended.",
+                "A change keeps the schedule kind: fixed days, times per day or times per week. End the goal and start a new attempt to change it.",
+                "Choose how the goal ended.",
+                "Only an ended goal can start a new attempt.",
+                "A new attempt starts after the day the goal ended.",
+                "This attempt does not exist.",
+                "Achieved",
+                "Abandoned",
+                "No longer relevant",
+            ],
+            texts);
+    }
+
+    [Fact]
+    public void ProgressText_on_EntrySettings_gives_what_the_GoalHistory_overload_gives_and_reads_the_entrys_own_settings()
+    {
+        var duration = Target(DurationDays(20, DurationUnit.Minutes, BuildOrReduce.Build, AllDays));
+        var weekly = Target(YesNoTimes(3, SchedulePeriod.Week));
+        var settings = new EntrySettings
+        {
+            GoalScheduleKind = duration.ScheduleKindOf,
+            BuildOrReduce = duration.BuildOrReduce,
+            Measurement = duration.Measurement,
+            Amount = duration.Amount,
+            DurationUnit = duration.DurationUnit,
+            Target = duration,
+        };
+        var entry = Entry(Wednesday, Wednesday, new Progress(ProgressKind.RecordedValue, 12, 20));
+
+        Assert.Equal(ReportText.ProgressText(History(duration), entry), ReportText.ProgressText(settings, entry));
+        Assert.Equal("12 of 20 min today", ReportText.ProgressText(History(weekly), entry with { Settings = settings }));
     }
 }

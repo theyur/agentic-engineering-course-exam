@@ -35,11 +35,15 @@ public sealed class FakeRecordStore : IRecordStore
     private Action? _beforeNextWrite;
     private Action? _afterNextAdd;
 
-    /// <summary>Takes the goal store whose goals decide who owns what.</summary>
+    /// <summary>
+    /// Takes the goal store whose goals decide who owns what, and (slice 8) attaches itself as its
+    /// <see cref="FakeGoalStore.Records"/>, so an ending cuts this store's pauses and excusals.
+    /// </summary>
     public FakeRecordStore(FakeGoalStore goals)
     {
         ArgumentNullException.ThrowIfNull(goals);
         _goals = goals;
+        goals.Records = this;
     }
 
     /// <summary>The names of the members called (<c>"AddAsync"</c>, …), in call order, refused ones included.</summary>
@@ -357,6 +361,48 @@ public sealed class FakeRecordStore : IRecordStore
         }
     }
 
+    /// <summary>Slice 8: the newest <paramref name="count"/> note keys from <paramref name="from"/> through <paramref name="through"/> (no upper bound when null).</summary>
+    public Task<IReadOnlyList<DateOnly>> ReadRecentNoteKeysAsync(
+        AccountId owner, GoalId goal, DateOnly from, DateOnly? through, int count, CancellationToken cancellationToken)
+    {
+        var owned = Owns(owner, goal);
+        lock (_gate)
+        {
+            _calls.Add(nameof(ReadRecentNoteKeysAsync));
+            IReadOnlyList<DateOnly> keys = owned
+                ? NotesOf(goal).Keys.Where(k => k >= from && (through is not { } last || k <= last)).Reverse().Take(count).ToList()
+                : [];
+            return Task.FromResult(keys);
+        }
+    }
+
+    /// <summary>
+    /// Slice 8 (research R-04): the cuts of an ending, called by <see cref="FakeGoalStore.TryEndAsync"/> under its lock:
+    /// the goal's pauses that begin after <paramref name="lastDate"/> are deleted, those that cover it end on it, and its
+    /// excusals after it are deleted. Records and notes stay. No <see cref="Calls"/> entry.
+    /// </summary>
+    public void CutAfter(GoalId goal, DateOnly lastDate)
+    {
+        lock (_gate)
+        {
+            var pauses = PausesOf(goal);
+            pauses.RemoveAll(p => p.FirstDay > lastDate);
+            for (var i = 0; i < pauses.Count; i++)
+            {
+                if (pauses[i].LastDay > lastDate)
+                {
+                    pauses[i] = new Pause(pauses[i].Id, pauses[i].FirstDay, lastDate, pauses[i].Reason);
+                }
+            }
+
+            var excusals = ExcusalsOf(goal);
+            foreach (var date in excusals.Keys.Where(d => d > lastDate).ToList())
+            {
+                excusals.Remove(date);
+            }
+        }
+    }
+
     public Task<GoalExemptions> ReadExemptionsAsync(AccountId owner, GoalId goal, CancellationToken cancellationToken)
     {
         var owned = Owns(owner, goal);
@@ -424,12 +470,19 @@ public sealed class FakeRecordStore : IRecordStore
         var pause = new Pause(new PauseId(Guid.NewGuid()), firstDay, lastDay, reason);
         RunBeforeNextWrite();
         var owned = Owns(owner, goal);
+        var ended = owned && _goals.Goals.Any(g => g.Id == goal && g.IsEnded);
         lock (_gate)
         {
             _calls.Add(nameof(AddPauseAsync));
             if (!owned)
             {
                 return Task.FromResult(ExemptionStoreWrite.GoalNotFound);
+            }
+
+            // Slice 8 (research R-05): no pause on a goal whose latest attempt is ended; nothing is written.
+            if (ended)
+            {
+                return Task.FromResult(ExemptionStoreWrite.GoalEnded);
             }
 
             var pauses = PausesOf(goal);

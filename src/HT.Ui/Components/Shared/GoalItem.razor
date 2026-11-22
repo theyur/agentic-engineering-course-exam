@@ -94,9 +94,10 @@
         ? ReportText.PausedUntil(lastDay)
         : DueProgress is { } progress ? SliceFourText + " · " + progress : SliceFourText;
 
+    /// <summary>The progress text of the newest Due entry with a record, with that entry's own settings (slice 8, research R-07).</summary>
     private string? DueProgress =>
         Goal.Recordable.Entries.FirstOrDefault(entry => entry.State == EvaluationState.Due && entry.Records.Count > 0) is { } due
-            ? ReportText.ProgressText(Goal.Recordable, due)
+            ? ReportText.ProgressText(Goal.Recordable.SettingsOf(due), due)
             : null;
 
     /// <summary>The schedule, then " · " and the first variant that applies, or the schedule alone (slice 4 HP-003).</summary>

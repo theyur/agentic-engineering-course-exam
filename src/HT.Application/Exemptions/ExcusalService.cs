@@ -41,6 +41,11 @@ public sealed class ExcusalService
     /// pause; (7) an excusal of the date; (8) the commitment's state without exemption, which must be Due or Pending
     /// (D-2); (9) a record of the commitment (D-3); (10) a reason over 200 characters after trimming. The store
     /// re-checks steps 6, 7 and 9 under the goal-row lock, and a concurrent write there gives that step's refusal.
+    /// <para>
+    /// Slice 8 (plan "Spec discrepancies" 2, FR-010): step 4 judges "period-based" by the schedule kind of the attempt
+    /// that contains the date (every version of one attempt has its schedule kind). A date between two attempts, or after
+    /// an ended latest attempt, is in no attempt and goes on to step 5's "Nothing is scheduled on this date.".
+    /// </para>
     /// </summary>
     public async Task<ExcuseResult> ExcuseAsync(
         ActingUser actingUser, GoalId goal, DateOnly date, string? reason, CancellationToken cancellationToken)
@@ -53,10 +58,11 @@ public sealed class ExcusalService
         }
 
         var now = _clock.GetUtcNow();
-        var found = access.Goal!;
+        var found = access.Goal!.Goal;
 
-        // The versions differ only in their time zone, so every version has the same schedule kind.
-        if (GoalTimeline.VersionOf(found, date).Settings.Target.ScheduleKindOf != GoalScheduleKind.CommitmentBased)
+        // VersionOf gives the version of the attempt that contains the date, so its schedule kind is that attempt's.
+        if (!IsAfterAnAttempt(found, date)
+            && GoalTimeline.VersionOf(found, date).Settings.Target.ScheduleKindOf != GoalScheduleKind.CommitmentBased)
         {
             return ExcuseResult.Refused(ExcuseOutcome.NotACommitment, ExcusalTexts.NotACommitment);
         }
@@ -139,7 +145,7 @@ public sealed class ExcusalService
 
         // An excusal is stored only for a commitment's date, and while versions differ only in their time zone that date
         // stays one; a date with no commitment therefore has no excusal to remove.
-        if (!exemptions.IsExcused(date) || GoalTimeline.EntryOf(found, date) is not { } entry)
+        if (!exemptions.IsExcused(date) || GoalTimeline.EntryOf(found.Goal, date) is not { } entry)
         {
             return RemoveExcusalResult.Refused(RemoveExcusalOutcome.NotExcused, ExcusalTexts.NotExcused);
         }
@@ -193,8 +199,28 @@ public sealed class ExcusalService
         }
 
         return await _goals.FindAsync(owner, goal, cancellationToken).ConfigureAwait(false) is { } stored
-            ? new Access(owner, stored.Goal, null, null)
+            ? new Access(owner, stored, null, null)
             : Access.Refused(AccessRefusal.NotFound, GoalTexts.NotFound);
+    }
+
+    /// <summary>
+    /// Slice 8 (plan "Spec discrepancies" 2): whether <paramref name="date"/> lies after an ended attempt's last date and
+    /// before the next attempt's start date, or after the last date of an ended latest attempt, so it is in no attempt.
+    /// </summary>
+    private static bool IsAfterAnAttempt(Goal goal, DateOnly date)
+    {
+        var attempts = goal.Attempts;
+        for (var i = 0; i < attempts.Count; i++)
+        {
+            if (GoalTimeline.LastDate(goal, attempts[i].Attempt.Number) is { } last
+                && last < date
+                && (i == attempts.Count - 1 || date < attempts[i + 1].Attempt.StartDate))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static ExcuseOutcome ExcuseOutcomeOf(AccessRefusal refusal) => refusal switch
@@ -219,7 +245,7 @@ public sealed class ExcusalService
     }
 
     /// <summary>The acting user's account and goal, or why the use case refuses before anything else is looked at.</summary>
-    private sealed record Access(AccountId Owner, Goal? Goal, AccessRefusal? Refusal, string? Message)
+    private sealed record Access(AccountId Owner, StoredGoal? Goal, AccessRefusal? Refusal, string? Message)
     {
         public static Access Refused(AccessRefusal refusal, string message) => new(default, null, refusal, message);
     }

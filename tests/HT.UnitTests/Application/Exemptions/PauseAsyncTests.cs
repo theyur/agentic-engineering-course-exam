@@ -6,6 +6,7 @@ using HT.Domain.Evaluation;
 using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
+using HT.UnitTests.Application.Goals;
 using static HT.UnitTests.Application.Exemptions.ExemptionWorld;
 using static HT.UnitTests.Domain.Goals.GoalSamples;
 using static HT.UnitTests.Domain.Time.Instants;
@@ -480,5 +481,50 @@ public sealed class PauseAsyncTests
 
         Assert.DoesNotContain("AddPauseAsync", _world.Records.Calls);
         Assert.Single(_world.Records.ExemptionsOfGoal(goal).Pauses);
+    }
+
+    // ---- Slice 8: an ended goal (FR-010; T056) ----
+
+    /// <summary>"10 min daily" from Monday 2 November 2026 in UTC, on <see cref="AttemptWorld"/>.</summary>
+    private static async Task<(AttemptWorld World, GoalId Goal)> RunningGoalAsync()
+    {
+        var world = new AttemptWorld();
+        var goal = await world.CreateGoalAsync(DurationDays(10, DurationUnit.Minutes, BuildOrReduce.Build, AllDays), Date(2026, 11, 2), Utc("2026-11-01T10:00:00Z"));
+        return (world, goal);
+    }
+
+    [Fact]
+    public async Task Slice_8_pausing_an_ended_goal_gives_This_goal_has_ended_after_the_access_and_goal_checks()
+    {
+        var (world, goal) = await RunningGoalAsync();
+        world.At(Utc("2026-11-16T10:00:00Z"));
+        await world.EndAsync(goal);
+        world.At(Utc("2026-11-17T10:00:00Z"));
+        var calls = world.Records.Calls.Count;
+
+        var other = await world.Pauses.PauseAsync(world.OtherUser, goal, Date(2026, 11, 20), Date(2026, 11, 22), null, CancellationToken.None);
+        var administrator = await world.Pauses.PauseAsync(world.Administrator, goal, Date(2026, 11, 20), Date(2026, 11, 22), null, CancellationToken.None);
+        var ended = await world.Pauses.PauseAsync(world.User, goal, null, null, new string('x', 201), CancellationToken.None);
+
+        Assert.Equal((PauseOutcome.NotFound, "This goal does not exist."), (other.Outcome, other.Message));
+        Assert.Equal((PauseOutcome.NotForAdministrators, "Goals are for registered users."), (administrator.Outcome, administrator.Message));
+        Assert.Equal((PauseOutcome.GoalEnded, "This goal has ended."), (ended.Outcome, ended.Message));
+        Assert.Null(ended.Pause);
+        Assert.Equal(calls, world.Records.Calls.Count);
+        Assert.Empty(world.Records.ExemptionsOfGoal(goal).Pauses);
+    }
+
+    [Fact]
+    public async Task Slice_8_an_ending_between_the_check_and_the_write_gives_This_goal_has_ended_and_writes_nothing()
+    {
+        var (world, goal) = await RunningGoalAsync();
+        world.At(Utc("2026-11-17T10:00:00Z"));
+        world.Records.BeforeNextWrite = () => world.EndNow(goal);
+
+        var result = await world.Pauses.PauseAsync(world.User, goal, Date(2026, 11, 20), Date(2026, 11, 22), null, CancellationToken.None);
+
+        Assert.Equal((PauseOutcome.GoalEnded, "This goal has ended."), (result.Outcome, result.Message));
+        Assert.True(world.GoalOf(goal).IsEnded);
+        Assert.Empty(world.Records.ExemptionsOfGoal(goal).Pauses);
     }
 }

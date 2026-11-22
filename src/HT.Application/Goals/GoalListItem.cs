@@ -31,12 +31,24 @@ public sealed record GoalListItem
 
     public required GoalScheduleKind ScheduleKind { get; init; }
 
-    /// <summary>The start date, only while the goal has no current date.</summary>
+    /// <summary>
+    /// The start date, only while the goal has no current date. Slice 8 (AC-035): the latest attempt's start date while
+    /// that attempt has not begun and the goal is not ended; null otherwise.
+    /// </summary>
     public DateOnly? StartDate { get; init; }
 
-    /// <summary>The next commitment's date; commitment-based goals only.</summary>
+    /// <summary>The next commitment's date; commitment-based goals only, and none for an ended goal.</summary>
     public DateOnly? NextCommitment { get; init; }
 
-    /// <summary>The first week's Monday; per-week goals only, and only while that week has not begun.</summary>
+    /// <summary>The first week's Monday; per-week goals only, only while that week has not begun, and none for an ended goal.</summary>
     public DateOnly? FirstWeekStarts { get; init; }
+
+    /// <summary>Slice 8 (FR-018): the latest attempt has ended.</summary>
+    public bool IsEnded { get; init; }
+
+    /// <summary>Slice 8 (FR-018): the ending date of an ended goal; null otherwise.</summary>
+    public DateOnly? EndingDate { get; init; }
+
+    /// <summary>Slice 8 (FR-018): how an ended goal ended; null otherwise.</summary>
+    public Outcome? Outcome { get; init; }
 }

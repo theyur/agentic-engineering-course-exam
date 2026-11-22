@@ -189,4 +189,44 @@ public sealed class RecordPreviewTests
         Assert.Equal(new Progress(ProgressKind.RecordsReachingAmount, 1, 2), RecordPreview.Progress(history, entry, null, YesNoAnswer.Yes, null));
         Assert.Equal(new Progress(ProgressKind.RecordsReachingAmount, 2, 2), RecordPreview.Progress(history, entry, null, null, 1440));
     }
+
+    // ---- Slice 8: each entry's own settings (research R-07; T052) ----
+
+    private static EntrySettings Settings(GoalTarget target) => new()
+    {
+        GoalScheduleKind = target.ScheduleKindOf,
+        Period = target.PeriodLength,
+        BuildOrReduce = target.BuildOrReduce,
+        Measurement = target.Measurement,
+        Amount = target.Amount,
+        CountUnit = target.CountUnit,
+        DurationUnit = target.DurationUnit,
+        Times = target.ScheduleKindOf == GoalScheduleKind.PeriodBased ? target.Schedule.Times : null,
+        Target = target,
+    };
+
+    [Fact]
+    public void The_EntrySettings_overload_gives_what_the_GoalHistory_overload_gives_for_the_same_settings()
+    {
+        var daily = DailyReading20Min();
+        var weekly = Pages20ThreeTimesAWeek();
+        var day = Entry(Tuesday, Tuesday, Amount(Tuesday, 15));
+        var week = Entry(Monday, Wednesday.AddDays(4), Amount(Monday, 20), Amount(Tuesday, 25));
+
+        Assert.Equal(RecordPreview.Progress(History(daily), day, day.Records[0].Id, null, 25), RecordPreview.Progress(Settings(daily), day, day.Records[0].Id, null, 25));
+        Assert.Equal(RecordPreview.Progress(History(daily), day, null, null, null), RecordPreview.Progress(Settings(daily), day, null, null, null));
+        Assert.Equal(RecordPreview.Progress(History(weekly), week, null, null, 30), RecordPreview.Progress(Settings(weekly), week, null, null, 30));
+    }
+
+    [Fact]
+    public void The_GoalHistory_overload_reads_the_entrys_own_measurement_and_target()
+    {
+        var countHistory = History(Target(CountDays(12, "pages", BuildOrReduce.Build, AllDays)));
+        var yesNo = Target(YesNoDays(BuildOrReduce.Build, AllDays));
+        var durationEntry = Entry(Tuesday, Tuesday) with { Settings = Settings(DailyReading20Min()) };
+        var yesNoEntry = Entry(Wednesday, Wednesday) with { Settings = Settings(yesNo) };
+
+        Assert.Equal(new Progress(ProgressKind.RecordedValue, 12, 20), RecordPreview.Progress(countHistory, durationEntry, null, null, 12));
+        Assert.Equal(RecordPreview.Progress(History(yesNo), Entry(Wednesday, Wednesday), null, YesNoAnswer.Yes, null), RecordPreview.Progress(countHistory, yesNoEntry, null, YesNoAnswer.Yes, null));
+    }
 }

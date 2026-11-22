@@ -39,14 +39,18 @@ internal sealed class GoalReadRow
 /// </summary>
 internal static class GoalMapping
 {
-    /// <summary>The version row of a settings version of goal <paramref name="goalId"/>.</summary>
-    public static GoalSettingsVersionRow ToRow(Guid goalId, GoalSettingsVersion version)
+    /// <summary>The version row of a settings version of goal <paramref name="goalId"/>'s attempt 1.</summary>
+    public static GoalSettingsVersionRow ToRow(Guid goalId, GoalSettingsVersion version) => ToRow(goalId, GoalAttempt.First, version);
+
+    /// <summary>Slice 8: the version row of a settings version of attempt <paramref name="attemptNumber"/> of goal <paramref name="goalId"/>.</summary>
+    public static GoalSettingsVersionRow ToRow(Guid goalId, int attemptNumber, GoalSettingsVersion version)
     {
         ArgumentNullException.ThrowIfNull(version);
         var target = version.Settings.Target;
         return new GoalSettingsVersionRow
         {
             GoalId = goalId,
+            AttemptNumber = attemptNumber,
             AppliesFrom = version.AppliesFrom,
             BuildOrReduce = target.BuildOrReduce,
             Measurement = target.Measurement,
@@ -74,21 +78,16 @@ internal static class GoalMapping
             throw new InvalidOperationException("A stored goal has a name that fails the name checks.");
         }
 
-        var attempt = read.Attempts.OrderByDescending(a => a.Number).FirstOrDefault()
-            ?? throw new InvalidOperationException("A stored goal has no attempt.");
-        var versions = read.Versions.OrderBy(v => v.AppliesFrom).Select(ToVersion).ToList();
+        var attempts = AttemptsOf(read);
+        if (attempts[0].Versions[0].AppliesFrom != row.StartDate)
+        {
+            throw new InvalidOperationException("A stored goal's first version does not apply from its start date.");
+        }
 
         Goal goal;
         try
         {
-            goal = new Goal(
-                new GoalId(row.Id),
-                new AccountId(row.OwnerId),
-                habit,
-                row.StartDate,
-                ownName,
-                new GoalAttempt(attempt.Number, attempt.StartDate),
-                versions);
+            goal = new Goal(new GoalId(row.Id), new AccountId(row.OwnerId), habit, ownName, attempts);
         }
         catch (ArgumentException)
         {
@@ -96,6 +95,73 @@ internal static class GoalMapping
         }
 
         return new StoredGoal(goal, view);
+    }
+
+    /// <summary>The stored ending of an attempt row; null while it is not ended. A row that fails a check is a fault naming no value (HP-010).</summary>
+    private static GoalEnding? EndingOf(GoalAttemptRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        switch (row)
+        {
+            case { EndingDate: null, Outcome: null, EndingNote: null }:
+                return null;
+            case { EndingDate: { } date, Outcome: { } outcome } when Enum.IsDefined(outcome):
+                EndingNote? note = null;
+                if (row.EndingNote is not null && (!EndingNote.TryCreate(row.EndingNote, out note, out _) || note is null))
+                {
+                    throw new InvalidOperationException("A stored ending note fails the note checks.");
+                }
+
+                return new GoalEnding(date, outcome, note);
+            default:
+                throw new InvalidOperationException("A stored attempt has an incomplete ending.");
+        }
+    }
+
+    /// <summary>
+    /// Slice 8 (data-model.md "Tables"): the goal's attempts with their versions and endings. The numbers run 1, 2, …
+    /// with no gap, every attempt has a version and every version an attempt, and every attempt but the latest is ended;
+    /// the <see cref="Goal"/> constructor checks the rest (a later attempt's first version on its start date among
+    /// them). Each failure is a fault that names no value (HP-010).
+    /// </summary>
+    private static List<GoalAttemptVersions> AttemptsOf(GoalReadRow read)
+    {
+        var rows = read.Attempts.OrderBy(a => a.Number).ToList();
+        if (rows.Count == 0)
+        {
+            throw new InvalidOperationException("A stored goal has no attempt.");
+        }
+
+        var attempts = new List<GoalAttemptVersions>(rows.Count);
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.Number != i + GoalAttempt.First)
+            {
+                throw new InvalidOperationException("A stored goal's attempt numbers do not run 1, 2, … without a gap.");
+            }
+
+            var ending = EndingOf(row);
+            if (ending is null && i < rows.Count - 1)
+            {
+                throw new InvalidOperationException("A stored goal has an attempt before its latest that is not ended.");
+            }
+
+            var versions = read.Versions.Where(v => v.AttemptNumber == row.Number).OrderBy(v => v.AppliesFrom).Select(ToVersion).ToList();
+            if (versions.Count == 0)
+            {
+                throw new InvalidOperationException("A stored goal has an attempt without a settings version.");
+            }
+
+            attempts.Add(new GoalAttemptVersions(new GoalAttempt(row.Number, row.StartDate) { Ending = ending }, versions));
+        }
+
+        if (read.Versions.Any(v => v.AttemptNumber < GoalAttempt.First || v.AttemptNumber > rows.Count))
+        {
+            throw new InvalidOperationException("A stored goal has a settings version of no attempt.");
+        }
+
+        return attempts;
     }
 
     private static GoalHabit HabitOf(GoalRow row) => (row.CatalogHabitId, row.CustomHabitId) switch

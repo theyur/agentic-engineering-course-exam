@@ -30,13 +30,19 @@
    message sits under the field it is about, one at a time: a value refusal under the field, "note too long" under the
    note, any other under "For". Esc and × close the dialog and focus returns to the opener. "Save record" calls
    RecordAsync (or ChangeRecordAsync in "Edit"), and "Delete record" DeleteRecordAsync, each in a scope of its own, and
-   raises OnSaved with the entry after the write. *@
+   raises OnSaved with the entry after the write.
+   Slice 8 (research R-07, contracts/host.md "History card and dialogs"): the sub line, the field with its label and
+   unit, the progress line and preview, the partial note, the Reduce help, the note help and the commitment rule of
+   "Excuse instead" come from the settings of the entry "For" names (Recordable.SettingsOf), through the EntrySettings
+   overloads; choosing another entry switches them, and an entry of another measurement starts with an empty field. So
+   an earlier attempt's Pending entry is shown and recorded with its own settings (AC-080). *@
 <HtDialog Open="Open" OnClose="OnClose" ReturnFocus="ReturnFocus" FocusOnOpen="FocusFirstFieldAsync" FocusOnClose="FocusOnClose">
     <Title>@RecordingText.Title(GoalName)</Title>
-    <Subtitle>@RecordingText.TargetLine(Recordable)</Subtitle>
+    <Subtitle>@(ChosenSettings is { } chosen ? RecordingText.TargetLine(chosen) : null)</Subtitle>
     <ChildContent>
         @if (_entry is { } entry)
         {
+            var settings = Recordable.SettingsOf(entry);
             @if (Editing is { } editing)
             {
                 @FixedFor(DateTexts.ShortDate(editing.Date))
@@ -71,26 +77,26 @@
             {
                 @FixedFor(RecordingText.EntryDate(entry))
             }
-            <RecordFields @ref="_fields" Measurement="Recordable.Measurement" Label="@RecordingText.FieldLabel(Recordable)" Unit="@Recordable.CountUnit"
+            <RecordFields @ref="_fields" Measurement="settings.Measurement" Label="@RecordingText.FieldLabel(settings)" Unit="@settings.CountUnit"
                           Answer="_answer" AnswerChanged="v => _answer = v" Amount="_amount" AmountChanged="v => _amount = v"
                           Error="@ErrorOf(RecordFieldKind.Value)">
-                @if (Preview(entry) is { } progress && RecordingText.Progress(Recordable, progress) is { } progressText)
+                @if (Preview(settings, entry) is { } progress && RecordingText.Progress(settings, progress) is { } progressText)
                 {
                     <div class="ht-target">
                         <span class="ht-progress" aria-hidden="true"><span style="@Width(progress)"></span></span>@progressText
                     </div>
                 }
-                @if (RecordingText.PartialNote(Recordable) is { } partial)
+                @if (RecordingText.PartialNote(settings) is { } partial)
                 {
                     <span class="ht-field__help">@partial</span>
                 }
-                @if (RecordingText.ReduceHelp(Recordable) is { } reduceHelp)
+                @if (RecordingText.ReduceHelp(settings) is { } reduceHelp)
                 {
                     <span class="ht-field__help">@reduceHelp</span>
                 }
             </RecordFields>
             <TextArea Id="@NoteId" Label="Note" Optional="true" Placeholder="What happened? Only you can see notes."
-                      Help="@RecordingText.NoteHelp(Recordable)" Error="@ErrorOf(RecordFieldKind.Note)"
+                      Help="@RecordingText.NoteHelp(settings)" Error="@ErrorOf(RecordFieldKind.Note)"
                       Value="@_note" ValueChanged="v => _note = v" />
         }
     </ChildContent>
@@ -153,9 +159,10 @@
     public string GoalName { get; set; } = string.Empty;
 
     /// <summary>
-    /// The goal's settings and current date, and for the page head's "Record" what can be recorded now
-    /// (GetRecordableAsync): at least one entry, newest first. Opened from a History row, the history the row came from
-    /// (GetHistoryAsync); its entries are not listed then.
+    /// The goal's current date, and for the page head's "Record" what can be recorded now (GetRecordableAsync): at least
+    /// one entry, newest first. Opened from a History row, the history the row came from (GetHistoryAsync); its entries
+    /// are not listed then. Slice 8 (research R-07): the dialog reads the chosen entry's settings through
+    /// <see cref="GoalHistory.SettingsOf"/>, never the goal-level ones.
     /// </summary>
     [Parameter, EditorRequired]
     public GoalHistory Recordable { get; set; } = default!;
@@ -193,8 +200,15 @@
     private bool CanExcuseInstead =>
         OnExcuseInstead.HasDelegate
         && Editing is null
-        && Recordable.GoalScheduleKind == GoalScheduleKind.CommitmentBased
-        && _entry is { Records.Count: 0, State: EvaluationState.Due or EvaluationState.Pending };
+        && _entry is { Records.Count: 0, State: EvaluationState.Due or EvaluationState.Pending } entry
+        && Recordable.SettingsOf(entry).GoalScheduleKind == GoalScheduleKind.CommitmentBased;
+
+    /// <summary>
+    /// Slice 8 (research R-07): the settings of the entry "For" names (<see cref="GoalHistory.SettingsOf"/>), which give
+    /// the sub line, the field, its label and unit, the progress line, the help lines, the preview and the commitment
+    /// rule; choosing another entry switches them. Null while there is no entry.
+    /// </summary>
+    private EntrySettings? ChosenSettings => _entry is { } entry ? Recordable.SettingsOf(entry) : null;
 
     private string ForErrorId => _id + "-for-error";
 
@@ -267,7 +281,7 @@
         return dates;
     }
 
-    private EntryProgress Preview(HistoryEntry entry) => RecordPreview.Progress(Recordable, entry, Editing?.Id, _answer, _amount);
+    private EntryProgress Preview(EntrySettings settings, HistoryEntry entry) => RecordPreview.Progress(settings, entry, Editing?.Id, _answer, _amount);
 
     private static string Width(EntryProgress progress) =>
         "width:" + RecordingText.ProgressFill(progress).ToString(CultureInfo.InvariantCulture) + "%";
@@ -281,6 +295,14 @@
     {
         if (Parse(e.Value) is { } key && Recordable.Entries.FirstOrDefault(entry => entry.FirstDate == key) is { } chosen)
         {
+            // Slice 8 (research R-07): an entry of another measurement gets another field, so a value typed for the
+            // previous one is not carried into it.
+            if (_entry is { } previous && Recordable.SettingsOf(previous).Measurement != Recordable.SettingsOf(chosen).Measurement)
+            {
+                _answer = null;
+                _amount = null;
+            }
+
             _entry = chosen;
             _date = DatesOf(chosen)[0];
             _note = chosen.Note ?? string.Empty;

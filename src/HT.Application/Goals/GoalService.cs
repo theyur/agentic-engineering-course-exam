@@ -264,19 +264,26 @@ public sealed class GoalService
         return GoalCalendarResult.Found(new GoalCalendarView(calendar.Kind, calendar.Commitments, calendar.Periods));
     }
 
-    /// <summary>The reading fields of FR-016 and FR-018 at <paramref name="now"/>.</summary>
+    /// <summary>
+    /// The reading fields of FR-016 and FR-018 at <paramref name="now"/>. Slice 8 (FR-004, FR-005, FR-017, research
+    /// R-07, R-08): the settings in effect (<see cref="GoalTimeline.VersionInEffect(Goal, DateTimeOffset)"/>) and the
+    /// latest attempt's one version after them as <see cref="GoalDetails.Later"/> (none for an ended goal), the name at
+    /// <paramref name="now"/>, the latest attempt's number, start date and whether it has begun, the ending fields, and
+    /// the date a settings change made now would apply from (nothing is written).
+    /// </summary>
     private static GoalDetails DetailsOf(StoredGoal stored, DateTimeOffset now)
     {
         var goal = stored.Goal;
         var current = GoalTimeline.CurrentDate(goal, now);
-        var version = current is { } date ? GoalTimeline.VersionOf(goal, date) : goal.Versions[0];
-        var later = goal.Versions.FirstOrDefault(v => v.AppliesFrom > version.AppliesFrom);
+        var version = GoalTimeline.VersionInEffect(goal, now);
+        var ending = goal.Attempt.Ending;
+        var later = ending is null ? goal.Versions.FirstOrDefault(v => v.AppliesFrom > version.AppliesFrom) : null;
         var target = version.Settings.Target;
         var schedule = target.Schedule;
         return new GoalDetails
         {
             Id = goal.Id,
-            Name = GoalText.Name(goal, stored.Habit.Name),
+            Name = GoalText.Name(goal, stored.Habit.Name, now),
             HasOwnName = goal.OwnName is not null,
             Habit = stored.Habit,
             BuildOrReduce = target.BuildOrReduce,
@@ -301,6 +308,48 @@ public sealed class GoalService
             LaterTimeZoneAppliesFrom = later?.AppliesFrom,
             AttemptNumber = goal.Attempt.Number,
             AttemptStartDate = goal.Attempt.StartDate,
+            Later = later is null ? null : SettingsViewOf(later),
+            IsEnded = ending is not null,
+            EndingDate = ending?.Date,
+            LastDate = GoalTimeline.LastDate(goal, goal.Attempt.Number),
+            Outcome = ending?.Outcome,
+            EndingNote = ending?.Note?.Value,
+            ChangesApplyFrom = ending is null ? ChangesApplyFromOf(goal, now) : null,
+            AttemptHasBegun = GoalTimeline.LatestAttemptHasBegun(goal, now),
+        };
+    }
+
+    /// <summary>
+    /// The date a settings change at <paramref name="now"/> would apply from (slice 8 HP-002): what
+    /// <see cref="GoalTimeline.SettingsChangeOf"/> gives for the latest version's own target and zone, which have the
+    /// attempt's schedule kind; its date does not depend on the target. Nothing is written. The goal is not ended.
+    /// </summary>
+    private static DateOnly ChangesApplyFromOf(Goal goal, DateTimeOffset now)
+    {
+        var settings = goal.Versions[^1].Settings;
+        return GoalTimeline.SettingsChangeOf(goal, now, settings.Target, settings.TimeZone).AppliesFrom;
+    }
+
+    /// <summary>One settings version with its date (slice 8 FR-005).</summary>
+    private static GoalSettingsView SettingsViewOf(GoalSettingsVersion version)
+    {
+        var target = version.Settings.Target;
+        var schedule = target.Schedule;
+        return new GoalSettingsView
+        {
+            BuildOrReduce = target.BuildOrReduce,
+            Measurement = target.Measurement,
+            Amount = target.Amount,
+            CountUnit = target.CountUnit,
+            DurationUnit = target.DurationUnit,
+            ScheduleKind = schedule.Kind,
+            Days = schedule.Days,
+            Times = schedule.Times,
+            Period = schedule.Period,
+            TargetText = GoalText.TargetText(target),
+            ScheduleText = GoalText.ScheduleText(target),
+            TimeZone = version.Settings.TimeZone.Id,
+            AppliesFrom = version.AppliesFrom,
         };
     }
 

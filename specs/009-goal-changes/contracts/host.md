@@ -148,7 +148,12 @@ III).
 - "Attempt {n} starts with its own history and a streak from zero.";
 - "No ended goals." and "No ended goals yet.".
 
-Pages build none of them.
+Pages build none of them. The members (T042; data-model.md "`ReportText`"): `ReportText.OutcomeText`, `Ended(date,
+outcome)`, `Ended(date)`, `AttemptStarted`, `AttemptStarts`, `AttemptSpan`, `AttemptWithoutDate`, `From`,
+`ChangesApplyFrom`, `NewAttemptLine`, `NoEndedGoals` and `NoEndedGoalsYet`. The CommitmentRow Tags and the attempt
+view's GoalStats eyebrow are `ReportText.Attempt(n)` ("Attempt 2") and `ReportText.EndedTag` ("Ended"). Dates: "Ended
+…", "From …" and "Changes apply from …" use `DateTexts.ShortDate` ("Mon 16 Nov"); the attempt lines and spans use
+`DateTexts.DayMonth` ("18 Nov", "2 Nov – 15 Nov", with an en dash between spaces).
 
 ## Operator log (HP-011)
 

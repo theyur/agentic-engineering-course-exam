@@ -128,6 +128,7 @@ public sealed class AttemptService
 | `TryChangeSettingsAsync` (new) | One transaction:<br>1. lock the account row (UPDLOCK, HOLDLOCK);<br>2. check the stored zone and `GoalsRevision`;<br>3. lock the owner's goal row;<br>4. check that the latest attempt is `write.Attempt` and has no ending;<br>5. write the name and, when given, replace that attempt's version rows;<br>6. increment `GoalsRevision`.<br>`Stale` on a failed check, `GoalNotFound` for no such goal of the owner. |
 | `TryEndAsync` (new) | The same transaction and checks. Then:<br>• write `EndingDate`, `Outcome` and `EndingNote`;<br>• replace the attempt's version rows with `KeptVersions`;<br>• delete `GoalPauses` rows whose first day is after `LastDate`, set the last day to `LastDate` where the first day is on or before it and the last day after it;<br>• delete `GoalExcusals` rows dated after `LastDate`;<br>• increment `GoalsRevision`. |
 | `TryStartAttemptAsync` (new) | The same locks and the zone and revision check. Then it checks that the latest attempt has an ending and is numbered `write.Number` − 1, inserts the attempt row and its first version row, and increments `GoalsRevision`. |
+| (all three writes) | Settled in T038: the checks run in the order of the steps above, so a stale zone or revision gives `Stale` before the goal is looked up (also for another owner's goal, and for an account that is gone), and only a fresh zone and revision with no such goal of the owner gives `GoalNotFound`. The name write of `TryChangeSettingsAsync` stores `write.Name` as it is: null removes the goal's own name. |
 | `ListAsync`, `FindAsync`, `ReadOwnerGoalsAsync` | Read every attempt with its versions and ending (one query, as before). |
 | `TryChangeTimeZoneAsync` | Applies each write to the latest attempt's versions. |
 | `CountByCatalogHabitAsync`, `ListOnCatalogHabitAsync` | Leave out ended goals (FR-020). |
@@ -137,8 +138,8 @@ public sealed class AttemptService
 
 | Member | Contract |
 |---|---|
-| `ReadRecentNoteKeysAsync(owner, goal, from, through, count, ct)` (new overload) | The newest `count` note keys from `from` through `through` (no upper bound when `through` is null), under the owner scope. |
-| `AddPauseAsync` | Also re-checks under the goal lock that the goal's latest attempt has no ending; otherwise it returns `GoalEnded` with nothing written. |
+| `ReadRecentNoteKeysAsync(owner, goal, from, through, count, ct)` (new overload) | The newest `count` note keys from `from` through `through` (no upper bound when `through` is null), under the owner scope. Empty for a `count` of 0 or less, as the old overload. |
+| `AddPauseAsync` | Also re-checks under the goal lock that the goal's latest attempt has no ending; otherwise it returns `GoalEnded` with nothing written. This re-check comes before the overlap check (T039). |
 
 ## Changed reads (FR-013, FR-016 to FR-021)
 
@@ -155,11 +156,11 @@ public sealed class AttemptService
 | `ReportService.GetGoalReportAsync` | Over the latest attempt (FR-013). |
 | `ReportService.GetGoalsOverviewAsync` | Ended goals keep slice 6's order, with their latest attempt's figures. They are never paused and have no Due entry (FR-018). `HasPending`, `CanRecord`, `Recordable` and the Pending group of the order include earlier Pending entries, so `Recordable` equals `GetRecordableAsync` at the same instant. |
 | `ReportService.GetDashboardAsync` | As data-model.md "Changed views" says (FR-019). |
-| `CatalogService.BrowseAsync`, `GetDetailsAsync` | Goal counts, "Only habits I track" and the details' goal list leave out ended goals (FR-020). Built with the added `TimeProvider` constructor, the goal list names each goal at one time read. |
+| `CatalogService.BrowseAsync`, `GetDetailsAsync` | Goal counts, "Only habits I track" and the details' goal list leave out ended goals (FR-020). Built with the added `TimeProvider` constructor, the goal list names each goal at one time read. Settled in T049: `AddHtApplication` registers it through `ActivatorUtilities.CreateInstance<CatalogService>(provider, clock)` with the registered `TimeProvider`, so the host never uses the two-argument constructor (data-model.md). |
 | `RecordPreview.Progress`, every `RecordingText` member that takes a `GoalHistory` (`Recorded`, `TargetLine`, `Progress`, `FieldLabel`, `PartialNote`, `ReduceHelp`, `NoteHelp`), `ReportText.ProgressText` | Overloads on `EntrySettings` (research R-07). The pages call only those, with `GoalHistory.SettingsOf(entry)`. `RecordPreview.Progress(GoalHistory, HistoryEntry, …)` reads `history.SettingsOf(entry)`. |
 | `ProfileService.ChangeTimeZoneAsync` | Adds no version to an ended goal, and updates the first version of a waiting attempt (FR-021). |
 | `PauseService.PauseAsync` | Step after (3): an ended goal gives `GoalEnded`, "This goal has ended.". |
-| `ExcusalService.ExcuseAsync` | Step 4 uses the schedule kind of the date's attempt. |
+| `ExcusalService.ExcuseAsync` | Step 4 uses the schedule kind of the date's attempt. A date between attempts, or after an ended latest attempt, skips it and gets step 5's "Nothing is scheduled on this date." (data-model.md, T050). |
 
 ## `DemoGoalChangeService` (`HT.Application.Operator`, FR-031)
 

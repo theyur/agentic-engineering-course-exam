@@ -47,7 +47,8 @@ public interface IGoalStore
     /// <see cref="GoalVersionChangeKind.ReplacePending"/> replaces the last version with one of the new zone and date,
     /// <see cref="GoalVersionChangeKind.Add"/> adds a version with the last version's target, and
     /// <see cref="GoalVersionChangeKind.None"/> writes nothing; then stores <paramref name="next"/> as the account's
-    /// zone and increments the goal revision.
+    /// zone and increments the goal revision. Slice 8 (FR-021): each write applies to the goal's latest attempt's
+    /// versions only.
     /// </summary>
     Task<bool> TryChangeTimeZoneAsync(
         AccountId owner,
@@ -58,7 +59,50 @@ public interface IGoalStore
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// The owner's goals in creation order, each with its habit's current name, category and state, read in one query.
+    /// Slice 8 (research R-05): the owner's stored time zone and goal revision, then the goal <paramref name="goal"/>
+    /// with all its attempts, versions and endings, in that order, as <see cref="ReadOwnerGoalsAsync"/> reads them for
+    /// all goals. Null when the owner has no account; <see cref="OwnerGoal.Goal"/> is null when the goal is not one of
+    /// the owner's (another owner's or an unknown one, constitution III).
+    /// </summary>
+    Task<OwnerGoal?> ReadOwnerGoalAsync(AccountId owner, GoalId goal, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Slice 8 (FR-001 to FR-006, research R-05): a settings change in one transaction. It locks the account row
+    /// (UPDLOCK, HOLDLOCK) and re-checks that the stored zone is still <paramref name="expectedStoredZone"/> (null: none
+    /// stored) and the goal revision still <paramref name="expectedRevision"/>; then it locks the owner's goal row and
+    /// re-checks that the goal's latest attempt is <see cref="GoalSettingsWrite.Attempt"/> and has no ending. A failed
+    /// re-check gives <see cref="GoalChangeWriteOutcome.Stale"/> and a goal that is not one of the owner's
+    /// <see cref="GoalChangeWriteOutcome.GoalNotFound"/>, both with nothing written. Otherwise it stores
+    /// <see cref="GoalSettingsWrite.Name"/> as the goal's own name and, when <see cref="GoalSettingsWrite.Versions"/> is
+    /// set, replaces that attempt's versions with them, and increments the goal revision.
+    /// </summary>
+    Task<GoalChangeWriteOutcome> TryChangeSettingsAsync(
+        AccountId owner, string? expectedStoredZone, int expectedRevision, GoalSettingsWrite write, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Slice 8 (FR-007 to FR-009, research R-04, R-05): an ending in one transaction, with the locks and re-checks of
+    /// <see cref="TryChangeSettingsAsync"/> (the latest attempt is <see cref="GoalEndingWrite.Attempt"/> and has no
+    /// ending), and the same outcomes. Then it stores the ending on that attempt and replaces its versions with
+    /// <see cref="GoalEndingWrite.KeptVersions"/>; deletes the goal's pauses whose first day is after
+    /// <see cref="GoalEndingWrite.LastDate"/>, gives that last day to those that begin on or before it and end after it,
+    /// and deletes the goal's excusals dated after it; and increments the goal revision. Records and notes stay.
+    /// </summary>
+    Task<GoalChangeWriteOutcome> TryEndAsync(
+        AccountId owner, string? expectedStoredZone, int expectedRevision, GoalEndingWrite write, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Slice 8 (FR-012, research R-05): a new attempt in one transaction, with the locks and the zone and revision
+    /// re-check of <see cref="TryChangeSettingsAsync"/>, and the same outcomes. It re-checks that the goal's latest
+    /// attempt has an ending and is numbered <see cref="GoalAttemptWrite.Number"/> − 1; then it stores the attempt,
+    /// beginning on <see cref="GoalAttemptWrite.First"/>'s date, with that first version, and increments the goal
+    /// revision.
+    /// </summary>
+    Task<GoalChangeWriteOutcome> TryStartAttemptAsync(
+        AccountId owner, string? expectedStoredZone, int expectedRevision, GoalAttemptWrite write, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The owner's goals in creation order, each with every attempt, its versions and its ending (slice 8), and with its
+    /// habit's current name, category and state, read in one query.
     /// </summary>
     Task<IReadOnlyList<StoredGoal>> ListAsync(AccountId owner, CancellationToken cancellationToken);
 
@@ -73,14 +117,15 @@ public interface IGoalStore
 
     /// <summary>
     /// How many of the owner's goals are based on each catalog habit, whatever its state, read in one query (FR-031):
-    /// a catalog habit the owner has no goal on is absent. Custom habits are never included.
+    /// a catalog habit the owner has no goal on is absent. Custom habits are never included. Slice 8 (FR-020): goals
+    /// whose latest attempt is ended are left out.
     /// </summary>
     Task<IReadOnlyDictionary<HabitId, int>> CountByCatalogHabitAsync(AccountId owner, CancellationToken cancellationToken);
 
     /// <summary>
     /// The owner's goals based on the catalog habit <paramref name="habit"/>, in creation order, each with its habit's
     /// current name, category and state, as <see cref="ListAsync"/> reads them (FR-031); empty for another owner's goals,
-    /// a custom habit or an unknown identifier.
+    /// a custom habit or an unknown identifier. Slice 8 (FR-020): goals whose latest attempt is ended are left out.
     /// </summary>
     Task<IReadOnlyList<StoredGoal>> ListOnCatalogHabitAsync(AccountId owner, HabitId habit, CancellationToken cancellationToken);
 

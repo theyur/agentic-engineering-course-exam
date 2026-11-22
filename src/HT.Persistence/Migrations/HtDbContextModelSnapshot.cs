@@ -30,6 +30,18 @@ namespace HT.Persistence.Migrations
                     b.Property<int>("Number")
                         .HasColumnType("int");
 
+                    b.Property<DateOnly?>("EndingDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("EndingNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
 
@@ -88,6 +100,9 @@ namespace HT.Persistence.Migrations
                     b.Property<Guid>("GoalId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("int");
+
                     b.Property<DateOnly>("AppliesFrom")
                         .HasColumnType("date");
 
@@ -137,7 +152,7 @@ namespace HT.Persistence.Migrations
                     b.Property<int?>("Times")
                         .HasColumnType("int");
 
-                    b.HasKey("GoalId", "AppliesFrom");
+                    b.HasKey("GoalId", "AttemptNumber", "AppliesFrom");
 
                     b.ToTable("GoalSettingsVersions", (string)null);
                 });
@@ -540,6 +555,12 @@ namespace HT.Persistence.Migrations
                         .WithMany("Versions")
                         .HasForeignKey("GoalId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HT.Persistence.Goals.GoalAttemptRow", null)
+                        .WithMany()
+                        .HasForeignKey("GoalId", "AttemptNumber")
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });
 

@@ -46,6 +46,11 @@ public sealed class PauseService
     /// before the first day; (7) a shared date with another pause of the goal (steps 4 to 7 from
     /// <see cref="PauseRules.Check"/>); (8) a reason over 200 characters after trimming. The store re-checks step 7
     /// under the goal-row lock, and a concurrent pause there gives step 7's refusal.
+    /// <para>
+    /// Slice 8 (FR-010): right after the goal, an ended goal gives <see cref="PauseOutcome.GoalEnded"/>, "This goal has
+    /// ended.", and nothing else is read; the store re-checks the ending under the goal lock, and an ending between the
+    /// check and the write gives the same result.
+    /// </para>
     /// </summary>
     public async Task<PauseResult> PauseAsync(
         ActingUser actingUser, GoalId goal, DateOnly? firstDay, DateOnly? lastDay, string? reason,
@@ -56,6 +61,11 @@ public sealed class PauseService
         if (access.Refusal is { } refusal)
         {
             return PauseResult.Refused(OutcomeOf(refusal, PauseOutcome.NotSignedIn, PauseOutcome.NotForAdministrators, PauseOutcome.NotFound), access.Message!);
+        }
+
+        if (access.Goal!.IsEnded)
+        {
+            return PauseResult.Refused(PauseOutcome.GoalEnded, GoalChangeTexts.GoalEnded);
         }
 
         var pauseDate = PauseDateOf(access);
@@ -91,6 +101,9 @@ public sealed class PauseService
 
             // The goal was removed between the lookup and the write.
             ExemptionStoreWriteOutcome.GoalNotFound => PauseResult.Refused(PauseOutcome.NotFound, GoalTexts.NotFound),
+
+            // The goal was ended between the check above and the write (slice 8 T039).
+            ExemptionStoreWriteOutcome.GoalEnded => PauseResult.Refused(PauseOutcome.GoalEnded, GoalChangeTexts.GoalEnded),
             _ => throw new InvalidOperationException("The record store gave an outcome that pausing does not have."),
         };
     }

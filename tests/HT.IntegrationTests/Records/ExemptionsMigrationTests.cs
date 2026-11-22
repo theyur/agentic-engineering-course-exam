@@ -43,8 +43,9 @@ public sealed class ExemptionsMigrationTests(MigrationDatabaseFixture database)
         var goal = await InsertGoalAsync();
         var before = await GoalStateAsync(goal);
 
-        // The remaining migrations through the public entry point.
-        Assert.True(await HtDatabase.MigrateAsync(provider, CancellationToken.None) > 0);
+        // ExcusalsAndPauses itself, not the latest: a later migration (slice 8, GoalChanges) adds columns to the goal's
+        // tables, which the before-and-after comparison below would see. The public entry point runs at the end.
+        await MigrateToAsync(provider, "ExcusalsAndPauses", deleteFirst: false);
 
         // Dates and reasons only: no column for a time or a state (FR-025). The reasons are nullable.
         string[] excusalColumns = ["GoalId uniqueidentifier NOT NULL", "Date date NOT NULL", "Reason nvarchar(200) NULL"];

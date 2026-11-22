@@ -278,4 +278,59 @@ public sealed class CommitmentRowTests : BunitContext
             [pending.FindAll("button")[1].GetAttribute("blazor:elementReference"), due.Find("button").GetAttribute("blazor:elementReference")],
             focused);
     }
+
+    // ---- slice 8: the row's own settings (research R-07, AC-080, contracts/host.md "Signed-in Home"; T059) ----
+
+    private static EntrySettings SettingsOf(GoalTarget target) => new()
+    {
+        GoalScheduleKind = target.ScheduleKindOf, Period = target.PeriodLength, BuildOrReduce = target.BuildOrReduce,
+        Measurement = target.Measurement, Amount = target.Amount, CountUnit = target.CountUnit, DurationUnit = target.DurationUnit,
+        Times = target.ScheduleKindOf == GoalScheduleKind.PeriodBased ? target.Schedule.Times : null, Target = target,
+    };
+
+    /// <summary>
+    /// A row of attempt 1, a "Reading, 20 min, 3 days a week" commitment with its own settings, of a goal whose latest
+    /// attempt has <paramref name="latest"/>: the goal-level settings of the row's <see cref="TodayEntry.Goal"/>, as the
+    /// dashboard gives an earlier attempt's Pending entry (FR-019).
+    /// </summary>
+    private static TodayEntry EarlierReading(GoalTarget latest, DateOnly date, EvaluationState state, int? minutes, DateTimeOffset graceEnds)
+    {
+        var row = Reading(date, state, minutes, graceEnds);
+        var entry = row.Entry with { AttemptNumber = 1, IsLatestAttempt = false, Settings = SettingsOf(Reading20MinOnMonWedFri) };
+        var goal = row.Goal with
+        {
+            GoalScheduleKind = latest.ScheduleKindOf, Period = latest.PeriodLength, BuildOrReduce = latest.BuildOrReduce,
+            Measurement = latest.Measurement, Amount = latest.Amount, CountUnit = latest.CountUnit, DurationUnit = latest.DurationUnit,
+            Times = latest.ScheduleKindOf == GoalScheduleKind.PeriodBased ? latest.Schedule.Times : null, Target = latest,
+            Entries = [entry],
+        };
+        return row with { Goal = goal, Entry = entry };
+    }
+
+    [Fact]
+    public void AC_080_an_earlier_attempts_Pending_commitment_under_a_per_day_attempt_has_its_own_commitment_actions()
+    {
+        // Under a latest attempt of Reduce, at most 2 cups a day (period-based), attempt 1's commitment keeps "Excuse",
+        // which only a commitment has, and with a record "Edit", where a period would have "Record".
+        var cut = RenderRow(EarlierReading(CoffeeAtMost2Cups, new DateOnly(2026, 11, 16), EvaluationState.Pending, null, ReadAt.AddHours(5)));
+        var recorded = RenderRow(EarlierReading(CoffeeAtMost2Cups, new DateOnly(2026, 11, 16), EvaluationState.Pending, 10, ReadAt.AddHours(5)));
+
+        Assert.Equal(
+            ("Mon 16 Nov · 5 h left to record", "Pending", "Record + Excuse",
+                "Record for Reading, 20 min, 3 days a week, Mon 16 Nov + Excuse Reading, 20 min, 3 days a week, Mon 16 Nov"),
+            Parts(cut));
+        Assert.Equal(("Mon 16 Nov · 5 h left to record", "Pending", "Edit", "Edit record of Reading, 20 min, 3 days a week, Mon 16 Nov"), Parts(recorded));
+        Assert.Empty(cut.FindAll(".ht-row__name .ht-chip"));
+    }
+
+    [Fact]
+    public void A_Due_commitment_under_goal_level_settings_of_a_yes_no_week_shows_its_own_state_word_progress_and_bar()
+    {
+        // The row's own settings, a duration commitment, give "Due today", "15 of 20 min today" and the bar; the goal-level
+        // yes/no week would give "Due this week" and no bar.
+        var cut = RenderRow(EarlierReading(RunningTwiceAWeek, Wed18, EvaluationState.Due, 15, ReadAt.AddHours(53)));
+
+        Assert.Equal(("15 of 20 min today", "Due today", "Edit", "Edit record of Reading, 20 min, 3 days a week, Wed 18 Nov"), Parts(cut));
+        Assert.Equal("width:75%", cut.Find(".ht-row__main .ht-progress span").GetAttribute("style"));
+    }
 }

@@ -8,6 +8,7 @@ using HT.Domain.Exemptions;
 using HT.Domain.Goals;
 using HT.Domain.Habits;
 using HT.Domain.Records;
+using HT.Domain.Time;
 using HT.Ui.Components.Records;
 using HT.UiTests.Components.Pages;
 using HT.UnitTests.Fakes;
@@ -830,5 +831,66 @@ public sealed class HistoryCardTests : BunitContext
 
         var focused = JSInterop.VerifyFocusAsyncInvoke().Arguments[0];
         Assert.Equal(only.GetAttribute("blazor:elementReference"), Assert.IsType<ElementReference>(focused).Id);
+    }
+
+    // ---- slice 8: each row's own settings (research R-07, AC-020, contracts/host.md "History card and dialogs"; T059) ----
+
+    private static readonly DateOnly Wed11Nov = new(2026, 11, 11);
+    private static readonly DateOnly Thu12Nov = new(2026, 11, 12);
+
+    private static GoalTargetFields Reading12MinDaily => new()
+    {
+        BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Duration, Amount = 12, DurationUnit = DurationUnit.Minutes,
+        ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+    };
+
+    private static GoalTargetFields Reading12PagesDaily => new()
+    {
+        BuildOrReduce = BuildOrReduce.Build, Measurement = Measurement.Count, Amount = 12, CountUnit = "pages",
+        ScheduleKind = ScheduleKind.FixedDays, Days = Enum.GetValues<DayOfWeek>().ToHashSet(),
+    };
+
+    private static GoalSettingsVersion VersionOf(GoalTargetFields fields, DateOnly from)
+    {
+        Assert.True(GoalTarget.TryCreate(fields, out var target, out _));
+        return new GoalSettingsVersion(new GoalSettings(target, NamedTimeZone.Utc), from);
+    }
+
+    /// <summary>
+    /// Stores a goal of the user straight in the goal fake, through the attempts constructor, with one attempt from
+    /// Monday 2 November and these versions: a change made while it was current, as the change use case will write it.
+    /// </summary>
+    private GoalId SeedGoal(params GoalSettingsVersion[] versions)
+    {
+        var habit = _catalog.Add(HabitSamples.Catalog("Reading"));
+        var owner = _user.AccountId!.Value;
+        var goal = new Goal(new GoalId(Guid.NewGuid()), owner, new GoalHabit(habit.Id, HabitKind.Catalog), null,
+            [new GoalAttemptVersions(new GoalAttempt(GoalAttempt.First, Mon2Nov), versions)]);
+        ((FakeGoalStore)Services.GetRequiredService<IGoalStore>()).Add(
+            owner, goal, new GoalHabitView(habit.Id, HabitKind.Catalog, "Reading", habit.Definition.Category, true));
+        return goal.Id;
+    }
+
+    [Fact]
+    public async Task AC_020_after_a_change_of_measurement_11_Nov_reads_12_min_and_12_Nov_12_pages()
+    {
+        // "Reading, 12 min daily" from Monday 2 November, changed on Wednesday 11 November to 12 pages a day from
+        // Thursday 12 November; 12 recorded on both days, the History read at 10:00 on Monday 16 November, when both are
+        // final. The History's goal-level settings are the count version of the current date, so the 11th must read
+        // its own.
+        var goal = SeedGoal(VersionOf(Reading12MinDaily, Mon2Nov), VersionOf(Reading12PagesDaily, Thu12Nov));
+        _records.Seed(goal, Wed11Nov, RecordValue.FromAmount(12));
+        _records.Seed(goal, Thu12Nov, RecordValue.FromAmount(12));
+
+        var history = await PageHistoryAsync(goal, Mon16Nov, new DateTimeOffset(2026, 11, 16, 10, 0, 0, TimeSpan.Zero));
+        var cut = RenderCard(history);
+
+        Assert.Equal(Measurement.Count, history.Measurement);
+        Assert.Equal("12 min", Cell(cut, "Wed 11 Nov", 1));
+        Assert.Equal("12 pages", Cell(cut, "Thu 12 Nov", 1));
+        Assert.Equal("Met", Cell(cut, "Wed 11 Nov", 2));
+        Assert.Equal("Met", Cell(cut, "Thu 12 Nov", 2));
+        Assert.Equal("Edit", Text(Action(cut, "Wed 11 Nov")));
+        Assert.Equal("Edit", Text(Action(cut, "Thu 12 Nov")));
     }
 }

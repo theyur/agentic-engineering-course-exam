@@ -636,6 +636,10 @@ public sealed class ExemptionLogTests(DatabaseFixture database)
         public Task<IReadOnlyList<DateOnly>> ReadRecentNoteKeysAsync(AccountId owner, GoalId goal, int count, CancellationToken cancellationToken) =>
             inner.ReadRecentNoteKeysAsync(owner, goal, count, cancellationToken);
 
+        public Task<IReadOnlyList<DateOnly>> ReadRecentNoteKeysAsync(
+            AccountId owner, GoalId goal, DateOnly from, DateOnly? through, int count, CancellationToken cancellationToken) =>
+            inner.ReadRecentNoteKeysAsync(owner, goal, from, through, count, cancellationToken);
+
         public Task<GoalExemptions> ReadExemptionsAsync(AccountId owner, GoalId goal, CancellationToken cancellationToken) =>
             inner.ReadExemptionsAsync(owner, goal, cancellationToken);
 

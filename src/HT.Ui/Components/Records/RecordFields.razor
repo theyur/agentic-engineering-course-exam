@@ -6,7 +6,9 @@
    whole minutes (from 0, step 5) with "minutes" after it. The Stepper's input has the label as its accessible name. A
    refusal about the value sits under the control; what the dialog passes as ChildContent (the progress line and the
    help) follows it. A typed value is passed on as it is: the use case decides the refusal. The dialog can move the
-   focus to the control when it is its first field (FocusAsync). *@
+   focus to the control when it is its first field (FocusAsync). Slice 8 (research R-07): "the goal's" measurement and
+   unit are those of the entry the dialog records for (GoalHistory.SettingsOf), which the dialog passes in; the field
+   reads no settings itself. *@
 <div class="ht-field">
     <span class="ht-field__label">@Label</span>
     @if (Measurement == Measurement.YesNo)
@@ -37,7 +39,7 @@
     private SegmentedControl<YesNoAnswer>? _answers;
     private Stepper? _stepper;
 
-    /// <summary>The goal's measurement, which decides the control.</summary>
+    /// <summary>The measurement of the entry recorded for (its own settings, slice 8), which decides the control.</summary>
     [Parameter, EditorRequired]
     public Measurement Measurement { get; set; }
 

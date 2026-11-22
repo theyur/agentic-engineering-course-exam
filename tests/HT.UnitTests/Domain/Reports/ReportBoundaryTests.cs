@@ -12,7 +12,7 @@ namespace HT.UnitTests.Domain.Reports;
 
 /// <summary>
 /// Constitution II, SC-003, D-1: the states <see cref="Evaluator.Evaluate"/> gives every entry of
-/// <see cref="GoalTimeline.EntriesThrough"/>, folded by <see cref="Consistency.Of"/> and <see cref="Streaks.Of"/>, on
+/// <see cref="GoalTimeline.EntriesThrough(Goal, DateOnly)"/>, folded by <see cref="Consistency.Of"/> and <see cref="Streaks.Of"/>, on
 /// both sides of each boundary: just before, at and just after a grace end; at, below and above a Build target or a
 /// Reduce limit; for each schedule kind and for Build and Reduce; and around the clock changes of Europe/Kyiv and
 /// Europe/Berlin, where a day of 23 or 25 hours counts once. Every instant is a UTC literal worked out by hand.

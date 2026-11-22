@@ -418,15 +418,23 @@ public sealed class RecordLogTests(DatabaseFixture database)
             "The record store gave an outcome that saving a note does not have.");
         faults.Member = null;
 
-        // A record and a note stored outside every entry of the goal (before its start date).
+        // A record and a note stored outside every entry of the goal (before its start date). Slice 8 (FR-009, plan "Spec
+        // discrepancies" 4, R-12): they stay stored facts; changing or deleting the record gives "Nothing is scheduled on
+        // this date." and changes nothing, and the recent notes leave the note out.
         var stray = await InsertRecordAsync(world.Daily, Sun15, Duration);
         await InsertNoteAsync(world.Daily, Sun15, Note("stray"));
-        await FailsAsync(s => s.ChangeRecordAsync(owner, world.Daily, stray, Minutes(ChangedDuration, Note("stray change")), None),
-            "A stored record's date belongs to no commitment or period of its goal.");
-        await FailsAsync(s => s.DeleteRecordAsync(owner, world.Daily, stray, None),
-            "A stored record's date belongs to no commitment or period of its goal.");
-        await FailsAsync(s => s.GetRecentNotesAsync(owner, world.Daily, None),
-            "A stored note's key belongs to no commitment or period of its goal.");
+        var strayRecords = await RecordSamples.RecordRowsAsync(database.ConnectionString, world.Daily);
+        var strayNotes = await RecordSamples.NoteRowsAsync(database.ConnectionString, world.Daily);
+        var strayChange = await RecordingAsync(services, s => s.ChangeRecordAsync(owner, world.Daily, stray, Minutes(ChangedDuration, Note("stray change")), None));
+        var strayDelete = await RecordingAsync(services, s => s.DeleteRecordAsync(owner, world.Daily, stray, None));
+        Assert.Equal((RecordWriteOutcome.NothingScheduled, "Nothing is scheduled on this date."), (strayChange.Outcome, strayChange.Message));
+        Assert.Equal((RecordWriteOutcome.NothingScheduled, "Nothing is scheduled on this date."), (strayDelete.Outcome, strayDelete.Message));
+        Assert.Equal(strayRecords.Select(r => string.Join("|", r.Values)), (await RecordSamples.RecordRowsAsync(database.ConnectionString, world.Daily)).Select(r => string.Join("|", r.Values)));
+        Assert.Equal(strayNotes.Select(r => string.Join("|", r.Values)), (await RecordSamples.NoteRowsAsync(database.ConnectionString, world.Daily)).Select(r => string.Join("|", r.Values)));
+        var recent = await RecordingAsync(services, s => s.GetRecentNotesAsync(owner, world.Daily, None));
+        Assert.Equal(RecentNotesOutcome.Found, recent.Outcome);
+        Assert.Contains(recent.Notes, n => n.FirstDate == Mon16);
+        Assert.DoesNotContain(recent.Notes, n => n.FirstDate == Sun15);
 
         // A stored amount out of range: every read of its week fails, and so does a write in it, which is rolled back.
         var invalid = await InsertRecordAsync(world.Weekly, Mon16, StoredOutOfRange);
@@ -617,6 +625,10 @@ public sealed class RecordLogTests(DatabaseFixture database)
 
         public Task<IReadOnlyList<DateOnly>> ReadRecentNoteKeysAsync(AccountId owner, GoalId goal, int count, CancellationToken cancellationToken) =>
             inner.ReadRecentNoteKeysAsync(owner, goal, count, cancellationToken);
+
+        public Task<IReadOnlyList<DateOnly>> ReadRecentNoteKeysAsync(
+            AccountId owner, GoalId goal, DateOnly from, DateOnly? through, int count, CancellationToken cancellationToken) =>
+            inner.ReadRecentNoteKeysAsync(owner, goal, from, through, count, cancellationToken);
 
         public Task<GoalExemptions> ReadExemptionsAsync(AccountId owner, GoalId goal, CancellationToken cancellationToken) =>
             inner.ReadExemptionsAsync(owner, goal, cancellationToken);

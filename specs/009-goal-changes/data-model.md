@@ -38,6 +38,13 @@ The migration's order on a populated database:
 `Down` reverses it. It is only valid while every version belongs to attempt 1, as in every migration that narrows a
 key.
 
+Settled in T037: the default 1 exists only in the migration. Step 1 adds the column with the default 1, which fills
+the existing rows, and drops the default constraint again in the same step (an `AlterColumn`), because the model has no
+default value: slice 4 keeps default values out of the goal tables, and a default on a key column of the model would
+give EF Core's key-default warning. Every writer sets `AttemptNumber` explicitly. EF Core generated the steps in
+another order (drop the key, add `AttemptNumber`, add the three ending columns, add the key and the foreign key);
+`20261122142029_GoalChanges.cs` has them in the order above.
+
 ## Domain: `HT.Domain.Goals` (new types)
 
 ### `Outcome` (enum)
@@ -270,20 +277,37 @@ Changed meanings, identical for a goal with one attempt:
 `CatalogService` gains the constructor `CatalogService(ICatalogHabitStore, IGoalStore, TimeProvider)`, so the goal list
 on a habit names each goal at one time read (research R-08). The two-argument constructor stays.
 
+Settled in T048 and T049:
+
+- `GoalSettingsView` has exactly the fields named above: `BuildOrReduce`, `Measurement`, `Amount`, `CountUnit`,
+  `DurationUnit`, `ScheduleKind`, `Days`, `Times`, `Period`, `TargetText`, `ScheduleText`, `TimeZone` and `AppliesFrom`.
+  `GoalDetails.Later` is the latest attempt's one version after the settings in effect, and null for an ended goal.
+- `GoalDetails.ChangesApplyFrom` is `SettingsChangeOf(goal, now, target, zone).AppliesFrom` with the latest version's
+  own target and zone. Those have the attempt's schedule kind, and the date doesn't depend on the target. Nothing is
+  written.
+- `GoalListItem.StartDate` is the latest attempt's timing date: the goal's start date for a goal with one attempt, as
+  in slice 4, and the latest attempt's own start date otherwise.
+- A service built with the two-argument `CatalogService` constructor names goals with `GoalText.Name(goal, habitName)`.
+  The host registers `CatalogService` through a factory, `ActivatorUtilities.CreateInstance<CatalogService>(provider,
+  clock)`. It passes the registered `TimeProvider`, so the three-argument constructor is always used. The stores are
+  resolved by that constructor, so the registration file names no store port. That keeps
+  `ApplicationDependencyTests`' `IGoalStore` rule as it is.
+
 ## Application: `HT.Application.Records` and `HT.Application.Exemptions` (changed; research R-05, R-07)
 
 | Type | Change |
 |---|---|
-| `HistoryEntry` | + `AttemptNumber` (`int`), `IsLatestAttempt` (`bool`, default true), `AttemptName` (`string?`, set only for an attempt that is not the latest, FR-016, FR-019), `Settings` (`EntrySettings?`, init-only, not `required`; always set by `EntryViews.Of`: the settings of the version of the entry's date). For an attempt that is not the latest, `Settings.BuildOrReduce` is "that attempt's Build or Reduce" (FR-016, FR-019, AC-080). |
-| `EntrySettings` (new sealed record) | `GoalScheduleKind`, `Period` (`SchedulePeriod?`), `BuildOrReduce`, `Measurement`, `Amount`, `CountUnit`, `DurationUnit`, `Times`, `Target` (`GoalTarget`), with `GoalHistory`'s meaning per field, for one entry (research R-07). |
+| `HistoryEntry` | + `AttemptNumber` (`int`, default 1 when not set, as for every entry of slices 5 to 7; T043), `IsLatestAttempt` (`bool`, default true), `AttemptName` (`string?`, set only for an attempt that is not the latest, FR-016, FR-019), `Settings` (`EntrySettings?`, init-only, not `required`; always set by `EntryViews.Of`: the settings of the version of the entry's date). For an attempt that is not the latest, `Settings.BuildOrReduce` is "that attempt's Build or Reduce" (FR-016, FR-019, AC-080). |
+| `EntrySettings` (new sealed record) | `GoalScheduleKind`, `Period` (`SchedulePeriod?`), `BuildOrReduce`, `Measurement`, `Amount`, `CountUnit`, `DurationUnit`, `Times`, `Target` (`GoalTarget`), with `GoalHistory`'s meaning per field, for one entry (research R-07). Init-only properties, `required` like `GoalHistory`'s for `GoalScheduleKind`, `BuildOrReduce`, `Measurement` and `Target` (T043). An internal `EntrySettings.Of(GoalTarget)` fills them from a version's target as `EntryViews.HistoryOf` fills `GoalHistory`'s. |
 | `GoalHistory` | Shape unchanged, plus the method `SettingsOf(HistoryEntry entry)`: `entry.Settings`, or the history's own goal-level settings as an `EntrySettings` when it is null. Its goal-level settings stay for the goal as a whole, and its doc comments drop "every version has the same target". Every view of one entry reads `SettingsOf(entry)`. |
 | `RecordPreview` | `Progress(GoalHistory, HistoryEntry, …)` reads `history.SettingsOf(entry)`. New `Progress(EntrySettings settings, HistoryEntry entry, RecordId? replacing, YesNoAnswer? answer, int? amount)`. |
-| `RecordingText` | Each member that takes a `GoalHistory` keeps its signature and gets an `EntrySettings` overload: `Recorded`, `TargetLine`, `Progress`, `FieldLabel`, `PartialNote`, `ReduceHelp` and `NoteHelp`. The pages call only the `EntrySettings` overloads, with the settings of the row they show (research R-07). |
+| `RecordingText` | Each member that takes a `GoalHistory` keeps its signature and gets an `EntrySettings` overload: `Recorded`, `TargetLine`, `Progress`, `FieldLabel`, `PartialNote`, `ReduceHelp` and `NoteHelp`. The pages call only the `EntrySettings` overloads, with the settings of the row they show (research R-07). Each `GoalHistory` member delegates to its overload with the history's goal-level settings (it has no entry), so its results are unchanged. |
+| `ReportText` | `ProgressText(EntrySettings, HistoryEntry)` (new overload); `ProgressText(GoalHistory, HistoryEntry)` delegates with `history.SettingsOf(entry)`, as `RecordPreview.Progress` does. The slice 8 texts of contracts/host.md "Shared texts" (T042): `OutcomeText(Outcome)`, `Ended(DateOnly, Outcome)` ("Ended Mon 16 Nov · Abandoned"), `Ended(DateOnly)` ("Ended Mon 16 Nov"), `Attempt(int)` ("Attempt 2", the CommitmentRow Tag and the attempt view's eyebrow), `AttemptStarted(int, DateOnly)`, `AttemptStarts(int, DateOnly)`, `AttemptSpan(int, DateOnly, DateOnly)`, `AttemptWithoutDate(int)`, `From(DateOnly)`, `ChangesApplyFrom(DateOnly)`, `NewAttemptLine(int)`, and the constants `NoEndedGoals`, `NoEndedGoalsYet` and `EndedTag` ("Ended"). |
 | `RecordingService.ChangeRecordAsync`, `DeleteRecordAsync` | A record whose date is in no attempt gives `NothingScheduled`, "Nothing is scheduled on this date.", and nothing changes. `StoredEntryOf` and `NoteEntryOf` are removed with their exceptions. |
 | `IRecordStore` | + `ReadRecentNoteKeysAsync(AccountId owner, GoalId goal, DateOnly from, DateOnly? through, int count, CancellationToken)`: the newest `count` note keys from `from` through `through` (no upper bound when null). `GetRecentNotesAsync` passes the latest attempt's first entry's first date and, once it is ended, its last entry's last date, and skips a key with no entry. An attempt with no entry (no date) gives an empty list without a store call. |
-| `ExemptionStoreWrite` | + outcome `GoalEnded`, returned by `AddPauseAsync` when the goal is ended under the lock. |
-| `PauseService.PauseAsync` | new outcome `GoalEnded`, "This goal has ended.", after step (3). |
-| `ExcusalService.ExcuseAsync` | step 4 uses the schedule kind of the attempt that contains the date. |
+| `ExemptionStoreWrite` | + outcome `GoalEnded` (appended last to `ExemptionStoreWriteOutcome`, so the existing values keep their numbers) and its static `ExemptionStoreWrite.GoalEnded`, returned by `AddPauseAsync` when the goal is ended under the lock. The ending is re-checked before the overlap (T039). |
+| `PauseService.PauseAsync` | new outcome `GoalEnded`, "This goal has ended.", after step (3), before anything else is read; a store `GoalEnded` gives the same result. Settled in T050: `GoalEnded` is appended last to `PauseOutcome`, so the existing values keep their numbers. |
+| `ExcusalService.ExcuseAsync` | step 4 uses the schedule kind of the attempt that contains the date. Settled in T050: step 4 reads the kind through `GoalTimeline.VersionOf`, which gives the version of the attempt whose span contains the date. A date after an ended attempt's last date and before the next attempt's start date (or after an ended latest attempt's last date) is in no attempt. It skips step 4 and gets step 5's "Nothing is scheduled on this date.". A date before every attempt keeps slice 7's result. |
 
 ## Application: `HT.Application.Reports` (research R-06, R-07)
 
@@ -338,6 +362,35 @@ Results:
 - The trend draws each bar or week in its kind. An entry of another measurement contributes only its result: one
   "Yes" when Met in commitment weeks, and no value in a value trend (research R-07).
 - The records come from one `ReadAsync` over the range the evaluated entries span.
+
+Settled in T044 to T047 (all internal, so no public surface changes):
+
+- `GoalEvaluation` exposes `AttemptNumber`, `IsLatestAttempt`, `EarlierPending`, `RecordableEntries` (the entries of
+  `Recordable`, newest first) and `HasPending` (a Pending entry of its own or in `EarlierPending`). `Recordable` is
+  built once. The overload with an attempt number gives an empty `EarlierPending`, so the attempt list stays at one
+  record read per attempt.
+- The current week's Upcoming commitments feed the trend only for the latest attempt while it runs (begun and not
+  ended). An ended attempt never gets a later attempt's commitments as Upcoming. A goal with one attempt gives slice 7's
+  trend. `NextUpcoming` gives nothing for an ended goal or an earlier attempt's evaluation.
+- The internal `HT.Application.Records.AttemptEntries` keeps, in one place, the attempt facts the read path derives from
+  `GoalTimeline`'s public members:
+  - the attempt of an entry (`AttemptOf`, skipped for a goal with one attempt);
+  - an attempt's timing date (its first version's date);
+  - its first and last entries (`EntriesThrough(goal, n, last date)` when it is ended, its first 14 days otherwise);
+  - "no date" (ended with no entry through its last date);
+  - the `EarlierPending` candidates: the entries with an open grace period of every ended attempt but the latest
+    whose last entry's grace period is open.
+
+  `GoalEvaluation` and `GetRecordableAsync` share those candidates. So the overview's `Recordable` equals
+  `GetRecordableAsync` also for earlier entries. `GetRecordableAsync` keeps its 9-day window for the latest attempt
+  and reads the candidates' records in the same one read.
+- `EntryViews.Of` takes the `StoredGoal`, because an earlier attempt's entry needs the habit's current name
+  (`GoalText.AttemptName`).
+- `GetHistoryAsync` and `GetRecordableAsync` keep the latest attempt's entries of their range as those from its timing
+  date on. Every earlier attempt ends before the latest one starts.
+- The dashboard also leaves ended goals out of the Due list and the Upcoming entries, besides the Missed ones.
+  `TodayEntry.GoalEnded` is the goal's `IsEnded`. An earlier attempt's row of an ended goal is marked by both, and the
+  row shows "Attempt n" first (contracts/host.md).
 
 ### Changed views
 

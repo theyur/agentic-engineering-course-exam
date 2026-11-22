@@ -343,4 +343,42 @@ public sealed class NoteDialogTests : BunitContext
         Assert.Equal(1, givenBack);
         Assert.Empty(cut.FindAll("[role=dialog]"));
     }
+
+    // ---- slice 8: the row's own settings (research R-07, contracts/host.md "History card and dialogs"; T059) ----
+
+    private async Task<GoalHistory> HistoryAsync(GoalId goal, DateTimeOffset at)
+    {
+        _clock.SetUtcNow(at);
+        await using var scope = Services.CreateAsyncScope();
+        var read = await scope.ServiceProvider.GetRequiredService<RecordingService>()
+            .GetHistoryAsync(_user, goal, Mon16, new DateOnly(at.Year, at.Month, at.Day), CancellationToken.None);
+        Assert.Equal(HistoryOutcome.Found, read.Outcome);
+        return read.History!;
+    }
+
+    [Fact]
+    public async Task R_07_an_earlier_rows_state_is_worded_by_its_own_settings_and_the_help_stays_the_same()
+    {
+        // At 10:00 on Wednesday 18 November the per-week row 16 – 22 Nov is Due. It is shown under a History whose
+        // goal-level settings are commitment-based, as an earlier attempt's row is under the latest attempt's settings:
+        // its state word follows its own period ("Due this week"), not the goal-level kind ("Due today").
+        var yoga = await GoalAsync(YogaThreeTimesAWeek);
+        var reading = await GoalAsync(Reading20MinDaily);
+        var week = (await HistoryAsync(yoga, Utc(18, 10))).Entries.Single(e => e.FirstDate == Mon16)
+            with { AttemptNumber = GoalAttempt.First, IsLatestAttempt = false };
+        var history = await HistoryAsync(reading, Utc(18, 10));
+        Assert.Equal(GoalScheduleKind.CommitmentBased, history.GoalScheduleKind);
+        Assert.Equal(EvaluationState.Due, week.State);
+
+        var cut = Render<NoteDialog>(p => p
+            .Add(x => x.Open, true)
+            .Add(x => x.GoalId, yoga)
+            .Add(x => x.GoalName, "Yoga, 3 times a week")
+            .Add(x => x.History, history)
+            .Add(x => x.Row, week)
+            .Add(x => x.ActingUser, _user));
+
+        Assert.Equal("16 – 22 Nov · Due this week", cut.Find(".ht-dialog__sub").TextContent);
+        Assert.Equal(Help, cut.Find(".ht-field__help").TextContent);
+    }
 }
