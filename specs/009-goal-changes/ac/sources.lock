@@ -2,7 +2,7 @@
   "group": "sources",
   "feature": "specs/009-goal-changes",
   "files": {
-    "specs/009-goal-changes/acceptance.md": "ceea5cc6cd9994b3a4f3ed2083a673b21f1fda8ee1a8aefac5c4c8699ad9419b"
+    "specs/009-goal-changes/acceptance.md": "4431caab643631a06053259d8f08974dbeee679a528fedc4cd1d4dff1eb8a484"
   },
   "spec": {
     "path": "specs/009-goal-changes/spec.md",

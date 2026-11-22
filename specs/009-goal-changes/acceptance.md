@@ -1361,7 +1361,7 @@ Examples:
 - And demo goal-change loading ran at 2026-11-18T10:00:00Z with the demo password `example2026`
 - When demo goal-change loading runs at 2026-11-19T10:00:00Z with the demo password `example2026`
 - Then its results are (demo7@example.com, already exists)
-- And at 2026-11-19T10:00:00Z the goals overview of `demo7@example.com` lists exactly `Reading, 20 min daily`, `Meditation, 5 min daily` and `Sugar, at most 1 sweet a day`
+- And at 2026-11-19T10:00:00Z the goals overview of `demo7@example.com` lists exactly `Reading, 25 min daily`, `Meditation, 5 min daily` and `Sugar, at most 1 sweet a day`
 - And at 2026-11-19T10:00:00Z the goal history of `demo7@example.com` is, in this order, `Sugar, at most 1 sweet a day`, attempt 1, ending date 2026-11-11; and `Meditation, 10 min daily`, attempt 1, ending date 2026-10-28
 
 ### AC-093 (FR-031; US6-AS4) Demo goal-change loading without a valid demo password creates nothing

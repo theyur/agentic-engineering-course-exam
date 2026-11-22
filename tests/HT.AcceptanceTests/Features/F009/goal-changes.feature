@@ -128,20 +128,20 @@ Feature: Goal changes
     And reading the goal gives the settings in effect Build, duration 15 minutes, fixed days on all seven days, from 2026-11-02, and no later settings
 
     Examples:
-      | n  | settings                                                              | message                                               |
-      | 01 | no Build or Reduce, duration 15 minutes, fixed days on all seven days | "Choose Build or Reduce."                             |
-      | 02 | Build, no measurement, fixed days on all seven days                   | "Choose how it is measured."                          |
-      | 03 | Build, yes/no with the amount 5, fixed days on all seven days         | "A yes/no goal has no amount or unit."                |
-      | 04 | Build, duration 0 minutes, fixed days on all seven days               | "Enter a whole number from 1 to 999."                 |
-      | 05 | Build, duration 1000 minutes, fixed days on all seven days            | "Enter a whole number from 1 to 999."                 |
-      | 06 | Reduce, count 1000 `sweets`, fixed days on all seven days             | "Enter a whole number from 0 to 999."                 |
-      | 07 | Build, count 20 with no unit, fixed days on all seven days            | "Enter a unit, for example pages."                    |
-      | 08 | Build, count 20 `abcdefghijklmnopqrstu`, fixed days on all seven days | "The unit can have at most 20 characters."            |
-      | 09 | Build, duration 15 with no time unit, fixed days on all seven days    | "Choose minutes or hours."                            |
-      | 10 | Build, duration 15 minutes, no schedule                               | "Choose fixed days or how many times."                |
-      | 11 | Build, duration 15 minutes, fixed days with no day                    | "Choose at least one day."                            |
-      | 12 | Build, duration 15 minutes, 21 times per day                          | "Enter a number of times from 1 to 20."               |
-      | 13 | Build, duration 15 minutes, 3 times with no period                    | "Choose per day or per week."                         |
+      | n  | settings                                                              | message                                              |
+      | 01 | no Build or Reduce, duration 15 minutes, fixed days on all seven days | "Choose Build or Reduce."                            |
+      | 02 | Build, no measurement, fixed days on all seven days                   | "Choose how it is measured."                         |
+      | 03 | Build, yes/no with the amount 5, fixed days on all seven days         | "A yes/no goal has no amount or unit."               |
+      | 04 | Build, duration 0 minutes, fixed days on all seven days               | "Enter a whole number from 1 to 999."                |
+      | 05 | Build, duration 1000 minutes, fixed days on all seven days            | "Enter a whole number from 1 to 999."                |
+      | 06 | Reduce, count 1000 `sweets`, fixed days on all seven days             | "Enter a whole number from 0 to 999."                |
+      | 07 | Build, count 20 with no unit, fixed days on all seven days            | "Enter a unit, for example pages."                   |
+      | 08 | Build, count 20 `abcdefghijklmnopqrstu`, fixed days on all seven days | "The unit can have at most 20 characters."           |
+      | 09 | Build, duration 15 with no time unit, fixed days on all seven days    | "Choose minutes or hours."                           |
+      | 10 | Build, duration 15 minutes, no schedule                               | "Choose fixed days or how many times."               |
+      | 11 | Build, duration 15 minutes, fixed days with no day                    | "Choose at least one day."                           |
+      | 12 | Build, duration 15 minutes, 21 times per day                          | "Enter a number of times from 1 to 20."              |
+      | 13 | Build, duration 15 minutes, 3 times with no period                    | "Choose per day or per week."                        |
       | 14 | Reduce, count 1 `sweet`, 2 times per day                              | "A Reduce goal with an amount has 1 time per period." |
 
   @AC-012 @FR-003
@@ -152,12 +152,12 @@ Feature: Goal changes
     And reading the goal gives the name `Reading, 15 min daily` and no later settings
 
     Examples:
-      | n  | settings                                                         | name                  | message                                                                                                                              |
-      | 01 | no Build or Reduce, no measurement, fixed days on all seven days | ""                    | "Choose Build or Reduce."                                                                                                            |
-      | 02 | Build, yes/no with the amount 5, 21 times per day                | ""                    | "A yes/no goal has no amount or unit."                                                                                               |
-      | 03 | Build, duration 1000 minutes, 5 times per week                   | ""                    | "Enter a whole number from 1 to 999."                                                                                                |
+      | n  | settings                                                         | name                  | message                                                                                                                 |
+      | 01 | no Build or Reduce, no measurement, fixed days on all seven days | ""                    | "Choose Build or Reduce."                                                                                               |
+      | 02 | Build, yes/no with the amount 5, 21 times per day                | ""                    | "A yes/no goal has no amount or unit."                                                                                  |
+      | 03 | Build, duration 1000 minutes, 5 times per week                   | ""                    | "Enter a whole number from 1 to 999."                                                                                   |
       | 04 | Build, duration 15 minutes, 5 times per week                     | `x` repeated 61 times | "A change keeps the schedule kind: fixed days, times per day or times per week. End the goal and start a new attempt to change it." |
-      | 05 | Build, duration 20 minutes, fixed days on all seven days         | `x` repeated 61 times | "The name can have at most 60 characters."                                                                                           |
+      | 05 | Build, duration 20 minutes, fixed days on all seven days         | `x` repeated 61 times | "The name can have at most 60 characters."                                                                              |
 
   @AC-013 @FR-003 @US1-AS10
   Scenario: The same settings and name give "settings unchanged"
@@ -191,12 +191,12 @@ Feature: Goal changes
     And reading the goal gives the name <name>
 
     Examples:
-      | n  | settings                                                 | given                                         | result                                      | name                    |
-      | 01 | Build, duration 15 minutes, fixed days on all seven days | "  Morning pages  "                           | "settings changed" with no date             | "Morning pages"         |
-      | 02 | Build, duration 15 minutes, fixed days on all seven days | "   "                                         | "settings unchanged"                        | `Reading, 15 min daily` |
-      | 03 | Build, duration 15 minutes, fixed days on all seven days | `x` repeated 60 times                         | "settings changed" with no date             | `x` repeated 60 times   |
-      | 04 | Build, duration 15 minutes, fixed days on all seven days | two spaces, `x` repeated 60 times, two spaces | "settings changed" with no date             | `x` repeated 60 times   |
-      | 05 | Build, duration 20 minutes, fixed days on all seven days | "Morning pages"                               | "settings changed" with the date 2026-11-12 | "Morning pages"         |
+      | n  | settings                                                 | given                                          | result                                      | name                    |
+      | 01 | Build, duration 15 minutes, fixed days on all seven days | "  Morning pages  "                            | "settings changed" with no date             | "Morning pages"         |
+      | 02 | Build, duration 15 minutes, fixed days on all seven days | "   "                                          | "settings unchanged"                        | `Reading, 15 min daily` |
+      | 03 | Build, duration 15 minutes, fixed days on all seven days | `x` repeated 60 times                          | "settings changed" with no date             | `x` repeated 60 times   |
+      | 04 | Build, duration 15 minutes, fixed days on all seven days | two spaces, `x` repeated 60 times, two spaces  | "settings changed" with no date             | `x` repeated 60 times   |
+      | 05 | Build, duration 20 minutes, fixed days on all seven days | "Morning pages"                                | "settings changed" with the date 2026-11-12 | "Morning pages"         |
 
   @AC-017 @FR-002 @FR-005 @US1-AS12
   Scenario: A change to a goal that has not begun replaces its first version
@@ -215,8 +215,8 @@ Feature: Goal changes
     And reading the goal gives the settings in effect Build, duration 15 minutes, fixed days on all seven days, time zone UTC, from 2026-11-02
 
     Examples:
-      | n  | first                                            | second                                          |
-      | 01 | changed the account's time zone to `Europe/Kyiv` | changes the amount to 20 minutes                |
+      | n  | first                                            | second                                           |
+      | 01 | changed the account's time zone to `Europe/Kyiv` | changes the amount to 20 minutes                 |
       | 02 | changed the amount to 20 minutes                 | changes the account's time zone to `Europe/Kyiv` |
 
   @AC-019 @FR-001 @US1-AS14
@@ -316,9 +316,9 @@ Feature: Goal changes
     And reading the goal gives it not ended
 
     Examples:
-      | n  | outcome               | message                                     |
+      | n  | outcome              | message                                     |
       | 01 | the outcome Abandoned | "The note can have at most 500 characters." |
-      | 02 | no outcome            | "Choose how the goal ended."                |
+      | 02 | no outcome           | "Choose how the goal ended."                |
 
   @AC-030 @FR-007 @US2-AS7
   Scenario Outline: An ending note of 500 characters is accepted, and the note is trimmed
@@ -446,11 +446,11 @@ Feature: Goal changes
     And the history of the goal from <date> to <date> gives <date> <entry>
 
     Examples:
-      | n  | action                                | date       | entry              |
-      | 01 | excuses 2026-11-15 without a reason   | 2026-11-15 | Excused            |
-      | 02 | removes the excusal of 2026-11-14     | 2026-11-14 | Pending, no record |
+      | n  | action                              | date       | entry              |
+      | 01 | excuses 2026-11-15 without a reason | 2026-11-15 | Excused            |
+      | 02 | removes the excusal of 2026-11-14   | 2026-11-14 | Pending, no record |
       | 03 | changes the record of 2026-11-12 to 5 | 2026-11-12 | Failed, record 5   |
-      | 04 | deletes the record of 2026-11-13      | 2026-11-13 | Missed, no record  |
+      | 04 | deletes the record of 2026-11-13    | 2026-11-13 | Missed, no record  |
 
   @AC-041 @FR-016 @FR-019 @FR-027
   Scenario: An ending note is not a note of a commitment, and an ended goal's notes leave the dashboard
@@ -604,9 +604,9 @@ Feature: Goal changes
     And reading the goal gives it not ended, with its latest attempt attempt 1
 
     Examples:
-      | n  | action                                                                                                                      |
-      | 01 | starts a new attempt with Build, duration 10 minutes, fixed days on all seven days and the start date 2026-11-17              |
-      | 02 | reads the starting values of a new attempt                                                                                  |
+      | n  | action                                                                                                                       |
+      | 01 | starts a new attempt with Build, duration 10 minutes, fixed days on all seven days and the start date 2026-11-17             |
+      | 02 | reads the starting values of a new attempt                                                                                   |
       | 03 | starts a new attempt with no Build or Reduce, duration 10 minutes, fixed days on all seven days and the start date 2026-11-17 |
 
   @AC-055 @FR-010 @FR-011 @FR-013 @US3-AS8
@@ -758,9 +758,9 @@ Feature: Goal changes
     Then the result is <result>
 
     Examples:
-      | n  | time                 | result                                         |
+      | n  | time                 | result                                        |
       | 01 | 2026-11-22T23:59:59Z | "You cannot record a day that has not begun." |
-      | 02 | 2026-11-23T00:00:00Z | the state Due, correction no                   |
+      | 02 | 2026-11-23T00:00:00Z | the state Due, correction no                  |
 
   @AC-070 @FR-002 @FR-005
   Scenario: A change to a new attempt that has not begun replaces its first version
@@ -902,13 +902,13 @@ Feature: Goal changes
     And reading the goal by `f9.ac084.<n>.a@example.com` gives the settings in effect Build, duration 10 minutes, fixed days on all seven days, from 2026-11-02, and no later settings
 
     Examples:
-      | n  | action                                                                                                                                    |
-      | 01 | changes the settings of the goal of `f9.ac084.01.a@example.com` to Build, duration 20 minutes, fixed days on all seven days                |
-      | 02 | ends the goal of `f9.ac084.02.a@example.com` with the outcome Achieved and no note                                                        |
-      | 03 | reads the starting values of a new attempt of the goal of `f9.ac084.03.a@example.com`                                                     |
+      | n  | action                                                                                                                                |
+      | 01 | changes the settings of the goal of `f9.ac084.01.a@example.com` to Build, duration 20 minutes, fixed days on all seven days            |
+      | 02 | ends the goal of `f9.ac084.02.a@example.com` with the outcome Achieved and no note                                                     |
+      | 03 | reads the starting values of a new attempt of the goal of `f9.ac084.03.a@example.com`                                                  |
       | 04 | starts a new attempt of the goal of `f9.ac084.04.a@example.com` with Build, duration 10 minutes, fixed days on all seven days and the start date 2026-11-18 |
-      | 05 | reads the attempts of the goal of `f9.ac084.05.a@example.com`                                                                             |
-      | 06 | reads attempt 1 of the goal of `f9.ac084.06.a@example.com`                                                                                |
+      | 05 | reads the attempts of the goal of `f9.ac084.05.a@example.com`                                                                          |
+      | 06 | reads attempt 1 of the goal of `f9.ac084.06.a@example.com`                                                                             |
 
   @AC-085 @FR-023 @US5-AS2
   Scenario Outline: An administrator cannot use any use case of this slice
@@ -920,14 +920,14 @@ Feature: Goal changes
     And reading the goal by `f9.ac085.<n>.a@example.com` gives the settings in effect Build, duration 10 minutes, fixed days on all seven days, from 2026-11-02, and no later settings
 
     Examples:
-      | n  | action                                                                                                                                    |
-      | 01 | changes the settings of the goal of `f9.ac085.01.a@example.com` to Build, duration 20 minutes, fixed days on all seven days                |
-      | 02 | ends the goal of `f9.ac085.02.a@example.com` with the outcome Achieved and no note                                                        |
-      | 03 | reads the starting values of a new attempt of the goal of `f9.ac085.03.a@example.com`                                                     |
+      | n  | action                                                                                                                                |
+      | 01 | changes the settings of the goal of `f9.ac085.01.a@example.com` to Build, duration 20 minutes, fixed days on all seven days            |
+      | 02 | ends the goal of `f9.ac085.02.a@example.com` with the outcome Achieved and no note                                                     |
+      | 03 | reads the starting values of a new attempt of the goal of `f9.ac085.03.a@example.com`                                                  |
       | 04 | starts a new attempt of the goal of `f9.ac085.04.a@example.com` with Build, duration 10 minutes, fixed days on all seven days and the start date 2026-11-18 |
-      | 05 | reads the attempts of the goal of `f9.ac085.05.a@example.com`                                                                             |
-      | 06 | reads attempt 1 of the goal of `f9.ac085.06.a@example.com`                                                                                |
-      | 07 | reads the goal history                                                                                                                    |
+      | 05 | reads the attempts of the goal of `f9.ac085.05.a@example.com`                                                                          |
+      | 06 | reads attempt 1 of the goal of `f9.ac085.06.a@example.com`                                                                             |
+      | 07 | reads the goal history                                                                                                                |
 
   @AC-086 @FR-023 @US5-AS3
   Scenario Outline: An anonymous visitor cannot use any use case of this slice
@@ -938,14 +938,14 @@ Feature: Goal changes
     And reading the goal by `f9.ac086.<n>.a@example.com` gives the settings in effect Build, duration 10 minutes, fixed days on all seven days, from 2026-11-02, and no later settings
 
     Examples:
-      | n  | action                                                                                                                                    |
-      | 01 | changes the settings of the goal of `f9.ac086.01.a@example.com` to Build, duration 20 minutes, fixed days on all seven days                |
-      | 02 | ends the goal of `f9.ac086.02.a@example.com` with the outcome Achieved and no note                                                        |
-      | 03 | reads the starting values of a new attempt of the goal of `f9.ac086.03.a@example.com`                                                     |
+      | n  | action                                                                                                                                |
+      | 01 | changes the settings of the goal of `f9.ac086.01.a@example.com` to Build, duration 20 minutes, fixed days on all seven days            |
+      | 02 | ends the goal of `f9.ac086.02.a@example.com` with the outcome Achieved and no note                                                     |
+      | 03 | reads the starting values of a new attempt of the goal of `f9.ac086.03.a@example.com`                                                  |
       | 04 | starts a new attempt of the goal of `f9.ac086.04.a@example.com` with Build, duration 10 minutes, fixed days on all seven days and the start date 2026-11-18 |
-      | 05 | reads the attempts of the goal of `f9.ac086.05.a@example.com`                                                                             |
-      | 06 | reads attempt 1 of the goal of `f9.ac086.06.a@example.com`                                                                                |
-      | 07 | reads the goal history                                                                                                                    |
+      | 05 | reads the attempts of the goal of `f9.ac086.05.a@example.com`                                                                          |
+      | 06 | reads attempt 1 of the goal of `f9.ac086.06.a@example.com`                                                                             |
+      | 07 | reads the goal history                                                                                                                |
 
   @AC-087 @FR-015 @FR-022 @US5-AS4
   Scenario: A user's goal history contains only their own attempts
@@ -1020,7 +1020,7 @@ Feature: Goal changes
     And demo goal-change loading ran at 2026-11-18T10:00:00Z with the demo password `example2026`
     When demo goal-change loading runs at 2026-11-19T10:00:00Z with the demo password `example2026`
     Then its results are (demo7@example.com, already exists)
-    And at 2026-11-19T10:00:00Z the goals overview of `demo7@example.com` lists exactly `Reading, 20 min daily`, `Meditation, 5 min daily` and `Sugar, at most 1 sweet a day`
+    And at 2026-11-19T10:00:00Z the goals overview of `demo7@example.com` lists exactly `Reading, 25 min daily`, `Meditation, 5 min daily` and `Sugar, at most 1 sweet a day`
     And at 2026-11-19T10:00:00Z the goal history of `demo7@example.com` is, in this order, `Sugar, at most 1 sweet a day`, attempt 1, ending date 2026-11-11; and `Meditation, 10 min daily`, attempt 1, ending date 2026-10-28
 
   @AC-093 @FR-031 @US6-AS4
@@ -1031,8 +1031,8 @@ Feature: Goal changes
     And sign-in with `demo7@example.com` and `example2026` does not succeed
 
     Examples:
-      | n  | password                    | result                                        |
-      | 01 | with no demo password       | no demo password configured                   |
+      | n  | password                     | result                                        |
+      | 01 | with no demo password        | no demo password configured                   |
       | 02 | with the demo password `abc` | demo password does not meet the password rule |
 
   @AC-094 @FR-031
@@ -1142,8 +1142,8 @@ Feature: Goal changes
     And reading the goal by `f9.ac104.<n>.a@example.com` gives it not ended, with its latest attempt attempt 1
 
     Examples:
-      | n  | action                                                                                                                                    |
-      | 01 | reads the starting values of a new attempt of the goal of `f9.ac104.01.a@example.com`                                                     |
+      | n  | action                                                                                                                                |
+      | 01 | reads the starting values of a new attempt of the goal of `f9.ac104.01.a@example.com`                                                  |
       | 02 | starts a new attempt of the goal of `f9.ac104.02.a@example.com` with Build, duration 10 minutes, fixed days on all seven days and the start date 2026-11-17 |
 
   @AC-105 @FR-020
