@@ -91,6 +91,19 @@ public sealed class PublicSurfaceTests
     [InlineData("HT.Application.Goals", "SettingsChangeOutcome")]
     [InlineData("HT.Application.Goals", "GoalEndResult")]
     [InlineData("HT.Application.Goals", "GoalEndOutcome")]
+    [InlineData("HT.Application.Goals", "NewAttemptInput")]
+    [InlineData("HT.Application.Goals", "NewAttemptValues")]
+    [InlineData("HT.Application.Goals", "NewAttemptValuesResult")]
+    [InlineData("HT.Application.Goals", "NewAttemptValuesOutcome")]
+    [InlineData("HT.Application.Goals", "AttemptStartResult")]
+    [InlineData("HT.Application.Goals", "AttemptStartOutcome")]
+    [InlineData("HT.Application.Reports", "AttemptService")]
+    [InlineData("HT.Application.Reports", "AttemptView")]
+    [InlineData("HT.Application.Reports", "AttemptDetails")]
+    [InlineData("HT.Application.Reports", "AttemptListResult")]
+    [InlineData("HT.Application.Reports", "AttemptListOutcome")]
+    [InlineData("HT.Application.Reports", "AttemptReadResult")]
+    [InlineData("HT.Application.Reports", "AttemptReadOutcome")]
     public void TheNewRecordingTypesHaveNoNodaTimeTypeInTheirSignatures(string ns, string typeName)
     {
         var types = new[] { ArchitectureModel.Domain, ArchitectureModel.Application }

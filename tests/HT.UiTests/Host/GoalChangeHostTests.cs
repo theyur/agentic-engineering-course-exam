@@ -13,8 +13,10 @@ namespace HT.UiTests.Host;
 /// <summary>
 /// Slice 8 (T070; HP-001, HP-002, SC-001, contracts/host.md "Routes", "Edit settings page"): the Edit settings page
 /// through the real host on HT-UI. Its owner gets the prerendered form; another account, an unknown goal and an
-/// administrator get the Not found page; an ended goal redirects to its goal page. Dates come from the host's clock in
-/// UTC, the accounts' zone. Shared database: own prefixes ("ui-gc-", "Ui-Gc").
+/// administrator get the Not found page; an ended goal redirects to its goal page. Slice 8 US3 (T092; HP-004, HP-014,
+/// US3-AS14): the Start new attempt page and the attempt view with their Not found and redirect states, a new attempt in
+/// two actions from the goal page's Notice, and the attempt view of attempt 1. Dates come from the host's clock in UTC,
+/// the accounts' zone. Shared database: own prefixes ("ui-gc-", "Ui-Gc").
 /// </summary>
 [Collection(HostCollection.Name)]
 public sealed class GoalChangeHostTests(HostFixture host)
@@ -199,6 +201,173 @@ public sealed class GoalChangeHostTests(HostFixture host)
             {
                 Assert.DoesNotContain(absent, text, StringComparison.Ordinal);
             }
+        }
+    }
+
+    // ---- slice 8 US3: the Start new attempt page and the attempt view (T092; HP-001, HP-004, HP-014, US3-AS14) ----
+
+    private static string NewAttemptAddress(GoalId goal) => $"/goals/{goal.Value}/new-attempt";
+
+    private static string AttemptAddress(GoalId goal, int number) => $"/goals/{goal.Value}/attempts/{number}";
+
+    /// <summary>Ends the goal through the host's GoalChangeService, today, with "Abandoned" (as the EndGoalDialog does).</summary>
+    private async Task EndAsync(ActingUser user, GoalId goal)
+    {
+        await using var scope = host.Services.CreateAsyncScope();
+        var ended = await scope.ServiceProvider.GetRequiredService<GoalChangeService>().EndAsync(
+            user, goal, Outcome.Abandoned, null, CancellationToken.None);
+        Assert.Equal(GoalEndOutcome.Ended, ended.Outcome);
+    }
+
+    /// <summary>
+    /// Starts attempt 2 through the host's GoalChangeService with the starting values unchanged, as "Start attempt" sends
+    /// the form the page filled with them; returns its start date.
+    /// </summary>
+    private async Task<DateOnly> StartWithStartingValuesAsync(ActingUser user, GoalId goal)
+    {
+        await using var scope = host.Services.CreateAsyncScope();
+        var changes = scope.ServiceProvider.GetRequiredService<GoalChangeService>();
+        var values = (await changes.GetNewAttemptValuesAsync(user, goal, CancellationToken.None)).Values!;
+        var input = new NewAttemptInput
+        {
+            Target = new GoalTargetFields
+            {
+                BuildOrReduce = values.BuildOrReduce, Measurement = values.Measurement, Amount = values.Amount, DurationUnit = values.DurationUnit,
+                ScheduleKind = values.ScheduleKind, Days = values.Days,
+            },
+            StartDate = values.StartDate,
+        };
+        var started = await changes.StartAttemptAsync(user, goal, input, CancellationToken.None);
+        Assert.Equal((AttemptStartOutcome.Started, (int?)2), (started.Outcome, started.AttemptNumber));
+        return started.StartDate!.Value;
+    }
+
+    [Fact]
+    public async Task HP_004_HP_014_a_goal_not_ended_redirects_from_Start_new_attempt_and_its_attempt_numbers_give_Not_found()
+    {
+        var (browser, user, goal, habit, _) = await OwnerWithGoalAsync("us3-states");
+        using (browser)
+        {
+            using (var response = await browser.GetAsync(new Uri(NewAttemptAddress(goal), UriKind.Relative)))
+            {
+                Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+                Assert.Equal($"https://localhost/goals/{goal.Value}", response.RedirectTarget(browser));
+            }
+
+            // The latest attempt's number (the goal page shows it) and an unknown number, before and after the ending.
+            await AssertNotFoundAsync(browser, habit, AttemptAddress(goal, 1), AttemptAddress(goal, 2));
+            await EndAsync(user, goal);
+            await AssertNotFoundAsync(browser, habit, AttemptAddress(goal, 1), AttemptAddress(goal, 0));
+        }
+    }
+
+    private static async Task AssertNotFoundAsync(HttpClient browser, string habit, params string[] addresses)
+    {
+        foreach (var address in addresses)
+        {
+            var (status, html) = await browser.GetPageAsync(address);
+
+            Assert.Equal(HttpStatusCode.NotFound, status);
+            Assert.Contains("Page not found", html, StringComparison.Ordinal);
+            Assert.DoesNotContain(habit, html, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task HP_004_HP_014_another_account_an_unknown_goal_and_an_administrator_get_the_Not_found_page_on_the_new_routes()
+    {
+        var (owner, user, goal, habit, _) = await OwnerWithGoalAsync("us3-nf-owner");
+        owner.Dispose();
+        await EndAsync(user, goal);
+        await StartWithStartingValuesAsync(user, goal);
+        using var other = await host.SignedInBrowserAsync(Email("us3-nf-other"), Role.RegisteredUser);
+        using var administrator = await host.SignedInBrowserAsync(Email("us3-nf-admin"), Role.Administrator);
+        var unknown = new GoalId(Guid.NewGuid());
+
+        foreach (var (browser, address) in new[]
+                 {
+                     (other, NewAttemptAddress(goal)), (other, NewAttemptAddress(unknown)), (administrator, NewAttemptAddress(goal)),
+                     (other, AttemptAddress(goal, 1)), (other, AttemptAddress(unknown, 1)), (administrator, AttemptAddress(goal, 1)),
+                 })
+        {
+            var (status, html) = await browser.GetPageAsync(address);
+
+            Assert.Equal(HttpStatusCode.NotFound, status);
+            Assert.Contains("Page not found", html, StringComparison.Ordinal);
+            Assert.DoesNotContain(habit, html, StringComparison.Ordinal);
+            Assert.DoesNotContain("Start attempt", html, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task SC_001_US3_AS14_a_new_attempt_in_two_actions_from_the_goal_pages_Notice_opens_the_goal_page_with_attempt_2()
+    {
+        var (browser, user, goal, habit, today) = await OwnerWithGoalAsync("us3-start");
+        using (browser)
+        {
+            await EndAsync(user, goal);
+
+            // 1. "Start new attempt" in the goal page's ended Notice.
+            var (pageStatus, page) = await browser.GetPageAsync($"/goals/{goal.Value}");
+            Assert.Equal(HttpStatusCode.OK, pageStatus);
+            Assert.Contains($"href=\"{NewAttemptAddress(goal)}\">Start new attempt</a>", page, StringComparison.Ordinal);
+
+            // 2. "Start attempt" on the Start new attempt page, which opens with the starting values: the day after the
+            // ending date (today) as the start date, and the line with the next number. The interactive save sends them
+            // to GoalChangeService, which this test calls as it does.
+            var (startStatus, start) = await browser.GetPageAsync(NewAttemptAddress(goal));
+            Assert.Equal(HttpStatusCode.OK, startStatus);
+            var text = WebUtility.HtmlDecode(start);
+            Assert.Contains($"<a class=\"ht-back\" href=\"/goals/{goal.Value}\">← {habit}, 15 min daily</a>", text, StringComparison.Ordinal);
+            Assert.Contains("<h1>Start new attempt</h1>", text, StringComparison.Ordinal);
+            Assert.Contains("<span class=\"ht-muted\">Attempt 2 starts with its own history and a streak from zero.</span>", text, StringComparison.Ordinal);
+            var tomorrow = today.AddDays(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            Assert.Contains($"id=\"new-attempt-start\" value=\"{tomorrow}\"", text, StringComparison.Ordinal);
+            Assert.Contains(">Start attempt</button>", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("Choose a habit", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("id=\"new-attempt-name\"", text, StringComparison.Ordinal);
+            var startDate = await StartWithStartingValuesAsync(user, goal);
+            Assert.Equal(today.AddDays(1), startDate);
+
+            // The goal page now shows attempt 2, not ended, with attempt 1 in the Earlier attempts card.
+            var (afterStatus, after) = await browser.GetPageAsync($"/goals/{goal.Value}");
+            Assert.Equal(HttpStatusCode.OK, afterStatus);
+            var goalPage = WebUtility.HtmlDecode(after);
+            Assert.Contains($"<span class=\"ht-attempt\">Attempt 2 · starts {DateTexts.DayMonth(startDate)}</span>", goalPage, StringComparison.Ordinal);
+            Assert.DoesNotContain("Start new attempt", goalPage, StringComparison.Ordinal);
+            Assert.Contains("<h2 class=\"ht-card__title\">Earlier attempts</h2>", goalPage, StringComparison.Ordinal);
+            Assert.Contains($"<a class=\"ht-goal__name\" href=\"{AttemptAddress(goal, 1)}\">Attempt 1 · ended before it began</a>", goalPage, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task HP_014_the_attempt_view_of_attempt_1_is_prerendered_with_its_head_and_figures_and_no_goal_actions()
+    {
+        var (browser, user, goal, habit, _) = await OwnerWithGoalAsync("us3-view");
+        using (browser)
+        {
+            await EndAsync(user, goal);
+            await StartWithStartingValuesAsync(user, goal);
+
+            var (status, html) = await browser.GetPageAsync(AttemptAddress(goal, 1));
+
+            Assert.Equal(HttpStatusCode.OK, status);
+            var text = WebUtility.HtmlDecode(html);
+            Assert.Contains($"<a class=\"ht-back\" href=\"/goals/{goal.Value}\">← {habit}, 15 min daily</a>", text, StringComparison.Ordinal);
+            // Ended on its start date, attempt 1 has no date (AC-102).
+            Assert.Contains("<h1>Attempt 1 · ended before it began</h1>", text, StringComparison.Ordinal);
+            Assert.Contains($"<span class=\"ht-attempt\">{habit}, 15 min daily</span>", text, StringComparison.Ordinal);
+            Assert.Contains("<span class=\"ht-chip\">Abandoned</span>", text, StringComparison.Ordinal);
+            Assert.Contains("<div class=\"ht-eyebrow\">Attempt 1</div>", text, StringComparison.Ordinal);
+            Assert.Contains(">N/A</div>", text, StringComparison.Ordinal);
+            foreach (var absent in new[] { ">Edit settings<", ">End goal<", ">Pause<", ">Record<", "Earlier attempts", "aria-label=\"History\"" })
+            {
+                Assert.DoesNotContain(absent, text, StringComparison.Ordinal);
+            }
+
+            // The latest attempt, now 2, is the goal page's.
+            var (latestStatus, _) = await browser.GetPageAsync(AttemptAddress(goal, 2));
+            Assert.Equal(HttpStatusCode.NotFound, latestStatus);
         }
     }
 }

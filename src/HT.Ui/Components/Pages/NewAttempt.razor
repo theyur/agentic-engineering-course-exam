@@ -1,0 +1,124 @@
+@page "/goals/{Id:guid}/new-attempt"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using HT.Application.Goals
+@using HT.Application.Reports
+@using HT.Domain.Accounts
+@using HT.Domain.Goals
+@using HT.Ui.Account
+@using HT.Ui.Components.Goals
+@using HT.Ui.Goals
+@using HT.Ui.Habits
+@using Microsoft.AspNetCore.Authorization
+@inject UseCaseScope UseCases
+@inject ActingUserAccessor ActingUsers
+@inject NavigationManager Navigation
+@* design/pages/PageNewAttempt, slice 8 state (HP-004, US3-AS14, contracts/host.md "Start new attempt page"): reads the
+   goal with GoalService.GetAsync, then the starting values with GoalChangeService.GetNewAttemptValuesAsync. An
+   administrator, an unknown goal and another account's goal get the Not found page; a goal that is not ended returns
+   to its goal page. Otherwise: BackLink "← {goal name}" to the goal page, the heading "Start new attempt" with the
+   muted line "Attempt {n} starts with its own history and a streak from zero." (ReportText.NewAttemptLine), and
+   NewGoalForm in its attempt mode, filled with the starting values, with "Start attempt" and Cancel (back to the goal
+   page), beside the summary card. "attempt started" opens the goal page; a refusal about a field shows under it, one
+   about no field above the form's first section (the goal was restarted elsewhere while the page was open), and an
+   access refusal gives the Not found page. Every use case runs in its own scope. *@
+<PageTitle>Start new attempt · Habit Tracker</PageTitle>
+
+@if (_model is { } model && _goal is { } goal && _values is { } values)
+{
+    <div class="ht-container">
+        <BackLink Href="@GoalAddress" Text="@goal.Name" />
+        <div class="ht-page-head ht-detail-head">
+            <div>
+                <h1>Start new attempt</h1>
+                <span class="ht-muted">@ReportText.NewAttemptLine(values.AttemptNumber)</span>
+            </div>
+        </div>
+        <NewGoalForm Model="model" Error="_error" ActingUser="_actingUser" CancelHref="@GoalAddress" AttemptMode="true"
+                     Refusal="@_refusal" OnSubmit="StartAsync" />
+    </div>
+}
+
+@code {
+    private ActingUser _actingUser = ActingUser.Anonymous;
+    private GoalDetails? _goal;
+    private NewAttemptValues? _values;
+    private GoalFormModel? _model;
+    private GoalFormError? _error;
+    private string? _refusal;
+
+    /// <summary>The goal's identifier from the address.</summary>
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private string GoalAddress => $"/goals/{Id}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _actingUser = await ActingUsers.GetAsync();
+        var read = await UseCases.RunAsync<GoalService, GoalReadResult>(
+            (service, token) => service.GetAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        if (read.Goal is not { } goal)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        if (!goal.IsEnded)
+        {
+            Navigation.NavigateTo(GoalAddress);
+            return;
+        }
+
+        var starting = await UseCases.RunAsync<GoalChangeService, NewAttemptValuesResult>(
+            (service, token) => service.GetNewAttemptValuesAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        switch (starting.Outcome)
+        {
+            case NewAttemptValuesOutcome.Found:
+                break;
+            case NewAttemptValuesOutcome.NotEnded:
+                // Restarted elsewhere between the two reads.
+                Navigation.NavigateTo(GoalAddress);
+                return;
+            default:
+                Navigation.NotFound();
+                return;
+        }
+
+        _goal = goal;
+        _values = starting.Values!;
+        _model = GoalFormModel.From(_values, goal.Habit);
+    }
+
+    private async Task StartAsync()
+    {
+        if (_model is not { } model)
+        {
+            return;
+        }
+
+        var input = model.ToAttemptInput();
+        var result = await UseCases.RunAsync<GoalChangeService, AttemptStartResult>(
+            (service, token) => service.StartAttemptAsync(_actingUser, new GoalId(Id), input, token), CancellationToken.None);
+        switch (result.Outcome)
+        {
+            case AttemptStartOutcome.Started:
+                Navigation.NavigateTo(GoalAddress);
+                return;
+            case AttemptStartOutcome.NotSignedIn or AttemptStartOutcome.NotForAdministrators or AttemptStartOutcome.NotFound:
+                Navigation.NotFound();
+                return;
+        }
+
+        if (result.Field is { } field)
+        {
+            _error = new GoalFormError(field, result.Message);
+            _refusal = null;
+            return;
+        }
+
+        // "Only an ended goal can start a new attempt.": restarted elsewhere while the page was open.
+        _error = null;
+        _refusal = result.Message;
+    }
+}

@@ -54,6 +54,9 @@
    attempt" (/goals/{id}/new-attempt), and never the paused Notice; its History card keeps its record and note actions.
    After "goal ended" the page reads the goal and everything else again, and the focus goes to the Notice's "Start new
    attempt"; after Esc, × or Cancel it goes back to "End goal".
+   Slice 8 US3 (HP-001): the goal's attempts are read with the pauses, on every read, and the Earlier attempts card
+   follows Recent notes in the right column; for a goal with no begun entry it follows Settings (and Pauses) in the
+   Settings column. It is absent when the goal has no earlier attempt.
    Every use case runs in its own scope. *@
 @if (_goal is { } goal)
 {
@@ -125,17 +128,20 @@
                 <GoalSettingsCard Details="goal" />
                 <PausesCard Pauses="_pauses" OnResume="ResumeFromCardAsync" OnCancel="CancelPauseAsync" Refusal="@_pausesRefusal" />
                 <RecentNotesCard Notes="_recentNotes" ScheduleKind="_history!.GoalScheduleKind" Period="_history.Period" />
+                <EarlierAttemptsCard Attempts="_attempts" GoalId="Id" GoalName="@goal.Name" />
             </div>
         </div>
     }
-    else if (_pauses.Count > 0)
+    else if (_pauses.Count > 0 || EarlierAttemptsCard.HasEarlier(_attempts))
     {
         @* A goal with no begun entry keeps the Settings card in ht-grid-2; with a pause, the Pauses card follows it in the
-           same column (design/pages/PageGoalDetail, slice 7 state, settled in T003). *@
+           same column (design/pages/PageGoalDetail, slice 7 state, settled in T003), and so does the Earlier attempts
+           card (slice 8 state: a restarted goal whose new attempt has not begun). *@
         <div class="ht-grid-2">
             <div class="ht-stack">
                 <GoalSettingsCard Details="goal" />
                 <PausesCard Pauses="_pauses" OnResume="ResumeFromCardAsync" OnCancel="CancelPauseAsync" Refusal="@_pausesRefusal" />
+                <EarlierAttemptsCard Attempts="_attempts" GoalId="Id" GoalName="@goal.Name" />
             </div>
         </div>
     }
@@ -234,6 +240,9 @@
     /// <summary>The ended Notice's "Start new attempt"; the focus goes there after an ending removed "End goal" (HP-009).</summary>
     private ElementReference _startNewAttemptLink;
 
+    /// <summary>The goal's attempts, the latest first (slice 8 FR-014), for the Earlier attempts card; empty until read.</summary>
+    private IReadOnlyList<AttemptView> _attempts = [];
+
     /// <summary>The goal's identifier; the page shell has already found it among the acting user's goals.</summary>
     [Parameter]
     public Guid Id { get; set; }
@@ -310,6 +319,9 @@
         _pauseDate = pauses.PauseDate;
         _resumeRefusal = null;
         _pausesRefusal = null;
+        var attempts = await UseCases.RunAsync<AttemptService, AttemptListResult>(
+            (service, token) => service.GetAttemptsAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
+        _attempts = attempts.Attempts;
         var recordable = await UseCases.RunAsync<RecordingService, RecordableResult>(
             (service, token) => service.GetRecordableAsync(_actingUser, new GoalId(Id), token), CancellationToken.None);
         _recordable = recordable.History;

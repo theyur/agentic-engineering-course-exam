@@ -130,3 +130,112 @@ public sealed class GoalEndResult
     internal static GoalEndResult Ended(DateOnly endingDate, DateOnly lastDate) =>
         new(GoalEndOutcome.Ended, GoalChangeTexts.Ended, endingDate, lastDate);
 }
+
+/// <summary>
+/// The outcomes of <see cref="GoalChangeService.GetNewAttemptValuesAsync"/>, in FR-011's check order (data-model.md
+/// "Results and views"): the acting user, the goal and a goal that is not ended; then the success.
+/// </summary>
+public enum NewAttemptValuesOutcome
+{
+    NotSignedIn,
+    NotForAdministrators,
+    NotFound,
+    NotEnded,
+    Found,
+}
+
+/// <summary>
+/// The starting values of a new attempt (slice 8 FR-011), or one refusal with its text. A refusal carries no values.
+/// </summary>
+public sealed class NewAttemptValuesResult
+{
+    private NewAttemptValuesResult(NewAttemptValuesOutcome outcome, string? message, NewAttemptValues? values)
+    {
+        Outcome = outcome;
+        Message = message;
+        Values = values;
+    }
+
+    public NewAttemptValuesOutcome Outcome { get; }
+
+    /// <summary>The refusal's text; null for <see cref="NewAttemptValuesOutcome.Found"/>.</summary>
+    public string? Message { get; }
+
+    /// <summary>Set only for <see cref="NewAttemptValuesOutcome.Found"/>.</summary>
+    public NewAttemptValues? Values { get; }
+
+    internal static NewAttemptValuesResult Refused(NewAttemptValuesOutcome outcome, string message) => new(outcome, message, null);
+
+    internal static NewAttemptValuesResult Found(NewAttemptValues values) => new(NewAttemptValuesOutcome.Found, null, values);
+}
+
+/// <summary>
+/// The outcomes of <see cref="GoalChangeService.StartAttemptAsync"/>, in FR-012's check order (data-model.md "Results and
+/// views"): the acting user, the goal, a goal that is not ended, the 13 target outcomes named as <see cref="GoalProblem"/>'s
+/// in its order (the Reduce N rule last), then the four start date outcomes; then the success.
+/// </summary>
+public enum AttemptStartOutcome
+{
+    NotSignedIn,
+    NotForAdministrators,
+    NotFound,
+    NotEnded,
+    BuildOrReduceMissing,
+    MeasurementMissing,
+    YesNoHasAmountOrUnit,
+    BuildAmountOutOfRange,
+    ReduceAmountOutOfRange,
+    CountUnitMissing,
+    CountUnitTooLong,
+    DurationUnitMissing,
+    ScheduleMissing,
+    DaysMissing,
+    TimesOutOfRange,
+    PeriodMissing,
+    ReduceAmountNeedsOneTime,
+    StartDateMissing,
+    StartDateInPast,
+    StartDateNotAfterEnding,
+    StartDateTooFar,
+    Started,
+}
+
+/// <summary>
+/// The result of starting a new attempt (slice 8 FR-012): "attempt started" with the attempt's number and start date, or
+/// one refusal with its text and the field it is about. A refusal carries no input value (HP-010).
+/// </summary>
+public sealed class AttemptStartResult
+{
+    private AttemptStartResult(AttemptStartOutcome outcome, string message, int? attemptNumber, DateOnly? startDate, GoalField? field)
+    {
+        Outcome = outcome;
+        Message = message;
+        AttemptNumber = attemptNumber;
+        StartDate = startDate;
+        Field = field;
+    }
+
+    public AttemptStartOutcome Outcome { get; }
+
+    /// <summary>The refusal's text, or the success words "attempt started" (<see cref="GoalChangeTexts.AttemptStarted"/>).</summary>
+    public string Message { get; }
+
+    /// <summary>The new attempt's number, the previous number + 1; set only for <see cref="AttemptStartOutcome.Started"/>.</summary>
+    public int? AttemptNumber { get; }
+
+    /// <summary>The new attempt's start date; set only for <see cref="AttemptStartOutcome.Started"/>.</summary>
+    public DateOnly? StartDate { get; }
+
+    /// <summary>
+    /// The field a refusal is about: the target field of a target refusal and <see cref="GoalField.StartDate"/> for the
+    /// four start date refusals (<see cref="GoalDraft.FieldOf"/>); null for the success and for the refusals of the acting
+    /// user, the goal and a goal that is not ended.
+    /// </summary>
+    public GoalField? Field { get; }
+
+    internal static AttemptStartResult Refused(AttemptStartOutcome outcome, string message, GoalField? field) =>
+        new(outcome, message, null, null, field);
+
+    internal static AttemptStartResult Started(int attemptNumber, DateOnly startDate) =>
+        new(AttemptStartOutcome.Started, GoalChangeTexts.AttemptStarted, attemptNumber, startDate, null);
+}

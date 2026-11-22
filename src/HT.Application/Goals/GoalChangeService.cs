@@ -183,6 +183,151 @@ public sealed class GoalChangeService
     }
 
     /// <summary>
+    /// The starting values of a new attempt of one of the acting user's ended goals (FR-011), checking after access that
+    /// the goal is ended: the target of the ended attempt's last version (<see cref="GoalTimeline.VersionInEffect(Goal, int, DateTimeOffset)"/>,
+    /// the version of its last date, or its first when it has no date), the start date
+    /// <see cref="GoalTimeline.NewAttemptEarliestStart"/> gives for the account's today at the supplied time, and the
+    /// number the attempt will get. Nothing is written.
+    /// </summary>
+    public async Task<NewAttemptValuesResult> GetNewAttemptValuesAsync(
+        ActingUser actingUser, GoalId goal, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        var access = await AccessAsync(actingUser, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return NewAttemptValuesResult.Refused(
+                refusal == AccessRefusal.NotSignedIn ? NewAttemptValuesOutcome.NotSignedIn : NewAttemptValuesOutcome.NotForAdministrators,
+                access.Message!);
+        }
+
+        var now = _clock.GetUtcNow();
+        return await DecideAndWriteAsync(
+            access.Owner,
+            goal,
+            static () => NewAttemptValuesResult.Refused(NewAttemptValuesOutcome.NotSignedIn, AccountTexts.NotSignedIn),
+            static () => NewAttemptValuesResult.Refused(NewAttemptValuesOutcome.NotFound, GoalTexts.NotFound),
+            (read, stored) => Decision<NewAttemptValuesResult>.Done(NewAttemptValuesOf(read, stored, now)),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Step 4 of FR-011 and the starting values, on one read of the goal.</summary>
+    private NewAttemptValuesResult NewAttemptValuesOf(OwnerGoal read, Goal goal, DateTimeOffset now)
+    {
+        if (!goal.IsEnded)
+        {
+            return NewAttemptValuesResult.Refused(NewAttemptValuesOutcome.NotEnded, GoalChangeTexts.NotEnded);
+        }
+
+        var target = GoalTimeline.VersionInEffect(goal, goal.Attempt.Number, now).Settings.Target;
+        var schedule = target.Schedule;
+        return NewAttemptValuesResult.Found(new NewAttemptValues
+        {
+            BuildOrReduce = target.BuildOrReduce,
+            Measurement = target.Measurement,
+            Amount = target.Amount,
+            CountUnit = target.CountUnit,
+            DurationUnit = target.DurationUnit,
+            ScheduleKind = schedule.Kind,
+            Days = schedule.Days,
+            Times = schedule.Times,
+            Period = schedule.Period,
+            StartDate = GoalTimeline.NewAttemptEarliestStart(goal, ZoneOf(read.StoredTimeZone).DateAt(now)),
+            AttemptNumber = goal.Attempt.Number + 1,
+        });
+    }
+
+    /// <summary>
+    /// Starts a new attempt of one of the acting user's ended goals (FR-012), checking in FR-012's order after access: a
+    /// goal that is not ended, the target fields (<see cref="GoalDraft.CheckTarget"/>, any schedule kind), then the start
+    /// date: missing, before the account's today, on or before the ending date, more than 365 days after the account's
+    /// today. <see cref="IGoalStore.TryStartAttemptAsync"/> then writes the attempt numbered the latest number + 1 with its
+    /// first version from the start date in the account's current zone; "attempt started" carries the number and the
+    /// start date. The habit is not looked up, so an Unpublished catalog habit can start a new attempt (AC-064), and the
+    /// goal keeps its habit and name.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The goal or the account kept changing during every write. The message names no value.</exception>
+    public async Task<AttemptStartResult> StartAttemptAsync(
+        ActingUser actingUser, GoalId goal, NewAttemptInput input, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actingUser);
+        ArgumentNullException.ThrowIfNull(input);
+        var access = await AccessAsync(actingUser, cancellationToken).ConfigureAwait(false);
+        if (access.Refusal is { } refusal)
+        {
+            return AttemptStartResult.Refused(
+                refusal == AccessRefusal.NotSignedIn ? AttemptStartOutcome.NotSignedIn : AttemptStartOutcome.NotForAdministrators,
+                access.Message!,
+                null);
+        }
+
+        var now = _clock.GetUtcNow();
+        return await DecideAndWriteAsync(
+            access.Owner,
+            goal,
+            static () => AttemptStartResult.Refused(AttemptStartOutcome.NotSignedIn, AccountTexts.NotSignedIn, null),
+            static () => AttemptStartResult.Refused(AttemptStartOutcome.NotFound, GoalTexts.NotFound, null),
+            (read, stored) => DecideAttemptStart(access.Owner, read, stored, input, now),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Steps 4 to 6 of FR-012 and the new attempt, on one read of the goal.</summary>
+    private Decision<AttemptStartResult> DecideAttemptStart(
+        AccountId owner, OwnerGoal read, Goal goal, NewAttemptInput input, DateTimeOffset now)
+    {
+        if (goal.Attempt.Ending is not { } ending)
+        {
+            return Decision<AttemptStartResult>.Done(
+                AttemptStartResult.Refused(AttemptStartOutcome.NotEnded, GoalChangeTexts.NotEnded, null));
+        }
+
+        var problem = GoalDraft.CheckTarget(input.Target, out var target);
+        var zone = ZoneOf(read.StoredTimeZone);
+        if (problem == GoalProblem.None)
+        {
+            problem = StartDateProblem(input.StartDate, zone.DateAt(now), ending.Date);
+        }
+
+        if (problem != GoalProblem.None)
+        {
+            return Decision<AttemptStartResult>.Done(AttemptStartResult.Refused(
+                Enum.Parse<AttemptStartOutcome>(problem.ToString()), GoalService.TextOf(problem), GoalDraft.FieldOf(problem)));
+        }
+
+        var start = input.StartDate!.Value;
+        var number = goal.Attempt.Number + 1;
+        var write = new GoalAttemptWrite(goal.Id, number, new GoalSettingsVersion(new GoalSettings(target!, zone), start));
+        return new Decision<AttemptStartResult>(
+            AttemptStartResult.Started(number, start),
+            token => _goals.TryStartAttemptAsync(owner, read.StoredTimeZone, read.GoalsRevision, write, token));
+    }
+
+    /// <summary>
+    /// FR-012 step 6, in its order: no start date, a date before <paramref name="accountToday"/>, a date on or before
+    /// <paramref name="endingDate"/>, a date more than <see cref="GoalDraft.MaxDaysAhead"/> days after
+    /// <paramref name="accountToday"/>; otherwise <see cref="GoalProblem.None"/>.
+    /// </summary>
+    private static GoalProblem StartDateProblem(DateOnly? startDate, DateOnly accountToday, DateOnly endingDate)
+    {
+        if (startDate is not { } date)
+        {
+            return GoalProblem.StartDateMissing;
+        }
+
+        if (date < accountToday)
+        {
+            return GoalProblem.StartDateInPast;
+        }
+
+        if (date <= endingDate)
+        {
+            return GoalProblem.StartDateNotAfterEnding;
+        }
+
+        return date > accountToday.AddDays(GoalDraft.MaxDaysAhead) ? GoalProblem.StartDateTooFar : GoalProblem.None;
+    }
+
+    /// <summary>
     /// The one write-and-retry loop of the goal changes (contracts/application-api.md "Writes", research R-05): it reads
     /// the owner's zone, revision and goal, lets <paramref name="decide"/> check them and choose the write, and makes it.
     /// No account gives <paramref name="notSignedIn"/>, a goal that is not the owner's <paramref name="notFound"/> (also

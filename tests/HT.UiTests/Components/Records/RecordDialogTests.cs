@@ -1102,4 +1102,37 @@ public sealed class RecordDialogTests : BunitContext
         Assert.Equal("minutes", Field(cut, "Time spent").QuerySelector(".ht-unit")!.TextContent);
         AssertNoteWithHelp(cut, string.Empty, CommitmentNoteHelp);
     }
+
+    // ---- slice 8: the attempt view as an opener (HP-014, US3-AS4, US3-AS15, FR-014; T092) ----
+
+    [Fact]
+    public async Task HP_014_US3_AS15_from_the_attempt_views_Add_record_the_dialog_uses_attempt_1s_settings_and_the_save_counts_in_attempt_1_only()
+    {
+        // US3-AS4: "Meditation, 10 min daily" ended on Monday 16 November, restarted with 5 minutes from Monday 23 November;
+        // attempt 1's History read on Thursday 19 November at 10:00, as the attempt view reads it.
+        var goal = MeditationAttempts.SeedRestarted(this, _user, MeditationAttempts.MinutesDaily(5), MeditationAttempts.Mon23);
+        _clock.SetUtcNow(MeditationAttempts.Utc(19, 10));
+        var attempt = await MeditationAttempts.AttemptAsync(this, _user, goal, 1);
+        var row = attempt.History.Entries.Single(e => e.FirstDate == MeditationAttempts.Sat14);
+        Assert.Equal(EvaluationState.Missed, row.State);
+
+        var cut = RenderExcusable(goal, attempt.Attempt.Name, attempt.History, row);
+
+        Assert.Equal("Record · Meditation, 10 min daily", cut.Find(".ht-dialog__head h2").TextContent);
+        Assert.Equal("Build · at least 10 min · every day", cut.Find(".ht-dialog__sub").TextContent);
+        Assert.Equal("Sat 14 Nov", Text(Field(cut, "For").QuerySelector("span:not(.ht-field__label)")!));
+        Assert.Equal("minutes", Field(cut, "Time spent").QuerySelector(".ht-unit")!.TextContent);
+        Assert.DoesNotContain("Excuse instead", cut.Markup, StringComparison.Ordinal);
+
+        cut.Find(".ht-stepper input").Change("10");
+        Assert.Equal("10 of 10 min", Text(cut.Find(".ht-target")));
+        await cut.Find(".ht-dialog__foot .ht-btn--primary").ClickAsync(new MouseEventArgs());
+
+        var saved = Assert.Single(_saved);
+        Assert.Equal((MeditationAttempts.Sat14, EvaluationState.Met, true), (saved.FirstDate, saved.State, saved.IsCorrection));
+        Assert.Contains(_records.RecordsOfGoal(goal), r => r.Date == MeditationAttempts.Sat14 && r.Value.Amount == 10);
+        Assert.Equal("92% (13 of 14)", (await MeditationAttempts.AttemptAsync(this, _user, goal, 1)).Attempt.Stats.ConsistencyText);
+        var latest = (await MeditationAttempts.AttemptsAsync(this, _user, goal))[0];
+        Assert.Equal((2, "N/A"), (latest.Number, latest.Stats.ConsistencyText));
+    }
 }

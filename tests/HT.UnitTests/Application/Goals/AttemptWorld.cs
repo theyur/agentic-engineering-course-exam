@@ -91,6 +91,9 @@ public sealed class AttemptWorld
     /// <summary>Slice 8 (T061): the goal-change use cases over the same fakes and clock.</summary>
     public GoalChangeService Changes => new(Goals, Accounts, Clock, DefaultZone);
 
+    /// <summary>Slice 8 (T082): the attempt reads over the same fakes and clock.</summary>
+    public AttemptService Attempts => new(Goals, Records, Accounts, Clock);
+
     /// <summary>A registered user stored with <paramref name="timeZone"/>.</summary>
     public ActingUser UserIn(string timeZone) => _reports.UserIn(timeZone);
 

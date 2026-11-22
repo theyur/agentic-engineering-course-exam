@@ -71,6 +71,38 @@ public sealed class GoalFormModel
         Name = Name,
     };
 
+    /// <summary>The Start new attempt page's attempt (slice 8 HP-004): the target fields of the shown controls and the start date.</summary>
+    public NewAttemptInput ToAttemptInput() => new()
+    {
+        Target = ToTargetFields(),
+        StartDate = StartDate,
+    };
+
+    /// <summary>
+    /// The Start new attempt form of an ended goal (slice 8 HP-004, contracts/host.md "Start new attempt page"): its
+    /// starting values (FR-011) and the goal's habit, kept for the summary card's sentence and never sent. There is no
+    /// name: the goal keeps its own.
+    /// </summary>
+    public static GoalFormModel From(NewAttemptValues values, GoalHabitView habit)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(habit);
+        return new()
+        {
+            Habit = habit,
+            BuildOrReduce = values.BuildOrReduce,
+            Measurement = values.Measurement,
+            Amount = values.Amount,
+            CountUnit = values.CountUnit,
+            DurationUnit = values.DurationUnit,
+            ScheduleKind = values.ScheduleKind,
+            Days = values.Days.ToHashSet(),
+            Times = values.Times,
+            Period = values.Period,
+            StartDate = values.StartDate,
+        };
+    }
+
     /// <summary>
     /// The Edit settings form of a goal (slice 8 HP-002, contracts/host.md "Edit settings page"): its latest settings
     /// (<see cref="GoalDetails.Later"/> when there is one, else the settings in effect) and its own name. The habit is

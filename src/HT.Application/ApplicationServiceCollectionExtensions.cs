@@ -38,6 +38,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<ProfileService>();
         services.AddScoped<RecordingService>();
         services.AddScoped<ReportService>();
+        services.AddScoped<AttemptService>();
         services.AddScoped<ExcusalService>();
         services.AddScoped<PauseService>();
         services.TryAddSingleton(TimeProvider.System);

@@ -453,7 +453,8 @@ public sealed class GoalService
 
     /// <summary>
     /// The text of a goal problem (FR-006): slice 2's target texts, with the goal's own yes/no text. Slice 8: also the
-    /// target texts of a settings change and a new attempt (<see cref="GoalChangeService"/>), so each exists once.
+    /// target and start date texts of a settings change and a new attempt (<see cref="GoalChangeService"/>), so each exists
+    /// once; a new attempt's <see cref="GoalProblem.StartDateNotAfterEnding"/> takes <see cref="GoalChangeTexts"/>' text.
     /// </summary>
     internal static string TextOf(GoalProblem problem) => problem switch
     {
@@ -473,6 +474,7 @@ public sealed class GoalService
         GoalProblem.ReduceAmountNeedsOneTime => GoalTexts.ReduceAmountNeedsOneTime,
         GoalProblem.StartDateMissing => GoalTexts.StartDateMissing,
         GoalProblem.StartDateInPast => GoalTexts.StartDateInPast,
+        GoalProblem.StartDateNotAfterEnding => GoalChangeTexts.StartDateNotAfterEnding,
         GoalProblem.StartDateTooFar => GoalTexts.StartDateTooFar,
         GoalProblem.NameTooLong => AccountTexts.NameTooLong,
         _ => throw new ArgumentOutOfRangeException(nameof(problem), problem, "Not a refusal."),

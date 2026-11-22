@@ -18,8 +18,8 @@ namespace HT.Application.Reports;
 /// </summary>
 public sealed class ReportService
 {
-    /// <summary>How many ended results the goal report gives at most (FR-005).</summary>
-    private const int GoalReportRecentCount = 30;
+    /// <summary>How many ended results the goal report gives at most (FR-005); slice 8: also an attempt's (FR-014).</summary>
+    internal const int GoalReportRecentCount = 30;
 
     /// <summary>How many ended results each goal of the overview gives at most, the Goals page's mini strip (FR-011).</summary>
     private const int OverviewRecentCount = 15;
@@ -282,8 +282,8 @@ public sealed class ReportService
         ReadAt = evaluation.Now,
     };
 
-    /// <summary>The goal's figures with their texts (FR-002 to FR-004, HP-005).</summary>
-    private static GoalStatsView StatsOf(GoalEvaluation evaluation) => new()
+    /// <summary>The goal's figures with their texts (FR-002 to FR-004, HP-005); slice 8: also an attempt's (<see cref="AttemptService"/>).</summary>
+    internal static GoalStatsView StatsOf(GoalEvaluation evaluation) => new()
     {
         Consistency = evaluation.Consistency,
         ConsistencyText = ReportText.Consistency(evaluation.Consistency),
@@ -297,9 +297,10 @@ public sealed class ReportService
     /// <summary>
     /// The latest <paramref name="count"/> ended results, oldest first, with the count of each ended state (FR-005).
     /// Slice 7 (FR-015, FR-023): the exempt results are among them, and the keys Excused and Paused are added only when
-    /// their count is above 0, so a goal without exemptions keeps slice 6's four keys.
+    /// their count is above 0, so a goal without exemptions keeps slice 6's four keys. Slice 8: also an attempt's
+    /// (<see cref="AttemptService"/>).
     /// </summary>
-    private static RecentResults RecentOf(GoalEvaluation evaluation, int count)
+    internal static RecentResults RecentOf(GoalEvaluation evaluation, int count)
     {
         var results = evaluation.Ended
             .TakeLast(count)

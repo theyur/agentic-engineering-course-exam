@@ -118,10 +118,8 @@ public sealed class GoalDetailPageTests : BunitContext
         // "End goal" follows "Pause", so it leaves the absent list too.
         Assert.Equal(["Pause", "End goal", "Record"], cut.FindAll(".ht-page-head button").Select(b => b.TextContent));
         Assert.Equal(["Edit settings", "Pause", "End goal", "Record"], cut.FindAll(".ht-page-head .ht-btn").Select(b => b.TextContent));
-        foreach (var absent in new[] { "Earlier attempts" })
-        {
-            Assert.DoesNotContain(absent, cut.Markup, StringComparison.Ordinal);
-        }
+        // Slice 8 (T090, on purpose): "Earlier attempts" leaves the absent list, the last of slices 7 and 8's absent parts;
+        // the card's absence for a goal with one attempt is covered by EarlierAttemptsCardTests.
 
         // Slice 7 (T042): the GoalStats legend now lists "Excused" and "Paused", so the markup contains "Excuse"; "Excuse
         // instead" is only in the RecordDialog and "Remove excusal" only on an Excused row (T052).
@@ -1316,5 +1314,41 @@ public sealed class GoalDetailPageTests : BunitContext
         Assert.Equal("Start new attempt", cut.Find(".ht-notice a").TextContent);
         Assert.Empty(cut.FindAll(".ht-page-head .ht-btn"));
         Assert.Equal(["Settings"], cut.FindAll(".ht-card__title").Select(Text));
+    }
+
+    // ---- slice 8: the Earlier attempts card (HP-001; T090, T092) ----
+
+    [Fact]
+    public void Slice_8_HP_001_a_restarted_goal_whose_attempt_2_has_begun_has_the_Earlier_attempts_card_after_the_right_columns_cards()
+    {
+        // "Meditation, 10 min daily" ended on Monday 16 November, restarted with unchanged settings from Tuesday 17
+        // November (today): attempt 1's Saturday 14 is Missed, and Sunday 15 is Pending until 00:00 on Wednesday 18.
+        var goal = MeditationAttempts.SeedRestarted(this, SignInUser(), MeditationAttempts.MinutesDaily(10), Today);
+
+        var cut = RenderGoal(goal);
+
+        var right = cut.FindAll(".ht-grid-2 > .ht-stack")[1];
+        Assert.Equal(["Settings", "Earlier attempts"], right.QuerySelectorAll(".ht-card__title").Select(Text));
+        var link = right.QuerySelector("a.ht-goal__name")!;
+        Assert.Equal(("Attempt 1 · 2 Nov – 15 Nov", $"/goals/{goal.Value}/attempts/1"), (link.TextContent, link.GetAttribute("href")));
+        Assert.Equal(["Attempt 1 · 2 Nov – 15 Nov", "Abandoned", "92% (12 of 13)"], right.QuerySelector(".ht-goal__top")!.Children.Select(Text));
+        // The same name as the goal's, and no note: nothing under the top line.
+        Assert.Empty(right.QuerySelectorAll(".ht-goal__meta"));
+        Assert.Equal("Attempt 2 · started 17 Nov", cut.Find(".ht-attempt").TextContent);
+    }
+
+    [Fact]
+    public void Slice_8_HP_001_a_restarted_goal_whose_attempt_2_has_not_begun_has_the_Earlier_attempts_card_under_Settings()
+    {
+        // US3-AS4: restarted with 5 minutes from Monday 23 November; attempt 1 is named by its own last settings.
+        var goal = MeditationAttempts.SeedRestarted(this, SignInUser(), MeditationAttempts.MinutesDaily(5), MeditationAttempts.Mon23);
+
+        var cut = RenderGoal(goal);
+
+        Assert.Equal("Attempt 2 · starts 23 Nov", cut.Find(".ht-attempt").TextContent);
+        var column = cut.Find(".ht-grid-2 > .ht-stack");
+        Assert.Equal(["Settings", "Earlier attempts"], column.QuerySelectorAll(".ht-card__title").Select(Text));
+        Assert.Equal(["Meditation, 10 min daily"], column.QuerySelectorAll(".ht-goal__meta").Select(Text));
+        Assert.Empty(cut.FindAll("table"));
     }
 }

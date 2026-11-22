@@ -381,4 +381,37 @@ public sealed class NoteDialogTests : BunitContext
         Assert.Equal("16 – 22 Nov · Due this week", cut.Find(".ht-dialog__sub").TextContent);
         Assert.Equal(Help, cut.Find(".ht-field__help").TextContent);
     }
+
+    // ---- slice 8: the attempt view as an opener (HP-014, US3-AS11, FR-014; T092) ----
+
+    [Fact]
+    public async Task HP_014_from_the_attempt_views_Add_note_the_dialog_is_fixed_to_attempt_1s_row_and_saves_its_note()
+    {
+        // "Meditation, 10 min daily" ended on Monday 16 November, restarted with unchanged settings from Wednesday 18
+        // November; attempt 1's History read on Monday 23 November at 12:00, as the attempt view reads it.
+        var goal = MeditationAttempts.SeedRestarted(this, _user, MeditationAttempts.MinutesDaily(10), MeditationAttempts.Wed18);
+        _clock.SetUtcNow(MeditationAttempts.Utc(23, 12));
+        var attempt = await MeditationAttempts.AttemptAsync(this, _user, goal, 1);
+        var row = attempt.History.Entries.Single(e => e.FirstDate == MeditationAttempts.Sat14);
+
+        var cut = Render<NoteDialog>(p => p
+            .Add(x => x.Open, true)
+            .Add(x => x.GoalId, goal)
+            .Add(x => x.GoalName, attempt.Attempt.Name)
+            .Add(x => x.History, attempt.History)
+            .Add(x => x.Row, row)
+            .Add(x => x.ActingUser, _user)
+            .Add(x => x.OnClose, () => _closed++)
+            .Add(x => x.OnSaved, entry => _saved.Add(entry)));
+
+        Assert.Equal("Add note · Meditation, 10 min daily", cut.Find(".ht-dialog__head h2").TextContent);
+        Assert.Equal("Sat 14 Nov · Missed", cut.Find(".ht-dialog__sub").TextContent);
+        cut.Find("textarea").Input("Travelling.");
+        await SaveAsync(cut);
+
+        var saved = Assert.Single(_saved);
+        Assert.Equal((MeditationAttempts.Sat14, EvaluationState.Missed, "Travelling."), (saved.FirstDate, saved.State, saved.Note));
+        Assert.Equal("Travelling.", _records.NotesOfGoal(goal)[MeditationAttempts.Sat14].Value);
+        Assert.DoesNotContain(_records.RecordsOfGoal(goal), r => r.Date == MeditationAttempts.Sat14);
+    }
 }

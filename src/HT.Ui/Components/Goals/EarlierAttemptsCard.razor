@@ -1,0 +1,70 @@
+@using HT.Application.Reports
+@using HT.Domain.Goals
+@* design/pages/PageGoalDetail, slice 8 state, the Earlier attempts card (HP-001, FR-014; contracts/host.md "Goal page"):
+   the goal's attempts as the page read them (AttemptService.GetAttemptsAsync, the latest first), each ended attempt
+   that is not the latest as one ht-goal item. On its top line: "Attempt {n} · {2 Nov} – {15 Nov}" (start date to last
+   date), or "Attempt {n} · ended before it began" for an attempt with no date (ReportText), as a link to its attempt
+   view (/goals/{id}/attempts/{n}); then the outcome Tag, always with its word; then the consistency as one text. Under
+   it the attempt's name (FR-004) only when it differs from the goal's current name, then the ending note in ht-muted
+   only when it has one. No card when there is no such attempt. The card builds no text and computes no figure. *@
+@if (_earlier.Count > 0)
+{
+    <HtCard Title="Earlier attempts">
+        @foreach (var (attempt, outcome) in _earlier)
+        {
+            <div class="ht-goal" @key="attempt.Number">
+                <div class="ht-goal__top">
+                    <a class="ht-goal__name" href="@($"/goals/{GoalId}/attempts/{attempt.Number}")">@Heading(attempt)</a>
+                    <Tag Text="@ReportText.OutcomeText(outcome)" />
+                    <span class="ht-goal__pct">@attempt.Stats.ConsistencyText</span>
+                </div>
+                @if (!string.Equals(attempt.Name, GoalName, StringComparison.Ordinal))
+                {
+                    <div class="ht-goal__meta">@attempt.Name</div>
+                }
+                @if (attempt.EndingNote is { } note)
+                {
+                    <div class="ht-goal__meta ht-muted">@note</div>
+                }
+            </div>
+        }
+    </HtCard>
+}
+
+@code {
+    /// <summary>Every attempt of the goal, the latest first, as <c>AttemptService.GetAttemptsAsync</c> gives them.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AttemptView> Attempts { get; set; } = [];
+
+    /// <summary>The goal's identifier, for the attempt view's address.</summary>
+    [Parameter, EditorRequired]
+    public Guid GoalId { get; set; }
+
+    /// <summary>The goal's current name: an attempt's name shows only when it differs.</summary>
+    [Parameter, EditorRequired]
+    public string GoalName { get; set; } = string.Empty;
+
+    /// <summary>The ended attempts that are not the goal's latest, with their outcome, in the order read (the latest first).</summary>
+    private IReadOnlyList<(AttemptView Attempt, Outcome Outcome)> _earlier = [];
+
+    protected override void OnParametersSet() => _earlier = EarlierOf(Attempts);
+
+    /// <summary>The card is shown only when the goal has an earlier attempt (HP-001).</summary>
+    public static bool HasEarlier(IReadOnlyList<AttemptView> attempts) => EarlierOf(attempts).Count > 0;
+
+    private static List<(AttemptView Attempt, Outcome Outcome)> EarlierOf(IReadOnlyList<AttemptView> attempts) =>
+    [
+        .. attempts
+            .Where(attempt => attempt is { IsLatest: false, Outcome: not null })
+            .Select(attempt => (attempt, attempt.Outcome!.Value)),
+    ];
+
+    /// <summary>
+    /// HP-001, HP-014: the span of the attempt's dates, or "ended before it began" for an attempt with no date; also the
+    /// attempt view's heading.
+    /// </summary>
+    public static string Heading(AttemptView attempt) =>
+        attempt.HasNoDate || attempt.LastDate is not { } last
+            ? ReportText.AttemptWithoutDate(attempt.Number)
+            : ReportText.AttemptSpan(attempt.Number, attempt.StartDate, last);
+}

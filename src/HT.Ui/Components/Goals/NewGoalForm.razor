@@ -16,14 +16,18 @@
    goal's period, without the kind's ChoiceCards or the period control); "Name (optional)" alone in its field pair; a
    refusal about no field as a role="alert" paragraph above the first section; above the actions the neutral Notice
    "Changes apply from …" (ReportText); "Save changes" and Cancel. The first field ("Build or reduce") gets the focus
-   when the form first renders interactively. *@
+   when the form first renders interactively.
+   Slice 8 attempt mode (design/pages/PageNewAttempt, HP-004, HP-009): no Habit section, no habit chooser and no name;
+   "When?" offers every schedule kind, as in creation; "Start date" alone in its field pair (the name's place stays
+   empty); a refusal about no field as a role="alert" paragraph above the first section, as in edit mode; "Start
+   attempt" and Cancel. The first field ("Build or reduce") gets the focus when the form first renders interactively. *@
 <div class="ht-grid-2">
-    <EditForm Model="Model" OnSubmit="OnSubmit" class="ht-card" FormName="@(EditMode ? "edit-goal" : "new-goal")" novalidate>
-        @if (EditMode && Refusal is { } refusal)
+    <EditForm Model="Model" OnSubmit="OnSubmit" class="ht-card" FormName="@Prefix" novalidate>
+        @if (!IsCreation && Refusal is { } refusal)
         {
             <p class="ht-field__error" role="alert">@refusal</p>
         }
-        @if (!EditMode)
+        @if (IsCreation)
         {
             <div class="ht-form-section">
                 <h2 class="ht-form-section__title">Habit</h2>
@@ -133,8 +137,8 @@
         else
         {
             <div class="ht-form-section">
-                <h2 class="ht-form-section__title" id="new-goal-when">When?</h2>
-                <ChoiceCard TValue="ScheduleKind" Name="new-goal-when" LabelledBy="new-goal-when" Options="Schedules"
+                <h2 class="ht-form-section__title" id="@(Prefix + "-when")">When?</h2>
+                <ChoiceCard TValue="ScheduleKind" Name="@(Prefix + "-when")" LabelledBy="@(Prefix + "-when")" Options="Schedules"
                             Value="Model.ScheduleKind" ValueChanged="v => Model.ScheduleKind = v" DescribedBy="@ErrorId(GoalField.Schedule)" />
                 @ErrorText(GoalField.Schedule)
                 @if (Model.ScheduleKind == ScheduleKind.FixedDays)
@@ -146,7 +150,7 @@
                 else if (Model.ScheduleKind == ScheduleKind.Times)
                 {
                     <div class="ht-inline">
-                        <Stepper Id="new-goal-times" Label="Times" Value="Model.Times" ValueChanged="v => Model.Times = v" Min="1" Max="20"
+                        <Stepper Id="@(Prefix + "-times")" Label="Times" Value="Model.Times" ValueChanged="v => Model.Times = v" Min="1" Max="20"
                                  Unit="@(Model.Times == 1 ? "time" : "times")"
                                  DescribedBy="@ErrorId(GoalField.Times)" Invalid="@(Error?.For(GoalField.Times) is not null)" />
                         <SegmentedControl TValue="SchedulePeriod" Label="Period" Options="Periods" Value="Model.Period"
@@ -164,23 +168,26 @@
                 <div class="ht-field-pair">
                     <label class="ht-field">
                         <span class="ht-field__label">Start date</span>
-                        <input class="ht-input" type="date" id="new-goal-start" value="@StartDateValue"
+                        <input class="ht-input" type="date" id="@(Prefix + "-start")" value="@StartDateValue"
                                aria-describedby="@ErrorId(GoalField.StartDate)" aria-invalid="@(Error?.For(GoalField.StartDate) is null ? null : "true")"
                                @onchange="OnStartDateChanged" />
                         @ErrorText(GoalField.StartDate)
                     </label>
-                    @NameField
+                    @if (!AttemptMode)
+                    {
+                        @NameField
+                    }
                 </div>
             </div>
         }
         <div class="ht-form-actions">
-            <HtButton Type="submit">@(EditMode ? "Save changes" : "Create goal")</HtButton>
+            <HtButton Type="submit">@(EditMode ? "Save changes" : AttemptMode ? "Start attempt" : "Create goal")</HtButton>
             <HtButton Variant="HtButton.ButtonVariant.Secondary" Href="@CancelHref">Cancel</HtButton>
         </div>
     </EditForm>
     <GoalSummaryCard Model="Model" />
 </div>
-@if (!EditMode)
+@if (IsCreation)
 {
     <HabitChooser Open="_chooserOpen" ActingUser="ActingUser" OnChoose="ChooseAsync" OnClose="CloseChooser" FocusOnClose="FocusHabitButtonAsync" />
 }
@@ -239,11 +246,24 @@
     [Parameter]
     public DateOnly? ChangesApplyFrom { get; set; }
 
-    /// <summary>Slice 8 edit mode: the text of a refusal about no field (the goal ended elsewhere, for example).</summary>
+    /// <summary>
+    /// Slice 8 edit and attempt modes: the text of a refusal about no field (the goal ended elsewhere, or was restarted
+    /// elsewhere, for example).
+    /// </summary>
     [Parameter]
     public string? Refusal { get; set; }
 
-    private string Prefix => EditMode ? "edit-goal" : "new-goal";
+    /// <summary>
+    /// Slice 8 (HP-004): the Start new attempt form of an ended goal instead of the New goal form: every schedule kind and
+    /// the start date, without the habit and the name.
+    /// </summary>
+    [Parameter]
+    public bool AttemptMode { get; set; }
+
+    /// <summary>The New goal form itself: neither the edit mode nor the attempt mode.</summary>
+    private bool IsCreation => !EditMode && !AttemptMode;
+
+    private string Prefix => EditMode ? "edit-goal" : AttemptMode ? "new-attempt" : "new-goal";
 
     private string? StartDateValue => Model.StartDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
@@ -255,10 +275,10 @@
         @ErrorText(GoalField.Name)
     </label>;
 
-    // HP-009: the edit form moves the focus to its first field when it first renders interactively.
+    // HP-009: the edit and attempt forms move the focus to their first field when they first render interactively.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && EditMode && _side is not null)
+        if (firstRender && !IsCreation && _side is not null)
         {
             await _side.FocusAsync();
         }

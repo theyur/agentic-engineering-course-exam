@@ -238,6 +238,25 @@ FR-007's check order and the success last: `NotSignedIn`, `NotForAdministrators`
 `LastDate` (`DateOnly?`) are set only for `Ended`. An `outcome` that is not a defined `Outcome` value gives
 `OutcomeMissing`, as a null one does. Neither the result nor a refusal carries the note.
 
+Settled in T079 and T080: `NewAttemptValuesResult`'s outcome enum is `NewAttemptValuesOutcome` and
+`AttemptStartResult`'s is `AttemptStartOutcome` (both in `GoalChangeResults.cs`), with the members in FR-011's and
+FR-012's check order and the success last: `NotSignedIn`, `NotForAdministrators`, `NotFound`, `NotEnded`, `Found`; and
+`NotSignedIn`, `NotForAdministrators`, `NotFound`, `NotEnded`, the target problems from `BuildOrReduceMissing` to
+`PeriodMissing`, `ReduceAmountNeedsOneTime`, `StartDateMissing`, `StartDateInPast`, `StartDateNotAfterEnding`,
+`StartDateTooFar`, `Started`. `NewAttemptValuesResult.Message` is null for `Found`, as for the other reads, and `Values`
+is set only then. `AttemptStartResult.Message` is never null ("attempt started" on success); `AttemptNumber` and
+`StartDate` (`int?`, `DateOnly?`) are set only for `Started`, and `Field` (`GoalField?`) only for the target refusals and
+the four start date refusals (`GoalDraft.FieldOf`, `StartDate` for the latter). `NewAttemptInput` is a sealed record
+with init-only `Target` (default empty) and `StartDate`, as `GoalInput`. `NewAttemptValues` is a sealed record:
+`BuildOrReduce`, `Measurement` and `ScheduleKind` are `required` and not nullable (a stored target always has them),
+`Amount`, `CountUnit`, `DurationUnit`, `Times` and `Period` are nullable as in `GoalStartingValues`, `Days` defaults to
+an empty set, and `StartDate` and `AttemptNumber` are `required`. The values come from
+`GoalTimeline.VersionInEffect(goal, latest number, now)`, which for an ended attempt is its last version. The start date
+checks live in `GoalChangeService` (no new Domain member, Locked AC code); `GoalService.TextOf` maps
+`StartDateNotAfterEnding` to `GoalChangeTexts.StartDateNotAfterEnding`. `GetNewAttemptValuesAsync` reads through
+`ReadOwnerGoalAsync` like the writes, so a goal or account gone between the access check and the read gives the same
+refusals.
+
 `NewAttemptValues` has:
 
 - the target fields of the ended attempt's last version, as `GoalStartingValues` gives them: `BuildOrReduce`,
@@ -357,6 +376,19 @@ Results:
 | `AttemptListResult` | `Found`, `NotSignedIn`, `NotForAdministrators`, `NotFound` | `Attempts`, latest first |
 | `AttemptReadResult` | `Found`, `NotSignedIn`, `NotForAdministrators`, `NotFound`, `AttemptNotFound` | `Details` |
 | `GoalHistoryListResult` | `Found`, `NotSignedIn`, `NotForAdministrators` | `Entries`: latest ending date first, then name (`HabitName.KeyOf`, ordinal), then attempt number |
+
+Settled in T081 and T082: the outcome enums are `AttemptListOutcome` (`NotSignedIn`, `NotForAdministrators`,
+`NotFound`, `Found`) and `AttemptReadOutcome` (`NotSignedIn`, `NotForAdministrators`, `NotFound`, `AttemptNotFound`,
+`Found`), in `src/HT.Application/Reports/AttemptResults.cs`, in the check order with the success last, as
+`GoalReportOutcome`. `Message` is null for `Found`; `AttemptListResult.Attempts` is empty and
+`AttemptReadResult.Details` null for a refusal. `AttemptView` and `AttemptDetails` are sealed records with init-only
+properties; the non-nullable ones are `required`. `AttemptView.Outcome` is `Outcome?` and `EndingNote` the trimmed text
+(`string?`). `AttemptDetails.Recent` holds the attempt's latest 30 ended results (the goal report's count). Its
+`History` holds the evaluated entries (first entry through the earlier of the last date and the goal's current date),
+newest first; when that range has more than 366 dates, it keeps the entries that overlap its newest 366 dates (from
+the end date − 365 to the end date, the end date being the last date, or the current date while not ended), as slice
+5's 366-day range keeps the weeks that overlap it. A number that is not one of the goal's attempts (0 and negative
+numbers included) gives `AttemptNotFound`. `GetGoalHistoryAsync` and `EndedAttemptView` come with US4.
 
 ### Internal: `GoalEvaluation` (changed)
 
