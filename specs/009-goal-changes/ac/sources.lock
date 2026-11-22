@@ -1,0 +1,11 @@
+{
+  "group": "sources",
+  "feature": "specs/009-goal-changes",
+  "files": {
+    "specs/009-goal-changes/acceptance.md": "ceea5cc6cd9994b3a4f3ed2083a673b21f1fda8ee1a8aefac5c4c8699ad9419b"
+  },
+  "spec": {
+    "path": "specs/009-goal-changes/spec.md",
+    "sha256": "df33615e97951d31acc1df894bf1f89dd3fd5f4b2ea3189d7f540c4a378b457d"
+  }
+}
