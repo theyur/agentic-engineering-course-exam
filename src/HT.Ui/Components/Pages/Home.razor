@@ -28,7 +28,9 @@
            administrator's Home has the page head only. A session whose account is gone gets no greeting, only the slice 1
            heading. Slice 7 (HP-005, FR-019): the "Active goals" tile counts and the card lists only the goals that are not
            paused (Counts.Goals; the DashboardGoals with no PausedUntil); a user whose goals are all paused still has goals,
-           so the EmptyState is chosen by the dashboard's goals, not by that count. *@
+           so the EmptyState is chosen by the dashboard's goals, not by that count. Slice 8 (design slice 8 state, T009): a
+           user whose goals are all ended also keeps the dashboard (Dashboard.EndedGoalCount), with the ended goals'
+           Pending rows in Today and an empty "Active goals" card, as for a user whose goals are all paused. *@
         <div class="ht-container">
             @if (_heading?.Heading is { } heading)
             {
@@ -40,7 +42,7 @@
             }
             @if (_dashboard?.Dashboard is { } dashboard)
             {
-                if (dashboard.Goals.Count == 0)
+                if (dashboard.Goals.Count == 0 && dashboard.EndedGoalCount == 0)
                 {
                     <NoGoalsEmptyState />
                 }

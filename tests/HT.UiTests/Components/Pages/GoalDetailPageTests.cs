@@ -1281,6 +1281,21 @@ public sealed class GoalDetailPageTests : BunitContext
     }
 
     [Fact]
+    public async Task Slice_8_an_ended_goals_Settings_card_has_no_sentence_about_changes()
+    {
+        // Owner decision on PR 45: an ended goal cannot be changed, so its Settings card keeps the rows only.
+        var (goal, owner) = OwnedReadingFromTue10();
+        Assert.Equal(GoalEndOutcome.Ended, (await EndThroughServiceAsync(owner, goal)).Outcome);
+
+        var cut = RenderGoal(goal);
+
+        var settings = cut.FindAll(".ht-card").Single(c => c.QuerySelector(".ht-card__title")?.TextContent == "Settings");
+        Assert.NotEmpty(Rows(cut));
+        Assert.Null(settings.QuerySelector(".ht-card__sub"));
+        Assert.DoesNotContain(Sentence, cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Slice_8_HP_001_the_attempt_line_of_a_waiting_attempt_2_says_starts_though_the_goal_has_started()
     {
         var (goal, owner) = OwnedReadingFromTue10();

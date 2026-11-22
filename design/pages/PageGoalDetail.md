@@ -156,7 +156,7 @@ Changed 2026-11-22 in the full preview, whose texts disagreed with the spec: the
   - when a later settings version exists (`GoalDetails.Later`), the row "From Thu 12 Nov" (`dt`, `ReportText`) with that version's target text ("20 min daily", `dd`), placed directly after the Target row, so the two targets read together (settled here, T003). The other rows show the settings in effect;
   - the start row shows the latest attempt's date: "Started" ("16 Nov 2026") once it has begun, "Starts" ("23 Nov 2026") while it has not. An ended goal whose latest attempt never began has no start row, so the card never announces a start under the Ended Notice.
 
-  Slice 4's sentence under the list, "Changes apply from the next commitment. Past results keep their rules.", stays as it is.
+  Slice 4's sentence under the list, "Changes apply from the next commitment. Past results keep their rules.", stays as it is on a goal that is not ended. An ended goal cannot be changed, so its card has no sentence (owner decision on PR 45).
 - **Ended goal** (`GoalDetails` with an ending):
   - no actions in the head: no "Record", "Edit settings", "Pause" or "End goal", and no `ht-spacer`;
   - directly under the head, the Notice (`ht-notice`, the invitation style, which may hold one button) with "Ended Mon 16 Nov · Abandoned" (`ReportText`), a separator "·" (`aria-hidden="true"`) and the action "Start new attempt" (`a.ht-btn.ht-btn--primary.ht-btn--sm`, a link to `/goals/{id}/new-attempt`, `pages/PageNewAttempt.md`), as slice 7's paused Notice holds "Resume now";

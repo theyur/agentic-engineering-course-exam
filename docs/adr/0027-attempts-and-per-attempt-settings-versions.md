@@ -1,7 +1,8 @@
 # 0027 — Attempts and per-attempt settings versions: a goal holds its attempts, each with its own versions
 
-**Status:** Accepted, 2026-11-22. Decided in the plan of slice 8, `specs/009-goal-changes` (research R-01 and
-R-05; plan, Constitution Check "Decision Discipline"), and written in its design step before any code. Applies
+**Status:** Accepted, 2026-11-22, by the owner with the plan of slice 8. Comes from the plan of slice 8,
+`specs/009-goal-changes` (research R-01 and R-05; plan, Constitution Check "Decision Discipline"), and was written
+in its design step before any code. Applies
 [ADR 0025](0025-goal-change-rules.md) (a change keeps the schedule kind; a new attempt may have any settings; an
 ending keeps the attempt's first version) to the Domain model and the storage. Keeps
 [ADR 0016](0016-time-zones.md) (settings versions with their time zone, at most one waiting after the current

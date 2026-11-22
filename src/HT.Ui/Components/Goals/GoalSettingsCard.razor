@@ -9,10 +9,14 @@
    Slice 8 state (HP-001, contracts/host.md "Settings card"): the rows show the settings in effect; when a later
    version exists (GoalDetails.Later), the row "From Thu 12 Nov" (ReportText.From) with its target text follows the
    Target row. The start row shows the latest attempt's date: "Started" or "Starts" from AttemptHasBegun with
-   AttemptStartDate; an ended goal whose latest attempt never began has no start row. *@
+   AttemptStartDate; an ended goal whose latest attempt never began has no start row. An ended goal cannot be changed,
+   so its card has no sentence about changes (owner decision on PR 45). *@
 <HtCard Title="Settings">
     <KeyValue Rows="Rows" />
-    <p class="ht-card__sub">Changes apply from the next commitment. Past results keep their rules.</p>
+    @if (!Details.IsEnded)
+    {
+        <p class="ht-card__sub">Changes apply from the next commitment. Past results keep their rules.</p>
+    }
 </HtCard>
 
 @code {

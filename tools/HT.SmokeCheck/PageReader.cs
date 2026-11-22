@@ -146,7 +146,7 @@ public static partial class PageReader
     public static IReadOnlyList<string> ReadStatusChips(string html) => ReadLeafTexts(html, StatusChipPattern());
 
     /// <summary>
-    /// The text of every attempt line, in document order: each element whose class list holds <c>ht-attempt</c>, such as
+    /// The text of every attempt line, in document order: each <c>&lt;span&gt;</c> whose class list holds <c>ht-attempt</c>, such as
     /// "Attempt 2 · started 8 Nov" under the goal page's title (smoke check 9, slice 8 HP-012).
     /// </summary>
     public static IReadOnlyList<string> ReadAttemptLines(string html) => ReadLeafTexts(html, AttemptLinePattern());
@@ -276,7 +276,7 @@ public static partial class PageReader
     [GeneratedRegex("""<(?<tag>[a-z][a-z0-9]*)\b[^>]*\bclass="(?:[^"]*\s)?ht-status(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</\k<tag>\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex StatusChipPattern();
 
-    [GeneratedRegex("""<(?<tag>[a-z][a-z0-9]*)\b[^>]*\bclass="(?:[^"]*\s)?ht-attempt(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</\k<tag>\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    [GeneratedRegex("""<span\b[^>]*\bclass="(?:[^"]*\s)?ht-attempt(?:\s[^"]*)?"[^>]*>(?<inner>.*?)</span\s*>""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex AttemptLinePattern();
 
     [GeneratedRegex("""<table\b(?<attributes>[^>]*\bclass="(?:[^"]*\s)?ht-table(?:\s[^"]*)?"[^>]*)>""", RegexOptions.IgnoreCase)]

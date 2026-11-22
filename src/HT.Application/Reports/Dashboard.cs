@@ -110,6 +110,13 @@ public sealed record Dashboard
     /// <summary>Every goal that is not ended (slice 8 FR-019), in FR-011's order.</summary>
     public required IReadOnlyList<DashboardGoal> Goals { get; init; }
 
+    /// <summary>
+    /// The number of the user's ended goals, which <see cref="Goals"/> leaves out (slice 8 FR-019). A user whose goals are
+    /// all ended still has goals, so the Home keeps its dashboard for them (design/pages/PageHomeSignedIn, slice 8
+    /// state, T009).
+    /// </summary>
+    public int EndedGoalCount { get; init; }
+
     /// <summary>At most 5, by first date descending, ties in goal order; none of an ended goal (slice 8 FR-019).</summary>
     public required IReadOnlyList<DashboardNote> Notes { get; init; }
 

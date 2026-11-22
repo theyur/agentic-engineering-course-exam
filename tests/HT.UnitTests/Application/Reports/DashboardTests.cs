@@ -353,6 +353,7 @@ public sealed class DashboardTests
         Assert.Equal(new DashboardCounts { Due = 0, Pending = 0, MissedThisWeek = 0, Goals = 0 }, dashboard.Counts);
         Assert.Empty(dashboard.Today);
         Assert.Empty(dashboard.Goals);
+        Assert.Equal(0, dashboard.EndedGoalCount);
         Assert.Empty(dashboard.Notes);
     }
 

@@ -120,7 +120,7 @@ with its own cookies on every call.
     `a.ht-goalitem__name` names (`PageReader.ReadGoalNames`).
   - The pages of "Meditation, 5 min daily" (position 2) and "Reading, 20 min daily" (position 1) are reached as checks 6
     to 8 reach their goal pages, from `GET /goals` (the Active tab, where both are listed).
-  - On "Meditation"'s page an attempt line (`PageReader.ReadAttemptLines`: the text of every element with the class
+  - On "Meditation"'s page an attempt line (`PageReader.ReadAttemptLines`: the text of every `<span>` with the class
     `ht-attempt`, the line under the title) must start with "Attempt 2 · started " (ordinal); the Earlier attempts card
     and the History card cannot satisfy it.
   - On "Reading"'s page the Settings card's text (`PageReader.ReadCardText(html, "Settings")`) must hold "From " with

@@ -36,7 +36,8 @@ III).
   {Thu 12 Nov}" with the later target text. Its start row shows the latest attempt's date, as the design does:
   "Started" or "Starts" from `AttemptHasBegun` with `AttemptStartDate`, not `HasStarted` with `StartDate`. An ended
   goal whose latest attempt has not begun has no start row, so the card never announces a start under the Ended
-  Notice (AC-035's goal).
+  Notice (AC-035's goal). An ended goal's card has no sentence "Changes apply from the next commitment. Past results
+  keep their rules.", since an ended goal cannot be changed (owner decision on PR 45).
 - **Ended goal**:
   - under the head, the Notice "Ended {Mon 16 Nov} · {Abandoned}" with the action "Start new attempt" (links to
     `/goals/{id}/new-attempt`);
@@ -134,6 +135,9 @@ III).
   - "Attempt {n}" for a row whose attempt is not the goal's latest (`IsLatestAttempt` false);
   - otherwise "Ended" for a row of an ended goal (`TodayEntry.GoalEnded`).
 - The other tiles, the Active goals card and recent notes leave ended goals out (FR-019). Nothing else changes.
+- A user whose goals are all ended keeps the dashboard, as a user whose goals are all paused does: the ended goals'
+  Pending rows in Today and an empty Active goals card, not the EmptyState "No goals yet" (`Dashboard.EndedGoalCount`;
+  design slice 8 state, T009).
 
 ## Shared texts (HP-008)
 

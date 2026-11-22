@@ -62,6 +62,7 @@ public sealed class EndedGoalListsTests
         // Pending: Reading's and Meditation's 14 and 15 November; Due: Reading's and Sugar's 16 November.
         Assert.Equal((2, 4, 2), (dashboard.Counts.Due, dashboard.Counts.Pending, dashboard.Counts.Goals));
         Assert.Equal([ReadingName, SugarName], dashboard.Goals.Select(g => g.Name));
+        Assert.Equal(1, dashboard.EndedGoalCount);
         Assert.DoesNotContain(dashboard.Notes, n => n.GoalId == goals.Meditation);
     }
 
@@ -79,6 +80,7 @@ public sealed class EndedGoalListsTests
         // nor counted.
         Assert.Equal(2, dashboard.Counts.MissedThisWeek);
         Assert.Equal(2, dashboard.Counts.Goals);
+        Assert.Equal(1, dashboard.EndedGoalCount);
     }
 
     [Fact]

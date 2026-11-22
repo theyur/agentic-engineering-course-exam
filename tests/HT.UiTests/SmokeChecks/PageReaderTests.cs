@@ -328,7 +328,7 @@ public sealed class PageReaderTests
         const string html = """
             <div class="ht-page-head ht-detail-head"><div><h1>Meditation, 5 min daily</h1>
             <div class="ht-inline ht-head-tags"><span class="ht-chip">Build</span><span class="ht-attempt">Attempt 2 &#xB7; started 8 Nov</span></div></div></div>
-            <div class="extra ht-attempt"><b>Attempt</b> 1 · ended before it began</div>
+            <span class="extra ht-attempt"><b>Attempt</b> 1 · ended before it began</span>
             <span class="ht-attempts">Attempt 3 · started 1 Dec</span>
             <span class="ht-chip">Attempt 2</span>
             """;

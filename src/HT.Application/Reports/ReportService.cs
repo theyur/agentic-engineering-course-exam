@@ -218,6 +218,7 @@ public sealed class ReportService
             },
             Today = [.. pending, .. due, .. missedThisWeek, .. upcoming],
             Goals = goals,
+            EndedGoalCount = ordered.Count(evaluation => evaluation.Goal.IsEnded),
             Notes = notes,
             AccountToday = today,
             WeekStarts = weekStarts,
