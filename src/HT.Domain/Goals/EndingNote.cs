@@ -11,9 +11,6 @@ namespace HT.Domain.Goals;
 /// </summary>
 public readonly record struct EndingNote
 {
-    /// <summary>What <see cref="ToString"/> returns in place of the text.</summary>
-    private const string Placeholder = "[ending note]";
-
     private EndingNote(string value) => Value = value;
 
     /// <summary>The trimmed text.</summary>
@@ -44,5 +41,5 @@ public readonly record struct EndingNote
     }
 
     /// <summary>A fixed placeholder, never the text (HP-010).</summary>
-    public override string ToString() => Placeholder;
+    public override string ToString() => "[ending note]";
 }
